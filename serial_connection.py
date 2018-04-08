@@ -71,7 +71,7 @@ class SerialCommunication:
         return None
 
 
-    def disconnect(self):
+    def close(self):
         """Closes the serial port"""
         self.comm.close()
         
