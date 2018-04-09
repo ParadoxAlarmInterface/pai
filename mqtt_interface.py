@@ -9,7 +9,6 @@ from config import *
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
-
 class MQTTInterface():
     """Interface Class using MQTT"""
 
@@ -21,6 +20,10 @@ class MQTTInterface():
         self.mqtt.on_disconnect = self.handle_disconnect
         self.connected = False
         self.alarm = None
+
+        #Local cache
+        self.zones = [dict()] * ZONES
+        self.partitions = [dict()] * PARTITIONS
 
     def set_alarm(self, alarm):
         self.alarm = alarm
@@ -146,9 +149,64 @@ class MQTTInterface():
             message,
             raw))
 
+        event = raw['major'][0]
+        subevent = raw['minor'][0]
+
+        change = dict()
+        # ZONES
+        if event in (0, 1):
+            change=dict(open=(event == 1))
+        elif event == 35: # TODO: Toggle bypass
+            pass
+        elif event in (36, 38):
+            change=dict(alarm=(event==36))
+        elif event in (37, 39):
+            change=dict(fire_alarm=(event==37))
+        elif event == 41:
+            change=dict(shutdown=True)
+        elif event in (42, 43):
+            change=dict(tamper=(event==42))
+        elif event in (49, 50):
+            change=dict(low_battery=(event==49))
+        elif event in (51, 52):
+            change=dict(supervision_trouble=(event==51))
+        
+        # PARTITIONS
+        elif event == 2:
+            if subevent in (2, 3, 4, 5, 6):
+                change=dict(alarm=True)
+            elif subevent == 7:
+                change = dict(alarm=False)
+            elif subevent == 11:
+                change = dict(arm=False, arm_full=False, arm_sleep=False, arm_stay=False, alarm=False)
+            elif subevent == 12:
+                change = dict(arm=True)
+        elif event == 3:
+            if subevent in (0, 1):
+                change=dict(bell=(subevent==1))
+        elif event == 6:
+            if subevent == 3:
+                change = dict(arm=True, arm_full=False, arm_sleep=False, arm_stay=True, alarm=False)
+            elif subevent == 4:
+                change = dict(arm=True, arm_full=False, arm_sleep=True, arm_stay=False, alarm=False)  
+        
+        # Wireless module
+        elif event in (53, 54):
+            change = dict(supervision_trouble=(event==53))
+        elif event in (53, 56):
+            change = dict(tampber_trouble=(event==55))
+            
+        for k,v in change.items():
+            self.mqtt.publish("{}/{}/{}/{}/{}".format(MQTT_BASE_TOPIC,
+                                    MQTT_EVENTS_TOPIC,
+                                    element, 
+                                    label,
+                                    k),
+                                v, 0, MQTT_RETAIN)
+
         if MQTT_PUBLISH_RAW_EVENTS:
             raw['time'] = "{}".format(datetime.datetime.now())
-            self.mqtt.publish('{}/{}/{}'.format(MQTT_BASE_TOPIC,
+            self.mqtt.publish('{}/{}'.format(MQTT_BASE_TOPIC,
                                                 MQTT_EVENTS_TOPIC,
                                                 MQTT_RAW_TOPIC),
                               json.dumps(raw), 0, MQTT_RETAIN)

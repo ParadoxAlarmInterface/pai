@@ -8,6 +8,8 @@ import logging
 LOGGING_LEVEL_CONSOLE = logging.INFO
 LOGGING_LEVEL_FILE = logging.ERROR
 LOGGING_FILE = None #or set to file path LOGGING_FILE='/var/log/paradox.log'
+LOGGING_DUMP_PACKETS = False
+LOGGING_DUMP_MESSAGES = False
 
 # Connection Type
 CONNECTION_TYPE = 'Serial'  #Only serial for now

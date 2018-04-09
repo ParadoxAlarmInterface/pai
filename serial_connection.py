@@ -2,16 +2,17 @@ import serial
 import logging
 import time
 
+logger = logging.getLogger('PAI').getChild(__name__)
+
 class SerialCommunication:    
-    def __init__(self, port, logger=logging.getLogger()):
+    def __init__(self, port):
         self.serialport = port
         self.comm = None
-        self.logger = logger
 
     def connect(self, baud=9600, timeout=1):
         """Connects the serial port"""
 
-        self.logger.debug( "Opening Serial port: {}".format(self.serialport))
+        logger.debug( "Opening Serial port: {}".format(self.serialport))
         self.comm = serial.Serial()
         self.comm.baudrate = baud
         self.comm.port =  self.serialport
@@ -19,10 +20,10 @@ class SerialCommunication:
 
         try:
             self.comm.open()
-            self.logger.debug( "Serial port open!")
+            logger.debug( "Serial port open!")
             return True
         except:
-            self.logger.exception("Error opening port {}".format(self.serialport))
+            logger.exception("Error opening port {}".format(self.serialport))
             return False
 
 
@@ -33,7 +34,7 @@ class SerialCommunication:
             self.comm.write(data)
             return True
         except:
-            self.logger.exception("Error writing to serial port")
+            logger.exception("Error writing to serial port")
             return False
         
     def read(self, sz=37, timeout=5):        
