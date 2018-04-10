@@ -124,7 +124,7 @@ class MQTTInterface():
                           bind_address=MQTT_BIND_ADDRESS)
         
         self.mqtt.loop_start()
-
+        return True
 
     def stop(self):
         if self.connected:
