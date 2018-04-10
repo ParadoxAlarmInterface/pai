@@ -59,6 +59,14 @@ class SerialCommunication:
             while not self.checksum(data) and len(data) >= 37:
                 data = data[1:]
             
+            i = 0
+            while i < 37 and data[i] == 0:
+                i= i+1
+            
+            if i == 37:
+                data= data[37:]
+                continue
+
             if not self.checksum(data):
                 if self.comm.in_waiting > 0:
                     read_sz = self.comm.in_waiting
@@ -70,7 +78,9 @@ class SerialCommunication:
             return data
             
         return None
-
+    
+    def timeout(self, timeout=5):
+        self.comm.timeout=timeout
 
     def close(self):
         """Closes the serial port"""

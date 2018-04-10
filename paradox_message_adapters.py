@@ -32,6 +32,24 @@ class PartitionStateAdapter(Adapter):
 
       return 0
 
+class ZoneStateAdapter(Adapter):
+    states = dict(bypass=0x10)
+
+    def _decode(self, obj, context, path):
+
+        for k,v in enumerate(self.states):
+          if v == obj[0]:
+            return k
+
+        return "unknown"
+
+    def _encode(self, obj, context, path):
+      if obj in self.states:
+        return self.states[obj]
+
+      return 0
+
+
 class ZoneOpenStatusAdapter(Adapter):
 
     def _decode(self, obj, context, path):
