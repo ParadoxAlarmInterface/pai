@@ -14,24 +14,28 @@ from paradox import Paradox
 
 class InterfaceHandler():
     def __init__(self):
-        self.interfaces = {}
+        self.interfaces = []
 
-    def register(self, name, object):
-        self.interfaces[name] = object
+    def register(self, name, object, initial=False):
+        self.interfaces.append(dict(name=name,object=object,initial=initial))
 
     def event(self, raw):
-        for k,v in self.interfaces.items():
+        for interface in self.interfaces:
             try:
-                v.event(raw)
+                interface['object'].event(raw)
             except:
-                logger.error("Error dispatching event to interface {}".format(k))
+                logger.exception("Error dispatching event to interface {}".format(interface['name']))
 
-    def change(self, element, label, property, value):
-        for k,v in self.interfaces.items():
+    def change(self, element, label, property, value, initial=False):
+        for interface in self.interfaces:
+            
+            if not interface['initial'] and initial:
+                continue
+
             try:
-                v.change(element, label, property, value)
+                interface['object'].change(element, label, property, value)
             except:
-                logger.error("Error dispatching change to interface {}".format(k))
+                logger.exception("Error dispatching change to interface {}".format(interface['name']))
 
 def main():
     logger.info("Starting Paradox Alarm Interface")
@@ -46,7 +50,7 @@ def main():
             from mqtt_interface import MQTTInterface
             interface = MQTTInterface()
             if interface.start():
-                interface_handler.register('mqtt', interface)
+                interface_handler.register('mqtt', interface, initial=True)
         except:
             logger.error("Unable to start MQTT Interface")
 
@@ -57,7 +61,7 @@ def main():
             from pushbullet_interface import PushBulletInterface
             interface = PushBulletInterface()
             if interface.start():
-                interface_handler.register('pushbullet', interface)
+                interface_handler.register('pushbullet', interface, initial=False)
         except:
             logger.exception("Unable to start Pushbullet Interface")
 

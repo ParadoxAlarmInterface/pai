@@ -212,17 +212,17 @@ class Paradox:
         for i in range(1, len(self.partitions)):
             partition = self.partitions[i]
             for k, v in partition.items():
-                self.interface.change('partition', i, k, v)
+                self.interface.change('partition', self.partitions[i]['label'], k, v, initial=True)
 
         for i in range(1, len(self.zones)):
             zone = self.zones[i]
             for k, v in zone.items():
-                self.interface.change('zone', i, k, v)
+                self.interface.change('zone', self.zones[i]['label'], k, v, initial=True)
 
         for i in range(1, len(self.outputs)):
             output = self.outputs[i]
             for k, v in output.items():
-                self.interface.change('output', i, k, v)
+                self.interface.change('output', self.outputs[i]['label'], k, v, initial=True)
 
         # DUMP Labels to console
         logger.debug("Labels updated")
@@ -260,7 +260,7 @@ class Paradox:
             payload = reply.fields.value.data
 
             for j in [0, 16]:
-                label = payload[j:j + 16].strip().decode('latin')
+                label = payload[j:j + 16].strip().decode('latin').replace(" ","_")
 
                 if label not in labelDict.keys() and len(labelList) - 1 < limit:
                     properties = template.copy()
@@ -407,7 +407,7 @@ class Paradox:
         logger.debug("Handle Event: {}".format(event))
 
         major = event['major'][0]
-        minor = ": {}".format(event['minor'][0])
+        minor = event['minor'][0]
 
         change = None
         # ZONES
@@ -452,7 +452,7 @@ class Paradox:
         elif major in (53, 56):
             change = dict(tamper_trouble=(major==55))
 
-        new_event = {'major': event['major'], 'minor': event['minor'] }
+        new_event = {'major': event['major'], 'minor': event['minor'], 'type': event['type'] }
         number = event['minor'][0]
         
         if change is not None:
@@ -488,7 +488,9 @@ class Paradox:
         if message.fields.value.po.command != 0x05:
             return
         
-        logger.debug("Handle Status: {}".format(message))
+        logger.debug("Handle Status")
+        if LOGGING_DUMP_MESSAGES:
+            logger.debug("{}".format(message))
 
         if message.fields.value.address == 0:
             self.power.update(

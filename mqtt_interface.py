@@ -145,8 +145,9 @@ class MQTTInterface():
 
     def event(self, raw):
         """Handle Live Event"""
-        logger.debug("Live Event: raw={}".format(
-            raw))
+        #logger.debug("Live Event: raw={}".format(
+        #    raw))
+        
 
         if MQTT_PUBLISH_RAW_EVENTS:
             self.mqtt.publish('{}/{}'.format(MQTT_BASE_TOPIC,
@@ -156,11 +157,20 @@ class MQTTInterface():
 
     def change(self, element, label, property, value):
         """Handle Property Change"""
-        logger.debug("Property Change: element={}, label={}, property={}, value={}".format(
-            element,
-            label,
-            property,
-            value))
+        #logger.debug("Property Change: element={}, label={}, property={}, value={}".format(
+        #    element,
+        #    label,
+        #    property,
+        #    value))
+        
+        if MQTT_IGNORE_UNNAMED_PARTITIONS and label.startswith('Partition_'):
+            return
+
+        if MQTT_IGNORE_UNNAMED_ZONES and label.startswith('Zone_'):
+            return
+
+        if MQTT_IGNORE_UNNAMED_OUTPUTS and label.startswith('Output_'):
+            return
 
         self.mqtt.publish('{}/{}/{}/{}/{}'.format(MQTT_BASE_TOPIC,
                                             MQTT_EVENTS_TOPIC,

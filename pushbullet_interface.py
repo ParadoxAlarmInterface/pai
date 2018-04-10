@@ -34,6 +34,8 @@ class PushBulletWSClient(WebSocketBaseClient):
         """ Callback trigger when connection succeeded"""
         logger.info("Handshake OK")
         self.manager.add(self)
+        for chat in self.pb.chats:
+            logger.debug("Associated contacts: {}".format(chat))
 
         # Receiving pending messages
         self.received_message(json.dumps({"type": "tickle", "subtype": "push"}))
@@ -83,13 +85,13 @@ class PushBulletWSClient(WebSocketBaseClient):
             
         self.close()
 
-    def send_message(self, destination, msg, dstchat=None):    
-        for chat in pb.chats:
-            # TODO: Only send to correct contacts
-            try:
-                self.pb.push_note("paradox", msg, chat=chat)
-            except:
-                logger.exception("Sending message")
+    def send_message(self, msg, dstchat=None):    
+        for chat in self.pb.chats:
+            if chat.email in PUSHBULLET_CONTACTS:
+                try:
+                    self.pb.push_note("paradox", msg, chat=chat)
+                except:
+                    logger.exception("Sending message")
 
     def send_command(self, message):
         """Handle message received from the MQTT broker"""
@@ -156,26 +158,28 @@ class PushBulletWSClient(WebSocketBaseClient):
 
     def event(self, raw):
         """Handle Live Event"""
-        logger.debug("Live Event: raw={}".format(raw))
+        #logger.debug("Live Event: raw={}".format(raw))
 
         # TODO Improve message display
         if raw['type'] == 'Partition' or raw['type'] == 'System' or raw['type'] == 'Trouble':
-            self.pb_ws.send_message(json.dumps(raw))
+            self.send_message(json.dumps(raw))
         
 
     def change(self, element, label, property, value):
         """Handle Property Change"""
-        logger.debug("Property Change: element={}, label={}, property={}, value={}".format(
-            element,
-            label,
-            property,
-            value))
+        #logger.debug("Property Change: element={}, label={}, property={}, value={}".format(
+        #    element,
+        #    label,
+        #    property,
+        #    value))
         
         # TODO Improve message display
         if element == 'partition' or element == 'system' or element == 'trouble':
-            self.pb_ws.send_message("{} {} {} {}".format(element, label, property, value))
+            self.send_message("{} {} {} {}".format(element, label, property, value))
 
        
+    def set_alarm(self, alarm):
+        self.alarm = alarm
 
 class PushBulletInterface():
     """Interface Class using Pushbullet"""
@@ -183,8 +187,6 @@ class PushBulletInterface():
     def __init__(self):        
         self.pb = None
         self.pb_ws = None
-        self.ws_manager = None
-        self.connected = False
         self.alarm = None
 
     def set_alarm(self, alarm):
@@ -204,7 +206,16 @@ class PushBulletInterface():
         except:
             logger.exception("PB")
         return False
-        
+    
+    def set_alarm(self, alarm):
+        self.pb_ws.set_alarm(alarm)
+
     def stop(self):
         """ Stops the Pushbullet interface"""
         self.pb_ws.terminate()
+    
+    def event(self, raw):
+        self.pb_ws.event(raw)
+
+    def change(self, element, label, property, value):
+        self.pb_ws.change(element, label, property, value)
