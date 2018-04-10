@@ -22,10 +22,9 @@ class SerialCommunication:
             self.comm.open()
             logger.debug( "Serial port open!")
             return True
-        except:
-            logger.exception("Error opening port {}".format(self.serialport))
+        except Exception as e:
+            logger.error(e)
             return False
-
 
     def write(self, data):
         """Write data to serial port"""
