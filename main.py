@@ -55,7 +55,6 @@ def main():
         try:
             logger.info("Using Pushbullet Interface")
             from pushbullet_interface import PushBulletInterface
-            from pushbullet import Pushbullet
             interface = PushBulletInterface()
             if interface.start():
                 interface_handler.register('pushbullet', interface)
