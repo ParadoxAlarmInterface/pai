@@ -1,10 +1,11 @@
 # PAI - Paradox Alarm Interface
 
-Python-based 'middleware' that aims to use any method to connect to a Paradox Alarm, exposing the interface for monitoring and control via an MQTT Broker. 
+Python-based 'middleware' that aims to use any method to connect to a Paradox Alarm, exposing the interface for monitoring and control via several methods.
 
 This is a complete rewrite from [ParadoxMulti-MQTT](https://github.com/jpbarraca/ParadoxMulti-MQTT)
 
-___Alfa stage! Expect bugs.___
+It supports panels connected through a serial port, which is present in all panels, or through a USB 307 module.
+
 
 Tested in the following environment:
 
@@ -15,7 +16,16 @@ Tested in the following environment:
 * Paradox MG5050 panel
 
 
-# Acknowledgments
+## Structure
+
+* __Paradox__: Object that interfaces with the panel and keeps some internal state. Accepts commands to control partitions, zones and outputs. Exposes changes and events
+
+* __Interfaces__: Expose interfaces to the outside world. Currently MQTT and Pushbullet are supported, but other are planned and almost any other is supported.
+
+* __Connections__: Handle communication with the panel, at a lower level. Currently, only Serial connections are supported.
+
+
+## Acknowledgments
 
 This work is inspired or uses parts from the following projects:
 

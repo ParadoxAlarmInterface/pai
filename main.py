@@ -12,10 +12,55 @@ logger.setLevel(LOGGING_LEVEL_CONSOLE)
 
 from paradox import Paradox
 
+class InterfaceHandler():
+    def __init__(self):
+        self.interfaces = {}
+
+    def register(self, name, object):
+        self.interfaces[name] = object
+
+    def event(self, raw):
+        for k,v in self.interfaces.items():
+            try:
+                v.event(raw)
+            except:
+                logger.error("Error dispatching event to interface {}".format(k))
+
+    def change(self, element, label, property, value):
+        for k,v in self.interfaces.items():
+            try:
+                v.change(element, label, property, value)
+            except:
+                logger.error("Error dispatching change to interface {}".format(k))
 
 def main():
     logger.info("Starting Paradox Alarm Interface")
     logger.info("Console Log level set to {}".format(LOGGING_LEVEL_CONSOLE))
+
+    interface_handler = InterfaceHandler()
+
+    # Load an interface for exposing data and accepting commands
+    if MQTT_HOST != "":
+        try:
+            logger.info("Using MQTT Interface")
+            from mqtt_interface import MQTTInterface
+            interface = MQTTInterface()
+            if interface.start():
+                interface_handler.register('mqtt', interface)
+        except:
+            logger.error("Unable to start MQTT Interface")
+
+    # Load Pushbullet service
+    if len(PUSHBULLET_SECRET) > 0 and len(PUSHBULLET_CONTACTS) > 0 and len(PUSHBULLET_CONTACTS) > 0:
+        try:
+            logger.info("Using Pushbullet Interface")
+            from pushbullet_interface import PushBulletInterface
+            interface = PushBulletInterface()
+            if interface.start():
+                interface_handler.register('pushbullet', interface)
+        except:
+            logger.exception("Unable to start Pushbullet Interface")
+
     # Load a connection to the alarm
     if CONNECTION_TYPE == "Serial":
         logger.info("Using Serial Connection")
@@ -29,21 +74,12 @@ def main():
         logger.error("Invalid connection type: {}".format(CONNECTION_TYPE))
         sys.exit(-1)
 
-    # Load an interface for exposing data and accepting commands
-    if MQTT_HOST != "":
-        logger.info("Using MQTT Interface")
-        from mqtt_interface import MQTTInterface
-        interface = MQTTInterface()
-        interface.start()
-    else:
-        logger.error("No Interface specified")
-        sys.exit(-1)
 
     logger.info("Starting...")
     # Start interacting with the alarm
     while True:
         try:
-            alarm = Paradox(connection=connection, interface=interface)
+            alarm = Paradox(connection=connection, interface=interface_handler)
             if alarm.connect():
                 interface.set_alarm(alarm)
                 alarm.loop()

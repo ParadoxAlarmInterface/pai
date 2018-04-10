@@ -118,6 +118,10 @@ Initialization = Struct("fields" / RawCopy(
             DIGIPLEX_EVO_48=3,
             DIGIPLEX_EVO_96=4,
             DIGIPLEX_EVO_192=5,
+            SPECTRA_SP5500=21,
+            SPECTRA_SP6000=22,
+            SPECTRA_SP7000=23,
+            MAGELLAN_MG5000=64,
             MAGELLAN_MG5050=65), "software" / Struct(
                 "version" / Int8ub, "revision" / Int8ub, "id" / Int8ub),
         "module_id" / Int16ub, "module_password" / Bytes(2),
