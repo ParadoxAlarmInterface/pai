@@ -47,7 +47,13 @@ def parse(message):
 
     elif message[0] >> 4 == 0x0e:
         return LiveEvent.parse(message)
+    elif message[0] >> 4 == 0x04:
+        return MonitoringResponse.parse(message)
     else:
+        print("Unknown message")
+        for c in message:
+            print("{:02x} ".format(c), end='')
+        print()
         return None
 
 
@@ -259,9 +265,11 @@ UploadResponseStatus1 = Struct(
                    "reserved0" / BitsInteger(5),
                    "eeprom_b17" / Flag,
                    "eeprom_b16" / Flag,
-               ), "bus_address" / Int8ub, "address" / Int8ub,
-               "reserved0" / Bytes(14), "partition_status" /
-               PartitionStatusAdapter(Bytes(8)), "reserved0" / Bytes(10))),
+               ), 
+               "bus_address" / Int8ub, "address" / Int8ub,
+               "reserved0" / Bytes(14), 
+               "partition_status" /PartitionStatusAdapter(Bytes(8)), 
+               "reserved0" / Bytes(10))),
     "checksum" / Checksum(
         Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
@@ -309,8 +317,39 @@ PartitionStateCommand = Struct("fields" / RawCopy(
         "reserved0" / Default(Int8ub, 0),
         "state" / PartitionStateAdapter(Bytes(1)),
         "partition" / ExprAdapter(Byte, obj_ + 1, obj_ - 1),
-    )), "reserved0" / Bytes(32), "checksum" / Checksum(
+    )), "reserved0" / Padding(32), "checksum" / Checksum(
         Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
+ZoneStateCommand = Struct("fields" / RawCopy(
+    Struct(
+        "po" / BitStruct(
+            "command" / Const(0x4, Nibble),
+            "reserved0" / Default(Nibble, 0),
+        ),
+        "reserved0" / Default(Int8ub, 0),
+        "state" / Const(0x10, Int8ub),
+        "zone" / ExprAdapter(Byte, obj_ + 1, obj_ - 1),
+        "reserved1" / Default(Int8ub, 0x04),
+    )), 
+    "reserved0" / Padding(31), 
+    "checksum" / Checksum(
+    Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
+MonitoringResponse = Struct("fields" / RawCopy(
+    Struct(
+        "po" / BitStruct(
+            "command" / Const(0x4, Nibble), "message_center" / Struct(
+                "reserved" / Flag, "alarm_reporting_pending" / Flag,
+                "Windload_connected" / Flag, "NeWare_connected" / Flag)),
+        "reserved0" / Default(Int8ub, 0),
+        "reserved1" / Default(Int8ub, 0),
+        "zone" / ExprAdapter(Byte, obj_ + 1, obj_ - 1),
+        "reserved0" / Default(Int8ub, 0x04),
+    )), 
+    "reserved0" / Padding(31), 
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
+
 
 TerminateConnection = Struct("fields" / RawCopy(
     Struct(
@@ -357,5 +396,3 @@ ErrorMessage = Struct("fields" / RawCopy(
     Padding(33),
     "checksum" / Checksum(
         Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-
-

@@ -33,6 +33,10 @@ class MQTTInterface():
         logger.info("message topic={}, payload={}".format(
             message.topic, str(message.payload.decode("utf-8"))))
 
+        if self.alarm is None:
+            logger.warning("No alarm. Ignoring command")
+            return
+
         topics = message.topic.split("/")
 
         if len(topics) < 3:
@@ -45,9 +49,9 @@ class MQTTInterface():
                 "Invalid subtopic in mqtt message: {}".format(message.topic))
             return
 
-        command = self.normalize_mqtt_payload(message.payload)
+        command = message.payload.decode("latin").strip()
         element = topics[3]
-
+        
         # Process a Zone Command
         if topics[2] == MQTT_ZONE_TOPIC:
             if command not in ['bypass', 'clear_bypass']:
@@ -121,8 +125,6 @@ class MQTTInterface():
         
         self.mqtt.loop_start()
 
-    def set_callback(self, callback):
-        self.callback = callback
 
     def stop(self):
         if self.connected:
@@ -141,71 +143,12 @@ class MQTTInterface():
 
         return None
 
-    def event(self, element, label, message, raw):
+    def event(self, raw):
         """Handle Live Event"""
-        logger.debug("Live Event: element={}, label={}, message={}, raw={}".format(
-            element,
-            label,
-            message,
+        logger.debug("Live Event: raw={}".format(
             raw))
 
-        event = raw['major'][0]
-        subevent = raw['minor'][0]
-
-        change = dict()
-        # ZONES
-        if event in (0, 1):
-            change=dict(open=(event == 1))
-        elif event == 35: # TODO: Toggle bypass
-            pass
-        elif event in (36, 38):
-            change=dict(alarm=(event==36))
-        elif event in (37, 39):
-            change=dict(fire_alarm=(event==37))
-        elif event == 41:
-            change=dict(shutdown=True)
-        elif event in (42, 43):
-            change=dict(tamper=(event==42))
-        elif event in (49, 50):
-            change=dict(low_battery=(event==49))
-        elif event in (51, 52):
-            change=dict(supervision_trouble=(event==51))
-        
-        # PARTITIONS
-        elif event == 2:
-            if subevent in (2, 3, 4, 5, 6):
-                change=dict(alarm=True)
-            elif subevent == 7:
-                change = dict(alarm=False)
-            elif subevent == 11:
-                change = dict(arm=False, arm_full=False, arm_sleep=False, arm_stay=False, alarm=False)
-            elif subevent == 12:
-                change = dict(arm=True)
-        elif event == 3:
-            if subevent in (0, 1):
-                change=dict(bell=(subevent==1))
-        elif event == 6:
-            if subevent == 3:
-                change = dict(arm=True, arm_full=False, arm_sleep=False, arm_stay=True, alarm=False)
-            elif subevent == 4:
-                change = dict(arm=True, arm_full=False, arm_sleep=True, arm_stay=False, alarm=False)  
-        
-        # Wireless module
-        elif event in (53, 54):
-            change = dict(supervision_trouble=(event==53))
-        elif event in (53, 56):
-            change = dict(tampber_trouble=(event==55))
-            
-        for k,v in change.items():
-            self.mqtt.publish("{}/{}/{}/{}/{}".format(MQTT_BASE_TOPIC,
-                                    MQTT_EVENTS_TOPIC,
-                                    element, 
-                                    label,
-                                    k),
-                                v, 0, MQTT_RETAIN)
-
         if MQTT_PUBLISH_RAW_EVENTS:
-            raw['time'] = "{}".format(datetime.datetime.now())
             self.mqtt.publish('{}/{}'.format(MQTT_BASE_TOPIC,
                                                 MQTT_EVENTS_TOPIC,
                                                 MQTT_RAW_TOPIC),
@@ -218,15 +161,6 @@ class MQTTInterface():
             label,
             property,
             value))
-        
-        if IGNORE_UNNAMED_ZONES and element=='zone' and label.startswith("Zone "):
-            return
-        
-        if IGNORE_UNNAMED_PARTITIONS and element=='partition' and label.startswith("Partition "):
-            return
-        
-        if IGNORE_UNNAMED_OUTPUTS and element=='output' and label.startswith("Output "):
-            return
 
         self.mqtt.publish('{}/{}/{}/{}/{}'.format(MQTT_BASE_TOPIC,
                                             MQTT_EVENTS_TOPIC,
