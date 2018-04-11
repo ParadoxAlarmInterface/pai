@@ -14,13 +14,15 @@ Tested in the following environment:
 * OrangePi 2G-IOT, NanoPi NEO, Raspberry Pi 3 through their built in Serial Port (with a level switch!)
 * Ubuntu Server 16.04.3 LTS
 * Paradox MG5050 panel
+* [Signal Cli](https://github.com/AsamK/signal-cli) through a DBUS interface
+* Pushbullet.py
 
 
 ## Structure
 
 * __Paradox__: Object that interfaces with the panel and keeps some internal state. Accepts commands to control partitions, zones and outputs. Exposes changes and events
 
-* __Interfaces__: Expose interfaces to the outside world. Currently MQTT and Pushbullet are supported, but other are planned and almost any other is supported.
+* __Interfaces__: Expose interfaces to the outside world. Currently, MQTT, Signal and Pushbullet are supported, but other are planned and almost any other is supported.
 
 * __Connections__: Handle communication with the panel, at a lower level. Currently, only Serial connections are supported.
 
