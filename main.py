@@ -18,6 +18,7 @@ class InterfaceHandler():
 
     def register(self, name, object, initial=False):
         self.interfaces.append(dict(name=name,object=object,initial=initial))
+        object.set_notify(self)
 
     def event(self, raw):
         for interface in self.interfaces:
@@ -37,6 +38,30 @@ class InterfaceHandler():
             except:
                 logger.exception("Error dispatching change to interface {}".format(interface['name']))
 
+    def notify(self, sender, message):
+        for interface in self.interfaces:
+            try:
+                if sender != interface['name']:
+                    interface['object'].notify(sender, message)
+            except:
+                logger.exception("Error dispatching notification to interface {}".format(interface['name']))
+                
+    def stop(self):
+        for interface in self.interfaces:
+            try:
+                interface['object'].stop()
+            except:
+                logger.exception("Error stoping interface {}".format(interface['name']))
+
+    def set_alarm(self, alarm):
+        for interface in self.interfaces:
+            try:
+                interface['object'].set_alarm(alarm)
+            except:
+                logger.exception("Error adding alarm to interface {}".format(interface['name']))
+
+
+
 def main():
     logger.info("Starting Paradox Alarm Interface")
     logger.info("Console Log level set to {}".format(LOGGING_LEVEL_CONSOLE))
@@ -50,21 +75,32 @@ def main():
             from mqtt_interface import MQTTInterface
             interface = MQTTInterface()
             if interface.start():
-                interface_handler.register('mqtt', interface, initial=True)
+                interface_handler.register(interface.name, interface, initial=True)
         except:
-            logger.error("Unable to start MQTT Interface")
+            logger.exception("Unable to start MQTT Interface")
 
     # Load Pushbullet service
-    if len(PUSHBULLET_SECRET) > 0 and len(PUSHBULLET_CONTACTS) > 0 and len(PUSHBULLET_CONTACTS) > 0:
+    if len(PUSHBULLET_SECRET) > 0 and len(PUSHBULLET_CONTACTS) > 0:
         try:
             logger.info("Using Pushbullet Interface")
             from pushbullet_interface import PushBulletInterface
             interface = PushBulletInterface()
             if interface.start():
-                interface_handler.register('pushbullet', interface, initial=False)
+                interface_handler.register(interface.name, interface, initial=False)
         except:
             logger.exception("Unable to start Pushbullet Interface")
-
+    
+    # Load Signal service
+    if len(SIGNAL_CONTACTS) > 0:
+        try:
+            logger.info("Using Signal Interface")
+            from signal_interface import SignalInterface
+            interface = SignalInterface()
+            if interface.start():
+                interface_handler.register(interface.name, interface, initial=False)
+        except:
+            logger.exception("Unable to start Signal Interface")
+            
     # Load a connection to the alarm
     if CONNECTION_TYPE == "Serial":
         logger.info("Using Serial Connection")
@@ -85,7 +121,7 @@ def main():
         try:
             alarm = Paradox(connection=connection, interface=interface_handler)
             if alarm.connect():
-                interface.set_alarm(alarm)
+                interface_handler.set_alarm(alarm)
                 alarm.loop()
             else:
                 logger.error("Unable to connect to alarm")
@@ -101,7 +137,7 @@ def main():
             time.sleep(1)
 
     #connection.close()
-    interface.stop()
+    interface_handler.stop()
     logger.info("Good bye!")
 
 

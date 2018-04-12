@@ -11,6 +11,7 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 class MQTTInterface():
     """Interface Class using MQTT"""
+    name = 'mqtt'
 
     def __init__(self):
         self.callback = None
@@ -20,11 +21,10 @@ class MQTTInterface():
         self.mqtt.on_disconnect = self.handle_disconnect
         self.connected = False
         self.alarm = None
+        self.state = {}
 
-        #Local cache
-        self.zones = [dict()] * ZONES
-        self.partitions = [dict()] * PARTITIONS
-
+        self.notification_handler = None
+        
     def set_alarm(self, alarm):
         self.alarm = alarm
 
@@ -64,11 +64,43 @@ class MQTTInterface():
 
         # Process a Partition Command
         elif topics[2] == MQTT_PARTITION_TOPIC:
+
+            if command.startswith('code_toggle '):
+                tokens = command.split(' ')
+                if len(tokens) < 2:
+                    return
+                
+                if tokens[1] not in MQTT_TOGGLE_CODES:
+                    logger.warning("Invalid toggle code {}".format(tokens[1]))
+                    return
+
+                if element.lower() == 'all':
+                    command = 'arm'
+
+                    for k,v in self.state.items():
+                        # If all and a single partition is armed, default is to desarm
+                        if v:
+                            command = 'disarm'
+                            break
+
+                elif element in self.state:
+                    if self.state[element]['arm']:
+                        command = 'disarm'
+                    else:
+                        command = 'arm'
+                
+                    self.notification_handler.notify('mqtt', "Command by {}: {}".format(MQTT_TOGGLE_CODES[tokens[1]], command))
+                else:
+                    logger.debug("Element {} not found".format(element))
+                    return
+
+            logger.debug("Effective command: {} = {}".format(element, command))
+
             if command not in ['arm', 'disarm', 'arm_stay', 'arm_sleep']:
                 logger.error(
                     "Invalid command for Partition {}".format(command))
                 return
-
+            
             if not self.alarm.control_partition(element, command):
                 logger.warning(
                     "Partition command refused: {}={}".format(element, command))
@@ -88,7 +120,18 @@ class MQTTInterface():
     def handle_disconnect(self, mqttc, userdata, rc):
         logger.info("MQTT Broker Disconnected")
         self.connected = False
-        self.mqtt.loop_stop()
+        
+        time.sleep(1)
+
+        if MQTT_USERNAME is not None and MQTT_PASSWORD is not None:
+            self.mqtt.username_pw_set(
+                username=MQTT_USERNAME, password=MQTT_PASSWORD)
+
+        self.mqtt.connect(host=MQTT_HOST,
+                          port=MQTT_PORT,
+                          keepalive=MQTT_KEEPALIVE,
+                          bind_address=MQTT_BIND_ADDRESS)
+        
 
     def handle_connect(self, mqttc, userdata, flags, result):
         logger.info("MQTT Broker Connected")
@@ -138,7 +181,7 @@ class MQTTInterface():
             return 'on'
         elif payload in ['false', 'off', '0', 'disable']:
             return 'off'
-        elif payload in ['pulse', 'arm', 'disarm', 'arm_stay', 'arm_sleep', 'bypass', 'clear_bypass']:
+        elif payload in ['pulse', 'arm', 'disarm', 'arm_stay', 'arm_sleep', 'bypass', 'clear_bypass', 'code_toogle']:
             return payload
 
         return None
@@ -171,11 +214,20 @@ class MQTTInterface():
 
         if MQTT_IGNORE_UNNAMED_OUTPUTS and label.startswith('Output_'):
             return
+        
+        # Keep track of ARM state
+        if element == 'partition' and property == 'arm':
+            self.state[label] = value
 
         self.mqtt.publish('{}/{}/{}/{}/{}'.format(MQTT_BASE_TOPIC,
-                                            MQTT_EVENTS_TOPIC,
+                                            MQTT_STATES_TOPIC,
                                             element,
                                             label,
                                             property),
                           "{}".format(value), 0, MQTT_RETAIN)
-
+    
+    def set_notify(self, handler):
+        self.notification_handler = handler
+    
+    def notify(self):
+        pass

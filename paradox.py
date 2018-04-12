@@ -453,32 +453,39 @@ class Paradox:
             change = dict(tamper_trouble=(major==55))
 
         new_event = {'major': event['major'], 'minor': event['minor'], 'type': event['type'] }
-        number = event['minor'][0]
         
         if change is not None:
-            if event['type'] == 'Zone' and len(self.zones) > 0:
-                self.update_properties('zone', self.zones, number, change)
-                new_event['minor'] = (number, self.zones[number]['label'])
-            elif event['type'] == 'Partition' and len(self.partitions) > 0:
-                self.update_properties('partition', self.partitions, number, change)
-                new_event['minor'] = (number, self.partitions[number]['label'])
-            elif event['type'] == 'Output' and len(self.outputs):
-                self.update_properties('output', self.outputs, number, change)
-                new_event['minor'] = (number, self.outputs[number]['label'])
+            if event['type'] == 'Zone' and len(self.zones) > 0 and minor < len(self.zones):
+                self.update_properties('zone', self.zones, minor, change)
+                new_event['minor'] = (minor, self.zones[minor]['label'])
+            elif event['type'] == 'Partition' and len(self.partitions) > 0 and minor < len(self.partitions):
+                self.update_properties('partition', self.partitions, minor, change)
+                new_event['minor'] = (minor, self.partitions[minor]['label'])
+            elif event['type'] == 'Output' and len(self.outputs) and minor < len(self.outputs):
+                self.update_properties('output', self.outputs, minor, change)
+                new_event['minor'] = (minor, self.outputs[minor]['label'])
 
         # Publish event
         if self.interface is not None:
             self.interface.event(
                 raw=new_event)
 
-    def update_properties(self, element_type, element_dict, index, change):
-        element = element_dict[index]
+    def update_properties(self, element_type, element_list, index, change):
+        logger.debug("Update Properties {} {} {}".format(element_type, index, change))
+        if index < 0 or index >= (len(element_list) + 1):
+            logger.debug("Index {} not in element_list {}".format(index, element_list))            
+            return
 
         # Publish changes and update state
         for k, v in change.items():
-            if k not in element or element[k] != change[k]:
-                element_dict[index][k] = change[k]
-                self.interface.change(element_type, element['label'],
+            old = None
+            if k in element_list[index]:
+                old = element_list[index][k]
+        
+            if old != change[k]:
+                logger.debug("Change {}/{}/{} from {} to {}".format(element_type, element_list[index]['label'], k, old, change[k]))
+                element_list[index][k] = change[k]
+                self.interface.change(element_type, element_list[index]['label'],
                                       k, change[k])
 
 
@@ -509,6 +516,7 @@ class Paradox:
             i = 1
             while i <= PARTITIONS and i in message.fields.value.partition_status:
                 v = message.fields.value.partition_status[i]
+                logger.debug("Partition Status {}".format(v))
                 self.update_properties('partition', self.partitions, i, v)
                 i += 1
 

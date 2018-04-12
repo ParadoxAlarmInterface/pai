@@ -3,4 +3,6 @@ pushbullet.py>=0.11.0
 pyserial>=3.4
 urllib3>=1.13.1
 websocket-client>=0.44.0
-ws4py==0.4.2
+ws4py>=0.4.2
+pydbus>=0.6.0
+gi>=1.2

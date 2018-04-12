@@ -65,15 +65,36 @@ class PartitionStatusAdapter(Adapter):
     def _decode(self, obj, context, path):
         partition_status=dict()
         for i in range(0, 2):
+            print(obj)
             partition = dict(
               arm=obj[i * 4] & 0x01 != 0,
               arm_sleep=obj[i * 4] & 0x02 != 0,
               arm_stay=obj[i * 4] & 0x04 != 0,
               arm_full=(obj[i * 4] & 0x01 != 0) and obj[i * 4] & 0x06 ==0,
-              alarm=obj[i * 4] & 0x0F != 0,
+              arm_noentry=obj[i * 4] & 0x08 != 0,
+              alarm=obj[i * 4] & 0x10 != 0,
               alarm_silent=obj[i * 4] & 0x20 != 0,
               alarm_audible=obj[i * 4] & 0x40 != 0,
-              alarm_fire=obj[i * 4] & 0x80 != 0)
+              alarm_fire=obj[i * 4] & 0x80 != 0,
+              
+              ready_to_arm=obj[i * 4 + 1] & 0x01 != 0,
+              exit_delay=obj[i * 4 + 1] & 0x02 != 0,
+              entry_delay=obj[i * 4 + 1] & 0x04 != 0,
+              trouble=obj[i * 4 + 1] & 0x08 != 0,
+              alarm_memory=obj[i * 4 + 1] & 0x10 != 0,
+              zone_bypass=obj[i * 4 + 1] & 0x20 != 0,
+              programming=obj[i * 4 + 1] & 0x40 != 0,
+              lockout=obj[i * 4 + 1] & 0x80 != 0,
+              
+              intelizone_engage=obj[i * 4 + 2] & 0x01 != 0,
+              fire_delay=obj[i * 4 + 2] & 0x02 != 0,
+              auto_arming=obj[i * 4 + 2] & 0x04 != 0,
+              voice_arming=obj[i * 4 + 2] & 0x08 != 0,
+              zone_tamper_trouble=obj[i * 4 + 2] & 0x10 != 0,
+              zone_low_battery_trouble=obj[i * 4 + 2] & 0x20 != 0,
+              zone_fire_loop_trouble=obj[i * 4 + 2] & 0x40 != 0,
+              zone_supervision_trouble=obj[i * 4 + 2] & 0x80 != 0,
+              )
               
             partition_status[i + 1] = partition
         

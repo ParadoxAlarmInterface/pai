@@ -18,6 +18,7 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 class SignalInterface(Thread):
     """Interface Class using Signal"""
+    name = 'signal'
 
     signal = None
     alarm = None
@@ -38,8 +39,10 @@ class SignalInterface(Thread):
         #logger.debug("Live Event: raw={}".format(raw))
 
         # TODO Improve message display
-        if raw['type'] == 'Partition' or raw['type'] == 'System' or raw['type'] == 'Trouble':
-            self.send_message(json.dumps(raw))
+        if raw['type'] == 'Zone':
+            return
+
+        self.send_message(json.dumps(raw))
         
 
     def change(self, element, label, property, value):
@@ -51,8 +54,10 @@ class SignalInterface(Thread):
         #    value))
         
         # TODO Improve message display
-        if element == 'partition' or element == 'system' or element == 'trouble':
-            self.send_message("{} {} {} {}".format(element, label, property, value))
+        if element == 'Zone':
+            return
+ 
+        self.send_message("{} {} {} {}".format(element, label, property, value))
 
        
     def set_alarm(self, alarm):
@@ -180,4 +185,12 @@ class SignalInterface(Thread):
 
         return None
 
+    def set_notification(self, handler):
+        self.notification_handler = handler
+
+    def notify(self, source, message):
+        if source == self.name:
+            return
+        
+        self.send_message(message)
 

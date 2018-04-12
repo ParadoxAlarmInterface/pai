@@ -49,9 +49,12 @@ MQTT_STATES_TOPIC = 'states'
 MQTT_RAW_TOPIC = 'raw'
 MQTT_PUBLISH_RAW_EVENTS = True
 MQTT_INTERFACE_TOPIC = 'interface'
-
+MQTT_TOGGLE_CODES = {'code': 'person name'}
 
 # Pushbullet
 PUSHBULLET_KEY = ''
 PUSHBULLET_SECRET = ''
 PUSHBULLET_CONTACTS = [] # PB User identifiers for notifications
+
+# Signal
+SIGNAL_CONTACTS = ''

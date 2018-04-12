@@ -271,9 +271,9 @@ UploadResponseStatus1 = Struct(
                    "eeprom_b16" / Flag,
                ), 
                "bus_address" / Int8ub, "address" / Int8ub,
-               "reserved0" / Bytes(14), 
+               "reserved0" / Bytes(16), 
                "partition_status" /PartitionStatusAdapter(Bytes(8)), 
-               "reserved0" / Bytes(10))),
+               "reserved0" / Bytes(8))),
     "checksum" / Checksum(
         Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 

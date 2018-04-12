@@ -40,6 +40,7 @@ class PushBulletWSClient(WebSocketBaseClient):
         # Receiving pending messages
         self.received_message(json.dumps({"type": "tickle", "subtype": "push"}))
        
+        self.send_message("Active")
 
     def handle_message(self, message):
         """ Handle Pushbullet message. It should be a command """
@@ -183,6 +184,7 @@ class PushBulletWSClient(WebSocketBaseClient):
 
 class PushBulletInterface():
     """Interface Class using Pushbullet"""
+    name = 'pushbullet'
 
     def __init__(self):        
         self.pb = None
@@ -219,3 +221,11 @@ class PushBulletInterface():
 
     def change(self, element, label, property, value):
         self.pb_ws.change(element, label, property, value)
+
+    def set_notify(self, handler):
+        self.notification_handler = handler
+
+    def notify(self, sender, message):
+        if sender == 'pushbullet':
+            return
+        self.pb_ws.send_message(message)
