@@ -157,29 +157,10 @@ class Paradox:
     def update_labels(self):
         logger.info("Updating Labels from Panel")
 
-        partition_template = dict(
-            alarm=False,
-            arm=False,
-            arm_full=False,
-            arm_sleep=False,
-            arm_stay=False,
-            alarm_fire=False,
-            alarm_audible=False,
-            alarm_silent=False)
-        zone_template = dict(
-            open=False,
-            bypass=False,
-            alarm=False,
-            fire_alarm=False,
-            shutdown=False,
-            tamper=False,
-            low_battery=False,
-            supervision_trouble=False,
-            in_alarm=False,
-            tx_delay=False,
-            entry_delay=False,
-            intellizone_delay=False,
-            generated_alarm=False)
+        partition_template = dict() # Will be populated after status message
+
+        zone_template = dict()
+
         output_template = dict(
             on=False,
             pulse=False,
@@ -479,15 +460,17 @@ class Paradox:
         # Publish changes and update state
         for k, v in change.items():
             old = None
+
             if k in element_list[index]:
                 old = element_list[index][k]
         
-            if old != change[k]:
-                logger.debug("Change {}/{}/{} from {} to {}".format(element_type, element_list[index]['label'], k, old, change[k]))
-                element_list[index][k] = change[k]
-                self.interface.change(element_type, element_list[index]['label'],
-                                      k, change[k])
-
+                if old != change[k]:
+                    logger.debug("Change {}/{}/{} from {} to {}".format(element_type, element_list[index]['label'], k, old, change[k]))
+                    element_list[index][k] = change[k]
+                    self.interface.change(element_type, element_list[index]['label'],
+                                          k, change[k])
+            else:
+                element_list[index][k] = v # Initial value
 
     def handle_status(self, message):
         """Handle MessageStatus"""
