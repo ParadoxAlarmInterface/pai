@@ -65,7 +65,6 @@ class PartitionStatusAdapter(Adapter):
     def _decode(self, obj, context, path):
         partition_status=dict()
         for i in range(0, 2):
-            print(obj)
             partition = dict(
               arm=obj[i * 4] & 0x01 != 0,
               arm_sleep=obj[i * 4] & 0x02 != 0,
