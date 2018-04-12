@@ -3,17 +3,22 @@ import time
 import logging
 import datetime
 import json
-
+from threading import Thread
+import queue
 from config_defaults import *
 from config import *
 
+from utils import SortableTuple
+
 logger = logging.getLogger('PAI').getChild(__name__)
 
-class MQTTInterface():
+class MQTTInterface(Thread):
     """Interface Class using MQTT"""
     name = 'mqtt'
 
     def __init__(self):
+        Thread.__init__(self)
+
         self.callback = None
         self.mqtt = mqtt.Client("MQTTParadox")
         self.mqtt.on_message = self.handle_message
@@ -22,12 +27,65 @@ class MQTTInterface():
         self.connected = False
         self.alarm = None
         self.state = {}
+        self.queue = queue.PriorityQueue()
 
         self.notification_handler = None
-        
-    def set_alarm(self, alarm):
-        self.alarm = alarm
 
+    def run(self):
+        if MQTT_USERNAME is not None and MQTT_PASSWORD is not None:
+            self.mqtt.username_pw_set(
+                username=MQTT_USERNAME, password=MQTT_PASSWORD)
+
+        self.mqtt.connect(host=MQTT_HOST,
+                          port=MQTT_PORT,
+                          keepalive=MQTT_KEEPALIVE,
+                          bind_address=MQTT_BIND_ADDRESS)
+    
+        self.mqtt.loop_start()
+
+        while True:
+            item = self.queue.get()
+            if item[1] == 'change':
+                self.handle_change(item[2])
+            elif item[1] == 'event':
+                self.handle_event(item[2])
+            elif item[1] == 'command':
+                if item[2] == 'stop':
+                    break
+
+        if self.connected:
+            self.mqtt.disconnect()
+            time.sleep(0.5)
+
+    def stop(self):
+        """ Stops the MQTT Interface Thread"""
+        self.mqtt.disconnect()
+        logger.debug("Stopping MQTT Interface")
+        self.queue.put_nowait(SortableTuple((0, 'command', 'stop')))
+        self.mqtt.loop_stop()
+        self.join()
+
+    def set_alarm(self, alarm):
+        """ Sets the alarm """
+        self.alarm = alarm
+    
+    def set_notify(self, handler):
+        """ Set the notification handler"""
+        self.notification_handler = handler
+
+    def event(self, raw):
+        """ Enqueues an event"""
+        self.queue.put_nowait(SortableTuple((2, 'event', raw)))
+
+    def change(self, element, label, property, value):
+        """ Enqueues a change """
+        self.queue.put_nowait(SortableTuple((2, 'change', (element, label, property, value))))
+
+    # not supported
+    def notify(self, source, message):
+        pass
+
+    ## Handlers here
     def handle_message(self, client, userdata, message):
         """Handle message received from the MQTT broker"""
         logger.info("message topic={}, payload={}".format(
@@ -117,6 +175,7 @@ class MQTTInterface():
         else:
             logger.error("Invalid control property {}".format(topics[2]))
 
+
     def handle_disconnect(self, mqttc, userdata, rc):
         logger.info("MQTT Broker Disconnected")
         self.connected = False
@@ -154,39 +213,8 @@ class MQTTInterface():
                                             self.__class__.__name__),
                           'online', 0, MQTT_RETAIN)
 
-    def start(self):
-        """Connect to the MQTT Server"""
 
-        if MQTT_USERNAME is not None and MQTT_PASSWORD is not None:
-            self.mqtt.username_pw_set(
-                username=MQTT_USERNAME, password=MQTT_PASSWORD)
-
-        self.mqtt.connect(host=MQTT_HOST,
-                          port=MQTT_PORT,
-                          keepalive=MQTT_KEEPALIVE,
-                          bind_address=MQTT_BIND_ADDRESS)
-        
-        self.mqtt.loop_start()
-        return True
-
-    def stop(self):
-        if self.connected:
-            self.mqtt.disconnect()
-            time.sleep(0.5)
-
-    def normalize_mqtt_payload(self, payload):
-        payload = payload.decode('utf-8').strip().lower().replace(' ', '_')
-
-        if payload in ['true', 'on', '1', 'enable']:
-            return 'on'
-        elif payload in ['false', 'off', '0', 'disable']:
-            return 'off'
-        elif payload in ['pulse', 'arm', 'disarm', 'arm_stay', 'arm_sleep', 'bypass', 'clear_bypass', 'code_toogle']:
-            return payload
-
-        return None
-
-    def event(self, raw):
+    def handle_event(self, raw):
         """Handle Live Event"""
         #logger.debug("Live Event: raw={}".format(
         #    raw))
@@ -198,7 +226,8 @@ class MQTTInterface():
                                                 MQTT_RAW_TOPIC),
                               json.dumps(raw), 0, MQTT_RETAIN)
 
-    def change(self, element, label, property, value):
+    def handle_change(self, raw):
+        element, label, property, value = raw 
         """Handle Property Change"""
         #logger.debug("Property Change: element={}, label={}, property={}, value={}".format(
         #    element,
@@ -225,9 +254,19 @@ class MQTTInterface():
                                             label,
                                             property),
                           "{}".format(value), 0, MQTT_RETAIN)
+
     
-    def set_notify(self, handler):
-        self.notification_handler = handler
-    
-    def notify(self):
-        pass
+    # Utils
+    def normalize_mqtt_payload(self, payload):
+        payload = payload.decode('utf-8').strip().lower().replace(' ', '_')
+
+        if payload in ['true', 'on', '1', 'enable']:
+            return 'on'
+        elif payload in ['false', 'off', '0', 'disable']:
+            return 'off'
+        elif payload in ['pulse', 'arm', 'disarm', 'arm_stay', 'arm_sleep', 'bypass', 'clear_bypass', 'code_toogle']:
+            return payload
+
+        return None
+
+ 

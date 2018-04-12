@@ -5,12 +5,16 @@ from ws4py.client import WebSocketBaseClient
 from ws4py.manager import WebSocketManager
 from ws4py import format_addresses, configure_logger
 
+from threading import Thread
+import queue
 from pushbullet import Pushbullet
 
 import time
 import logging
 import datetime
 import json
+
+from utils import SortableTuple
 
 from config_defaults import *
 from config import *
@@ -41,7 +45,8 @@ class PushBulletWSClient(WebSocketBaseClient):
         self.received_message(json.dumps({"type": "tickle", "subtype": "push"}))
        
         self.send_message("Active")
-
+    
+   
     def handle_message(self, message):
         """ Handle Pushbullet message. It should be a command """
 
@@ -157,6 +162,9 @@ class PushBulletWSClient(WebSocketBaseClient):
 
         return None
 
+    def notify(self, source, message):
+        self.send_message("{}: {}".format(source, message))
+
     def event(self, raw):
         """Handle Live Event"""
         #logger.debug("Live Event: raw={}".format(raw))
@@ -178,54 +186,74 @@ class PushBulletWSClient(WebSocketBaseClient):
         if element == 'partition' or element == 'system' or element == 'trouble':
             self.send_message("{} {} {} {}".format(element, label, property, value))
 
-       
-    def set_alarm(self, alarm):
-        self.alarm = alarm
-
-class PushBulletInterface():
+class PushBulletInterface(Thread):
     """Interface Class using Pushbullet"""
     name = 'pushbullet'
 
     def __init__(self):        
+        Thread.__init__(self)
+
         self.pb = None
         self.pb_ws = None
-        self.alarm = None
+        self.queue = queue.PriorityQueue()
 
-    def set_alarm(self, alarm):
-        self.alarm = alarm
-
-
-    def start(self):
-        """Connect to the Pushbullet Server"""
-
+    def run(self):
         logger.info("Starting Pushbullet Interface")
         try:
             self.pb_ws = PushBulletWSClient('wss://stream.pushbullet.com/websocket/{}'.format(PUSHBULLET_KEY))
             self.pb_ws.init()
             self.pb_ws.connect()
 
-            return True
+            while True:
+                item = self.queue.get()
+
+                if item[1] == 'change':
+                    self.handle_change(item[2])
+                elif item[1] == 'event':
+                    self.handle_event(item[2])
+                elif item[1] == 'notify':
+                    self.handle_notify(item[2])
+                elif item[1] == 'command':
+                    if item[2] == 'stop':
+                        break        
         except:
             logger.exception("PB")
-        return False
     
+ 
     def set_alarm(self, alarm):
-        self.pb_ws.set_alarm(alarm)
+        self.pb_ws.set_alarm(alarm)   
+    
+    def set_notify(self, handler):
+        """ Set the notification handler"""
+        self.notification_handler = handler
+
+    def event(self, raw):
+        """ Enqueues an event"""
+        self.queue.put_nowait(SortableTuple((2, 'event', raw)))
+
+    def change(self, element, label, property, value):
+        """ Enqueues a change """
+        self.queue.put_nowait(SortableTuple((2, 'change', (element, label, property, value))))
+        
+    def notify(self, source, message):
+        self.queue.put_nowait(SortableTuple((2, 'notify', (source, message))))
 
     def stop(self):
         """ Stops the Pushbullet interface"""
+        self.queue.put_nowait(SortableTuple((2, 'command', 'stop')))
+
         self.pb_ws.terminate()
     
-    def event(self, raw):
+    def handle_event(self, raw):
         self.pb_ws.event(raw)
 
-    def change(self, element, label, property, value):
+    def handle_change(self, raw):
+        element, label, property, value = raw
         self.pb_ws.change(element, label, property, value)
 
-    def set_notify(self, handler):
-        self.notification_handler = handler
-
-    def notify(self, sender, message):
+    def handle_notify(self, raw):
+        sender, message = raw
         if sender == 'pushbullet':
             return
-        self.pb_ws.send_message(message)
+        self.pb_ws.notify(sender, message)
+

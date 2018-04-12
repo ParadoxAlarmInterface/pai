@@ -452,7 +452,7 @@ class Paradox:
                 raw=new_event)
 
     def update_properties(self, element_type, element_list, index, change):
-        logger.debug("Update Properties {} {} {}".format(element_type, index, change))
+        #logger.debug("Update Properties {} {} {}".format(element_type, index, change))
         if index < 0 or index >= (len(element_list) + 1):
             logger.debug("Index {} not in element_list {}".format(index, element_list))            
             return

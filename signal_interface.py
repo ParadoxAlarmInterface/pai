@@ -1,7 +1,9 @@
 # Signal interface.
 # Only exposes critical status changes and accepts commands
 from pydbus import SystemBus
+
 from gi.repository import GLib
+from gi.repository import GObject
 
 import time
 import logging
@@ -9,9 +11,11 @@ import datetime
 import json
 
 from threading import Thread, Event
+from utils import SortableTuple
 
 from config_defaults import *
 from config import *
+import queue
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -26,76 +30,100 @@ class SignalInterface(Thread):
     thread = None
     loop = None
     
+    
+    def __init__(self):
+        Thread.__init__(self)
+        
+        self.queue = queue.PriorityQueue()
+
 
     def stop(self):
-        """ Stops the Pushbullet interface"""
-        self.stop_running.set()
-        if self.loop is not None:
-            logger.info("Stopping Signal Interface")
-            self.loop.quit()
+        """ Stops the Signal Interface Thread"""
+        logger.debug("Stopping Signal Interface")
+        self.queue.put_nowait(SortableTuple((0, 'command', 'stop')))
+
+    def set_alarm(self, alarm):
+        """ Sets the alarm """
+        self.alarm = alarm
+    
+    def set_notify(self, handler):
+        """ Set the notification handler"""
+        self.notification_handler = handler
 
     def event(self, raw):
-        """Handle Live Event"""
-        #logger.debug("Live Event: raw={}".format(raw))
-
+        """ Enqueues an event"""
         # TODO Improve message display
+        
         if raw['type'] == 'Zone':
             return
 
-        self.send_message(json.dumps(raw))
-        
+        self.queue.put_nowait(SortableTuple((2, 'event', raw)))
 
     def change(self, element, label, property, value):
-        """Handle Property Change"""
-        #logger.debug("Property Change: element={}, label={}, property={}, value={}".format(
-        #    element,
-        #    label,
-        #    property,
-        #    value))
+        """ Enqueues a change """
         
-        # TODO Improve message display
-        if element == 'Zone':
+        if element == 'zone':
             return
- 
-        self.send_message("{} {} {} {}".format(element, label, property, value))
 
-       
-    def set_alarm(self, alarm):
-        self.alarm = alarm
+        self.queue.put_nowait(SortableTuple((2, 'change', (element, label, property, value))))
+
+    def notify(self, source, message):
+        if source == self.name:
+            return
+
+        self.queue.put_nowait(SortableTuple((2, 'notify', (source, message))))
+
 
     def run(self):
+
         logger.info("Starting Signal Interface")
-        try:
-            self.thread = Thread(target=self.loop)
-            self.thread.start()
-        except:
-            logger.exception("PB")
-            return False
 
         bus = SystemBus()
-        while not self.stop_running.is_set():
-            try:
-                self.signal = bus.get('org.asamk.Signal')
-                self.signal.onMessageReceived = self.handle_message
-                self.loop = GLib.MainLoop()
-                self.send_message("Active")
 
-                logger.debug("Signal Interface Running")
-                self.loop.run()
-            except (KeyboardInterrupt, SystemExit):
-                logger.info("Exit start")
-                self.stop_running.set()
-                self.loop.quit()
-                self.stop()
-            except:
-                logger.exception("signal")
+        self.signal = bus.get('org.asamk.Signal')
+        self.signal.onMessageReceived = self.handle_message
+        self.loop = GLib.MainLoop()
+
+        self.send_message("Active")
+        self.timer = GObject.idle_add(self.run_loop)
+
+        try:
+            logger.debug("Signal Interface Running")
+            self.loop.run()
+
+        except (KeyboardInterrupt, SystemExit):
+            logger.info("Exit start")
+            self.stop_running.set()
+            self.loop.quit()
+            self.stop()
+        except:
+            logger.exception("signal")
     
+    def run_loop(self):
+        try:
+            item = self.queue.get(block=True, timeout=1)
+            if item[1] == 'change':
+                self.handle_change(item[2])
+            elif item[1] == 'event':
+                self.handle_event(item[2])
+            elif item[1] == 'notify':
+                self.send_message("{}: {}".format(item[2][0], item[2][1]))
+            elif item[1] == 'command':
+                if item[2] == 'stop':
+                    self.loop.quit()
+        except:
+            pass
+
+        return True
+
     def send_message(self, message):
         if self.signal is None:
+            logger.warning("Signal not available when sending message")
             return
-
+        
         for contact in SIGNAL_CONTACTS:
-            self.signal.sendMessage(message, [], [contact])
+            self.signal.sendMessage(str(message), [], [contact])
+
 
     def handle_message (timestamp, source, groupID, message, attachments):
         """ Handle Signal message. It should be a command """
@@ -172,6 +200,36 @@ class SignalInterface(Thread):
         else:
             logger.error("Invalid control property {}".format(element))
 
+    
+
+    def handle_notify(self, raw):
+        source, message = raw
+
+        self.send_message(message)
+
+
+    def handle_event(self, raw):
+        """Handle Live Event"""
+        #logger.debug("Live Event: raw={}".format(raw))
+        m = "{}: {}".format(raw['major'][1], raw['minor'][1])
+
+        self.send_message(m)
+        
+
+    def handle_change(self, raw ):
+        element, label, property, value = raw
+        """Handle Property Change"""
+        #logger.debug("Property Change: element={}, label={}, property={}, value={}".format(
+        #    element,
+        #    label,
+        #    property,
+        #    value))
+        
+ 
+        self.send_message("{} {} {} {}".format(element, label, property, value))
+
+
+
 
     def normalize_payload(self, message):
         message = message.strip().lower()
@@ -184,13 +242,4 @@ class SignalInterface(Thread):
             return message
 
         return None
-
-    def set_notification(self, handler):
-        self.notification_handler = handler
-
-    def notify(self, source, message):
-        if source == self.name:
-            return
-        
-        self.send_message(message)
 
