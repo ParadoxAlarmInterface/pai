@@ -76,9 +76,10 @@ class PartitionStatusAdapter(Adapter):
               alarm_audible=obj[i * 4] & 0x40 != 0,
               alarm_fire=obj[i * 4] & 0x80 != 0,
               
-              ready_to_arm=obj[i * 4 + 1] & 0x01 != 0,
-              exit_delay=obj[i * 4 + 1] & 0x02 != 0,
-              entry_delay=obj[i * 4 + 1] & 0x04 != 0,
+              exit_delay=obj[i * 4 + 1] & 0x01 != 0,
+              entry_delay=obj[i * 4 + 1] & 0x02 != 0,
+              #ready_to_arm=obj[i * 4 + 1] & 0x01 != 0,
+              #ready_to_arm=obj[i * 4 + 1] & 0x01 != 0,
               trouble=obj[i * 4 + 1] & 0x08 != 0,
               alarm_memory=obj[i * 4 + 1] & 0x10 != 0,
               zone_bypass=obj[i * 4 + 1] & 0x20 != 0,

@@ -329,7 +329,6 @@ class Paradox:
             if reply is not None and reply.fields.value.po.command == 0x04:
                 accepted = True
                 if command in ['arm_stay', 'arm_sleep']:
-                    self.update_properties('partition', self.partitions, e, {'arm': True})
                     self.update_properties('partition', self.partitions, e, {command: True})
                 else:
                     self.update_properties('partition', self.partitions, e, {'arm': False, 'arm_stay': False, 'arm_sleep': False})

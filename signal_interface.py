@@ -53,8 +53,29 @@ class SignalInterface(Thread):
     def event(self, raw):
         """ Enqueues an event"""
         # TODO Improve message display
+       
+        # Open Cloze
+        if raw['major'][0] in (0, 1):
+            return
         
-        if raw['type'] == 'Zone':
+        # Software Log on
+        if raw['major'][0] == 48 and raw['minor'][0] == 2:
+            return
+
+        # Squawk on off
+        if raw['major'][0] == 2 and raw['minor'][0] in (8, 9):
+            return
+
+        # Bell Squawk
+        if raw['major'][0] == 3 and raw['minor'][0] in (3, ):
+            return
+
+        # Arming Through Winload
+        if raw['major'][0] == 30 and raw['minor'][0] == 5:
+            return
+
+        # Disarming Through Winload
+        if raw['major'][0] == 34 and raw['minor'][0] == 1:
             return
 
         self.queue.put_nowait(SortableTuple((2, 'event', raw)))
@@ -211,6 +232,7 @@ class SignalInterface(Thread):
     def handle_event(self, raw):
         """Handle Live Event"""
         #logger.debug("Live Event: raw={}".format(raw))
+
         m = "{}: {}".format(raw['major'][1], raw['minor'][1])
 
         self.send_message(m)
