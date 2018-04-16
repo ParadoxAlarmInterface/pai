@@ -35,12 +35,17 @@ class SignalInterface(Thread):
         Thread.__init__(self)
         
         self.queue = queue.PriorityQueue()
-
+        self.partitions = dict()
+        
 
     def stop(self):
         """ Stops the Signal Interface Thread"""
         logger.debug("Stopping Signal Interface")
-        self.queue.put_nowait(SortableTuple((0, 'command', 'stop')))
+        if self.loop is not None:
+            self.stop_running.set()
+            self.loop.quit()
+
+        logger.debug("Signal Stopped")
 
     def set_alarm(self, alarm):
         """ Sets the alarm """
@@ -54,7 +59,7 @@ class SignalInterface(Thread):
         """ Enqueues an event"""
         # TODO Improve message display
        
-        # Open Cloze
+        # Open Close
         if raw['major'][0] in (0, 1):
             return
         
@@ -62,22 +67,27 @@ class SignalInterface(Thread):
         if raw['major'][0] == 48 and raw['minor'][0] == 2:
             return
 
-        # Squawk on off
-        if raw['major'][0] == 2 and raw['minor'][0] in (8, 9):
+        # Squawk on off, Partition Arm Disarm
+        if raw['major'][0] == 2 and raw['minor'][0] in (8, 9, 11, 12, 14):
             return
 
         # Bell Squawk
-        if raw['major'][0] == 3 and raw['minor'][0] in (3, ):
+        if raw['major'][0] == 3 and raw['minor'][0] in (2, 3):
+            return
+
+        # Arm in Sleep
+        if raw['major'][0] == 6 and raw['minor'][0] in (3, 4 ):
             return
 
         # Arming Through Winload
-        if raw['major'][0] == 30 and raw['minor'][0] == 5:
+        # PArtial Arming
+        if raw['major'][0] == 30 and raw['minor'][0] in (3, 5):
             return
 
         # Disarming Through Winload
         if raw['major'][0] == 34 and raw['minor'][0] == 1:
             return
-
+    
         self.queue.put_nowait(SortableTuple((2, 'event', raw)))
 
     def change(self, element, label, property, value):
@@ -104,21 +114,20 @@ class SignalInterface(Thread):
         self.signal = bus.get('org.asamk.Signal')
         self.signal.onMessageReceived = self.handle_message
         self.loop = GLib.MainLoop()
-
-        self.send_message("Active")
+    
         self.timer = GObject.idle_add(self.run_loop)
 
+        logger.debug("Signal Interface Running")
         try:
-            logger.debug("Signal Interface Running")
             self.loop.run()
-
+        
         except (KeyboardInterrupt, SystemExit):
-            logger.info("Exit start")
-            self.stop_running.set()
-            self.loop.quit()
-            self.stop()
-        except:
-            logger.exception("signal")
+            logger.debug("Signal loop stopping")
+            if self.alarm is not None:
+                self.loop.quit()
+                self.alarm.disconnect()
+        except :
+            logger.exception("Signal loop")
     
     def run_loop(self):
         try:
@@ -129,11 +138,10 @@ class SignalInterface(Thread):
                 self.handle_event(item[2])
             elif item[1] == 'notify':
                 self.send_message("{}: {}".format(item[2][0], item[2][1]))
-            elif item[1] == 'command':
-                if item[2] == 'stop':
-                    self.loop.quit()
+        except queue.Empty as e:
+            return
         except:
-            pass
+            logger.exception("loop")
 
         return True
 
@@ -233,9 +241,9 @@ class SignalInterface(Thread):
         """Handle Live Event"""
         #logger.debug("Live Event: raw={}".format(raw))
 
-        m = "{}: {}".format(raw['major'][1], raw['minor'][1])
-
-        self.send_message(m)
+        #m = "{}: {}".format(raw['major'][1], raw['minor'][1])
+         
+        self.send_message(str(raw))
         
 
     def handle_change(self, raw ):
@@ -246,11 +254,42 @@ class SignalInterface(Thread):
         #    label,
         #    property,
         #    value))
-        
- 
-        self.send_message("{} {} {} {}".format(element, label, property, value))
+        message = "{} {} {} {}".format(element, label, property, value)
+        if element == 'partition':
+            if element not in self.partitions:
+                self.partitions[label] = dict()
+            
+            self.partitions[label][property] = value
 
+            if property == 'arm_sleep':
+                return
+            elif property == 'exit_delay' :
+                if not value:
+                    return
+                else:
+                    message = "Partition {} in Exit Delay".format(label)
+                    if 'arm_sleep' in self.partitions[label] and self.partitions[label]['arm_sleep']:
+                        m = ''.join([m, ' (Sleep)'])
+            elif property == 'entry_delay' :
+                if not value:
+                    return
+                else:
+                    message = "Partition {} in Entry Delay".format(label)
+            elif property == 'arm':
+                try:
+                    if value:
+                        message = "Partition {} is Armed".format(label)
+                        if 'arm_sleep' in self.partitions[label] and self.partitions[label]['arm_sleep']:
+                            m = ''.join([m, ' (Sleep)'])
+                    else:
+                        message = "Partition {} is Disarmed".format(label)
+                except:
+                    logger.exception("ARM")
 
+            elif property == 'arm_full':
+                return
+
+        self.send_message(message)
 
 
     def normalize_payload(self, message):

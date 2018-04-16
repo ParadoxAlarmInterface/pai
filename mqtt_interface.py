@@ -26,7 +26,7 @@ class MQTTInterface(Thread):
         self.mqtt.on_disconnect = self.handle_disconnect
         self.connected = False
         self.alarm = None
-        self.state = {}
+        self.partitions = {}
         self.queue = queue.PriorityQueue()
 
         self.notification_handler = None
@@ -122,9 +122,9 @@ class MQTTInterface(Thread):
 
         # Process a Partition Command
         elif topics[2] == MQTT_PARTITION_TOPIC:
-
-            if command.startswith('code_toggle '):
-                tokens = command.split(' ')
+    
+            if command.startswith('code_toggle-'):
+                tokens = command.split('-')
                 if len(tokens) < 2:
                     return
                 
@@ -135,14 +135,19 @@ class MQTTInterface(Thread):
                 if element.lower() == 'all':
                     command = 'arm'
 
-                    for k,v in self.state.items():
+                    for k,v in self.partitions.items():
                         # If all and a single partition is armed, default is to desarm
-                        if v:
-                            command = 'disarm'
+                        for k1,v1 in self.partitions[k].items():
+                            if (k1 == 'arm' or k1 == 'exit_delay') and v1:
+                                command = 'disarm'
+                                break
+                        
+                        if command == 'disarm':
                             break
 
-                elif element in self.state:
-                    if self.state[element]['arm']:
+
+                elif element in self.partitions:
+                    if ('arm' in self.partitions[element] and self.partitions[element]['arm']) or ('exit_delay' in self.partitions[element] and self.partitions[element]['exit_delay']):
                         command = 'disarm'
                     else:
                         command = 'arm'
@@ -234,7 +239,7 @@ class MQTTInterface(Thread):
         #    label,
         #    property,
         #    value))
-        
+
         if MQTT_IGNORE_UNNAMED_PARTITIONS and label.startswith('Partition_'):
             return
 
@@ -245,9 +250,12 @@ class MQTTInterface(Thread):
             return
         
         # Keep track of ARM state
-        if element == 'partition' and property == 'arm':
-            self.state[label] = value
+        if element == 'partition':
+            if not label in self.partitions:
+                self.partitions[label] = dict()
 
+            self.partitions[label][property] = value
+        
         self.mqtt.publish('{}/{}/{}/{}/{}'.format(MQTT_BASE_TOPIC,
                                             MQTT_STATES_TOPIC,
                                             element,
@@ -264,7 +272,9 @@ class MQTTInterface(Thread):
             return 'on'
         elif payload in ['false', 'off', '0', 'disable']:
             return 'off'
-        elif payload in ['pulse', 'arm', 'disarm', 'arm_stay', 'arm_sleep', 'bypass', 'clear_bypass', 'code_toogle']:
+        elif payload in ['pulse', 'arm', 'disarm', 'arm_stay', 'arm_sleep', 'bypass', 'clear_bypass']:
+            return payload
+        elif 'code_toggle' in payload:
             return payload
 
         return None

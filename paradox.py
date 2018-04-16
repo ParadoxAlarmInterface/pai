@@ -99,7 +99,7 @@ class Paradox:
                 i += 1
 
             # Listen for events
-            while time.time() - tstart < KEEP_ALIVE_INTERVAL: 
+            while (time.time() - tstart) < KEEP_ALIVE_INTERVAL: 
                 self.send_wait_for_reply(None)
 
     def send_wait_for_reply(self, message_type=None, args=None, message=None, retries=5):
@@ -125,6 +125,9 @@ class Paradox:
 
             # Retry if no data was available
             if data is None or len(data) == 0:
+                if message is None:
+                    return None
+
                 time.sleep(0.25)
                 continue
 
@@ -137,6 +140,9 @@ class Paradox:
             try:
                 recv_message = msg.parse(data)
             except:
+                recv_message = None
+
+            if recv_message is None:
                 logging.exception("Error parsing message")
                 time.sleep(0.25)
                 continue
@@ -418,6 +424,8 @@ class Paradox:
                 change = dict(arm=False, arm_full=False, arm_sleep=False, arm_stay=False, alarm=False)
             elif minor == 12:
                 change = dict(arm=True)
+            elif minor == 14:
+                change = dict(exit_delay=True)
         elif major == 3:
             if minor in (0, 1):
                 change=dict(bell=(minor==1))
@@ -438,9 +446,10 @@ class Paradox:
             if event['type'] == 'Zone' and len(self.zones) > 0 and minor < len(self.zones):
                 self.update_properties('zone', self.zones, minor, change)
                 new_event['minor'] = (minor, self.zones[minor]['label'])
-            elif event['type'] == 'Partition' and len(self.partitions) > 0 and minor < len(self.partitions):
-                self.update_properties('partition', self.partitions, minor, change)
-                new_event['minor'] = (minor, self.partitions[minor]['label'])
+            elif event['type'] == 'Partition' and len(self.partitions) > 0:
+                pass
+                #self.update_properties('partition', self.partitions, minor, change)
+                #new_event['minor'] = (minor, self.partitions[minor]['label'])
             elif event['type'] == 'Output' and len(self.outputs) and minor < len(self.outputs):
                 self.update_properties('output', self.outputs, minor, change)
                 new_event['minor'] = (minor, self.outputs[minor]['label'])
@@ -459,7 +468,7 @@ class Paradox:
         # Publish changes and update state
         for k, v in change.items():
             old = None
-
+           
             if k in element_list[index]:
                 old = element_list[index][k]
         
@@ -467,9 +476,11 @@ class Paradox:
                     logger.debug("Change {}/{}/{} from {} to {}".format(element_type, element_list[index]['label'], k, old, change[k]))
                     element_list[index][k] = change[k]
                     self.interface.change(element_type, element_list[index]['label'],
-                                          k, change[k])
+                                          k, change[k], initial=False)
             else:
                 element_list[index][k] = v # Initial value
+                self.interface.change(element_type, element_list[index]['label'],
+                                          k, change[k], initial=True)
 
     def handle_status(self, message):
         """Handle MessageStatus"""
@@ -478,8 +489,6 @@ class Paradox:
             return
         
         logger.debug("Handle Status")
-        if LOGGING_DUMP_MESSAGES:
-            logger.debug("{}".format(message))
 
         if message.fields.value.address == 0:
             self.power.update(
@@ -511,9 +520,10 @@ class Paradox:
 
     def disconnect(self):
         reply = self.send_wait_for_reply(msg.TerminateConnection, None)
+        
         if reply is not None and reply.fields.value.message == 0x05:
             logger.info("Disconnected: {}".format(reply.fields.value.message))
         else:
             logger.error("Got error from panel: {}".format(reply.fields.value.message))
-
         self.run = False
+

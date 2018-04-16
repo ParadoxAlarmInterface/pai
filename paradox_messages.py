@@ -49,6 +49,8 @@ def parse(message):
         return LiveEvent.parse(message)
     elif message[0] >> 4 == 0x04:
         return MonitoringResponse.parse(message)
+    elif message[0] == 0x70:
+        return TerminateConnection.parse(message)
     else:
         print("Unknown message")
         for c in message:

@@ -52,11 +52,14 @@ class InterfaceManager():
                 logger.exception("Error dispatching notification to interface {}".format(interface['name']))
                 
     def stop(self):
+        logger.debug("Stopping all interfaces")
         for interface in self.interfaces:
             try:
+                logger.debug("\t{}".format(interface['name']))
                 interface['object'].stop()
             except:
                 logger.exception("Error stoping interface {}".format(interface['name']))
+        logger.debug("All Interfaces stopped")
 
     def set_alarm(self, alarm):
         for interface in self.interfaces:
@@ -125,13 +128,14 @@ def main():
     logger.info("Starting...")
     # Start interacting with the alarm
 
-    interface_manager.notify("main", "PAI active")
     while True:
         try:
             alarm = Paradox(connection=connection, interface=interface_manager)
             if alarm.connect():
                 interface_manager.set_alarm(alarm)
+                interface_manager.notify("PAI", "Alarm Interface Active")
                 alarm.loop()
+                break
             else:
                 logger.error("Unable to connect to alarm")
                 break
@@ -144,10 +148,10 @@ def main():
         except:
             logger.exception("Restarting")
             time.sleep(1)
-
-    #connection.close()
+        
     interface_manager.stop()
     logger.info("Good bye!")
+
 
 
 if __name__ == '__main__':

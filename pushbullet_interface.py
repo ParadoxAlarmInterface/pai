@@ -98,6 +98,7 @@ class PushBulletWSClient(WebSocketBaseClient):
                     self.pb.push_note("paradox", msg, chat=chat)
                 except:
                     logger.exception("Sending message")
+                    time.sleep(5)
 
     def send_command(self, message):
         """Handle message received from the MQTT broker"""
