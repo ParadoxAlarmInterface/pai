@@ -91,7 +91,7 @@ class PartitionStatusAdapter(Adapter):
               auto_arming=obj[i * 4 + 2] & 0x04 != 0,
               voice_arming=obj[i * 4 + 2] & 0x08 != 0,
               zone_tamper_trouble=obj[i * 4 + 2] & 0x10 != 0,
-              zone_low_battery_trouble=obj[i * 4 + 2] & 0x20 != 0,
+              #zone_low_battery_trouble=obj[i * 4 + 2] & 0x20 != 0,
               zone_fire_loop_trouble=obj[i * 4 + 2] & 0x40 != 0,
               zone_supervision_trouble=obj[i * 4 + 2] & 0x80 != 0,
               )

@@ -101,7 +101,7 @@ class SignalInterface(Thread):
     def notify(self, source, message):
         if source == self.name:
             return
-
+        
         self.queue.put_nowait(SortableTuple((2, 'notify', (source, message))))
 
 
@@ -132,14 +132,16 @@ class SignalInterface(Thread):
     def run_loop(self):
         try:
             item = self.queue.get(block=True, timeout=1)
+            
             if item[1] == 'change':
                 self.handle_change(item[2])
             elif item[1] == 'event':
                 self.handle_event(item[2])
             elif item[1] == 'notify':
                 self.send_message("{}: {}".format(item[2][0], item[2][1]))
+
         except queue.Empty as e:
-            return
+            return True
         except:
             logger.exception("loop")
 
@@ -150,19 +152,16 @@ class SignalInterface(Thread):
             logger.warning("Signal not available when sending message")
             return
         
-        for contact in SIGNAL_CONTACTS:
-            self.signal.sendMessage(str(message), [], [contact])
+        self.signal.sendMessage(str(message), [], SIGNAL_CONTACTS)
 
+        #for contact in SIGNAL_CONTACTS:
+        #    self.signal.sendMessage(str(message), [], [contact])
+        #    time.sleep(1)
 
-    def handle_message (timestamp, source, groupID, message, attachments):
+    def handle_message (self, timestamp, source, groupID, message, attachments):
         """ Handle Signal message. It should be a command """
 
-        logger.debug("Received Message {}".format(message))
-        try:
-            message = json.loads(str(message))
-        except:
-            logger.exception("Unable to parse message")
-            return
+        logger.debug("Received Message {} {} {} {} {}".format(timestamp, message, groupID, message, attachments))
 
         if self.alarm == None:
             return
@@ -171,11 +170,14 @@ class SignalInterface(Thread):
             ret = self.send_command(message)
 
             if ret:
-                logger.info("From {} ACCEPTED: {}".format(p.get('sender_email_normalized'), message))
+                logger.info("ACCEPTED: {}".format(message))
+                self.send_message("ACCEPTED: {}".format(message))
             else:
-                logger.warning("From {} UNKNOWN: {}".format(p.get('sender_email_normalized'), message))
+                logger.warning("REJECTED: {}".format(message))
+                self.send_message("REJECTED: {}".format(message))
         else:
-            logger.warning("Command from INVALID SENDER {}: {}".format(p.get('sender_email_normalized'), message))
+            logger.warning("REJECTED: {}".format(message))
+            self.send_message("REJECTED: {}".format(message))
 
 
 
@@ -233,17 +235,25 @@ class SignalInterface(Thread):
 
     def handle_notify(self, raw):
         source, message = raw
-
-        self.send_message(message)
-
+        try:
+            self.send_message(message)
+        except:
+            logger.exception("handle_notify")
 
     def handle_event(self, raw):
         """Handle Live Event"""
         #logger.debug("Live Event: raw={}".format(raw))
 
         #m = "{}: {}".format(raw['major'][1], raw['minor'][1])
-         
-        self.send_message(str(raw))
+        major_code = raw['major'][0]
+        minor_code = raw['minor'][1]
+
+        if major_code == 29:
+            self.send_message("Arming by user {}".format(minor_code))
+        elif major_code == 31:
+            self.send_message("Disarming by user {}".format(minor_code))
+        else:
+            self.send_message(str(raw))
         
 
     def handle_change(self, raw ):
