@@ -1,7 +1,10 @@
+pydbus==0.6.0
 pushbullet.py==0.11.0
 ws4py==0.4.2
-pydbus==0.6.0
 construct==2.9.43
 gi==1.2
 paho_mqtt==1.3.1
 pyserial==3.4
+construct==2.9.43
+pydbus==0.6.0
+pygobject==3.20.0
