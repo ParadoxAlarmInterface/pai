@@ -29,8 +29,25 @@ Tested in the following environment:
 
 ## Steps to use it:
 1.  Download the files in this repository and place it in some directory
-2.  Copy config.ini.example to config_sample.py to config.py and edit it to match your setup
-3.  Run the script: python3 main.py
+```
+git clone https://github.com/jpbarraca/pai.git
+```
+
+2.  Copy config_sample.py to config.py and edit it to match your setup
+```
+cp config_sample.py config.py
+```
+
+3.  Install the python requirements
+
+```
+pip3 install -r requirements.txt
+```
+3.  Run the script: 
+```
+python3 main.py
+```
+
 
 
 ## MQTT
