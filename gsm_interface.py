@@ -57,11 +57,11 @@ class GSMInterface(Thread):
         
         # Fire Alarm and Strobe
         # Special Alarms
-        if raw['major'][0] == 37 or 
-            (raw['major'][0] == 2 and raw['minor'][0] == 6) or
+        if raw['major'][0] == 37 or \
+            (raw['major'][0] == 2 and raw['minor'][0] == 6) or \
             (raw['major'][0] == 40  and raw['minor'][0] in [0,1,2,3,4,5]):
 
-        self.queue.put_nowait(SortableTuple((2, 'event', (raw))))
+            self.queue.put_nowait(SortableTuple((2, 'event', (raw))))
 
 
     def change(self, element, label, property, value):
