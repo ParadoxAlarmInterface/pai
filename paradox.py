@@ -391,11 +391,98 @@ class Paradox:
         """Process Live Event Message and dispatch it to the interface module"""
         event = message.fields.value.event
         logger.debug("Handle Event: {}".format(event))
+        
+        new_event = self.process_event(event)
+        
+        self.generate_event_notifications(new_event)
+
+        # Publish event
+        if self.interface is not None:
+            self.interface.event(raw=new_event)
+        
+
+    
+    def generate_event_notifications(self, event):
+        major_code = event['major'][0]
+        minor_code = event['minor'][0]
+
+        # IGNORED
+
+        # Open Close
+        if major_code in (0, 1):
+            return
+
+        # Software Log on
+        if major_code == 48 and minor_code == 2:
+            return
+
+        # Squawk on off, Partition Arm Disarm
+        if major_code == 2 and minor_code in (8, 9, 11, 12, 14):
+            return
+
+        # Bell Squawk
+        if major_code == 3 and minor_code in (2, 3):
+            return
+
+        # Arm in Sleep
+        if major_code == 6 and minor_code in (3, 4 ):
+            return
+
+        # Arming Through Winload
+        # Partial Arming
+        if major_code == 30 and minor_code in (3, 5):
+            return
+
+        # Disarming Through Winload
+        if major_code == 34 and minor_code == 1:
+            return
+        
+        ## CRITICAL Events
+
+        # Fire Delay Started
+        # Zone in Alarm
+        # Fire Alarm
+        # Zone Alarm Restore
+        # Fire Alarm Restore
+        # Zone Tampered
+        # Zone Tamper Restore
+        # Non Medical Alarm
+        if major_code in [24, 36, 37, 40, 42, 43, 57] or \
+            ( major_code in [44, 45] and minor_code in [1, 2, 3, 4, 5, 6, 7]):
+             self.interface.notify("Paradox", "{} {}".format(raw['major'][1], raw['minor'][1]), logging.CRITICAL)
+        
+        # Silent Alarm
+        # Buzzer Alarm
+        # Steady Alarm
+        # Pulse Alarm
+        # Strobe
+        # Alarm Stopped
+        elif major_code == 2 and minor_code in [2,3,4,5,6,7]:
+            zones_open = []
+            zones_in_alarm = []
+            for zone in self.zones:
+                if zone['alarm']:
+                    zones_in_alarm.append(zone['label'])
+                if zone['open']:
+                    zones_open.append(zone['label'])
+
+                self.interface.notify("Paradox", "{} open: {}, alarm: {}".format(event['minor'][1], ','.join(zones_open), ','.join(zones_in_alarm)), logging.CRITICAL)
+
+        # Special Alarm, New Trouble and Trouble Restore
+        elif major_code in [40, 44, 45] and minor_code in [1, 2, 3, 4, 5, 6, 7]:
+            self.interface.notify("Paradox", "{}: {}".format(event['major'][1], event['minor'][1]), logging.CRITICAL)
+        
+        # Remaining events trigger lower level notifications
+        self.interface.notify("Paradox", "{}: {}".format(event['major'][1], event['minor'][1]), logging.INFO)
+
+
+    def process_event(self, event):
 
         major = event['major'][0]
         minor = event['minor'][0]
 
         change = None
+
         # ZONES
         if major in (0, 1):
             change=dict(open=(major==1))
@@ -454,10 +541,8 @@ class Paradox:
                 self.update_properties('output', self.outputs, minor, change)
                 new_event['minor'] = (minor, self.outputs[minor]['label'])
 
-        # Publish event
-        if self.interface is not None:
-            self.interface.event(
-                raw=new_event)
+        return new_event
+
 
     def update_properties(self, element_type, element_list, index, change):
         #logger.debug("Update Properties {} {} {}".format(element_type, index, change))
@@ -477,6 +562,11 @@ class Paradox:
                     element_list[index][k] = change[k]
                     self.interface.change(element_type, element_list[index]['label'],
                                           k, change[k], initial=False)
+
+                    # Trigger notifications for Partitions changes
+                    if element_type == "Partition":
+                        self.interface.notify("Paradox", "{} {} {}".format(element_list[index]['label'], k, change[k]), logging.INFO)
+
             else:
                 element_list[index][k] = v # Initial value
                 self.interface.change(element_type, element_list[index]['label'],

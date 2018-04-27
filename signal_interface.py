@@ -57,52 +57,20 @@ class SignalInterface(Thread):
 
     def event(self, raw):
         """ Enqueues an event"""
-        # TODO Improve message display
-       
-        # Open Close
-        if raw['major'][0] in (0, 1):
-            return
-        
-        # Software Log on
-        if raw['major'][0] == 48 and raw['minor'][0] == 2:
-            return
-
-        # Squawk on off, Partition Arm Disarm
-        if raw['major'][0] == 2 and raw['minor'][0] in (8, 9, 11, 12, 14):
-            return
-
-        # Bell Squawk
-        if raw['major'][0] == 3 and raw['minor'][0] in (2, 3):
-            return
-
-        # Arm in Sleep
-        if raw['major'][0] == 6 and raw['minor'][0] in (3, 4 ):
-            return
-
-        # Arming Through Winload
-        # PArtial Arming
-        if raw['major'][0] == 30 and raw['minor'][0] in (3, 5):
-            return
-
-        # Disarming Through Winload
-        if raw['major'][0] == 34 and raw['minor'][0] == 1:
-            return
-    
-        self.queue.put_nowait(SortableTuple((2, 'event', raw)))
+        return
 
     def change(self, element, label, property, value):
         """ Enqueues a change """
-        
-        if element == 'zone':
-            return
+        return
 
-        self.queue.put_nowait(SortableTuple((2, 'change', (element, label, property, value))))
-
-    def notify(self, source, message):
+    def notify(self, source, message, level):
         if source == self.name:
             return
         
-        self.queue.put_nowait(SortableTuple((2, 'notify', (source, message))))
+        if level < logging.INFO:
+            return
+        
+        self.queue.put_nowait(SortableTuple((2, 'notify', (source, message, level))))
 
 
     def run(self):
@@ -234,7 +202,8 @@ class SignalInterface(Thread):
     
 
     def handle_notify(self, raw):
-        source, message = raw
+        source, message, level = raw
+
         try:
             self.send_message(message)
         except:

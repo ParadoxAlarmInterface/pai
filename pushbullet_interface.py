@@ -163,17 +163,18 @@ class PushBulletWSClient(WebSocketBaseClient):
 
         return None
 
-    def notify(self, source, message):
-        self.send_message("{}: {}".format(source, message))
+    def notify(self, source, message, level):
+        if level < logging.INFO:
+            return
+
+        try:
+            self.send_message("{}".format(message))
+        except:
+            logging.exception("Pushbullet notify")
 
     def event(self, raw):
         """Handle Live Event"""
-        #logger.debug("Live Event: raw={}".format(raw))
-
-        # TODO Improve message display
-        if raw['type'] == 'Partition' or raw['type'] == 'System' or raw['type'] == 'Trouble':
-            self.send_message(json.dumps(raw))
-        
+        return 
 
     def change(self, element, label, property, value):
         """Handle Property Change"""
@@ -181,11 +182,8 @@ class PushBulletWSClient(WebSocketBaseClient):
         #    element,
         #    label,
         #    property,
-        #    value))
-        
-        # TODO Improve message display
-        if element == 'partition' or element == 'system' or element == 'trouble':
-            self.send_message("{} {} {} {}".format(element, label, property, value))
+        #    value))    
+        return
 
 class PushBulletInterface(Thread):
     """Interface Class using Pushbullet"""

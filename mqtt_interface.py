@@ -82,7 +82,7 @@ class MQTTInterface(Thread):
         self.queue.put_nowait(SortableTuple((2, 'change', (element, label, property, value))))
 
     # not supported
-    def notify(self, source, message):
+    def notify(self, source, message, level):
         pass
 
     ## Handlers here

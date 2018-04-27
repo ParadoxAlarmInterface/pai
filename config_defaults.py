@@ -57,4 +57,11 @@ PUSHBULLET_SECRET = ''
 PUSHBULLET_CONTACTS = [] # PB User identifiers for notifications
 
 # Signal
-SIGNAL_CONTACTS = ''
+SIGNAL_CONTACTS = []
+
+# GSM
+GSM_MODEM_BAUDRATE = 115200
+GSM_MODEM_PORT = ''
+GSM_CONTACTS = []
+
+
