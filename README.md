@@ -16,6 +16,7 @@ Tested in the following environment:
 * Paradox MG5050 panel
 * [Signal Cli](https://github.com/AsamK/signal-cli) through a DBUS interface
 * Pushbullet.py
+* SIM900 module through serial port
 
 
 ## Structure
@@ -120,6 +121,11 @@ The Pushbullet Interface allows accessing major state changes and arming/disarmi
 
 In order to use this interface, please set the relevant configuration settings. The ```PUSHBULLET_CONTACTS``` setting should contain a list of contacts used for pushbullet notifications.
 
+## GSM
+
+The GSM Interface will notify users of major events through SMS and will accept commands through the same method.
+
+In order to use this interface, please et the relevant configuration settings. The ```GSM_CONTACTS```setting should contain a list of contacts used for notifications and commands. Only these contacts will be allowed to control the alarm.
 
 ## Acknowledgments
 
