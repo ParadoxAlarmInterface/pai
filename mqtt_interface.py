@@ -152,7 +152,7 @@ class MQTTInterface(Thread):
                     else:
                         command = 'arm'
                 
-                    self.notification_handler.notify('mqtt', "Command by {}: {}".format(MQTT_TOGGLE_CODES[tokens[1]], command))
+                    self.notification_handler.notify('mqtt', "Command by {}: {}".format(MQTT_TOGGLE_CODES[tokens[1]], command), logging.INFO)
                 else:
                     logger.debug("Element {} not found".format(element))
                     return
@@ -240,13 +240,7 @@ class MQTTInterface(Thread):
         #    property,
         #    value))
 
-        if MQTT_IGNORE_UNNAMED_PARTITIONS and label.startswith('Partition_'):
-            return
-
-        if MQTT_IGNORE_UNNAMED_ZONES and label.startswith('Zone_'):
-            return
-
-        if MQTT_IGNORE_UNNAMED_OUTPUTS and label.startswith('Output_'):
+        if MQTT_IGNORE_UNNAMED_PARTITIONS and (label.startswith('Partition_') or label.startswith('Zone_') or label.startswith('Output_')):
             return
         
         # Keep track of ARM state
@@ -256,9 +250,18 @@ class MQTTInterface(Thread):
 
             self.partitions[label][property] = value
         
+        if element == 'partition':
+            element_topic = MQTT_PARTITION_TOPIC
+        elif element == 'zone':
+            element_topic = MQTT_ZONE_TOPIC
+        elif element == 'output':
+            element_topic = MQTT_OUTPUT_TOPIC
+        else:
+            element_topic = element
+        
         self.mqtt.publish('{}/{}/{}/{}/{}'.format(MQTT_BASE_TOPIC,
                                             MQTT_STATES_TOPIC,
-                                            element,
+                                            element_topic,
                                             label,
                                             property),
                           "{}".format(value), 0, MQTT_RETAIN)
