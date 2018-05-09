@@ -449,7 +449,7 @@ class Paradox:
         # Non Medical Alarm
         if major_code in [24, 36, 37, 40, 42, 43, 57] or \
             ( major_code in [44, 45] and minor_code in [1, 2, 3, 4, 5, 6, 7]):
-             self.interface.notify("Paradox", "{} {}".format(raw['major'][1], raw['minor'][1]), logging.CRITICAL)
+             self.interface.notify("Paradox", "{} {}".format(event['major'][1], event['minor'][1]), logging.CRITICAL)
         
         # Silent Alarm
         # Buzzer Alarm
@@ -460,11 +460,11 @@ class Paradox:
         elif major_code == 2 and minor_code in [2,3,4,5,6,7]:
             zones_open = []
             zones_in_alarm = []
-            for zone in self.zones:
-                if zone['alarm']:
-                    zones_in_alarm.append(zone['label'])
-                if zone['open']:
-                    zones_open.append(zone['label'])
+            for i in range(len(self.zones)):
+                if self.zones[i]['alarm']:
+                    zones_in_alarm.append(self.zones[i]['label'])
+                if self.zones[i]['open']:
+                    zones_open.append(self.zones[i]['label'])
 
                 self.interface.notify("Paradox", "{} open: {}, alarm: {}".format(event['minor'][1], ','.join(zones_open), ','.join(zones_in_alarm)), logging.CRITICAL)
 
@@ -564,7 +564,7 @@ class Paradox:
                                           k, change[k], initial=False)
 
                     # Trigger notifications for Partitions changes
-                    if element_type == "Partition":
+                    if element_type == "partition":
                         self.interface.notify("Paradox", "{} {} {}".format(element_list[index]['label'], k, change[k]), logging.INFO)
 
             else:

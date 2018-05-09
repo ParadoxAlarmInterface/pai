@@ -136,9 +136,9 @@ class MQTTInterface(Thread):
                     command = 'arm'
 
                     for k,v in self.partitions.items():
-                        # If all and a single partition is armed, default is to desarm
+                        # If "all" and a single partition is armed, default is to desarm
                         for k1,v1 in self.partitions[k].items():
-                            if (k1 == 'arm' or k1 == 'exit_delay') and v1:
+                            if (k1 == 'arm' or k1 == 'exit_delay' or k1 == 'entry_delay') and v1:
                                 command = 'disarm'
                                 break
                         
@@ -152,7 +152,6 @@ class MQTTInterface(Thread):
                     else:
                         command = 'arm'
                 
-                    self.notification_handler.notify('mqtt', "Command by {}: {}".format(MQTT_TOGGLE_CODES[tokens[1]], command), logging.INFO)
                 else:
                     logger.debug("Element {} not found".format(element))
                     return
@@ -164,6 +163,7 @@ class MQTTInterface(Thread):
                     "Invalid command for Partition {}".format(command))
                 return
             
+            self.notification_handler.notify('mqtt', "Command by {}: {}".format(MQTT_TOGGLE_CODES[tokens[1]], command), logging.INFO)
             if not self.alarm.control_partition(element, command):
                 logger.warning(
                     "Partition command refused: {}={}".format(element, command))
