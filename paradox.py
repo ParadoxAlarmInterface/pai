@@ -27,13 +27,11 @@ class Paradox:
     def __init__(self,
                  connection,
                  interface,
-                 retries=3,
-                 alarmeventmap="ParadoxMG5050"):
+                 retries=3):
 
         self.connection = connection
         self.connection.timeout(0.5)
         self.retries = retries
-        self.alarmeventmap = alarmeventmap
         self.interface = interface
 
         # Keep track of alarm state
