@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # Signal interface.
 # Only exposes critical status changes and accepts commands
 from pydbus import SystemBus

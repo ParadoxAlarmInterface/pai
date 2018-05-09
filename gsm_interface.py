@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # GSM interface.
 # Only exposes critical status changes and accepts commands
 import time

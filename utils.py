@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 
 class SortableTuple(tuple):
     def __lt__(self, rhs):

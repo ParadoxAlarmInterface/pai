@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from construct import *
 from paradox_message_adapters import *
 

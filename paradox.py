@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import paradox_messages as msg
 from serial_connection import *
 import logging
@@ -445,9 +447,15 @@ class Paradox:
         # Zone Tampered
         # Zone Tamper Restore
         # Non Medical Alarm
-        if major_code in [24, 36, 37, 40, 42, 43, 57] or \
+        if major_code in [24, 36, 37, 38, 39, 40, 42, 43, 57] or \
             ( major_code in [44, 45] and minor_code in [1, 2, 3, 4, 5, 6, 7]):
-             self.interface.notify("Paradox", "{} {}".format(event['major'][1], event['minor'][1]), logging.CRITICAL)
+            # Zone Alarm Restore
+            if major_code in [36, 38]:
+                detail = self.zones[event['minor'][0]]['label']
+            else:
+                detail = event['minor'][1]
+
+            self.interface.notify("Paradox", "{} {}".format(event['major'][1], detail), logging.CRITICAL)
         
         # Silent Alarm
         # Buzzer Alarm
