@@ -564,7 +564,8 @@ class Paradox:
                                           k, change[k], initial=False)
 
                     # Trigger notifications for Partitions changes
-                    if element_type == "partition":
+                    # Ignore some changes as defined in the configuration
+                    if element_type == "partition" and k not in PARTITIONS_CHANGE_NOTIFICATION_IGNORE:
                         self.interface.notify("Paradox", "{} {} {}".format(element_list[index]['label'], k, change[k]), logging.INFO)
 
             else:
