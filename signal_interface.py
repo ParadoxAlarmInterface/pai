@@ -121,8 +121,10 @@ class SignalInterface(Thread):
         if self.signal is None:
             logger.warning("Signal not available when sending message")
             return
-        
-        self.signal.sendMessage(str(message), [], SIGNAL_CONTACTS)
+        try:    
+            self.signal.sendMessage(str(message), [], SIGNAL_CONTACTS)
+        except:
+            logger.exception("Signal send message")
 
         #for contact in SIGNAL_CONTACTS:
         #    self.signal.sendMessage(str(message), [], [contact])
@@ -158,49 +160,54 @@ class SignalInterface(Thread):
 
         if len(tokens) != 3:
             logger.warning("Message format is invalid")
-            return
+            return False
 
         if self.alarm == None:
             logger.error("No alarm registered")
-            return
+            return False
 
         element_type = tokens[0].lower()
         element = tokens[1]
-        command = self.normalize_payload(tokens[2])
+        command = self.normalize_payload(tokens[2].lower())
         
         # Process a Zone Command
         if element_type == 'zone':
             if command not in ['bypass', 'clear_bypass']:
                 logger.error("Invalid command for Zone {}".format(command))
-                return
+                return False
 
             if not self.alarm.control_zone(element, command):
                 logger.warning(
                     "Zone command refused: {}={}".format(element, command))
+                return False
 
         # Process a Partition Command
         elif element_type == 'partition':
             if command not in ['arm', 'disarm', 'arm_stay', 'arm_sleep']:
                 logger.error(
                     "Invalid command for Partition {}".format(command))
-                return
+                return False
 
             if not self.alarm.control_partition(element, command):
                 logger.warning(
                     "Partition command refused: {}={}".format(element, command))
-       
+                return False
+
         # Process an Output Command
         elif element_type == 'output':
             if command not in ['on', 'off', 'pulse']:
                 logger.error("Invalid command for Output {}".format(command))
-                return
+                return False
 
             if not self.alarm.control_output(element, command):
                 logger.warning(
                     "Output command refused: {}={}".format(element, command))
+                return False
         else:
             logger.error("Invalid control property {}".format(element))
-
+            return False
+        
+        return True
     
 
     def handle_notify(self, raw):
@@ -269,6 +276,12 @@ class SignalInterface(Thread):
 
             elif property == 'arm_full':
                 return
+        elif element == 'zone':
+            if property == 'alarm':
+                if value:
+                    message = "Zone {} is in Alarm".format(label)
+                else:
+                    message = "Zone {} Alarm cleared".format(label)
 
         self.send_message(message)
 

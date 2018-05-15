@@ -156,14 +156,15 @@ class MQTTInterface(Thread):
                     logger.debug("Element {} not found".format(element))
                     return
 
-            logger.debug("Effective command: {} = {}".format(element, command))
+                logger.debug("Effective command: {} = {}".format(element, command))
 
-            if command not in ['arm', 'disarm', 'arm_stay', 'arm_sleep']:
-                logger.error(
-                    "Invalid command for Partition {}".format(command))
-                return
+                if command not in ['arm', 'disarm', 'arm_stay', 'arm_sleep']:
+                    logger.error(
+                        "Invalid command for Partition {}".format(command))
+                    return
             
-            self.notification_handler.notify('mqtt', "Command by {}: {}".format(MQTT_TOGGLE_CODES[tokens[1]], command), logging.INFO)
+                self.notification_handler.notify('mqtt', "Command by {}: {}".format(MQTT_TOGGLE_CODES[tokens[1]], command), logging.INFO)
+
             if not self.alarm.control_partition(element, command):
                 logger.warning(
                     "Partition command refused: {}={}".format(element, command))

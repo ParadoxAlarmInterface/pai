@@ -53,12 +53,14 @@ class Paradox:
             if reply is None:
                 return False
 
-            logging.info("Found Panel {} version {}.{} build {}".format(
+            logger.info("Interface connected")
+            logger.info("Found Panel {} version {}.{} build {}".format(
                 (reply.fields.value.label.decode('latin').strip()),
                 reply.fields.value.application.version,
                 reply.fields.value.application.revision,
                 reply.fields.value.application.build))
             reply = self.send_wait_for_reply(msg.SerialInitialization, None)
+            
             if reply is None:
                 return False
 
@@ -67,12 +69,11 @@ class Paradox:
 
             if reply is None:
                 return False
-
-            logger.info("Connected!")
-
+            
             self.update_labels()
             
             self.run = True
+            logger.info("Connection OK")
 
             return True
         except:
@@ -85,24 +86,26 @@ class Paradox:
         args = {}
 
         while self.run:
-            logger.debug("Getting alarm status")
+            #logger.debug("Getting alarm status")
             
             tstart = time.time()
+            try:
+                i = 0
+                while i < 3:
+                    args = dict(address=MEM_STATUS_BASE1 + i)
+                    reply = self.send_wait_for_reply(msg.Upload, args)
+                    if reply is not None:
+                        self.handle_status(reply)
 
-            i = 0
-            while i < 3:
-                args = dict(address=MEM_STATUS_BASE1 + i)
-                reply = self.send_wait_for_reply(msg.Upload, args)
-                if reply is not None:
-                    self.handle_status(reply)
-
-                i += 1
-
+                    i += 1
+            except:
+                logger.exception("Loop")
+                
             # Listen for events
             while (time.time() - tstart) < KEEP_ALIVE_INTERVAL: 
-                self.send_wait_for_reply(None)
+                self.send_wait_for_reply(None, timeout=0.5)
 
-    def send_wait_for_reply(self, message_type=None, args=None, message=None, retries=5):
+    def send_wait_for_reply(self, message_type=None, args=None, message=None, retries=5, timeout=5):
         if message is None and message_type is not None:
             message = message_type.build(dict(fields=dict(value=args)))
 
@@ -119,6 +122,7 @@ class Paradox:
             
             with serial_lock:
                 if message is not None:
+                    self.connection.timeout(timeout)
                     self.connection.write(message)
             
                 data = self.connection.read()
@@ -152,7 +156,11 @@ class Paradox:
 
             # Events are async
             if recv_message.fields.value.po.command == 0xe:
-                self.handle_event(recv_message)
+                try:
+                    self.handle_event(recv_message)
+                except:
+                    logger.exception("Handle event")
+
                 time.sleep(0.25)
                 continue
 
@@ -450,10 +458,11 @@ class Paradox:
         if major_code in [24, 36, 37, 38, 39, 40, 42, 43, 57] or \
             ( major_code in [44, 45] and minor_code in [1, 2, 3, 4, 5, 6, 7]):
             # Zone Alarm Restore
-            if major_code in [36, 38]:
-                detail = self.zones[event['minor'][0]]['label']
-            else:
-                detail = event['minor'][1]
+            #if major_code in [36, 38]:
+            
+                #detail = self.zones[event['minor'][0]]['label']
+            #else:
+            detail = event['minor'][1]
 
             self.interface.notify("Paradox", "{} {}".format(event['major'][1], detail), logging.CRITICAL)
         
@@ -463,16 +472,23 @@ class Paradox:
         # Pulse Alarm
         # Strobe
         # Alarm Stopped
-        elif major_code == 2 and minor_code in [2,3,4,5,6,7]:
-            zones_open = []
-            zones_in_alarm = []
-            for i in range(len(self.zones)):
-                if self.zones[i]['alarm']:
-                    zones_in_alarm.append(self.zones[i]['label'])
-                if self.zones[i]['open']:
-                    zones_open.append(self.zones[i]['label'])
+        # Entry Delay
+        elif major_code == 2:
+            if minor_code in [2,3,4,5,6,7, 13]:
+                zones_in_alarm = []
+                for i in range(1, len(self.zones)):
+                    if 'in_alarm' in self.zones[i] and self.zones[i]['in_alarm']:
+                        zones_in_alarm.append(self.zones[i]['label'])
+                
+                self.interface.notify("Paradox", "{} zones: {}".format(event['minor'][1], ','.join(zones_in_alarm)), logging.CRITICAL)
+                
+            elif minor_code == 13:
+                zones_open = []
+                for i in range(1, len(self.zones)):
+                    if 'open' in self.zones[i] and self.zones[i]['open']:
+                        zones_open.append(self.zones[i]['label'])
 
-                self.interface.notify("Paradox", "{} open: {}, alarm: {}".format(event['minor'][1], ','.join(zones_open), ','.join(zones_in_alarm)), logging.CRITICAL)
+                self.interface.notify("Paradox", "{} open: {}".format(event['minor'][1], ','.join(zones_open)), logging.INFO)
 
         # Special Alarm, New Trouble and Trouble Restore
         elif major_code in [40, 44, 45] and minor_code in [1, 2, 3, 4, 5, 6, 7]:
@@ -585,7 +601,6 @@ class Paradox:
         if message.fields.value.po.command != 0x05:
             return
         
-        logger.debug("Handle Status")
 
         if message.fields.value.address == 0:
             self.power.update(
@@ -604,7 +619,6 @@ class Paradox:
             i = 1
             while i <= PARTITIONS and i in message.fields.value.partition_status:
                 v = message.fields.value.partition_status[i]
-                logger.debug("Partition Status {}".format(v))
                 self.update_properties('partition', self.partitions, i, v)
                 i += 1
 
