@@ -42,6 +42,7 @@ class Paradox:
         self.partitions = []
         self.outputs = []
         self.power = dict()
+        self.last_power_update = 0
         self.run = False
 
     def connect(self):
@@ -608,6 +609,12 @@ class Paradox:
                     vdc=message.fields.value.vdc,
                     battery=message.fields.value.battery,
                     dc=message.fields.value.dc))
+
+            if time.time() - self.last_power_update > POWER_UPDATE_INTERVAL:
+                self.last_power_update = time.time()
+                self.interface.change('system','power','vdc', round(message.fields.value.vdc,2), False)
+                self.interface.change('system','power','battery', round(message.fields.value.battery,2), False)
+                self.interface.change('system','power','dc', round(message.fields.value.dc,2), False)
 
             i = 1
             while i <= ZONES and i in message.fields.value.zone_status:
