@@ -23,19 +23,19 @@ class GSMInterface(Thread):
     """Interface Class using GSM"""
     name = 'gsm'
 
-    modem = None
+    port = None
     alarm = None
     stop_running = Event()
     thread = None
     loop = None
-    
+    notification_handler = None 
     
     def __init__(self):
         Thread.__init__(self)
         
         self.queue = queue.PriorityQueue()
         self.partitions = dict()
-        
+        self.stop_running.clear() 
 
     def stop(self):
         """ Stops the GSM Interface Thread"""
@@ -87,7 +87,6 @@ class GSMInterface(Thread):
             data += self.port.read()
         
         data = data.strip().decode('latin-1')
-
         return data
 
     def run(self):
@@ -102,23 +101,28 @@ class GSMInterface(Thread):
             self.write('ATE0')
             self.write('AT+CMGF=1')
             self.write('AT+CNMI=1,2,0,0,0')
+            self.write('AT+CUSD=1,"*111#"')
 
-            while not self.stop_running:
-                time.sleep(1)
+            logger.info("Started GSM Interface")
+            
+            while not self.stop_running.isSet():
                 try:
                     data = self.port.read(200)
-
                     if len(data) > 0:
                         tokens = data.decode('latin-1').strip().split('"')
                         for i in range(len(tokens)):
                             tokens[i] = tokens[i].strip()
-
+                        
                         if len(tokens) > 0:
                             if tokens[0] == '+CMT:':
                                 source = tokens[1]
                                 timestamp = datetime.datetime.strptime(tokens[5].split('+')[0],'%y/%m/%d,%H:%M:%S')
                                 message = tokens[6]
                                 self.handle_message(timestamp, source, message)
+                            elif tokens[0].startswith('+CUSD:'):
+                                self.notification_handler.notify(self.name, tokens[1], logging.INFO)
+                    else:
+                        self.run_loop()
 
                 except:
                     logger.exception("")
@@ -132,8 +136,7 @@ class GSMInterface(Thread):
     
     def run_loop(self):
         try:
-            item = self.queue.get(block=True, timeout=1)
-            
+            item = self.queue.get(block=False, timeout=1)
             if item[1] == 'change':
                 self.handle_change(item[2])
             elif item[1] == 'event':
@@ -151,11 +154,10 @@ class GSMInterface(Thread):
     def send_sms(self, dst, message):
         self.write('AT+CMGS="{}"'.format(dst))    
         self.write(message)
-        self.write('\x1A')
-
+        self.write('\x1A\r\n')
 
     def send_message(self, message):
-        if self.modem is None:
+        if self.port is None:
             logger.warning("GSM not available when sending message")
             return
          
