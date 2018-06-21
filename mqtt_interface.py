@@ -106,15 +106,30 @@ class MQTTInterface(Thread):
             logger.error(
                 "Invalid topic in mqtt message: {}".format(message.topic))
             return
+        
+        if topics[1] == MQTT_NOTIFICATIONS_TOPIC:
+            if topics[2].upper() == "CRITICAL":
+                level = logging.CRITICAL
+            elif topics[2].upper() == "INFO":
+                level = logging.INFO
+            else:
+                logger.error(
+                    "Invalid notification level: {}".format(topics[2]))
+                return
+
+            payload = message.payload.decode("latin").strip()
+            self.notification_handler.notify(self.name, payload, level)
+            return
+
 
         if topics[1] != MQTT_CONTROL_TOPIC:
             logger.error(
                 "Invalid subtopic in mqtt message: {}".format(message.topic))
-            return
-
+            return        
+        
         command = message.payload.decode("latin").strip()
         element = topics[3]
-        
+
         # Process a Zone Command
         if topics[2] == MQTT_ZONE_TOPIC:
             if command not in ['bypass', 'clear_bypass']:
@@ -211,6 +226,10 @@ class MQTTInterface(Thread):
         self.mqtt.subscribe(
             "{}/{}/{}".format(MQTT_BASE_TOPIC,
                               MQTT_CONTROL_TOPIC, "#"))
+        
+        self.mqtt.subscribe(
+            "{}/{}/{}".format(MQTT_BASE_TOPIC,
+                              MQTT_NOTIFICATIONS_TOPIC, "#"))
         
         self.mqtt.will_set('{}/{}/{}'.format(MQTT_BASE_TOPIC,
                                              MQTT_INTERFACE_TOPIC,
