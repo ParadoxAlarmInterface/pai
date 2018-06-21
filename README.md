@@ -72,7 +72,6 @@ All interactions are made through a ```MQTT_BASE_TOPIC```, which defaults to ```
     }
 
 ```
-
 * ```major_code```  and ```major_text``` represent the major code and corresponding text description as provided by the alarm. This will mostly identify the event.
 * ```minor_code```  and ```minor_text``` represent the minor code and corresponding text description as provided by the alarm. This will mostly identify a detail of the event, such as the zone number/name, the user name, partition name, and so on.
 * ```type``` identifies the event category, and can take the following values: ```Partition```, ```Bell```, ```NonReportable```, ```User```, ```Remote```, ```Special```, ```Trouble```, ```Software```, ```Output```, ```Wireless```, ```Bus Module```, ```Zone```, ```System```.
