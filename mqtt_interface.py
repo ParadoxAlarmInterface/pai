@@ -30,7 +30,8 @@ class MQTTInterface(Thread):
         self.queue = queue.PriorityQueue()
 
         self.notification_handler = None
-
+        self.cache = dict()
+        
     def run(self):
         if MQTT_USERNAME is not None and MQTT_PASSWORD is not None:
             self.mqtt.username_pw_set(
@@ -42,6 +43,7 @@ class MQTTInterface(Thread):
                           bind_address=MQTT_BIND_ADDRESS)
     
         self.mqtt.loop_start()
+        last_republish = time.time()
 
         while True:
             item = self.queue.get()
@@ -52,6 +54,9 @@ class MQTTInterface(Thread):
             elif item[1] == 'command':
                 if item[2] == 'stop':
                     break
+            if time.time() - last_republish > MQTT_REPUBLISH_INTERVAL:
+                self.republish()
+                last_republish = time.time()
 
         if self.connected:
             self.mqtt.disconnect()
@@ -214,7 +219,7 @@ class MQTTInterface(Thread):
 
         
 
-        self.mqtt.publish('{}/{}/{}'.format(MQTT_BASE_TOPIC,
+        self.publish('{}/{}/{}'.format(MQTT_BASE_TOPIC,
                                             MQTT_INTERFACE_TOPIC,
                                             self.__class__.__name__),
                           'online', 0, MQTT_RETAIN)
@@ -227,7 +232,7 @@ class MQTTInterface(Thread):
         
 
         if MQTT_PUBLISH_RAW_EVENTS:
-            self.mqtt.publish('{}/{}'.format(MQTT_BASE_TOPIC,
+            self.publish('{}/{}'.format(MQTT_BASE_TOPIC,
                                                 MQTT_EVENTS_TOPIC,
                                                 MQTT_RAW_TOPIC),
                               json.dumps(raw), 0, MQTT_RETAIN)
@@ -260,7 +265,7 @@ class MQTTInterface(Thread):
         else:
             element_topic = element
         
-        self.mqtt.publish('{}/{}/{}/{}/{}'.format(MQTT_BASE_TOPIC,
+        self.publish('{}/{}/{}/{}/{}'.format(MQTT_BASE_TOPIC,
                                             MQTT_STATES_TOPIC,
                                             element_topic,
                                             label,
@@ -283,4 +288,12 @@ class MQTTInterface(Thread):
 
         return None
 
- 
+    def publish(self, topic, value, qos, retain):
+        self.cache[topic] = {'value': value, 'qos': qos, 'retain': retain}
+        self.mqtt.publish(topic, value, qos, retain)
+
+    def republish(self):
+        for k in list(self.cache.keys()):
+            v = self.cache[k]
+            self.mqtt.publish(k, v['value'], v['qos'], v['retain'])
+

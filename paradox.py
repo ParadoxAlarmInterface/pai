@@ -104,7 +104,7 @@ class Paradox:
                 
             # Listen for events
             while (time.time() - tstart) < KEEP_ALIVE_INTERVAL: 
-                self.send_wait_for_reply(None, timeout=0.5)
+                self.send_wait_for_reply(None, timeout=1)
 
     def send_wait_for_reply(self, message_type=None, args=None, message=None, retries=5, timeout=5):
         if message is None and message_type is not None:

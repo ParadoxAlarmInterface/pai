@@ -17,10 +17,20 @@ from config_defaults import *
 from config import *
 
 FORMAT = '%(asctime)s - %(levelname)-8s - %(name)s - %(message)s'
-logging.basicConfig(format=FORMAT)
 
 logger = logging.getLogger('PAI')
 logger.setLevel(LOGGING_LEVEL_CONSOLE)
+
+if LOGGING_FILE is not None:
+    logfile_handler = logging.FileHandler(LOGGING_FILE)
+    logfile_handler.setLevel(LOGGING_LEVEL_FILE)
+    logfile_handler.setFormatter(logging.Formatter(FORMAT))
+    logger.addHandler(logfile_handler)
+
+logconsole_handler = logging.StreamHandler()
+logconsole_handler.setLevel(LOGGING_LEVEL_CONSOLE)
+logconsole_handler.setFormatter(logging.Formatter(FORMAT))
+logger.addHandler(logconsole_handler)
 
 from paradox import Paradox
 
