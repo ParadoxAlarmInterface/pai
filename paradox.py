@@ -418,33 +418,34 @@ class Paradox:
         # IGNORED
 
         # Open Close
-        if major_code in (0, 1):
-            return
-
-        # Software Log on
-        if major_code == 48 and minor_code == 2:
+        if major_code in [0, 1]:
             return
 
         # Squawk on off, Partition Arm Disarm
-        if major_code == 2 and minor_code in (8, 9, 11, 12, 14):
+        if major_code == 2 and minor_code in [8, 9, 11, 12, 14]:
             return
 
         # Bell Squawk
-        if major_code == 3 and minor_code in (2, 3):
+        if major_code == 3 and minor_code in [2, 3]:
             return
 
         # Arm in Sleep
-        if major_code == 6 and minor_code in (3, 4 ):
+        if major_code == 6 and minor_code in [3, 4]:
             return
 
         # Arming Through Winload
         # Partial Arming
-        if major_code == 30 and minor_code in (3, 5):
+        if major_code == 30 and minor_code in [3, 5]:
             return
 
         # Disarming Through Winload
         if major_code == 34 and minor_code == 1:
             return
+        
+        # Software Log on
+        if major_code == 48 and minor_code == 2:
+            return
+
         
         ## CRITICAL Events
 
@@ -475,7 +476,7 @@ class Paradox:
         # Alarm Stopped
         # Entry Delay
         elif major_code == 2:
-            if minor_code in [2,3,4,5,6,7, 13]:
+            if minor_code in [2, 3, 4, 5, 6, 7, 13]:
                 zones_in_alarm = []
                 for i in range(1, len(self.zones)):
                     if 'in_alarm' in self.zones[i] and self.zones[i]['in_alarm']:
@@ -494,9 +495,15 @@ class Paradox:
         # Special Alarm, New Trouble and Trouble Restore
         elif major_code in [40, 44, 45] and minor_code in [1, 2, 3, 4, 5, 6, 7]:
             self.interface.notify("Paradox", "{}: {}".format(event['major'][1], event['minor'][1]), logging.CRITICAL)
-        
+        # Signal Weak
+        elif major_code in [18, 19, 20, 21]:
+            if event['minor'][0] >= 0 and event['minor'][0] < len(self.zones):
+                label = self.zones[event['minor'][0]]['label']
+            else:
+                label = event['minor'][1]
+
         # Remaining events trigger lower level notifications
-        self.interface.notify("Paradox", "{}: {}".format(event['major'][1], event['minor'][1]), logging.INFO)
+        self.interface.notify("Paradox", "{}: {}".format(event['major'][1], label), logging.INFO)
 
 
     def process_event(self, event):
