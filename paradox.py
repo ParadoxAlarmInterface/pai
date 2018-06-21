@@ -501,9 +501,11 @@ class Paradox:
                 label = self.zones[event['minor'][0]]['label']
             else:
                 label = event['minor'][1]
-
-        # Remaining events trigger lower level notifications
-        self.interface.notify("Paradox", "{}: {}".format(event['major'][1], label), logging.INFO)
+            
+            self.interface.notify("Paradox", "{}: {}".format(event['major'][1], label), logging.INFO)
+        else:
+            # Remaining events trigger lower level notifications
+            self.interface.notify("Paradox", "{}: {}".format(event['major'][1], event['minor'][1]), logging.INFO)
 
 
     def process_event(self, event):
