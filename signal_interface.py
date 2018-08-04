@@ -126,10 +126,6 @@ class SignalInterface(Thread):
         except:
             logger.exception("Signal send message")
 
-        #for contact in SIGNAL_CONTACTS:
-        #    self.signal.sendMessage(str(message), [], [contact])
-        #    time.sleep(1)
-
     def handle_message (self, timestamp, source, groupID, message, attachments):
         """ Handle Signal message. It should be a command """
 
@@ -225,6 +221,12 @@ class SignalInterface(Thread):
         #m = "{}: {}".format(raw['major'][1], raw['minor'][1])
         major_code = raw['major'][0]
         minor_code = raw['minor'][1]
+        
+        # Ignore some events
+
+        for ev in SIGNAL_IGNORE_EVENTS:
+            if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
+                return
 
         if major_code == 29:
             self.send_message("Arming by user {}".format(minor_code))

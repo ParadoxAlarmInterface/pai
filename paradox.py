@@ -106,7 +106,7 @@ class Paradox:
             while (time.time() - tstart) < KEEP_ALIVE_INTERVAL: 
                 self.send_wait_for_reply(None, timeout=1)
 
-    def send_wait_for_reply(self, message_type=None, args=None, message=None, retries=5, timeout=5):
+    def send_wait_for_reply(self, message_type=None, args=None, message=None, retries=5, timeout=5, raw=False):
         if message is None and message_type is not None:
             message = message_type.build(dict(fields=dict(value=args)))
 
@@ -125,8 +125,9 @@ class Paradox:
                 if message is not None:
                     self.connection.timeout(timeout)
                     self.connection.write(message)
-            
                 data = self.connection.read()
+                if raw:
+                    return data
 
             # Retry if no data was available
             if data is None or len(data) == 0:

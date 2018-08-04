@@ -29,7 +29,8 @@ class GSMInterface(Thread):
     thread = None
     loop = None
     notification_handler = None 
-    
+    modem_connected = False
+
     def __init__(self):
         Thread.__init__(self)
         
@@ -80,32 +81,34 @@ class GSMInterface(Thread):
         self.queue.put_nowait(SortableTuple((2, 'notify', (source, message, level))))
 
     def write(self, message):
-        self.port.write((message + '\r\n').encode('latin-1'))
-        time.sleep(0.1) 
         data = b''
-        while self.port.in_waiting > 0:
-            data += self.port.read()
         
-        data = data.strip().decode('latin-1')
+        if not self.connected():
+            return data
+        
+        try:
+            self.port.write((message + '\r\n').encode('latin-1'))
+            time.sleep(0.1) 
+            while self.port.in_waiting > 0:
+                data += self.port.read()
+        
+            data = data.strip().decode('latin-1')
+        except:
+            logger.exception("Modem write")
+            self.modem_connected = False
+
         return data
 
     def run(self):
-
         logger.info("Starting GSM Interface")
 
         try:
-            logger.info("Using {} at {} baud".format(GSM_MODEM_PORT, GSM_MODEM_BAUDRATE))
-            self.port = serial.Serial(GSM_MODEM_PORT, baudrate=GSM_MODEM_BAUDRATE, timeout=5)
-
-            self.write('AT')
-            self.write('ATE0')
-            self.write('AT+CMGF=1')
-            self.write('AT+CNMI=1,2,0,0,0')
-            self.write('AT+CUSD=1,"*111#"')
-
-            logger.info("Started GSM Interface")
-            
             while not self.stop_running.isSet():
+
+                while not self.connected() and self.stop_running.isSet():
+                    logging.warning("Could not connect to modem")
+                    time.sleep(10)
+
                 try:
                     data = self.port.read(200)
                     if len(data) > 0:
@@ -125,6 +128,7 @@ class GSMInterface(Thread):
                         self.run_loop()
 
                 except:
+                    self.modem_connected = False
                     logger.exception("")
         
         except (KeyboardInterrupt, SystemExit):
@@ -151,6 +155,25 @@ class GSMInterface(Thread):
 
         return True
     
+    def connected(self):
+        if not self.modem_connected:
+            logger.info("Using {} at {} baud".format(GSM_MODEM_PORT, GSM_MODEM_BAUDRATE))
+            commands = [b'AT',b'ATE0', b'AT+CMGF=1', b'AT+CNMI=1,2,0,0,0', b'AT+CUSD=1,"*111#"']
+            try:
+                self.port = serial.Serial(GSM_MODEM_PORT, baudrate=GSM_MODEM_BAUDRATE, timeout=5)
+                for command in commands:
+                    if self.port.write(command) == 0:
+                        logger.error("Unable to initialize modem")
+                        return False
+            except:
+                logger.exception("Modem connect error")
+                return False
+
+            self.modem_connected = True
+            logger.info("Started GSM Interface")
+        
+        return True
+
     def send_sms(self, dst, message):
         self.write('AT+CMGS="{}"'.format(dst))    
         self.write(message)
@@ -252,6 +275,12 @@ class GSMInterface(Thread):
     def handle_event(self, raw):
         """Handle Live Event"""
         
+	# Ignore some events
+
+        for ev in GSM_IGNORE_EVENTS:
+            if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
+                return
+ 
         # All events are extremelly critical. Make call to get user attention
         
         for contact in GSM_CONTACTS:

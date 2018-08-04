@@ -62,10 +62,12 @@ PUSHBULLET_CONTACTS = [] # PB User identifiers for notifications
 
 # Signal
 SIGNAL_CONTACTS = []
+SIGNAL_IGNORE_EVENTS = [] # List of tuples (major, minor)
 
 # GSM
 GSM_MODEM_BAUDRATE = 115200
 GSM_MODEM_PORT = ''
 GSM_CONTACTS = []
+GSM_IGNORE_EVENTS = [] # List of tuples (major, minor)
 
 
