@@ -47,11 +47,22 @@ class Paradox:
 
     def connect(self):
         logger.info("Connecting to panel")
+        
+        # Reset all states
+        self.labels = {'zone': {}, 'partition': {}, 'output': {}}
+        self.zones = []
+        self.partitions = []
+        self.outputs = []
+        self.power = dict()
+        self.last_power_update = 0
 
+        self.run = True
+        
         try:
-            reply = self.send_wait_for_reply(msg.InitiateCommunication, None)
+            reply = self.send_wait_for_reply(msg.InitiateCommunication, None, reply_expected=0x07)
 
             if reply is None:
+                self.run = False
                 return False
 
             logger.info("Interface connected")
@@ -60,26 +71,27 @@ class Paradox:
                 reply.fields.value.application.version,
                 reply.fields.value.application.revision,
                 reply.fields.value.application.build))
-            reply = self.send_wait_for_reply(msg.SerialInitialization, None)
+            reply = self.send_wait_for_reply(msg.SerialInitialization, None, reply_expected=0x00)
             
             if reply is None:
+                self.run = False
                 return False
 
-            reply = self.send_wait_for_reply(
-                message=reply.fields.data + reply.checksum)
+            reply = self.send_wait_for_reply(message=reply.fields.data + reply.checksum, reply_expected=0x01)
 
             if reply is None:
+                self.run = False
                 return False
             
             self.update_labels()
             
-            self.run = True
             logger.info("Connection OK")
 
             return True
         except:
             logger.exception("Connect error")
 
+        self.run = False
         return False
 
     def loop(self):
@@ -94,7 +106,7 @@ class Paradox:
                 i = 0
                 while i < 3:
                     args = dict(address=MEM_STATUS_BASE1 + i)
-                    reply = self.send_wait_for_reply(msg.Upload, args)
+                    reply = self.send_wait_for_reply(msg.Upload, args, reply_expected=0x05)
                     if reply is not None:
                         self.handle_status(reply)
 
@@ -106,7 +118,10 @@ class Paradox:
             while (time.time() - tstart) < KEEP_ALIVE_INTERVAL: 
                 self.send_wait_for_reply(None, timeout=1)
 
-    def send_wait_for_reply(self, message_type=None, args=None, message=None, retries=5, timeout=5, raw=False):
+    def send_wait_for_reply(self, message_type=None, args=None, message=None, retries=5, timeout=5, raw=False, reply_expected=None):
+        if not self.run:
+            return None
+        
         if message is None and message_type is not None:
             message = message_type.build(dict(fields=dict(value=args)))
 
@@ -163,6 +178,16 @@ class Paradox:
                 except:
                     logger.exception("Handle event")
 
+                time.sleep(0.25)
+                continue
+            
+            if recv_message.fields.value.po.command == 0x70:
+                self.handle_error(recv_message)
+                return None
+
+            if reply_expected is not None and recv_message.fields.value.po.command != reply_expected:
+                logging.error("Got message {} but expected {}".format(recv_message.fields.value.po.command, reply_expected))
+                logging.error("Detail:\n{}".format(recv_message))
                 time.sleep(0.25)
                 continue
 
@@ -252,7 +277,11 @@ class Paradox:
         address = start
         while address <= end and len(labelList) - 1 < limit:
             args = dict(address=address)
-            reply = self.send_wait_for_reply(msg.Upload, args)
+            reply = self.send_wait_for_reply(msg.Upload, args, reply_expected=0x05)
+            
+            if reply is None:
+                logger.error("Could not fully load labels")
+                return
 
             payload = reply.fields.value.data
 
@@ -304,9 +333,9 @@ class Paradox:
                 continue
 
             args = dict(zone=e)
-            reply = self.send_wait_for_reply(msg.ZoneStateCommand, args)
+            reply = self.send_wait_for_reply(msg.ZoneStateCommand, args, reply_expected=0x04)
             
-            if reply is not None and reply.fields.value.po.command == 0x04:
+            if reply is not None:
                 accepted = True
                 self.update_properties('zone', self.zones, e, dict(bypass=value))
 
@@ -340,9 +369,9 @@ class Paradox:
         accepted = False
         for e in partitions_selected:
             args = dict(partition=e, state=command)
-            reply = self.send_wait_for_reply(msg.PartitionStateCommand, args)
+            reply = self.send_wait_for_reply(msg.PartitionStateCommand, args, reply_expected=0x04)
 
-            if reply is not None and reply.fields.value.po.command == 0x04:
+            if reply is not None:
                 accepted = True
                 if command in ['arm_stay', 'arm_sleep']:
                     self.update_properties('partition', self.partitions, e, {command: True})
@@ -380,19 +409,19 @@ class Paradox:
         for e in outputs:
             if command == 'pulse':
                 args = dict(output=e, state='on')
-                reply = self.send_wait_for_reply(msg.OutputStateCommand, args)
-                if reply is not None and reply.fields.value.po.command == 0x04:
+                reply = self.send_wait_for_reply(msg.OutputStateCommand, args, reply_expected=0x04)
+                if reply is not None:
                     accepted = True
 
                 time.sleep(1)
                 args = dict(output=e, state='off')
-                reply = self.send_wait_for_reply(msg.OutputStateCommand, args)
-                if reply is not None and reply.fields.value.po.command == 0x04:
+                reply = self.send_wait_for_reply(msg.OutputStateCommand, args, reply_expected=0x04)
+                if reply is not None:
                     accepted = True
             else:
                 args = dict(output=e, state=command)
-                reply = self.send_wait_for_reply(msg.OutputStateCommand, args)
-                if reply is not None and reply.fields.value.po.command == 0x04:
+                reply = self.send_wait_for_reply(msg.OutputStateCommand, args, reply_expected=0x04)
+                if reply is not None:
                     accepted = True
 
         return accepted
@@ -609,10 +638,6 @@ class Paradox:
     def handle_status(self, message):
         """Handle MessageStatus"""
    
-        if message.fields.value.po.command != 0x05:
-            return
-        
-
         if message.fields.value.address == 0:
             self.power.update(
                 dict(
@@ -646,12 +671,15 @@ class Paradox:
                 self.update_properties('zone', self.zones, i, v)
                 i += 1
 
-    def disconnect(self):
-        reply = self.send_wait_for_reply(msg.TerminateConnection, None)
-        
-        if reply is not None and reply.fields.value.message == 0x05:
-            logger.info("Disconnected: {}".format(reply.fields.value.message))
-        else:
-            logger.error("Got error from panel: {}".format(reply.fields.value.message))
+    def handle_error(self, message):
+        """Handle ErrorMessage"""
+        logger.warn("Got Message: {}".format(message.fields.value.message))
         self.run = False
 
+    def disconnect(self):
+        reply = self.send_wait_for_reply(msg.TerminateConnection, None, reply_expected=0x05)
+        
+        if reply is not None:
+            logger.info("Disconnected: {}".format(reply.fields.value.message))
+
+        self.run = False

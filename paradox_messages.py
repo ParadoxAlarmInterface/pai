@@ -361,9 +361,8 @@ MonitoringResponse = Struct("fields" / RawCopy(
 
 TerminateConnection = Struct("fields" / RawCopy(
     Struct(
-      "po" / BitStruct(
-              "command" / Const(7, Nibble),
-              "reserved" / Const(0, Nibble)
+      "po" / Struct(
+              "command" / Const(0x70, Int8ub)
       ),
       "number_of_bytes" / Const(0, Int8ub),
       "message" / Default(Enum(Int8ub,
