@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import paradox_messages_sp as msg
+import paradox_messages as msg
 from serial_connection import *
 import logging
 import sys
@@ -61,16 +61,15 @@ class Paradox:
         try:
             reply = self.send_wait_for_reply(msg.InitiateCommunication, None, reply_expected=0x07)
 
-            if reply is None:
-                self.run = False
-                return False
-
-            logger.info("Interface connected")
-            logger.info("Found Panel {} version {}.{} build {}".format(
-                (reply.fields.value.label.decode('latin').strip()),
-                reply.fields.value.application.version,
-                reply.fields.value.application.revision,
-                reply.fields.value.application.build))
+            if reply:
+                logger.info("Found Panel {} version {}.{} build {}".format(
+                    (reply.fields.value.label.decode('latin').strip()),
+                    reply.fields.value.application.version,
+                    reply.fields.value.application.revision,
+                    reply.fields.value.application.build))
+            else:
+                logger.warn("Unknown panel")
+                
             reply = self.send_wait_for_reply(msg.StartCommunication, None, reply_expected=0x00)
             
             if reply is None:
