@@ -52,54 +52,70 @@ class ZoneStateAdapter(Adapter):
       return 0
 
 
-class ZoneOpenStatusAdapter(Adapter):
-
+class StatusAdapter(Adapter):
     def _decode(self, obj, context, path):
-        zone_status = dict()
-        for i in range(0, 4):
+        r = dict()
+        for i in range(0, len(obj)):
           status = obj[i]
           for j in range(0, 8):
-              zone_status[i * 8 + j + 1]=dict(open=((status >> j) & 0x01) == 0x01) 
+              r[i * 8 + j + 1]=(((status >> j) & 0x01) == 0x01) 
         
-        return zone_status
+        return r
+
+class ZoneStatusAdapter(Adapter):
+    def _decode(self, obj, context, path):
+        return  dict(
+            zone_was_in_alarm=(obj[0] & 0x80) != 0,
+            zone_is_in_alarm=(obj[0] & 0x40) != 0,
+            fire_delay=(obj[0] & 0b00110000) == 0b00110000,
+            entry_delay=(obj[0] & 0b00010000) == 0b00010000,
+            intellizone_delay=(obj[0] & 0b00100000) == 0b00010000,
+            no_delay=(obj[0] & 0b00110000) == 0,
+            zone_bypassed=(obj[0] & 0x08) != 0,
+            zone_shutdown=(obj[0] & 0x04) != 0,
+            zone_in_tx_delay=(obj[0] & 0x02) != 0,
+            zone_was_bypassed=(obj[0] & 0x01) != 0)
+
 
 class PartitionStatusAdapter(Adapter):
     def _decode(self, obj, context, path):
-        partition_status=dict()
+        partition_status= dict()
+
         for i in range(0, 2):
-            partition = dict(
-              arm=obj[i * 4] & 0x01 != 0,
-              arm_sleep=obj[i * 4] & 0x02 != 0,
-              arm_stay=obj[i * 4] & 0x04 != 0,
-              arm_full=(obj[i * 4] & 0x01 != 0) and obj[i * 4] & 0x06 ==0,
-              arm_noentry=obj[i * 4] & 0x08 != 0,
-              alarm=obj[i * 4] & 0x10 != 0,
-              alarm_silent=obj[i * 4] & 0x20 != 0,
-              alarm_audible=obj[i * 4] & 0x40 != 0,
-              alarm_fire=obj[i * 4] & 0x80 != 0,
-              
-              exit_delay=obj[i * 4 + 1] & 0x01 != 0,
-              entry_delay=obj[i * 4 + 1] & 0x02 != 0,
-              #ready_to_arm=obj[i * 4 + 1] & 0x01 != 0,
-              #ready_to_arm=obj[i * 4 + 1] & 0x01 != 0,
-              trouble=obj[i * 4 + 1] & 0x08 != 0,
-              alarm_memory=obj[i * 4 + 1] & 0x10 != 0,
-              zone_bypass=obj[i * 4 + 1] & 0x20 != 0,
-              programming=obj[i * 4 + 1] & 0x40 != 0,
-              lockout=obj[i * 4 + 1] & 0x80 != 0,
-              
-              intelizone_engage=obj[i * 4 + 2] & 0x01 != 0,
-              fire_delay=obj[i * 4 + 2] & 0x02 != 0,
-              auto_arming=obj[i * 4 + 2] & 0x04 != 0,
-              voice_arming=obj[i * 4 + 2] & 0x08 != 0,
-              zone_tamper_trouble=obj[i * 4 + 2] & 0x10 != 0,
-              #zone_low_battery_trouble=obj[i * 4 + 2] & 0x20 != 0,
-              zone_fire_loop_trouble=obj[i * 4 + 2] & 0x40 != 0,
-              zone_supervision_trouble=obj[i * 4 + 2] & 0x80 != 0,
+            partition_status[i+1] = dict(
+	        pulse_alarm_fire = obj[0] & 0x80 != 0,
+                audible_alarm = obj[0] & 0x40 != 0,
+                silent_alarm = obj[0] & 0x20 != 0,
+                strobe_alarm = obj[0] & 0x10 != 0,
+                stay_arm = obj[0] & 0x04 != 0,
+                sleep_arm = obj[0] & 0x02 != 0,
+                arm = obj[0] & 0x01 != 0,
+                bell_activated = obj[1] & 0x80 != 0,
+                auto_arming_engaged = obj[1] & 0x40 != 0,
+                recent_closing_delay = obj[1] & 0x20 != 0,
+                intellizone_delay = obj[1] & 0x10 != 0,
+                zone_bypassed = obj[1] & 0x08 != 0,
+                alarms_in_memory = obj[1] & 0x04 != 0,
+                entry_delay = obj[1] & 0x02 != 0,
+                exit_delay = obj[1] & 0x01 != 0,
+                paramedic_alarm = obj[2] & 0x80 != 0,
+                not_used1 = obj[2] & 0x40 != 0,
+                arm_with_remote = obj[2] & 0x20 != 0,
+                transmission_delay_finished = obj[2] & 0x10 != 0,
+                bell_delay_finished = obj[2] & 0x08 != 0,
+                entry_delay_finished = obj[2] & 0x04 != 0,
+                exit_delay_finished = obj[2] & 0x02 != 0,
+                intellizone_delay_finished = obj[2] & 0x01 != 0,
+                not_used2 = obj[3] & 0x80 != 0,
+                wait_window = obj[3] & 0x40 != 0,
+                not_used3 = obj[3] & 0x20 != 0,
+                in_remote_delay = obj[3] & 0x10 != 0,
+                not_used4 = obj[3] & 0x08 != 0,
+                stayd_mode_active = obj[3] & 0x04 != 0,
+                force_arm = obj[3] & 0x02 != 0,
+                ready_status = obj[3] & 0x01 != 0,
               )
               
-            partition_status[i + 1] = partition
-        
         return partition_status
 
 class ZoneStatusAdapter(Adapter):
@@ -107,16 +123,25 @@ class ZoneStatusAdapter(Adapter):
         zone_status = dict()
         for i in range(0, 32):
             zone_status[i+1] = dict(
-              supervision_trouble=obj[i] & 0x01 != 0,
-              tx_delay=obj[i] & 0x02 != 0,
-              shutdown=obj[i] & 0x04 != 0,
-              bypass=obj[i] & 0x08 != 0,
-              intellizone_delay=obj[i] & 0x0f != 0,
-              entry_delay=obj[i] & 0x20 != 0,
-              in_alarm=obj[i] & 0x40 != 0,
-              generated_alarm=obj[i] & 0x40 != 0)
+              zone_was_in_alarm=(obj[i] & 0x80) != 0,
+              zone_is_in_alarm=(obj[i] & 0x40) != 0,
+              fire_delay=(obj[i] & 0b00110000) == 0b00110000,
+              entry_delay=(obj[i] & 0b00010000) == 0b00010000,
+              intellizone_delay=(obj[i] & 0b00100000) == 0b00010000,
+              no_delay=(obj[i] & 0b00110000) == 0,
+              zone_bypassed=(obj[i] & 0x08) != 0,
+              zone_shutdown=(obj[i] & 0x04) != 0,
+              zone_in_tx_delay=(obj[i] & 0x02) != 0,
+              zone_was_bypassed=(obj[i] & 0x01) != 0)
 
         return zone_status
+
+class SignalStrengthAdapter(Adapter):
+    def _decode(self, obj, context, path):
+        strength = dict()
+        for i in range(0, len(obj)):
+            strength[i+1] = obj[i]
+        return strength
 
 eventGroupMap = {0: 'Zone OK',
                  1: 'Zone open',

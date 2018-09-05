@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import paradox_messages as msg
+import paradox_messages_sp as msg
 from serial_connection import *
 import logging
 import sys
@@ -16,12 +16,12 @@ logger = logging.getLogger('PAI').getChild(__name__)
 MEM_STATUS_BASE1 = 0x8000
 MEM_STATUS_BASE2 = 0x1fe0
 MEM_ZONE_START = 0x010
-MEM_ZONE_END = MEM_ZONE_START + 0x10 * ZONES
+MEM_ZONE_END = MEM_ZONE_START + 0x10 * 16 # For 16 Zones
 MEM_OUTPUT_START = 0x210
-MEM_OUTPUT_END = MEM_OUTPUT_START + 0x10 * OUTPUTS
+MEM_OUTPUT_END = MEM_OUTPUT_START + 0x10 * 16 # For 16 Outputs
 MEM_PARTITION_START = 0x310
 MEM_PARTITION_END = 0x310
-MEM_STEP = 0x10
+MEM_STEP = 0x20
 
 serial_lock = Lock()
 
@@ -38,9 +38,9 @@ class Paradox:
 
         # Keep track of alarm state
         self.labels = {'zone': {}, 'partition': {}, 'output': {}}
-        self.zones = []
-        self.partitions = []
-        self.outputs = []
+        self.zones = dict()
+        self.partitions = dict()
+        self.outputs = dict()
         self.power = dict()
         self.last_power_update = 0
         self.run = False
@@ -50,9 +50,9 @@ class Paradox:
         
         # Reset all states
         self.labels = {'zone': {}, 'partition': {}, 'output': {}}
-        self.zones = []
-        self.partitions = []
-        self.outputs = []
+        self.zones = dict()
+        self.partitions = dict()
+        self.outputs = dict()
         self.power = dict()
         self.last_power_update = 0
 
@@ -71,14 +71,20 @@ class Paradox:
                 reply.fields.value.application.version,
                 reply.fields.value.application.revision,
                 reply.fields.value.application.build))
-            reply = self.send_wait_for_reply(msg.SerialInitialization, None, reply_expected=0x00)
+            reply = self.send_wait_for_reply(msg.StartCommunication, None, reply_expected=0x00)
             
             if reply is None:
                 self.run = False
                 return False
+            
+            args = dict(product_id=reply.fields.value.product_id,
+                        firmware=reply.fields.value.firmware, 
+                        panel_id=reply.fields.value.panel_id,
+                        pc_password=0x0000,
+                        ) 
 
-            reply = self.send_wait_for_reply(message=reply.fields.data + reply.checksum, reply_expected=0x01)
-
+            reply = self.send_wait_for_reply(msg.InitializeCommunication, args=args, reply_expected=0x10)
+            
             if reply is None:
                 self.run = False
                 return False
@@ -97,23 +103,20 @@ class Paradox:
     def loop(self):
         logger.debug("Loop start")
         args = {}
-
+        
         while self.run:
             #logger.debug("Getting alarm status")
             
             tstart = time.time()
             try:
-                i = 0
-                while i < 3:
+                for i in STATUS_REQUESTS:
                     args = dict(address=MEM_STATUS_BASE1 + i)
-                    reply = self.send_wait_for_reply(msg.Upload, args, reply_expected=0x05)
+                    reply = self.send_wait_for_reply(msg.ReadEEPROM, args, reply_expected=0x05)
                     if reply is not None:
                         self.handle_status(reply)
-
-                    i += 1
             except:
                 logger.exception("Loop")
-                
+            
             # Listen for events
             while (time.time() - tstart) < KEEP_ALIVE_INTERVAL: 
                 self.send_wait_for_reply(None, timeout=1)
@@ -231,53 +234,37 @@ class Paradox:
             OUTPUTS,
             template=output_template)
 
-        for i in range(1, len(self.partitions)):
-            partition = self.partitions[i]
-            for k, v in partition.items():
-                self.interface.change('partition', self.partitions[i]['label'], k, v, initial=True)
+        for k,v in self.partitions.items():
+            self.interface.change('partition', self.partitions[k]['label'], k, v, initial=True)
 
-        for i in range(1, len(self.zones)):
-            zone = self.zones[i]
-            for k, v in zone.items():
-                self.interface.change('zone', self.zones[i]['label'], k, v, initial=True)
+        for k, v in self.zones.items():
+            self.interface.change('zone', self.zones[k]['label'], k, v, initial=True)
 
-        for i in range(1, len(self.outputs)):
-            output = self.outputs[i]
-            for k, v in output.items():
-                self.interface.change('output', self.outputs[i]['label'], k, v, initial=True)
+        for k, v in self.outputs.items():
+                self.interface.change('output', self.outputs[k]['label'], k, v, initial=True)
 
         # DUMP Labels to console
         logger.debug("Labels updated")
-
-        aux = []
-        for c in self.partitions[1:]:
-            aux.append(c['label'])
-        logger.debug("Partitions: {}".format(aux))
-
-        aux = []
-        for c in self.zones[1:]:
-            aux.append(c['label'])
-        logger.debug("Zones: {}".format(aux))
-
-        aux = []
-        for c in self.outputs[1:]:
-            aux.append(c['label'])
-        logger.debug("Outputs: {}".format(aux))
+        logger.debug("Partitions: {}".format(list(self.labels['partition'])))
+        logger.debug("Zones: {}".format(self.labels['zone']))
+        logger.debug("Outputs: {}".format(list(self.labels['output'])))
 
     def load_labels(self,
-                    labelList,
-                    labelDict,
+                    labelDictIndex,
+                    labelDictName,
                     start,
                     end,
-                    limit=16,
+                    limit=range(1, 17),
                     template=dict(label='')):
         """Load labels from panel"""
         i = 1
-        labelList.append("all")
         address = start
-        while address <= end and len(labelList) - 1 < limit:
+        if len(limit) == 0:
+            return
+        
+        while address <= end and i <= max(limit):
             args = dict(address=address)
-            reply = self.send_wait_for_reply(msg.Upload, args, reply_expected=0x05)
+            reply = self.send_wait_for_reply(msg.ReadEEPROM, args, reply_expected=0x05)
             
             if reply is None:
                 logger.error("Could not fully load labels")
@@ -287,17 +274,17 @@ class Paradox:
 
             for j in [0, 16]:
                 label = payload[j:j + 16].strip().decode('latin').replace(" ","_")
-
-                if label not in labelDict.keys() and len(labelList) - 1 < limit:
+                
+                if label not in labelDictName and i in limit:
                     properties = template.copy()
                     properties['label'] = label
-                    if len(labelList) <= i:
-                        labelList.append(properties)
+                    if i in labelDictIndex:
+                        labelDictIndex[i] = properties
                     else:
-                        labelList[i] = properties
+                        labelDictIndex[i] = properties
 
-                    labelDict[label] = i
-                    i += 1
+                    labelDictName[label] = i
+                i += 1
             address += MEM_STEP
 
     def control_zone(self, zone, command):
@@ -309,7 +296,7 @@ class Paradox:
         zones_selected = []
         # if all or 0, select all
         if zone == 'all' or zone == '0':
-            zones_selected = list(range(1, len(self.zones)))
+            zones_selected = list(self.zones)
         else:
             # if set by name, look for it
             if zone in self.labels['zone']:
@@ -317,7 +304,7 @@ class Paradox:
             # if set by number, look for it
             elif zone.isdigit():
                 number = int(zone)
-                if number > 0 and number < len(self.zones):
+                if number in self.zones:
                     zones_selected = [number]
 
         # Not Found
@@ -350,7 +337,7 @@ class Paradox:
         partitions_selected = []
         # if all or 0, select all
         if partition == 'all' or partition == '0':
-            partitions_selected = list(range(1, len(self.partitions)))
+            partitions_selected = list(self.partitions)
         else:
             # if set by name, look for it
             if partition in self.labels['partition']:
@@ -358,7 +345,7 @@ class Paradox:
             # if set by number, look for it
             elif partition.isdigit():
                 number = int(partition)
-                if number > 0 and number < len(self.partitions):
+                if number in self.partitions:
                     partitions_selected = [number]
 
         # Not Found
@@ -615,7 +602,6 @@ class Paradox:
         # Publish changes and update state
         for k, v in change.items():
             old = None
-           
             if k in element_list[index]:
                 old = element_list[index][k]
         
@@ -627,7 +613,7 @@ class Paradox:
 
                     # Trigger notifications for Partitions changes
                     # Ignore some changes as defined in the configuration
-                    if element_type == "partition" and k not in PARTITIONS_CHANGE_NOTIFICATION_IGNORE:
+                    if element_type == "partition" and k not in PARTITIONS:
                         self.interface.notify("Paradox", "{} {} {}".format(element_list[index]['label'], k, change[k]), logging.INFO)
 
             else:
@@ -637,8 +623,8 @@ class Paradox:
 
     def handle_status(self, message):
         """Handle MessageStatus"""
-   
-        if message.fields.value.address == 0:
+        
+        if message.fields.value.status_request == 0:
             self.power.update(
                 dict(
                     vdc=message.fields.value.vdc,
@@ -652,23 +638,54 @@ class Paradox:
                 self.interface.change('system','power','dc', round(message.fields.value.dc,2), False)
 
             i = 1
-            while i <= ZONES and i in message.fields.value.zone_status:
-                v = message.fields.value.zone_status[i]
-                self.update_properties('zone', self.zones, i, v)
+            while i in ZONES and i in value.zone_open_status:
+                zone_open = message.fields.value.zone_open_status[i]
+                zone_fire = message.fields.value.zone_fire_status[i]
+                zone_tamper = message.fields.value.zone_tamper_status[i]
+                self.update_properties('zone', self.zones, i, dict(open=zone_open, fire=zone_fire, tamper=zone_tamper))
                 i += 1
-
-        elif message.fields.value.address == 1:
+            
+        elif message.fields.value.status_request == 1:
             i = 1
-            while i <= PARTITIONS and i in message.fields.value.partition_status:
+            while i in PARTITIONS and i in message.fields.value.partition_status:
                 v = message.fields.value.partition_status[i]
                 self.update_properties('partition', self.partitions, i, v)
                 i += 1
-
-        elif message.fields.value.address == 2:
+            
             i = 1
-            while i <= ZONES and i in message.fields.value.zone_status:
+            while i in ZONES and i in message.fields.value.zone_rf_supervision_trouble:
+                rf_supervision = message.fields.value.zone_rf_supervision_trouble[i]
+                rf_battery = message.fields.value.zone_rf_low_battery_trouble[i]
+
+                self.update_properties('zone', self.zones, i, dict(
+                        rf_supervision_trouble=rf_supervision, 
+                        rf_low_battery_trouble=rf_battery))
+
+                i += 1
+
+        elif message.fields.value.status_request == 2:
+            i = 1
+            while i in ZONES and i in message.fields.value.zone_status:
                 v = message.fields.value.zone_status[i]
                 self.update_properties('zone', self.zones, i, v)
+                i += 1
+        
+        elif message.fields.value.status_request == 3:
+            i = 1
+            while i in ZONES and i in message.fields.value.zone_signal_strength:
+                v = message.fields.value.zone_signal_strength[i]
+                self.update_properties('zone', self.zones, i, dict(signal_strength=v))
+                i += 1
+        
+        elif message.fields.value.status_request == 4:
+            #Not Implemented. PGM, Repeaterr, Keypad Signal Strength
+            pass
+
+        elif message.fields.value.status_request == 5:
+            i = 1
+            while i in ZONES and i in message.fields.value.zone_exit_delay:
+                v = message.fields.value.zone_exit_delay[i]
+                self.update_properties('zone', self.zones, i, dict(exit_delay=v))
                 i += 1
 
     def handle_error(self, message):
