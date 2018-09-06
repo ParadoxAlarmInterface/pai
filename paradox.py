@@ -16,13 +16,25 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 MEM_STATUS_BASE1 = 0x8000
 MEM_STATUS_BASE2 = 0x1fe0
+
 MEM_ZONE_START = 0x010
-MEM_ZONE_END = MEM_ZONE_START + 0x10 * 16 # For 16 Zones
-MEM_OUTPUT_START = 0x210
-MEM_OUTPUT_END = MEM_OUTPUT_START + 0x10 * 16 # For 16 Outputs
-MEM_PARTITION_START = 0x310
-MEM_PARTITION_END = 0x310
-MEM_STEP = 0x20
+MEM_ZONE_END = MEM_ZONE_START + 0x10 * 32
+MEM_OUTPUT_START = MEM_ZONE_END
+MEM_OUTPUT_END = MEM_OUTPUT_START + 0x10 * 16
+MEM_PARTITION_START = MEM_OUTPUT_END
+MEM_PARTITION_END = MEM_PARTITION_START + 0x10 * 2
+MEM_USER_START = MEM_PARTITION_END
+MEM_USER_END = MEM_USER_START + 0x10 * 32
+MEM_BUS_START = MEM_USER_END 
+MEM_BUS_END = MEM_BUS_START + 0x10 * 15
+MEM_REPEATER_START = MEM_BUS_END 
+MEM_REPEATER_END = MEM_REPEATER_START + 0x10 * 2
+MEM_KEYPAD_START = MEM_REPEATER_END
+MEM_KEYPAD_END = MEM_KEYPAD_START + 0x10 * 8
+MEM_SITE_START = MEM_KEYPAD_END
+MEM_SITE_END = MEM_SITE_START + 0x10
+MEM_SIREN_START = MEM_SITE_END 
+MEM_SIREN_END = MEM_SIREN_START + 0x10 * 4
 
 PARTITION_ACTIONS = dict(arm=0x04, disarm=0x05, arm_stay=0x01, arm_sleep=0x03,  arm_stay_stayd=0x06, arm_sleep_stay=0x07, disarm_all=0x08)
 ZONE_ACTIONS = dict(bypass=0x10, clear_bypass=0x10)
@@ -45,7 +57,13 @@ class Paradox:
     def reset(self):
 
         # Keep track of alarm state
-        self.labels = {'zone': {}, 'partition': {}, 'output': {}}
+        self.labels = {'zone': {}, 'partition': {}, 'output': {}, 'user': {}, 'bus': {}, 'repeater': {}, 'siren':{}, 'site': {}, 'keypad': {} }
+        self.repeaters = dict()
+        self.keypads = dict()
+        self.sirens = dict()
+        self.sites = dict()
+        self.users = dict()
+        self.buses = dict()
         self.zones = dict()
         self.partitions = dict()
         self.outputs = dict()
@@ -223,69 +241,53 @@ class Paradox:
 
     def update_labels(self):
         logger.info("Updating Labels from Panel")
-
-        partition_template = dict() # Will be populated after status message
-
-        zone_template = dict()
-
+        
         output_template = dict(
             on=False,
             pulse=False,
             tamper=False,
             supervision_trouble=False,
             timestamp=0)
+        self.load_labels(self.zones, self.labels['zone'], MEM_ZONE_START, MEM_ZONE_END)
+        logger.debug("Zones: {}".format(self.labels['zone']))
+        self.load_labels(self.outputs, self.labels['output'], MEM_OUTPUT_START, MEM_OUTPUT_END, template=output_template)
+        logger.debug("Outputs: {}".format(list(self.labels['output'])))
+        self.load_labels(self.partitions, self.labels['partition'], MEM_PARTITION_START, MEM_PARTITION_END)
+        logger.debug("Partitions: {}".format(list(self.labels['partition'])))
+        self.load_labels(self.users, self.labels['user'], MEM_USER_START, MEM_USER_END)
+        logger.debug("Users: {}".format(list(self.labels['user'])))
+        self.load_labels(self.buses, self.labels['bus'], MEM_BUS_START, MEM_BUS_END)
+        logger.debug("Buses: {}".format(list(self.labels['bus'])))
+        self.load_labels(self.repeaters, self.labels['repeater'], MEM_REPEATER_START, MEM_REPEATER_END)
+        logger.debug("Repeaters: {}".format(list(self.labels['repeater'])))
+        self.load_labels(self.keypads, self.labels['keypad'], MEM_KEYPAD_START, MEM_KEYPAD_END)
+        logger.debug("Keypads: {}".format(list(self.labels['keypad'])))
+        self.load_labels(self.sites, self.labels['site'], MEM_SITE_START, MEM_SITE_END)
+        logger.debug("Sites: {}".format(list(self.labels['site'])))
+        self.load_labels(self.sirens, self.labels['siren'], MEM_SIREN_START, MEM_SIREN_END)
+        logger.debug("Sirens: {}".format(list(self.labels['siren'])))
 
-        self.load_labels(
-            self.partitions,
-            self.labels['partition'],
-            MEM_PARTITION_START,
-            MEM_PARTITION_END,
-            PARTITIONS,
-            template=partition_template)
-        self.load_labels(
-            self.zones,
-            self.labels['zone'],
-            MEM_ZONE_START,
-            MEM_ZONE_END,
-            ZONES,
-            template=zone_template)
-        self.load_labels(
-            self.outputs,
-            self.labels['output'],
-            MEM_OUTPUT_START,
-            MEM_OUTPUT_END,
-            OUTPUTS,
-            template=output_template)
-
-        for k,v in self.partitions.items():
-            self.interface.change('partition', self.partitions[k]['label'], k, v, initial=True)
-
-        for k, v in self.zones.items():
-            self.interface.change('zone', self.zones[k]['label'], k, v, initial=True)
 
         for k, v in self.outputs.items():
             self.interface.change('output', self.outputs[k]['label'], k, v, initial=True)
-
-        # DUMP Labels to console
+        
         logger.debug("Labels updated")
-        logger.debug("Partitions: {}".format(list(self.labels['partition'])))
-        logger.debug("Zones: {}".format(self.labels['zone']))
-        logger.debug("Outputs: {}".format(list(self.labels['output'])))
-
+        
     def load_labels(self,
                     labelDictIndex,
                     labelDictName,
                     start,
                     end,
-                    limit=range(1, 17),
+                    limit=range(1, 33),
                     template=dict(label='')):
         """Load labels from panel"""
         i = 1
         address = start
+
         if len(limit) == 0:
             return
         
-        while address <= end and i <= max(limit):
+        while address < end and i <= max(limit):
             args = dict(address=address)
             reply = self.send_wait_for_reply(msg.ReadEEPROM, args, reply_expected=0x05)
             
@@ -298,21 +300,20 @@ class Paradox:
                 continue
 
             payload = reply.fields.value.data
-        
-            for j in [0, 16]:
-                label = payload[j:j + 16].strip().decode('latin').replace(" ","_")
+            label = payload[:16].strip().decode('latin').replace(" ","_")
                 
-                if label not in labelDictName and i in limit:
-                    properties = template.copy()
-                    properties['label'] = label
-                    if i in labelDictIndex:
-                        labelDictIndex[i] = properties
-                    else:
-                        labelDictIndex[i] = properties
+            if label not in labelDictName and i in limit:
+                properties = template.copy()
+                properties['label'] = label
+                if i in labelDictIndex:
+                    labelDictIndex[i] = properties
+                else:
+                    labelDictIndex[i] = properties
 
-                    labelDictName[label] = i
-                i += 1
-            address += MEM_STEP
+                labelDictName[label] = i
+            i += 1
+
+            address += 16
 
     def control_zone(self, zone, command):
         logger.debug("Control Zone: {} - {}".format(zone, command))
@@ -646,7 +647,7 @@ class Paradox:
                     battery=message.fields.value.battery,
                     dc=message.fields.value.dc))
 
-            if time.time() - self.last_power_update > POWER_UPDATE_INTERVAL:
+            if time.time() - self.last_power_update >= POWER_UPDATE_INTERVAL:
                 self.last_power_update = time.time()
                 self.interface.change('system','power','vdc', round(message.fields.value.vdc,2), False)
                 self.interface.change('system','power','battery', round(message.fields.value.battery,2), False)
