@@ -160,7 +160,7 @@ def main():
 
     logger.info("Starting...")
     # Start interacting with the alarm
-
+    stop = False
     while True:
         try:
             alarm = Paradox(connection=connection, interface=interface_manager)
@@ -176,12 +176,15 @@ def main():
             time.sleep(1)
         except (KeyboardInterrupt, SystemExit):
             logger.info("Exit start")
+            stop = True
+            alarm.stop()
             break
 
         except:
-            logger.exception("Restarting")
-            time.sleep(1)
-        
+            if not stop:
+                logger.exception("Restarting")
+                time.sleep(1)
+    
     interface_manager.stop()
     logger.info("Good bye!")
 

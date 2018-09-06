@@ -7,6 +7,7 @@ import sys
 import time
 import json
 from threading import Lock
+import datetime
 
 from config_defaults import *
 from config import *
@@ -23,6 +24,10 @@ MEM_PARTITION_START = 0x310
 MEM_PARTITION_END = 0x310
 MEM_STEP = 0x20
 
+PARTITION_ACTIONS = dict(arm=0x04, disarm=0x05, arm_stay=0x01, arm_sleep=0x03,  arm_stay_stayd=0x06, arm_sleep_stay=0x07, disarm_all=0x08)
+ZONE_ACTIONS = dict(bypass=0x10, clear_bypass=0x10)
+PGM_ACTIONS = dict(on_override=0x30, off_override=0x31, on=0x32, off=0x33, pulse=0)
+
 serial_lock = Lock()
 
 class Paradox:
@@ -35,6 +40,9 @@ class Paradox:
         self.connection.timeout(0.5)
         self.retries = retries
         self.interface = interface
+        self.reset()
+
+    def reset(self):
 
         # Keep track of alarm state
         self.labels = {'zone': {}, 'partition': {}, 'output': {}}
@@ -44,17 +52,13 @@ class Paradox:
         self.power = dict()
         self.last_power_update = 0
         self.run = False
+        self.loop_wait = False
 
     def connect(self):
         logger.info("Connecting to panel")
         
         # Reset all states
-        self.labels = {'zone': {}, 'partition': {}, 'output': {}}
-        self.zones = dict()
-        self.partitions = dict()
-        self.outputs = dict()
-        self.power = dict()
-        self.last_power_update = 0
+        self.reset()
 
         self.run = True
         
@@ -75,11 +79,11 @@ class Paradox:
             if reply is None:
                 self.run = False
                 return False
-            
+             
             args = dict(product_id=reply.fields.value.product_id,
                         firmware=reply.fields.value.firmware, 
                         panel_id=reply.fields.value.panel_id,
-                        pc_password=0x0000,
+                        pc_password=int(PASSWORD),
                         ) 
 
             reply = self.send_wait_for_reply(msg.InitializeCommunication, args=args, reply_expected=0x10)
@@ -88,8 +92,11 @@ class Paradox:
                 self.run = False
                 return False
             
+            if SYNC_TIME:
+                self.sync_time()
+
             self.update_labels()
-            
+                    
             logger.info("Connection OK")
 
             return True
@@ -98,6 +105,22 @@ class Paradox:
 
         self.run = False
         return False
+    
+    def stop(self):
+        self.run = False
+        self.loop_wait = False
+
+    def sync_time(self):
+        logger.debug("Synchronizing panel time")
+
+        now = datetime.datetime.now()
+        args = dict(century=int(now.year / 100), year=int(now.year % 100), month=now.month, day=now.day, hour=now.hour,minute=now.minute)
+
+        reply = self.send_wait_for_reply(msg.SetTimeDate, args, reply_expected=0x03)
+        if reply is None:
+            logger.warn("Could not set panel time")
+        
+        return
 
     def loop(self):
         logger.debug("Loop start")
@@ -105,7 +128,8 @@ class Paradox:
         
         while self.run:
             #logger.debug("Getting alarm status")
-            
+            self.loop_wait = True
+
             tstart = time.time()
             try:
                 for i in STATUS_REQUESTS:
@@ -117,7 +141,7 @@ class Paradox:
                 logger.exception("Loop")
             
             # Listen for events
-            while (time.time() - tstart) < KEEP_ALIVE_INTERVAL: 
+            while (time.time() - tstart) < KEEP_ALIVE_INTERVAL and self.loop_wait: 
                 self.send_wait_for_reply(None, timeout=1)
 
     def send_wait_for_reply(self, message_type=None, args=None, message=None, retries=5, timeout=5, raw=False, reply_expected=None):
@@ -240,7 +264,7 @@ class Paradox:
             self.interface.change('zone', self.zones[k]['label'], k, v, initial=True)
 
         for k, v in self.outputs.items():
-                self.interface.change('output', self.outputs[k]['label'], k, v, initial=True)
+            self.interface.change('output', self.outputs[k]['label'], k, v, initial=True)
 
         # DUMP Labels to console
         logger.debug("Labels updated")
@@ -268,9 +292,13 @@ class Paradox:
             if reply is None:
                 logger.error("Could not fully load labels")
                 return
+           
+            # Avoid errors due to colision with events
+            if reply.fields.value.address != address:
+                continue
 
             payload = reply.fields.value.data
-
+        
             for j in [0, 16]:
                 label = payload[j:j + 16].strip().decode('latin').replace(" ","_")
                 
@@ -289,7 +317,7 @@ class Paradox:
     def control_zone(self, zone, command):
         logger.debug("Control Zone: {} - {}".format(zone, command))
 
-        if command not in ['bypass', 'clear_bypass']:
+        if command not in self.ZONE_COMMANDS:
             return False
 
         zones_selected = []
@@ -310,29 +338,25 @@ class Paradox:
         if len(zones_selected) == 0:
             return False
 
-        value = command=='bypass'
-        
         # Apply state changes
         accepted = False
         for e in zones_selected:
-            if self.zones[e]['bypass'] == value:
-                continue
-
-            args = dict(zone=e)
-            reply = self.send_wait_for_reply(msg.ZoneStateCommand, args, reply_expected=0x04)
+            args = dict(action=self.ZONES[command], argument=e)
+            reply = self.send_wait_for_reply(msg.PerformAction, args, reply_expected=0x04)
             
             if reply is not None:
                 accepted = True
-                self.update_properties('zone', self.zones, e, dict(bypass=value))
 
+        # Refresh status
+        self.loop_wait = False
         return accepted
 
     def control_partition(self, partition, command):
         logger.debug("Control Partition: {} - {}".format(partition, command))
         
-        if command not in ['arm', 'disarm', 'arm_stay', 'arm_sleep']:
+        if command not in PARTITION_ACTIONS:
             return False
-        
+
         partitions_selected = []
         # if all or 0, select all
         if partition == 'all' or partition == '0':
@@ -354,22 +378,21 @@ class Paradox:
         # Apply state changes
         accepted = False
         for e in partitions_selected:
-            args = dict(partition=e, state=command)
-            reply = self.send_wait_for_reply(msg.PartitionStateCommand, args, reply_expected=0x04)
+            args = dict(action=PARTITION_ACTIONS[command], argument=e)
+            reply = self.send_wait_for_reply(msg.PerformAction, args, reply_expected=0x04)
 
             if reply is not None:
                 accepted = True
-                if command in ['arm_stay', 'arm_sleep']:
-                    self.update_properties('partition', self.partitions, e, {command: True})
-                else:
-                    self.update_properties('partition', self.partitions, e, {'arm': False, 'arm_stay': False, 'arm_sleep': False})
 
+        # Refresh status
+        self.loop_wait = False
+        
         return accepted
 
     def control_output(self, output, command):
         logger.debug("Control Partition: {} - {}".format(output, command))
 
-        if command not in ['on', 'off', 'pulse']:
+        if command not in PGM_ACTIONS:
             return False
 
         outputs = []
@@ -394,22 +417,25 @@ class Paradox:
 
         for e in outputs:
             if command == 'pulse':
-                args = dict(output=e, state='on')
-                reply = self.send_wait_for_reply(msg.OutputStateCommand, args, reply_expected=0x04)
+                args = dict(action=PGM_COMMAND['on'], argument=e)
+                reply = self.send_wait_for_reply(msg.PerformAction, args, reply_expected=0x04)
                 if reply is not None:
                     accepted = True
 
                 time.sleep(1)
-                args = dict(output=e, state='off')
-                reply = self.send_wait_for_reply(msg.OutputStateCommand, args, reply_expected=0x04)
+                args = dict(action=PGM_COMMAND['off'], argument=e)
+                reply = self.send_wait_for_reply(msg.PerformAction, args, reply_expected=0x04)
                 if reply is not None:
                     accepted = True
             else:
-                args = dict(output=e, state=command)
-                reply = self.send_wait_for_reply(msg.OutputStateCommand, args, reply_expected=0x04)
+                args = dict(action=PGM_COMMAND[command], argument=e)
+                reply = self.send_wait_for_reply(msg.PerformAction, args, reply_expected=0x04)
                 if reply is not None:
                     accepted = True
 
+        # Refresh status
+        self.loop_wait = False
+        
         return accepted
 
     def handle_event(self, message):
@@ -493,20 +519,10 @@ class Paradox:
         # Entry Delay
         elif major_code == 2:
             if minor_code in [2, 3, 4, 5, 6, 7, 13]:
-                zones_in_alarm = []
-                for i in range(1, len(self.zones)):
-                    if 'in_alarm' in self.zones[i] and self.zones[i]['in_alarm']:
-                        zones_in_alarm.append(self.zones[i]['label'])
-                
-                self.interface.notify("Paradox", "{} zones: {}".format(event['minor'][1], ','.join(zones_in_alarm)), logging.CRITICAL)
+                self.interface.notify("Paradox", event['minor'][1], logging.CRITICAL)
                 
             elif minor_code == 13:
-                zones_open = []
-                for i in range(1, len(self.zones)):
-                    if 'open' in self.zones[i] and self.zones[i]['open']:
-                        zones_open.append(self.zones[i]['label'])
-
-                self.interface.notify("Paradox", "{} open: {}".format(event['minor'][1], ','.join(zones_open)), logging.INFO)
+                self.interface.notify("Paradox", event['minor'][1], logging.INFO)
 
         # Special Alarm, New Trouble and Trouble Restore
         elif major_code in [40, 44, 45] and minor_code in [1, 2, 3, 4, 5, 6, 7]:

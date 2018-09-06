@@ -14,7 +14,7 @@ def calculate_checksum(message):
 def parse(message):
     if message is None or len(message) == 0:
         return None
-    print(message)
+    
     if message[0] == 0x70:
         return CloseConnection.parse(message)
     elif message[0] == 0x72 and message[1] == 0:
@@ -26,33 +26,26 @@ def parse(message):
     elif message[0] == 0x5F:
         return StartCommunication.parse(message)
     elif message[0] == 0x00 and message[4] > 0:
-        print("Start Communication Response")
         return StartCommunicationResponse.parse(message)
     elif message[0] == 0x00:
-        print("Initialize Communication")
         return InitializeCommunication.parse(message)
     elif message[0] == 0x10:
-        print("Initialize Communication Response")
         return InitializeCommunicationResponse.parse(message)
     elif message[0] == 0x30:
-        return SetTime.parse(message)
+        return SetTimeDate.parse(message)
     elif message[0] >> 4 == 0x03:
-        return SetTimeResponse.parse(message)
+        return SetTimeDateResponse.parse(message)
     elif message[0] == 0x40:
         return PerformAction.parse(message)
     elif message[0] >> 4 == 4:
         return PerformActionResponse.parse(message)
     elif message[0] == 0x50 and message[2] == 0x80:
-        print("Panel Status")
         return PanelStatus.parse(message)
     elif message[0] == 0x50 and message[2] < 0x80:
-        print("ReadEEPROM")
         return ReadEEPROM.parse(message)
     elif message[0] >> 4 == 0x05 and message[2] == 0x80:
-        print("Panel Status Response {}".format(message[3]))
         return PanelStatusResponse[message[3]].parse(message)
     elif message[0] >> 4 == 0x05 and message[2] < 0x80:
-        print("ReadEEPROM Response")
         return ReadEEPROMResponse.parse(message)
     elif message[0] == 0x60 and message[2] < 0x80:
         return WriteEEPROM.parse(message)
@@ -554,5 +547,111 @@ ReadEEPROMResponse = Struct("fields" / RawCopy(
         )),
     "checksum" / Checksum(
         Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
+SetTimeDate = Struct("fields" / RawCopy(Struct(
+        "po" / Struct(
+            "command" / Const(0x30, Int8ub)),
+	"not_used0" / Padding(3),
+        "century" / Int8ub,
+        "year" / Int8ub,
+        "month" /Int8ub,
+        "day" / Int8ub,
+        "hour" / Int8ub,
+        "minute" / Int8ub,
+        "not_used1" / Padding(23),
+        "source_id" / Default(Int8ub, 0),
+        "user_high" / Default(Int8ub, 0),
+        "user_low" / Default(Int8ub, 0),
+        )),
+    "checksum" / Checksum(
+        Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
+SetTimeDateResponse = Struct("fields" / RawCopy(
+     Struct(
+        "po" / BitStruct(
+          "command" / Const(0x3, Nibble),
+          "status" / Struct(
+            "reserved" / Flag, 
+            "alarm_reporting_pending" / Flag,
+            "Windload_connected" / Flag, 
+            "NeWare_connected" / Flag)),
+         "not_used0" / Padding(35),
+        )),
+    "checksum" / Checksum(
+        Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
+PerformAction = Struct("fields" / RawCopy(Struct(
+        "po" / Struct(
+            "command" / Const(0x40, Int8ub)),
+	"not_used0" / Padding(1),
+        "action" / Enum(Int8ub,
+            Stay_Arm=0x01,
+            Stay_Arm1=0x02,
+            Sleep_Arm=0x03,
+            Full_Arm=0x04,
+            Disarm=0x05,
+            Stay_Arm_StayD=0x06,
+            Sleep_Arm_StayD=0x07,
+            Disarm_Both_Disable_StayD=0x08,
+            Bypass=0x10,
+            Beep=0x10,
+            PGM_On_Overwride=0x30,
+            PGM_Off_Override=0x31,
+            PGM_On=0x32,
+            PGM_Off=0x33,
+            Reload_RAM=0x80,
+            Bus_Scan=0x85,
+            Future_Use=0x90),
+        "argument" / Enum(Int8ub,
+            One_Beep=0x04,
+            Fail_Beep=0x08,
+            Beep_Twice=0x0c,
+            Accept_Beep=0x10),
+        "not_used1" / Padding(29),
+        "source_id" / Default(Int8ub, 0),
+        "user_high" / Default(Int8ub, 0),
+        "user_low" / Default(Int8ub, 0),
+        )),
+    "checksum" / Checksum(
+        Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
+PerformActionResponse = Struct("fields" / RawCopy(
+     Struct(
+        "po" / BitStruct(
+          "command" / Const(0x4, Nibble),
+          "status" / Struct(
+            "reserved" / Flag, 
+            "alarm_reporting_pending" / Flag,
+            "Windload_connected" / Flag, 
+            "NeWare_connected" / Flag)),
+	"not_used0" / Padding(1),
+        "action" / Enum(Int8ub,
+            Stay_Arm=0x01,
+            Stay_Arm1=0x02,
+            Sleep_Arm=0x03,
+            Full_Arm=0x04,
+            Disarm=0x05,
+            Stay_Arm_StayD=0x06,
+            Sleep_Arm_StayD=0x07,
+            Disarm_Both_Disable_StayD=0x08,
+            Bypass=0x10,
+            Beep=0x10,
+            PGM_On_Overwrite=0x30,
+            PGM_Off_Overrite=0x31,
+            PGM_On=0x32,
+            PGM_Of=0x33,
+            Reload_RAM=0x80,
+            Bus_Scan=0x85,
+            Future_Use=0x90),
+        "not_used1" / Padding(33),
+        )),
+        "checksum" / Checksum(
+            Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
+
+
+
+
+
 
 
