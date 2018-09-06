@@ -1,31 +1,30 @@
 # PAI - Paradox Alarm Interface
 
 Python-based 'middleware' that aims to use any method to connect to a Paradox Alarm, exposing the interface for monitoring and control via several methods.
+With this interface it is possible to integrate Paradox panels with HomeAssistant, OpenHAB or other domotics system that supports MQTT.
 
-This is a complete rewrite from [ParadoxMulti-MQTT](https://github.com/jpbarraca/ParadoxMulti-MQTT)
-
-It supports panels connected through a serial port, which is present in all panels, or through a USB 307 module.
-
+It supports panels connected through a serial port, which is present in all panels, or through a USB 307 module. If you are using a NanoPi/RPi with the onboard
+serial port, do not forget the level shifter as the panels operate on 5V logic.
 
 Tested in the following environment:
 
 * Python 3.5.2
-* Mosquitto MQTT Broker v1.4.14
-* OrangePi 2G-IOT, NanoPi NEO, Raspberry Pi 3 through their built in Serial Port (with a level switch!)
+* Mosquitto MQTT Broker v1.4.8-1.4.14
+* OrangePi 2G-IOT, NanoPi NEO, Raspberry Pi 3 through their built in Serial Port (with a level switcher!) or an USB RS232 TTL adapter (CP2102, PL2303, CH340, etc..)
 * Ubuntu Server 16.04.3 LTS
 * Paradox MG5050 panel
 * [Signal Cli](https://github.com/AsamK/signal-cli) through a DBUS interface
 * Pushbullet.py
-* SIM900 module through serial port
+* SIM900 module through a serial port
 
 
 ## Structure
 
-* __Paradox__: Object that interfaces with the panel and keeps some internal state. Accepts commands to control partitions, zones and outputs. Exposes changes and events
+* __Paradox__: Object that interfaces with the panel and keeps some internal state. Accepts commands to control partitions, zones and outputs. Exposes states, changes and events
 
-* __Interfaces__: Expose interfaces to the outside world. Currently, MQTT, Signal and Pushbullet are supported, but other are planned and almost any other is supported.
+* __Interfaces__: Expose interfaces to the outside world. Currently, MQTT, Signal and Pushbullet are supported, but others are planned and almost any other is supported.
 
-* __Connections__: Handle communication with the panel, at a lower level. Currently, only Serial connections are supported.
+* __Connections__: Handle communications with the panel, at a lower level. Currently, only Serial connections are supported.
 
 
 ## Steps to use it:
@@ -34,7 +33,7 @@ Tested in the following environment:
 git clone https://github.com/jpbarraca/pai.git
 ```
 
-2.  Copy config_sample.py to config.py and edit it to match your setup
+2.  Copy config_defaults.py to config.py and edit it to match your setup
 ```
 cp config_sample.py config.py
 ```
@@ -76,14 +75,16 @@ All interactions are made through a ```MQTT_BASE_TOPIC```, which defaults to ```
 * ```minor_code```  and ```minor_text``` represent the minor code and corresponding text description as provided by the alarm. This will mostly identify a detail of the event, such as the zone number/name, the user name, partition name, and so on.
 * ```type``` identifies the event category, and can take the following values: ```Partition```, ```Bell```, ```NonReportable```, ```User```, ```Remote```, ```Special```, ```Trouble```, ```Software```, ```Output```, ```Wireless```, ```Bus Module```, ```Zone```, ```System```.
 
+PGM_ACTIONS = dict(on_override=0x30, off_override=0x31, on=0x32, off=0x33, pulse=0)
+
 
 ### Control
 
 The MQTT Interface allows setting some properties for individual objects by specifying the correct name. In alternative, the ```all``` keyword can be used to apply the same setting to all objects. This is useful to activate all PGMs or to Arm/Disarm all partitions.
 
-* ```paradox/control/partitions/name``` allow setting some partition properties where ```name``` identifies the partition. If the ```name``` is ```all```, all partitions will be updated. The payload can have the values ```arm```, ```arm_stay```, ```arm_sleep``` or ```disarm```.
+* ```paradox/control/partitions/name``` allow setting some partition properties where ```name``` identifies the partition. If the ```name``` is ```all```, all partitions will be updated. The payload can have the values ```arm```, ```arm_stay```, ```arm_sleep```, ```arm_stay_stayd```,  ```arm_sleep_stay``` or ```disarm``` and ```disarm_all```.
 * ```paradox/control/zones/name``` allow setting some zone properties where ```name``` identifies the partition. If the ```name``` is ```all```, all zones will be updated. The payload can have the values ```bypass``` and ```clear_bypass```.
-* ```paradox/control/outputs/name``` allow setting some zone properties where ```name``` identifies the partition. If the ```name``` is ```all```, all outputs will be updated. The payload can have the values ```pulse```, ```on``` (or ```true```, ```1```, ```enable```), or ```off``` (or ```false```, ```0```, ```disable```).
+* ```paradox/control/outputs/name``` allow setting some zone properties where ```name``` identifies the partition. If the ```name``` is ```all```, all outputs will be updated. The payload can have the values ```pulse```, ```on```, ```on_override```, ```off``` or ```off_override```.
 
 
 ### Code Toggle

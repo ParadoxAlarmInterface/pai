@@ -132,7 +132,7 @@ class MQTTInterface(Thread):
 
         # Process a Zone Command
         if topics[2] == MQTT_ZONE_TOPIC:
-            if command not in ['bypass', 'clear_bypass']:
+            if command not in self.alarm.ZONE_ACTIONS:
                 logger.error("Invalid command for Zone {}".format(command))
                 return
 
@@ -178,7 +178,7 @@ class MQTTInterface(Thread):
 
                 logger.debug("Effective command: {} = {}".format(element, command))
 
-                if command not in ['arm', 'disarm', 'arm_stay', 'arm_sleep']:
+                if command not in self.alarm.PARTITION_ACTIONS:
                     logger.error(
                         "Invalid command for Partition {}".format(command))
                     return
@@ -191,7 +191,7 @@ class MQTTInterface(Thread):
        
         # Process an Output Command
         elif topics[2] == MQTT_OUTPUT_TOPIC:
-            if command not in ['on', 'off', 'pulse']:
+            if command not in self.alarm.PGM_ACTIONS:
                 logger.error("Invalid command for Output {}".format(command))
                 return
 
@@ -265,9 +265,6 @@ class MQTTInterface(Thread):
         #    property,
         #    value))
 
-        if MQTT_IGNORE_UNNAMED_PARTITIONS and (label.startswith('Partition_') or label.startswith('Zone_') or label.startswith('Output_')):
-            return
-        
         # Keep track of ARM state
         if element == 'partition':
             if not label in self.partitions:
@@ -296,11 +293,7 @@ class MQTTInterface(Thread):
     def normalize_mqtt_payload(self, payload):
         payload = payload.decode('utf-8').strip().lower().replace(' ', '_')
 
-        if payload in ['true', 'on', '1', 'enable']:
-            return 'on'
-        elif payload in ['false', 'off', '0', 'disable']:
-            return 'off'
-        elif payload in ['pulse', 'arm', 'disarm', 'arm_stay', 'arm_sleep', 'bypass', 'clear_bypass']:
+        if payload in self.alarm.PGM_ACTIONS or payload in self.alarm.PARTITION_ACTIONS or payload in self.alarm.ZONE_ACTIONS:
             return payload
         elif 'code_toggle' in payload:
             return payload
