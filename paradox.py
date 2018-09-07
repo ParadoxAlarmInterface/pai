@@ -91,7 +91,7 @@ class Paradox:
                     reply.fields.value.application.build))
             else:
                 logger.warn("Unknown panel")
-                
+
             reply = self.send_wait_for_reply(msg.StartCommunication, None, reply_expected=0x00)
             
             if reply is None:
@@ -104,7 +104,8 @@ class Paradox:
                         pc_password=int(PASSWORD),
                         ) 
 
-            reply = self.send_wait_for_reply(msg.InitializeCommunication, args=args, reply_expected=0x10)
+            reply = self.send_wait_for_reply(message=reply.fields.data + reply.checksum, raw=True, reply_expected=0x10)
+            #reply = self.send_wait_for_reply(msg.InitializeCommunication, args=args, reply_expected=0x10)
             
             if reply is None:
                 self.run = False
