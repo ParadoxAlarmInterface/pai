@@ -101,12 +101,13 @@ class Paradox:
             args = dict(product_id=reply.fields.value.product_id,
                         firmware=reply.fields.value.firmware, 
                         panel_id=reply.fields.value.panel_id,
-                        pc_password=int(PASSWORD),
+                        pc_password=PASSWORD,
+                        user_code=0x00000000
                         ) 
 
-            reply = self.send_wait_for_reply(message=reply.fields.data + reply.checksum, raw=True, reply_expected=0x10)
-            #reply = self.send_wait_for_reply(msg.InitializeCommunication, args=args, reply_expected=0x10)
-            
+            #reply = self.send_wait_for_reply(message=reply.fields.data + reply.checksum, raw=True, reply_expected=0x10)
+            reply = self.send_wait_for_reply(msg.InitializeCommunication, args=args, reply_expected=0x10)
+
             if reply is None:
                 self.run = False
                 return False
@@ -125,10 +126,6 @@ class Paradox:
         self.run = False
         return False
     
-    def stop(self):
-        self.run = False
-        self.loop_wait = False
-
     def sync_time(self):
         logger.debug("Synchronizing panel time")
 
@@ -160,13 +157,10 @@ class Paradox:
                 logger.exception("Loop")
             
             # Listen for events
-            while (time.time() - tstart) < KEEP_ALIVE_INTERVAL and self.loop_wait: 
+            while (time.time() - tstart) < KEEP_ALIVE_INTERVAL and self.loop_wait and self.run: 
                 self.send_wait_for_reply(None, timeout=1)
 
     def send_wait_for_reply(self, message_type=None, args=None, message=None, retries=5, timeout=5, raw=False, reply_expected=None):
-        if not self.run:
-            return None
-        
         if message is None and message_type is not None:
             message = message_type.build(dict(fields=dict(value=args)))
 
@@ -460,6 +454,10 @@ class Paradox:
         minor_code = event['minor'][0]
 
         # IGNORED
+        
+        # Clock loss
+        if major_code == 45 and minor_code == 6:
+            return
 
         # Open Close
         if major_code in [0, 1]:
@@ -707,13 +705,12 @@ class Paradox:
 
     def handle_error(self, message):
         """Handle ErrorMessage"""
-        logger.warn("Got Message: {}".format(message.fields.value.message))
+        logger.warn("Got ERROR Message: {}".format(message.fields.value.message))
         self.run = False
 
     def disconnect(self):
-        reply = self.send_wait_for_reply(msg.TerminateConnection, None, reply_expected=0x05)
-        
-        if reply is not None:
-            logger.info("Disconnected: {}".format(reply.fields.value.message))
-
+        logger.info("Disconnecting from the Alarm Panel")
         self.run = False
+        self.loop_wait = False
+        reply = self.send_wait_for_reply(msg.CloseConnection, None, reply_expected=0x07)
+        
