@@ -29,7 +29,7 @@ PARTITIONS_CHANGE_NOTIFICATION_IGNORE=['arm_full', 'exit_delay'] # Do not send n
 POWER_UPDATE_INTERVAL = 60      # Interval between updates of the battery, DC and VDC voltages
 STATUS_REQUESTS = [1, 2, 3, 5]  # 4 ignored
 SYNC_TIME = True    # Update panel time
-PASSWORD = '0000'   # PC Password
+PASSWORD = 0000   # PC Password
 
 # MQTT
 MQTT_HOST = 'localhost' # Hostname or address

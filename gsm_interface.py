@@ -104,6 +104,7 @@ class GSMInterface(Thread):
 
         try:
             while not self.stop_running.isSet():
+                time.sleep(1)
 
                 while not self.connected() and self.stop_running.isSet():
                     logging.warning("Could not connect to modem")
@@ -129,8 +130,8 @@ class GSMInterface(Thread):
 
                 except:
                     self.modem_connected = False
-                    logger.exception("")
-        
+                    #logger.exception("")
+                    
         except (KeyboardInterrupt, SystemExit):
             logger.debug("GSM loop stopping")
             return

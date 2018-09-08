@@ -164,6 +164,7 @@ def main():
     while True:
         try:
             alarm = Paradox(connection=connection, interface=interface_manager)
+            alarm.disconnect()
             if alarm.connect():
                 interface_manager.set_alarm(alarm)
                 #interface_manager.notify("PAI", "Paradox Alarm Interface is active", logging.INFO)
@@ -177,7 +178,7 @@ def main():
         except (KeyboardInterrupt, SystemExit):
             logger.info("Exit start")
             stop = True
-            alarm.stop()
+            alarm.disconnect()
             break
 
         except:
