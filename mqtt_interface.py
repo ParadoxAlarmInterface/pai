@@ -278,15 +278,29 @@ class MQTTInterface(Thread):
             element_topic = MQTT_ZONE_TOPIC
         elif element == 'output':
             element_topic = MQTT_OUTPUT_TOPIC
+        elif element == 'repeater':
+            element_topic = MQTT_REPEATER_TOPIC
+        elif element == 'bus':
+            element_topic = MQTT_BUS_TOPIC
+        elif element == 'keypad':
+            element_topic = MQTT_KEYPAD_TOPIC
+        elif element == 'system':
+            element_topic = MQTT_SYSTEM_TOPIC
+        elif element == 'user':
+            element_topic = MQTT_USER_TOPIC
         else:
             element_topic = element
         
+        if MQTT_USE_NUMERIC_STATES:
+            publish_value = int(value)
+        else:
+            publish_value = value
         self.publish('{}/{}/{}/{}/{}'.format(MQTT_BASE_TOPIC,
                                             MQTT_STATES_TOPIC,
                                             element_topic,
                                             label,
                                             property),
-                          "{}".format(value), 0, MQTT_RETAIN)
+                          "{}".format(publish_value), 0, MQTT_RETAIN)
 
     
     # Utils

@@ -62,19 +62,6 @@ class StatusAdapter(Adapter):
         
         return r
 
-class ZoneStatusAdapter(Adapter):
-    def _decode(self, obj, context, path):
-        return  dict(
-            zone_was_in_alarm=(obj[0] & 0x80) != 0,
-            zone_is_in_alarm=(obj[0] & 0x40) != 0,
-            fire_delay=(obj[0] & 0b00110000) == 0b00110000,
-            entry_delay=(obj[0] & 0b00010000) == 0b00010000,
-            intellizone_delay=(obj[0] & 0b00100000) == 0b00010000,
-            no_delay=(obj[0] & 0b00110000) == 0,
-            zone_bypassed=(obj[0] & 0x08) != 0,
-            zone_shutdown=(obj[0] & 0x04) != 0,
-            zone_in_tx_delay=(obj[0] & 0x02) != 0,
-            zone_was_bypassed=(obj[0] & 0x01) != 0)
 
 
 class PartitionStatusAdapter(Adapter):
@@ -121,18 +108,18 @@ class PartitionStatusAdapter(Adapter):
 class ZoneStatusAdapter(Adapter):
     def _decode(self, obj, context, path):
         zone_status = dict()
-        for i in range(0, 32):
+        for i in range(0, len(obj)):
             zone_status[i+1] = dict(
-              zone_was_in_alarm=(obj[i] & 0x80) != 0,
-              zone_is_in_alarm=(obj[i] & 0x40) != 0,
+              was_in_alarm=(obj[i] & 0x80) != 0,
+              is_in_alarm=(obj[i] & 0x40) != 0,
               fire_delay=(obj[i] & 0b00110000) == 0b00110000,
               entry_delay=(obj[i] & 0b00010000) == 0b00010000,
               intellizone_delay=(obj[i] & 0b00100000) == 0b00010000,
               no_delay=(obj[i] & 0b00110000) == 0,
-              zone_bypassed=(obj[i] & 0x08) != 0,
-              zone_shutdown=(obj[i] & 0x04) != 0,
-              zone_in_tx_delay=(obj[i] & 0x02) != 0,
-              zone_was_bypassed=(obj[i] & 0x01) != 0)
+              bypassed=(obj[i] & 0x08) != 0,
+              shutdown=(obj[i] & 0x04) != 0,
+              in_tx_delay=(obj[i] & 0x02) != 0,
+              was_bypassed=(obj[i] & 0x01) != 0)
 
         return zone_status
 
