@@ -66,7 +66,7 @@ class Paradox:
         self.zones = dict()
         self.partitions = dict()
         self.outputs = dict()
-        self.system = dict()
+        self.system = dict(power=dict(label='power'), rf=dict(label='rf'), troubles=dict(label='troubles'))
         self.last_power_update = 0
         self.run = False
         self.loop_wait = False
@@ -627,7 +627,15 @@ class Paradox:
 
                     # Trigger notifications for Partitions changes
                     # Ignore some changes as defined in the configuration
-                    if element_type == "partition" and k in PARTITIONS:
+                    if element_type == "partition" and k in PARTITIONS or \
+                        element_type == 'system' and 'trouble' in k or \
+                        element_type == 'zone' and 'trouble' in k and k in ZONES or \
+                        element_type == 'bus' and 'trouble' in k and k in BUSES or \
+                        element_type == 'output' and 'trouble' in k and k in OUTPUTS or \
+                        element_type == 'keypad' and 'trouble' in k and k in KEYPADS or \
+                        element_type == 'repeater' and 'trouble' in k and k in REPEATERS or \
+                        element_type == 'siren' and 'trouble' in k and k in SIRENS:
+
                         self.interface.notify("Paradox", "{} {} {}".format(elements[key]['label'], k, change[k]), logging.INFO)
 
             else:
@@ -688,8 +696,8 @@ class Paradox:
                 self.update_properties('system', 'power', dict(vdc=round(message.fields.value.vdc, 2)))
                 self.update_properties('system', 'power', dict(battery=round(message.fields.value.battery, 2)))
                 self.update_properties('system', 'power', dict(dc=round(message.fields.value.dc, 2)))
+                self.update_properties('system','rf', dict(rf_noise_floor=round(message.fields.value.rf_noise_floor, 2 )))
             
-            self.update_properties('system','rf', dict(rf_noise_floor=round(message.fields.value.rf_noise_floor, 2 )))
             for k in message.fields.value.troubles:
                 if "not_used" in k:
                     continue
