@@ -655,6 +655,8 @@ class Paradox:
             if element_type == 'pgm':
                 element_type = 'output'
                 limit_list = OUTPUTS
+            elif element_type == 'partition':
+                limit_list = PARTITIONS
             elif element_type == 'zone':
                 limit_list = ZONES
             elif element_type == 'bus':
@@ -675,18 +677,14 @@ class Paradox:
             
             prop_name = '_'.join(k.split('_')[1:])
             if prop_name == 'status':
-                for kk in message.fields.value[k]:
-                    i = 1
-                    while i in limit_list and i in message.fields.value[k][kk]:
-                        status = message.fields.value[k][kk][i]
-                        self.update_properties(element_type, i, {prop_name:status})
-                        i += 1
+                for i in message.fields.value[k]:
+                    if i in limit_list:
+                        self.update_properties(element_type, i, message.fields.value[k][i])
             else:
-                i = 1
-                while i in limit_list and i in message.fields.value[k]:
-                    status = message.fields.value[k][i]
-                    self.update_properties(element_type, i, {prop_name:status})
-                    i += 1
+                for i in message.fields.value[k]:    
+                    if i in limit_list:
+                        status = message.fields.value[k][i]
+                        self.update_properties(element_type, i, {prop_name:status})
 
 
     def handle_status(self, message):
@@ -708,21 +706,9 @@ class Paradox:
            
             self.process_status_bulk(message)
         
-        elif message.fields.value.status_request == 1:
+        elif message.fields.value.status_request >= 1 and message.fields.value.status_request <= 5:
             self.process_status_bulk(message)
         
-        elif message.fields.value.status_request == 2:
-            self.process_status_bulk(message)
-        
-        elif message.fields.value.status_request == 3:
-            self.process_status_bulk(message)
-        
-        elif message.fields.value.status_request == 4:
-            self.process_status_bulk(message)
-        
-        elif message.fields.value.status_request == 5:
-            self.process_status_bulk(message)
-
     def handle_error(self, message):
         """Handle ErrorMessage"""
         logger.warn("Got ERROR Message: {}".format(message.fields.value.message))

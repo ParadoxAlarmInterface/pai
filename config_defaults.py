@@ -30,7 +30,7 @@ LABEL_REFRESH_INTERVAL = 15 * 60    # Interval between refresh of labels
 OUTPUT_PULSE_DURATION = 1           # Duration of a PGM pulse in seconds
 PARTITIONS_CHANGE_NOTIFICATION_IGNORE=['arm_full', 'exit_delay'] # Do not send notifications for these notificions
 POWER_UPDATE_INTERVAL = 60      # Interval between updates of the battery, DC and VDC voltages
-STATUS_REQUESTS = [0, 1, 2, 3, 4, 5]  # 4 ignored
+STATUS_REQUESTS = [0, 1, 2, 3, 4, 5]
 SYNC_TIME = True    # Update panel time
 PASSWORD = 0000   # PC Password
 
