@@ -96,6 +96,9 @@ class MQTTInterface(Thread):
         logger.info("message topic={}, payload={}".format(
             message.topic, str(message.payload.decode("utf-8"))))
 
+        if message.retain:
+            return
+
         if self.alarm is None:
             logger.warning("No alarm. Ignoring command")
             return
