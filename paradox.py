@@ -350,6 +350,7 @@ class Paradox:
             return False
 
         partitions_selected = []
+        
         # if all or 0, select all
         if partition == 'all' or partition == '0':
             partitions_selected = list(self.partitions)
@@ -369,6 +370,7 @@ class Paradox:
 
         # Apply state changes
         accepted = False
+
         for e in partitions_selected:
             args = dict(action=PARTITION_ACTIONS[command], argument=e)
             reply = self.send_wait_for_reply(msg.PerformAction, args, reply_expected=0x04)

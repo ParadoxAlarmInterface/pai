@@ -118,7 +118,7 @@ class MQTTInterface(Thread):
                 return
 
             payload = message.payload.decode("latin").strip()
-            self.notification_handler.notify(self.name, payload, level)
+            #self.notification_handler.notify(self.name, payload, level)
             return
 
 
@@ -132,10 +132,6 @@ class MQTTInterface(Thread):
 
         # Process a Zone Command
         if topics[2] == MQTT_ZONE_TOPIC:
-            if command not in self.alarm.ZONE_ACTIONS:
-                logger.error("Invalid command for Zone {}".format(command))
-                return
-
             if not self.alarm.control_zone(element, command):
                 logger.warning(
                     "Zone command refused: {}={}".format(element, command))
@@ -178,11 +174,6 @@ class MQTTInterface(Thread):
 
                 logger.debug("Effective command: {} = {}".format(element, command))
 
-                if command not in self.alarm.PARTITION_ACTIONS:
-                    logger.error(
-                        "Invalid command for Partition {}".format(command))
-                    return
-            
                 self.notification_handler.notify('mqtt', "Command by {}: {}".format(MQTT_TOGGLE_CODES[tokens[1]], command), logging.INFO)
 
             if not self.alarm.control_partition(element, command):
@@ -191,10 +182,6 @@ class MQTTInterface(Thread):
        
         # Process an Output Command
         elif topics[2] == MQTT_OUTPUT_TOPIC:
-            if command not in self.alarm.PGM_ACTIONS:
-                logger.error("Invalid command for Output {}".format(command))
-                return
-
             if not self.alarm.control_output(element, command):
                 logger.warning(
                     "Output command refused: {}={}".format(element, command))
