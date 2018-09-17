@@ -70,7 +70,7 @@ class PartitionStatusAdapter(Adapter):
 
         for i in range(0, 2):
             partition_status[i+1] = dict(
-	        pulse_alarm_fire = obj[0 + i*4] & 0x80 != 0,
+	        pulse_fire_alarm = obj[0 + i*4] & 0x80 != 0,
                 audible_alarm = obj[0 + i*4] & 0x40 != 0,
                 silent_alarm = obj[0 + i*4] & 0x20 != 0,
                 strobe_alarm = obj[0 + i*4] & 0x10 != 0,

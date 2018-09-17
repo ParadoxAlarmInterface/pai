@@ -618,6 +618,32 @@ class Paradox:
         # Publish changes and update state
         for k, v in change.items():
             old = None
+            
+            # Virtual property "Trouble"
+            if '_trouble' in k:
+                if v:
+                    self.update_properties(element_type, key, dict(trouble=True))
+                else:
+                    r = False
+                    for kk,vv in elements[key].items():
+                        if '_trouble' in kk:
+                            r = r or elements[key][kk]
+
+                    self.update_properties(element_type, key, dict(trouble=r))
+            
+            # Virtual property "Alarm"
+            if '_alarm' in k:
+                if v:
+                    self.update_properties(element_type, key, dict(alarm=True))
+                else:
+                    r = False
+                    for kk, vv in elements[key].items():
+                        if '_alarm' in kk:
+                            r = r or elements[key][kk]
+
+                    self.update_properties(element_type, key, dict(alarm=r))
+                    
+
             if k in elements[key]:
                 old = elements[key][k]
         
@@ -629,14 +655,14 @@ class Paradox:
 
                     # Trigger notifications for Partitions changes
                     # Ignore some changes as defined in the configuration
-                    if element_type == "partition" and k in PARTITIONS or \
-                        element_type == 'system' and 'trouble' in k or \
-                        element_type == 'zone' and 'trouble' in k and k in ZONES or \
-                        element_type == 'bus' and 'trouble' in k and k in BUSES or \
-                        element_type == 'output' and 'trouble' in k and k in OUTPUTS or \
-                        element_type == 'keypad' and 'trouble' in k and k in KEYPADS or \
-                        element_type == 'repeater' and 'trouble' in k and k in REPEATERS or \
-                        element_type == 'siren' and 'trouble' in k and k in SIRENS:
+                    if (element_type == "partition" and k in PARTITIONS) or \
+                        (element_type == 'system' and 'trouble' in k) or \
+                        (element_type == 'zone' and 'trouble' in k and k in ZONES) or \
+                        (element_type == 'bus' and 'trouble' in k and k in BUSES) or \
+                        (element_type == 'output' and 'trouble' in k and k in OUTPUTS) or \
+                        (element_type == 'keypad' and 'trouble' in k and k in KEYPADS) or \
+                        (element_type == 'repeater' and 'trouble' in k and k in REPEATERS) or \
+                        (element_type == 'siren' and 'trouble' in k and k in SIRENS):
 
                         self.interface.notify("Paradox", "{} {} {}".format(elements[key]['label'], k, change[k]), logging.INFO)
 
@@ -646,6 +672,7 @@ class Paradox:
 
                 self.interface.change(element_type, elements[key]['label'],
                                           k, change[k], initial=surpress)
+
 
     def process_status_bulk(self, message):
 
