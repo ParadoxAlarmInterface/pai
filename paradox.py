@@ -333,7 +333,7 @@ class Paradox:
         # Apply state changes
         accepted = False
         for e in zones_selected:
-            args = dict(action=self.ZONES[command], argument=e)
+            args = dict(action=self.ZONES[command], argument=(e-1))
             reply = self.send_wait_for_reply(msg.PerformAction, args, reply_expected=0x04)
             
             if reply is not None:
@@ -372,7 +372,7 @@ class Paradox:
         accepted = False
 
         for e in partitions_selected:
-            args = dict(action=PARTITION_ACTIONS[command], argument=e)
+            args = dict(action=PARTITION_ACTIONS[command], argument=(e-1))
             reply = self.send_wait_for_reply(msg.PerformAction, args, reply_expected=0x04)
 
             if reply is not None:
@@ -411,18 +411,18 @@ class Paradox:
 
         for e in outputs:
             if command == 'pulse':
-                args = dict(action=PGM_COMMAND['on'], argument=e)
+                args = dict(action=PGM_COMMAND['on'], argument=(e-1))
                 reply = self.send_wait_for_reply(msg.PerformAction, args, reply_expected=0x04)
                 if reply is not None:
                     accepted = True
 
                 time.sleep(1)
-                args = dict(action=PGM_COMMAND['off'], argument=e)
+                args = dict(action=PGM_COMMAND['off'], argument=(e-1))
                 reply = self.send_wait_for_reply(msg.PerformAction, args, reply_expected=0x04)
                 if reply is not None:
                     accepted = True
             else:
-                args = dict(action=PGM_COMMAND[command], argument=e)
+                args = dict(action=PGM_COMMAND[command], argument=(e-1))
                 reply = self.send_wait_for_reply(msg.PerformAction, args, reply_expected=0x04)
                 if reply is not None:
                     accepted = True
