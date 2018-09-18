@@ -620,6 +620,7 @@ class Paradox:
             old = None
             
             # Virtual property "Trouble"
+            # True if element has ANY type of alarm
             if '_trouble' in k:
                 if v:
                     self.update_properties(element_type, key, dict(trouble=True))
@@ -631,19 +632,6 @@ class Paradox:
 
                     self.update_properties(element_type, key, dict(trouble=r))
             
-            # Virtual property "Alarm"
-            if '_alarm' in k:
-                if v:
-                    self.update_properties(element_type, key, dict(alarm=True))
-                else:
-                    r = False
-                    for kk, vv in elements[key].items():
-                        if '_alarm' in kk:
-                            r = r or elements[key][kk]
-
-                    self.update_properties(element_type, key, dict(alarm=r))
-                    
-
             if k in elements[key]:
                 old = elements[key][k]
         

@@ -70,7 +70,8 @@ class PartitionStatusAdapter(Adapter):
 
         for i in range(0, 2):
             partition_status[i+1] = dict(
-	        pulse_fire_alarm = obj[0 + i*4] & 0x80 != 0,
+	        alarm = (obj[0 + i*4] & 0xf0 != 0) or (obj[2 + i*4] & 0x80 != 0), # Combined status
+                pulse_fire_alarm = obj[0 + i*4] & 0x80 != 0,
                 audible_alarm = obj[0 + i*4] & 0x40 != 0,
                 silent_alarm = obj[0 + i*4] & 0x20 != 0,
                 strobe_alarm = obj[0 + i*4] & 0x10 != 0,
@@ -111,7 +112,7 @@ class ZoneStatusAdapter(Adapter):
         for i in range(0, len(obj)):
             zone_status[i+1] = dict(
               was_in_alarm=(obj[i] & 0x80) != 0,
-              is_in_alarm=(obj[i] & 0x40) != 0,
+              alarm=(obj[i] & 0x40) != 0,
               fire_delay=(obj[i] & 0b00110000) == 0b00110000,
               entry_delay=(obj[i] & 0b00010000) == 0b00010000,
               intellizone_delay=(obj[i] & 0b00100000) == 0b00010000,
