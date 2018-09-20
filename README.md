@@ -12,7 +12,7 @@ Tested in the following environment:
 * Mosquitto MQTT Broker v1.4.8-1.4.14
 * OrangePi 2G-IOT, NanoPi NEO, Raspberry Pi 3 through their built in Serial Port (with a level switcher!) or an USB RS232 TTL adapter (CP2102, PL2303, CH340, etc..)
 * Ubuntu Server 16.04.3 LTS
-* Paradox MG5050 panel
+* Paradox MG5050 and SP7000 panels
 * [Signal Cli](https://github.com/AsamK/signal-cli) through a DBUS interface
 * Pushbullet.py
 * SIM900 module through a serial port
