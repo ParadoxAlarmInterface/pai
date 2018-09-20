@@ -616,50 +616,43 @@ class Paradox:
             return
 
         # Publish changes and update state
-        for k, v in change.items():
+        for property_name, property_value in change.items():
             old = None
             
             # Virtual property "Trouble"
             # True if element has ANY type of alarm
-            if '_trouble' in k:
-                if v:
+            if '_trouble' in property_name:
+                if property_value:
                     self.update_properties(element_type, key, dict(trouble=True))
                 else:
                     r = False
-                    for kk,vv in elements[key].items():
+                    for kk, vv in elements[key].items():
                         if '_trouble' in kk:
                             r = r or elements[key][kk]
 
                     self.update_properties(element_type, key, dict(trouble=r))
             
-            if k in elements[key]:
-                old = elements[key][k]
+            if property_name in elements[key]:
+                old = elements[key][property_name]
         
-                if old != change[k]:
-                    logger.debug("Change {}/{}/{} from {} to {}".format(element_type, elements[key]['label'], k, old, change[k]))
-                    elements[key][k] = change[k]
+                if old != change[property_name]:
+                    logger.debug("Change {}/{}/{} from {} to {}".format(element_type, elements[key]['label'], property_name, old, property_value))
+                    elements[key][property_name] = property_value
                     self.interface.change(element_type, elements[key]['label'],
-                                          k, change[k], initial=False)
+                                          property_name, property_value, initial=False)
 
                     # Trigger notifications for Partitions changes
                     # Ignore some changes as defined in the configuration
-                    if (element_type == "partition" and k in PARTITIONS) or \
-                        (element_type == 'system' and 'trouble' in k) or \
-                        (element_type == 'zone' and 'trouble' in k and k in ZONES) or \
-                        (element_type == 'bus' and 'trouble' in k and k in BUSES) or \
-                        (element_type == 'output' and 'trouble' in k and k in OUTPUTS) or \
-                        (element_type == 'keypad' and 'trouble' in k and k in KEYPADS) or \
-                        (element_type == 'repeater' and 'trouble' in k and k in REPEATERS) or \
-                        (element_type == 'siren' and 'trouble' in k and k in SIRENS):
-
-                        self.interface.notify("Paradox", "{} {} {}".format(elements[key]['label'], k, change[k]), logging.INFO)
+                    if (element_type == "partition" and key in PARTITIONS and property_name not in PARTITIONS_CHANGE_NOTIFICATION_IGNORE) \
+                            or ('trouble' in property_name):
+                        self.interface.notify("Paradox", "{} {} {}".format(elements[key]['label'], property_name, property_value), logging.INFO)
 
             else:
-                elements[key][k] = v # Initial value
-                surpress = 'trouble' not in k
+                elements[key][property_name] = property_value # Initial value
+                surpress = 'trouble' not in property_name
 
                 self.interface.change(element_type, elements[key]['label'],
-                                          k, change[k], initial=surpress)
+                                          property_name, property_value, initial=surpress)
 
 
     def process_status_bulk(self, message):

@@ -43,6 +43,7 @@ MQTT_PASSWORD = None    # MQTT Password
 MQTT_RETAIN = True      # Publish messages with Retain
 MQTT_BIND_ADDRESS = ''
 MQTT_REPUBLISH_INTERVAL = 60 * 60 * 12  # Interval for republishing all data
+MQTT_HOMEBRIDGE_ENABLE = False
 
 # MQTT Topics
 MQTT_BASE_TOPIC = 'paradox'         # Root of all topics
@@ -57,6 +58,7 @@ MQTT_OUTPUT_TOPIC = 'outputs'
 MQTT_KEYPAD_TOPIC = 'keypads'
 MQTT_STATES_TOPIC = 'states'
 MQTT_RAW_TOPIC = 'raw'
+MQTT_SUMMARY_TOPIC = 'current'
 MQTT_NOTIFICATIONS_TOPIC = 'notifications'
 MQTT_PUBLISH_RAW_EVENTS = True
 MQTT_INTERFACE_TOPIC = 'interface'

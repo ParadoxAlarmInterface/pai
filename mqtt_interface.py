@@ -12,6 +12,9 @@ from utils import SortableTuple
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
+PARTITION_SUMMARY_STATES = dict(stay_arm=('STAY_ARM', True), away_arm=('AWAY_ARM', True), sleep_arm=('NIGHT_ARM', True), alarm=('ALARM_TRIGGERED', True), arm=('DISARMED', False)) 
+PARTITION_SUMMARY_TARGETS = dict(STAY_ARM='stay_arm', AWAY_ARM='arm', NIGHT_ARM='sleep_arm', DISARM='disarm')
+
 class MQTTInterface(Thread):
     """Interface Class using MQTT"""
     name = 'mqtt'
@@ -31,7 +34,8 @@ class MQTTInterface(Thread):
 
         self.notification_handler = None
         self.cache = dict()
-        
+
+
     def run(self):
         if MQTT_USERNAME is not None and MQTT_PASSWORD is not None:
             self.mqtt.username_pw_set(
@@ -141,7 +145,10 @@ class MQTTInterface(Thread):
 
         # Process a Partition Command
         elif topics[2] == MQTT_PARTITION_TOPIC:
-    
+
+            if command in self.partition_current_target:
+                command = self.partition_current_target[command]
+
             if command.startswith('code_toggle-'):
                 tokens = command.split('-')
                 if len(tokens) < 2:
@@ -285,6 +292,7 @@ class MQTTInterface(Thread):
             publish_value = int(value)
         else:
             publish_value = value
+
         self.publish('{}/{}/{}/{}/{}'.format(MQTT_BASE_TOPIC,
                                             MQTT_STATES_TOPIC,
                                             element_topic,
@@ -292,18 +300,17 @@ class MQTTInterface(Thread):
                                             property),
                           "{}".format(publish_value), 0, MQTT_RETAIN)
 
+        # Publish summary info about the partition state
+        if element == 'partition' and MQTT_HOMEBRIDGE_ENABLE and property in PARTITION_SUMMARY_STATES:
+            if value == PARTITION_SUMMARY_STATES[property][1]:
+                self.publish('{}/{}/{}/{}/{}'.format(MQTT_BASE_TOPIC,
+                                            MQTT_STATES_TOPIC,
+                                            element_topic,
+                                            label,
+                                            MQTT_SUMMARY_TOPIC),
+                          "{}".format(PARTITION_SUMMARY_STATES[property][0]), 0, MQTT_RETAIN)
+
     
-    # Utils
-    def normalize_mqtt_payload(self, payload):
-        payload = payload.decode('utf-8').strip().lower().replace(' ', '_')
-
-        if payload in self.alarm.PGM_ACTIONS or payload in self.alarm.PARTITION_ACTIONS or payload in self.alarm.ZONE_ACTIONS:
-            return payload
-        elif 'code_toggle' in payload:
-            return payload
-
-        return None
-
     def publish(self, topic, value, qos, retain):
         self.cache[topic] = {'value': value, 'qos': qos, 'retain': retain}
         self.mqtt.publish(topic, value, qos, retain)
