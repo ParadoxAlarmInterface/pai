@@ -105,6 +105,12 @@ endon
 
 ```reader#tag``` identifies the ESPEasy PN532 device name (```reader```) and the property holding the RFID ID (```tag```).
 
+### Homebridge and Homekit
+
+This interface also provides an integration with Homebridge, when using the [homebridge-mqttthing](https://github.com/arachnetech/homebridge-mqttthing) plugin. To use it, enable the ```MQTT_HOMEBRIDGE_ENABLE``` option in the configuration file. Partitions will have a new property (```current``` by default) which will have the current state of the partition. 
+
+The interface allows setting the state of a partition by issuing the commands ```AWAY_ARM```, ```NIGHT_ARM```, ```STAY_ARM``` and ```DISARM```, which are mapped into a Homebridge Security System target. These commands should be sent to the standard control topic (```paradox/control/partitions/PARTITION_NAME``` by default)
+
 
 ## Signal
 
