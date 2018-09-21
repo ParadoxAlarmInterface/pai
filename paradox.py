@@ -309,7 +309,7 @@ class Paradox:
     def control_zone(self, zone, command):
         logger.debug("Control Zone: {} - {}".format(zone, command))
 
-        if command not in self.ZONE_COMMANDS:
+        if command not in ZONE_COMMANDS:
             return False
 
         zones_selected = []

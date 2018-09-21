@@ -12,8 +12,16 @@ from utils import SortableTuple
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
-PARTITION_SUMMARY_STATES = dict(stay_arm=('STAY_ARM', True), away_arm=('AWAY_ARM', True), sleep_arm=('NIGHT_ARM', True), alarm=('ALARM_TRIGGERED', True), arm=('DISARMED', False)) 
-PARTITION_SUMMARY_TARGETS = dict(STAY_ARM='stay_arm', AWAY_ARM='arm', NIGHT_ARM='sleep_arm', DISARM='disarm')
+PARTITION_HOMEBRIDGE_STATES = {
+        ('stay_arm', True): 'STAY_ARM', 
+        ('stay_arm', False): 'DISARMED', 
+        ('arm', True): 'AWAY_ARM', 
+        ('arm', False): 'DISARMED', 
+        ('sleep_arm', True): 'NIGHT_ARM', 
+        ('sleep_arm', False): 'DISARMED', 
+        ('alarm', True): 'ALARM_TRIGGERED', 
+        }
+PARTITION_HOMEBRIDGE_TARGETS = dict(STAY_ARM='arm_stay', AWAY_ARM='arm', NIGHT_ARM='arm_sleep', DISARM='disarm')
 
 class MQTTInterface(Thread):
     """Interface Class using MQTT"""
@@ -35,6 +43,7 @@ class MQTTInterface(Thread):
         self.notification_handler = None
         self.cache = dict()
 
+        self.armed = None
 
     def run(self):
         if MQTT_USERNAME is not None and MQTT_PASSWORD is not None:
@@ -146,8 +155,8 @@ class MQTTInterface(Thread):
         # Process a Partition Command
         elif topics[2] == MQTT_PARTITION_TOPIC:
 
-            if command in self.partition_current_target:
-                command = self.partition_current_target[command]
+            if command in PARTITION_HOMEBRIDGE_TARGETS and MQTT_HOMEBRIDGE_ENABLE:
+                command = PARTITION_HOMEBRIDGE_TARGETS[command]
 
             if command.startswith('code_toggle-'):
                 tokens = command.split('-')
@@ -301,14 +310,17 @@ class MQTTInterface(Thread):
                           "{}".format(publish_value), 0, MQTT_RETAIN)
 
         # Publish summary info about the partition state
-        if element == 'partition' and MQTT_HOMEBRIDGE_ENABLE and property in PARTITION_SUMMARY_STATES:
-            if value == PARTITION_SUMMARY_STATES[property][1]:
+        if element == 'partition' and MQTT_HOMEBRIDGE_ENABLE and (property, value) in PARTITION_HOMEBRIDGE_STATES:
+            # Ignore double arms (e.g., arm after sleep arm)
+            if not (value and self.armed): 
+                self.armed = value
+                
                 self.publish('{}/{}/{}/{}/{}'.format(MQTT_BASE_TOPIC,
-                                            MQTT_STATES_TOPIC,
-                                            element_topic,
-                                            label,
-                                            MQTT_SUMMARY_TOPIC),
-                          "{}".format(PARTITION_SUMMARY_STATES[property][0]), 0, MQTT_RETAIN)
+                                        MQTT_STATES_TOPIC,
+                                        element_topic,
+                                        label,
+                                        MQTT_SUMMARY_TOPIC),
+                      "{}".format(PARTITION_HOMEBRIDGE_STATES[(property, value)]), 0, MQTT_RETAIN)
 
     
     def publish(self, topic, value, qos, retain):
