@@ -44,6 +44,7 @@ class MQTTInterface(Thread):
         self.cache = dict()
 
         self.armed = None
+        self.alarm = None
 
     def run(self):
         if MQTT_USERNAME is not None and MQTT_PASSWORD is not None:
@@ -312,15 +313,26 @@ class MQTTInterface(Thread):
         # Publish summary info about the partition state
         if element == 'partition' and MQTT_HOMEBRIDGE_ENABLE and (property, value) in PARTITION_HOMEBRIDGE_STATES:
             # Ignore double arms (e.g., arm after sleep arm)
-            if not (value and self.armed): 
-                self.armed = value
-                
-                self.publish('{}/{}/{}/{}/{}'.format(MQTT_BASE_TOPIC,
-                                        MQTT_STATES_TOPIC,
-                                        element_topic,
-                                        label,
-                                        MQTT_SUMMARY_TOPIC),
-                      "{}".format(PARTITION_HOMEBRIDGE_STATES[(property, value)]), 0, MQTT_RETAIN)
+            if '_arm' in property and value:
+                if self.armed is not None:
+                    return
+                else:
+                    self.armed = property # Save arm state
+
+            # If alarm is off, and it was armed, revert to the previous armed state
+            elif 'alarm' in property and not value:
+                if self.armed is not None:
+                    property = self.armed # Restore arm state
+                    value = True
+                else:
+                    property = 'arm' # (arm, false) == DISARM
+            
+            self.publish('{}/{}/{}/{}/{}'.format(MQTT_BASE_TOPIC,
+                                    MQTT_STATES_TOPIC,
+                                    element_topic,
+                                    label,
+                                    MQTT_SUMMARY_TOPIC),
+                       "{}".format(PARTITION_HOMEBRIDGE_STATES[(property, value)]), 0, MQTT_RETAIN)
 
     
     def publish(self, topic, value, qos, retain):
