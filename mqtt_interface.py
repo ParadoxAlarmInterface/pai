@@ -12,15 +12,6 @@ from utils import SortableTuple
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
-PARTITION_HOMEBRIDGE_STATES = {
-        ('stay_arm', True): 'STAY_ARM', 
-        ('stay_arm', False): 'DISARMED', 
-        ('arm', True): 'AWAY_ARM', 
-        ('arm', False): 'DISARMED', 
-        ('sleep_arm', True): 'NIGHT_ARM', 
-        ('sleep_arm', False): 'DISARMED', 
-        ('alarm', True): 'ALARM_TRIGGERED', 
-        }
 PARTITION_HOMEBRIDGE_TARGETS = dict(STAY_ARM='arm_stay', AWAY_ARM='arm', NIGHT_ARM='arm_sleep', DISARM='disarm')
 
 class MQTTInterface(Thread):
@@ -310,29 +301,36 @@ class MQTTInterface(Thread):
                                             property),
                           "{}".format(publish_value), 0, MQTT_RETAIN)
 
-        # Publish summary info about the partition state
-        if element == 'partition' and MQTT_HOMEBRIDGE_ENABLE and (property, value) in PARTITION_HOMEBRIDGE_STATES:
-            # Ignore double arms (e.g., arm after sleep arm)
-            if '_arm' in property and value:
-                if self.armed is not None:
+        if element == 'partition' and MQTT_HOMEBRIDGE_ENABLE:
+            if value:
+                if property == 'alarm':
+                    state = 'ALARM_TRIGGERED'
+                elif property == 'stay_arm' :
+                    state = 'STAY_ARM'
+                    self.armed = state
+                elif property == 'arm':
+                    state = 'AWAY_ARM'
+                    self.armed = state
+                elif property == 'sleep_arm':
+                    state = 'NIGHT_ARM'
+                    self.armed = state
+                else:
                     return
+            else:
+                if property == 'alarm' and self.armed is not None:
+                    state = self.armed
+                elif property in ['stay_arm', 'arm', 'sleep_arm']:
+                    state = 'DISARMED'
+                    self.armed = None
                 else:
-                    self.armed = property # Save arm state
+                    return
 
-            # If alarm is off, and it was armed, revert to the previous armed state
-            elif 'alarm' in property and not value:
-                if self.armed is not None:
-                    property = self.armed # Restore arm state
-                    value = True
-                else:
-                    property = 'arm' # (arm, false) == DISARM
-            
             self.publish('{}/{}/{}/{}/{}'.format(MQTT_BASE_TOPIC,
                                     MQTT_STATES_TOPIC,
                                     element_topic,
                                     label,
                                     MQTT_SUMMARY_TOPIC),
-                       "{}".format(PARTITION_HOMEBRIDGE_STATES[(property, value)]), 0, MQTT_RETAIN)
+                       "{}".format(state), 0, MQTT_RETAIN)
 
     
     def publish(self, topic, value, qos, retain):
