@@ -141,7 +141,18 @@ def main():
             interface_manager.register(interface.name, interface)
         except:
             logger.exception("Unable to start Pushbullet Interface")
-    
+   
+     # Load IP Interface
+    if IP_SOCKET_BIND_ADDRESS is not None and IP_SOCKET_BIND_PORT > 0:
+        try:
+             logger.info("Using IP Interface")
+             from ip_interface import IPInterface
+             interface = IPInterface()
+             interface.start()
+             interface_manager.register(interface.name, interface)
+        except:
+             logger.exception("Unable to start IP Interface")
+
     time.sleep(1)
 
     # Load a connection to the alarm

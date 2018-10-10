@@ -80,4 +80,8 @@ GSM_MODEM_PORT = ''                 # Pathname of the serial port
 GSM_CONTACTS = []                   # Contacts that are allowed to control the panel and receive notifications through SMS
 GSM_IGNORE_EVENTS = []              # List of tuples [(major, minor), ...]
 
+# IP Socket Interface. Disabled by default
+#IP_SOCKET_BIND_ADDRESS = '0.0.0.0'
+#IP_SOCKET_BIND_PORT = 10000
+#IP_PASSWORD = b'0000'
 

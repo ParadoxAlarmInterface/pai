@@ -8,6 +8,7 @@ import time
 import json
 from threading import Lock
 import datetime
+import binascii
 
 from config_defaults import *
 from config import *
@@ -42,6 +43,11 @@ PGM_ACTIONS = dict(on_override=0x30, off_override=0x31, on=0x32, off=0x33, pulse
 
 serial_lock = Lock()
 
+STATE_STOP = 0
+STATE_RUN = 1
+STATE_PAUSE = 2
+STATE_ERROR = 3
+
 class Paradox:
     def __init__(self,
                  connection,
@@ -68,7 +74,7 @@ class Paradox:
         self.outputs = dict()
         self.system = dict(power=dict(label='power'), rf=dict(label='rf'), troubles=dict(label='troubles'))
         self.last_power_update = 0
-        self.run = False
+        self.run = STATE_STOP
         self.loop_wait = False
         
         self.type_to_element_dict = dict(repeater=self.repeaters, keypad=self.keypads, siren=self.sirens, user=self.users, bus=self.buses, zone=self.zones, partition=self.partitions, output=self.outputs, system=self.system)
@@ -83,10 +89,10 @@ class Paradox:
         # Reset all states
         self.reset()
 
-        self.run = True
+        self.run = STATE_RUN
         
         try:
-            reply = self.send_wait_for_reply(msg.InitiateCommunication, None, reply_expected=0x07)
+            reply = self.send_wait(msg.InitiateCommunication, None, reply_expected=0x07)
 
             if reply:
                 logger.info("Found Panel {} version {}.{} build {}".format(
@@ -97,10 +103,10 @@ class Paradox:
             else:
                 logger.warn("Unknown panel")
 
-            reply = self.send_wait_for_reply(msg.StartCommunication, None, reply_expected=0x00)
+            reply = self.send_wait(msg.StartCommunication, None, reply_expected=0x00)
             
             if reply is None:
-                self.run = False
+                self.run = STATE_STOP
                 return False
              
             args = dict(product_id=reply.fields.value.product_id,
@@ -110,11 +116,11 @@ class Paradox:
                         user_code=0x00000000
                         ) 
 
-            #reply = self.send_wait_for_reply(message=reply.fields.data + reply.checksum, raw=True, reply_expected=0x10)
-            reply = self.send_wait_for_reply(msg.InitializeCommunication, args=args, reply_expected=0x10)
+            #reply = self.send_wait(message=reply.fields.data + reply.checksum, raw=True, reply_expected=0x10)
+            reply = self.send_wait(msg.InitializeCommunication, args=args, reply_expected=0x10)
 
             if reply is None:
-                self.run = False
+                self.run = STATE_STOP
                 return False
             
             if SYNC_TIME:
@@ -128,7 +134,7 @@ class Paradox:
         except:
             logger.exception("Connect error")
 
-        self.run = False
+        self.run = STATE_STOP
         return False
     
     def sync_time(self):
@@ -137,7 +143,7 @@ class Paradox:
         now = datetime.datetime.now()
         args = dict(century=int(now.year / 100), year=int(now.year % 100), month=now.month, day=now.day, hour=now.hour,minute=now.minute)
 
-        reply = self.send_wait_for_reply(msg.SetTimeDate, args, reply_expected=0x03)
+        reply = self.send_wait(msg.SetTimeDate, args, reply_expected=0x03)
         if reply is None:
             logger.warn("Could not set panel time")
         
@@ -147,25 +153,48 @@ class Paradox:
         logger.debug("Loop start")
         args = {}
         
-        while self.run:
-            #logger.debug("Getting alarm status")
+        while self.run != STATE_STOP:
+
+            while self.run == STATE_PAUSE:
+                time.sleep(5)
+
             self.loop_wait = True
 
             tstart = time.time()
             try:
                 for i in STATUS_REQUESTS:
                     args = dict(address=MEM_STATUS_BASE1 + i)
-                    reply = self.send_wait_for_reply(msg.ReadEEPROM, args, reply_expected=0x05)
+                    reply = self.send_wait(msg.ReadEEPROM, args, reply_expected=0x05)
                     if reply is not None:
                         self.handle_status(reply)
             except:
                 logger.exception("Loop")
             
             # Listen for events
-            while (time.time() - tstart) < KEEP_ALIVE_INTERVAL and self.loop_wait and self.run: 
-                self.send_wait_for_reply(None, timeout=1)
+            while (time.time() - tstart) < KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
+                self.send_wait(None, timeout=1)
 
-    def send_wait_for_reply(self, message_type=None, args=None, message=None, retries=5, timeout=5, raw=False, reply_expected=None):
+    def send_wait_simple(self, message=None, timeout=5, wait=True):
+        if message is not None:
+            if LOGGING_DUMP_PACKETS:
+                logger.debug("PC -> A {]".format(binascii.hexlify(message)))
+        
+        with serial_lock:
+            if message is not None:
+                self.connection.timeout(timeout)
+                self.connection.write(message)
+            
+            if not wait:
+                return None
+
+            data = self.connection.read()
+        
+        if LOGGING_DUMP_PACKETS:
+            logger.debug("PC <- A {]".format(binascii.hexlify(message)))
+
+        return data
+
+    def send_wait(self, message_type=None, args=None, message=None, retries=5, timeout=5, raw=False, reply_expected=None, wait=True):
         if message is None and message_type is not None:
             message = message_type.build(dict(fields=dict(value=args)))
 
@@ -174,16 +203,16 @@ class Paradox:
 
             if message is not None:
                 if LOGGING_DUMP_PACKETS:
-                    m = "PC -> A "
-                    for c in message:
-                        m += "{0:02x} ".format(c)
-                    logger.debug(m)
-            
+                    logger.debug("PC -> A {]".format(binascii.hexlify(message)))        
             
             with serial_lock:
                 if message is not None:
                     self.connection.timeout(timeout)
                     self.connection.write(message)
+                
+                if not wait:
+                    return None
+
                 data = self.connection.read()
                 if raw:
                     return data
@@ -192,25 +221,20 @@ class Paradox:
             if data is None or len(data) == 0:
                 if message is None:
                     return None
-
-                time.sleep(0.25)
                 continue
 
             if LOGGING_DUMP_PACKETS:
-                m = "PC <- A "
-                for c in data:
-                    m += "{0:02x} ".format(c)
-                logger.debug(m)
+                logger.debug("PC <- A {]".format(binascii.hexlify(message)))
 
             try:
                 recv_message = msg.parse(data)
+                # No message
+                if recv_message is None:
+                    continue
             except:
-                recv_message = None
-
-            if recv_message is None:
                 logging.exception("Error parsing message")
-                time.sleep(0.1)
                 continue
+
 
             if LOGGING_DUMP_MESSAGES:
                 logger.debug(recv_message)
@@ -221,8 +245,6 @@ class Paradox:
                     self.handle_event(recv_message)
                 except:
                     logger.exception("Handle event")
-
-                time.sleep(0.1)
                 continue
             
             if recv_message.fields.value.po.command == 0x70:
@@ -232,7 +254,6 @@ class Paradox:
             if reply_expected is not None and recv_message.fields.value.po.command != reply_expected:
                 logging.error("Got message {} but expected {}".format(recv_message.fields.value.po.command, reply_expected))
                 logging.error("Detail:\n{}".format(recv_message))
-                time.sleep(0.1)
                 continue
 
             return recv_message
@@ -283,7 +304,7 @@ class Paradox:
         
         while address < end and i <= max(limit):
             args = dict(address=address)
-            reply = self.send_wait_for_reply(msg.ReadEEPROM, args, reply_expected=0x05)
+            reply = self.send_wait(msg.ReadEEPROM, args, reply_expected=0x05)
             
             if reply is None:
                 logger.error("Could not fully load labels")
@@ -334,7 +355,7 @@ class Paradox:
         accepted = False
         for e in zones_selected:
             args = dict(action=self.ZONES[command], argument=(e-1))
-            reply = self.send_wait_for_reply(msg.PerformAction, args, reply_expected=0x04)
+            reply = self.send_wait(msg.PerformAction, args, reply_expected=0x04)
             
             if reply is not None:
                 accepted = True
@@ -373,7 +394,7 @@ class Paradox:
 
         for e in partitions_selected:
             args = dict(action=PARTITION_ACTIONS[command], argument=(e-1))
-            reply = self.send_wait_for_reply(msg.PerformAction, args, reply_expected=0x04)
+            reply = self.send_wait(msg.PerformAction, args, reply_expected=0x04)
 
             if reply is not None:
                 accepted = True
@@ -412,18 +433,18 @@ class Paradox:
         for e in outputs:
             if command == 'pulse':
                 args = dict(action=PGM_COMMAND['on'], argument=(e-1))
-                reply = self.send_wait_for_reply(msg.PerformAction, args, reply_expected=0x04)
+                reply = self.send_wait(msg.PerformAction, args, reply_expected=0x04)
                 if reply is not None:
                     accepted = True
 
                 time.sleep(1)
                 args = dict(action=PGM_COMMAND['off'], argument=(e-1))
-                reply = self.send_wait_for_reply(msg.PerformAction, args, reply_expected=0x04)
+                reply = self.send_wait(msg.PerformAction, args, reply_expected=0x04)
                 if reply is not None:
                     accepted = True
             else:
                 args = dict(action=PGM_COMMAND[command], argument=(e-1))
-                reply = self.send_wait_for_reply(msg.PerformAction, args, reply_expected=0x04)
+                reply = self.send_wait(msg.PerformAction, args, reply_expected=0x04)
                 if reply is not None:
                     accepted = True
 
@@ -499,11 +520,6 @@ class Paradox:
         # Non Medical Alarm
         if major_code in [24, 36, 37, 38, 39, 40, 42, 43, 57] or \
             ( major_code in [44, 45] and minor_code in [1, 2, 3, 4, 5, 6, 7]):
-            # Zone Alarm Restore
-            #if major_code in [36, 38]:
-            
-                #detail = self.zones[event['minor'][0]]['label']
-            #else:
             detail = event['minor'][1]
 
             self.interface.notify("Paradox", "{} {}".format(event['major'][1], detail), logging.CRITICAL)
@@ -610,9 +626,7 @@ class Paradox:
 
         elements = self.type_to_element_dict[element_type]
 
-        #logger.debug("Update Properties {} {} {}".format(element_type, index, change))
         if key not in elements:
-            #logger.debug("Key {} not in elements {}".format(key, element_type))            
             return
 
         # Publish changes and update state
@@ -704,7 +718,7 @@ class Paradox:
                 self.update_properties('system', 'power', dict(vdc=round(message.fields.value.vdc, 2)))
                 self.update_properties('system', 'power', dict(battery=round(message.fields.value.battery, 2)))
                 self.update_properties('system', 'power', dict(dc=round(message.fields.value.dc, 2)))
-                self.update_properties('system','rf', dict(rf_noise_floor=round(message.fields.value.rf_noise_floor, 2 )))
+                self.update_properties('system', 'rf', dict(rf_noise_floor=round(message.fields.value.rf_noise_floor, 2 )))
             
             for k in message.fields.value.troubles:
                 if "not_used" in k:
@@ -720,11 +734,22 @@ class Paradox:
     def handle_error(self, message):
         """Handle ErrorMessage"""
         logger.warn("Got ERROR Message: {}".format(message.fields.value.message))
-        self.run = False
+        self.run = STATE_STOP
 
     def disconnect(self):
-        logger.info("Disconnecting from the Alarm Panel")
-        self.run = False
-        self.loop_wait = False
-        reply = self.send_wait_for_reply(msg.CloseConnection, None, reply_expected=0x07)
-        
+        if self.run == STATE_RUN:
+            logger.info("Disconnecting from the Alarm Panel")
+            self.run = STATE_STOP
+            self.loop_wait = False
+            reply = self.send_wait(msg.CloseConnection, None, reply_expected=0x07, wait=False)
+            
+    def pause(self):
+        if self.run == STATE_RUN: 
+            logger.info("Disconnecting from the Alarm Panel")
+            self.run = STATE_PAUSE
+            self.loop_wait = False
+            reply = self.send_wait(msg.CloseConnection, None, reply_expected=0x07, wait=False)
+            
+    def resume(self):
+        if self.run == STATE_PAUSE:
+            self.connect()
