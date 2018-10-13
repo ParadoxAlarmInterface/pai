@@ -172,7 +172,7 @@ class IPInterface(Thread):
         message = ip_message.parse(data)
         message_payload = data[16:]
         
-        if len(message_payload) >= 16 and message.header.flags & 0x01 != 0:
+        if len(message_payload) >= 16  and message.header.flags & 0x01 != 0 and len(message_payload) % 16 == 0:
             message_payload = decrypt(message_payload, self.key)[:37]
 
         force_plain_text = False
@@ -208,8 +208,9 @@ class IPInterface(Thread):
 
         if payload is not None:
             flags = 0x38
+            print(binascii.hexlify(payload))
             if message.header.encrypt == 0x01 and not force_plain_text:
-                payload = rijndael_encrypt(payload, self.key)
+                payload = encrypt(payload, self.key)
                 flags = 0x39
            
             m = ip_message.build(dict(header=dict(length=len(payload), flags=flags, command=message.header.command), payload=payload))

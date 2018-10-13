@@ -220,7 +220,7 @@ def inv_mix_column(a):
 
 
 
-def rijndael_keygen(k, W):
+def keygen(k, W):
 	temp = [0, 0, 0, 0]
 
 	i = 0
@@ -273,9 +273,12 @@ def rijndael_keygen(k, W):
 def encrypt(ctxt, key):
 	rk = [0] * 240
 	dtxt = []
-	key = list(key + b'\xee' * (32-len(key)))
+	if len(key) % 32 != 0:
+		key = list(key + b'\xee' * (32-(len(key) % 32)))
+	if len(ctxt) % 32 != 0:
+		ctxt = list(ctxt + b'\xee' * (32-(len(ctxt) % 32)))
 
-	rijndael_keygen(key, rk)	
+	keygen(key, rk)	
 
 	i = 0
 	ctxt = list(ctxt)
@@ -283,7 +286,6 @@ def encrypt(ctxt, key):
 	while i < len(ctxt) / 16:
 		a = ctxt[i*16:(i+1)*16].copy()
 		ROUNDS = 14
-		
 		key_addition(a, rk[:16])
 
 		r = 1
@@ -307,9 +309,10 @@ def encrypt(ctxt, key):
 def decrypt(ctxt, key):
 	rk = [0] * 240
 	dtxt = []
-	key = list(key + b'\xee' * (32-len(key)))
+	if len(key) % 32:
+		key = list(key + b'\xee' * (32-(len(key) % 32)))
 
-	rijndael_keygen(key, rk)	
+	keygen(key, rk)	
 	
 	ctxt = list(ctxt)
 	i = 0
@@ -334,4 +337,5 @@ def decrypt(ctxt, key):
 		i += 1
 
 	return bytes(dtxt)
+
 

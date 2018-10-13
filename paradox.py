@@ -75,7 +75,7 @@ class Paradox:
         self.system = dict(power=dict(label='power'), rf=dict(label='rf'), troubles=dict(label='troubles'))
         self.last_power_update = 0
         self.run = STATE_STOP
-        self.loop_wait = False
+        self.loop_wait = True
         
         self.type_to_element_dict = dict(repeater=self.repeaters, keypad=self.keypads, siren=self.sirens, user=self.users, bus=self.buses, zone=self.zones, partition=self.partitions, output=self.outputs, system=self.system)
 
@@ -129,6 +129,7 @@ class Paradox:
             self.update_labels()
                     
             logger.info("Connection OK")
+            self.loop_wait = False
 
             return True
         except:
@@ -177,7 +178,7 @@ class Paradox:
     def send_wait_simple(self, message=None, timeout=5, wait=True):
         if message is not None:
             if LOGGING_DUMP_PACKETS:
-                logger.debug("PC -> A {]".format(binascii.hexlify(message)))
+                logger.debug("PC -> A {}".format(binascii.hexlify(message)))
         
         with serial_lock:
             if message is not None:
@@ -190,7 +191,7 @@ class Paradox:
             data = self.connection.read()
         
         if LOGGING_DUMP_PACKETS:
-            logger.debug("PC <- A {]".format(binascii.hexlify(message)))
+            logger.debug("PC <- A {}".format(binascii.hexlify(message)))
 
         return data
 
@@ -203,7 +204,7 @@ class Paradox:
 
             if message is not None:
                 if LOGGING_DUMP_PACKETS:
-                    logger.debug("PC -> A {]".format(binascii.hexlify(message)))        
+                    logger.debug("PC -> A {}".format(binascii.hexlify(message)))        
             
             with serial_lock:
                 if message is not None:
@@ -224,7 +225,7 @@ class Paradox:
                 continue
 
             if LOGGING_DUMP_PACKETS:
-                logger.debug("PC <- A {]".format(binascii.hexlify(message)))
+                logger.debug("PC <- A {}".format(binascii.hexlify(message)))
 
             try:
                 recv_message = msg.parse(data)
