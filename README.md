@@ -49,19 +49,22 @@ python3 main.py
 ```
 
 
+## Interfaces
+Interfaces provide the means to interact with PAI and the alarm panel.
 
-## MQTT
+
+### MQTT Interface
 
 The MQTT Interface allows accessing all relevant states and setting some. The list of states will increase as the knowledge of the alarm internal memory and its states is improved.
 
 All interactions are made through a ```MQTT_BASE_TOPIC```, which defaults to ```paradox```. States are exposed by name with a boolean payload (True or False) and are mainly update by the alarm status messages, updated every ```KEEP_ALIVE_INTERFACE``` seconds.
 
-### States 
+#### States 
 * ```paradox/states/partitions/name/property```: Exposes Partition properties where ```name``` identifies the Partition name (e.g. Interior) and ```property``` identifies the property (e.g. ```arm```). 
 * ```paradox/states/zones/name/property```: Exposes Partition properties where ```name``` identifies the Zone name (e.g. Kitchen) and ```property``` identifies the property (e.g. ```open```). 
 * ```paradox/states/outputs/name/property```: Exposes Partition properties where ```name``` identifies the PGM name (e.g. Gate) and ```property``` identifies the property.
 
-### Events
+#### Events
 * ```paradox/states/raw```: Exposes raw event information, composed by a minor and major codes, as well as descriptive text. The payload is a JSON object with the following structure:
 ```
     {
@@ -78,7 +81,7 @@ All interactions are made through a ```MQTT_BASE_TOPIC```, which defaults to ```
 PGM_ACTIONS = dict(on_override=0x30, off_override=0x31, on=0x32, off=0x33, pulse=0)
 
 
-### Control
+#### Control
 
 The MQTT Interface allows setting some properties for individual objects by specifying the correct name. In alternative, the ```all``` keyword can be used to apply the same setting to all objects. This is useful to activate all PGMs or to Arm/Disarm all partitions.
 
@@ -87,7 +90,7 @@ The MQTT Interface allows setting some properties for individual objects by spec
 * ```paradox/control/outputs/name``` allow setting some zone properties where ```name``` identifies the partition. If the ```name``` is ```all```, all outputs will be updated. The payload can have the values ```pulse```, ```on```, ```on_override```, ```off``` or ```off_override```.
 
 
-### Code Toggle
+#### Code Toggle
 
 Sometimes it is useful to toggle the ARM state through a remote device, such as a NFC reader. Therefore, Partitions arm state can be toggled by issuing a special command with the format ```code_toggle-code_number``` (e.g., code_toggle-123456755). The ```code_toggle-``` keyword is constant, while the ```code_number``` is provided by the card (e.g., Card ID). If the code is present in the ```MQTT_TOGGLE_CODES```, the partition state will be toggled.
 
@@ -105,14 +108,14 @@ endon
 
 ```reader#tag``` identifies the ESPEasy PN532 device name (```reader```) and the property holding the RFID ID (```tag```).
 
-### Homebridge and Homekit
+#### Homebridge and Homekit through MQTT
 
 This interface also provides an integration with Homebridge, when using the [homebridge-mqttthing](https://github.com/arachnetech/homebridge-mqttthing) plugin. To use it, enable the ```MQTT_HOMEBRIDGE_ENABLE``` option in the configuration file. Partitions will have a new property (```current``` by default) which will have the current state of the partition. 
 
 The interface allows setting the state of a partition by issuing the commands ```AWAY_ARM```, ```NIGHT_ARM```, ```STAY_ARM``` and ```DISARM```, which are mapped into a Homebridge Security System target. These commands should be sent to the standard control topic (```paradox/control/partitions/PARTITION_NAME``` by default)
 
 
-## Signal
+### Signal Interface
 
 The Signal Interface allows accessing major state changes and arming/disarming partitions through the [WhisperSystems](https://www.whispersystems.org/) Signal service. You will require the corresponding mobile application in your smartphone. As this interface will produce notifications to other devices, and are destined to users, only a subset of the events are sent.
 
@@ -121,17 +124,23 @@ Interface with Signal is made through [Signal-CLI](https://github.com/AsamK/sign
 The configuration setting ```SIGNAL_CONTACTS``` should contain a list with the contacts used for signal notifications. If the list is empty, the Signal module is disabled.
 
 
-## Pushbullet
+### Pushbullet Interface
 
 The Pushbullet Interface allows accessing major state changes and arming/disarming partitions. As this interface will produce notifications to other devices, and are destined to users, only a subset of the events are sent.
 
 In order to use this interface, please set the relevant configuration settings. The ```PUSHBULLET_CONTACTS``` setting should contain a list of contacts used for pushbullet notifications.
 
-## GSM
+### GSM SIMXXX Interface
 
 The GSM Interface will notify users of major events through SMS and will accept commands through the same method.
 
 In order to use this interface, please et the relevant configuration settings. The ```GSM_CONTACTS```setting should contain a list of contacts used for notifications and commands. Only these contacts will be allowed to control the alarm.
+
+### IP Interface
+
+The IP Interface mimicks an IP150 module, allowing the use of standard alarm management tools to interact with the panel. It supports plain sessions or encrypted session as found in later versions of the IP150 module.
+
+__When a client is connected to this interface, PAI will operate as a proxy, and most features and interfaces will be disabled__ 
 
 ## Acknowledgments
 
@@ -139,3 +148,12 @@ This work is inspired or uses parts from the following projects:
 
 * Tertiush at https://github.com/Tertiush/ParadoxIP150v2
 * Spinza at https://github.com/spinza/paradox_mqtt
+
+## Disclaimer
+
+Paradox, MG5050 and IP150 are registered marks of PARADOX. Other brands are owned by their respective owners. 
+
+The code was developed as a way of integrating personally owned Paradox systems, and it cannot be used for other purposes.
+It is not affiliated with any company and it doesn't have have commercial intent.
+
+The code is provided AS IS and the developers will not be held responsible for failures in the alarm systems, or any other malfunction.

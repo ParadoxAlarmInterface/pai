@@ -12,10 +12,15 @@ LOGGING_DUMP_PACKETS = False    # Dump RAW Packets to log
 LOGGING_DUMP_MESSAGES = False   # Dump Messages to log
 
 # Connection Type
-CONNECTION_TYPE = 'Serial'  # Only serial for now
+CONNECTION_TYPE = 'Serial'  # Serial or IP
 
 # Serial Connection Details
 SERIAL_PORT = '/dev/ttyS1' # Pathname of the Serial Port
+
+# IP Connection Defails
+IP_CONNECTION_HOST = '127.0.0.1'
+IP_CONNECTION_PORT = 10000
+IP_CONNECTION_PASSWORD = b'0000'
 
 # Paradox
 KEEP_ALIVE_INTERVAL = 9     # Interval between status updates
@@ -35,6 +40,7 @@ SYNC_TIME = True    # Update panel time
 PASSWORD = 0000   # PC Password
 
 # MQTT
+MQTT_ENABLE = False
 MQTT_HOST = 'localhost' # Hostname or address
 MQTT_PORT = 1883        # TCP Port
 MQTT_KEEPALIVE = 60     # Keep alive
@@ -66,22 +72,26 @@ MQTT_TOGGLE_CODES = {}
 MQTT_USE_NUMERIC_STATES = False      # use 0 and 1 instead of True and False
 
 # Pushbullet
+PUSHBULLET_ENABLE = False
 PUSHBULLET_KEY = ''                 # Authentication key used for Pushbullet
 PUSHBULLET_SECRET = ''              # Authentication secret used for Pushbullet
 PUSHBULLET_CONTACTS = []            # Pushbullet user identifiers for notifications and interaction
 
 # Signal
+SIGNAL_ENABLE = False
 SIGNAL_CONTACTS = []                # Contacts that are allowed to control the panel and receive notifications through Signal
 SIGNAL_IGNORE_EVENTS = [] # List of tuples (major, minor)
 
 # GSM
+GSM_ENABLE = False
 GSM_MODEM_BAUDRATE = 115200         # Baudrate of the GSM modem
 GSM_MODEM_PORT = ''                 # Pathname of the serial port
 GSM_CONTACTS = []                   # Contacts that are allowed to control the panel and receive notifications through SMS
 GSM_IGNORE_EVENTS = []              # List of tuples [(major, minor), ...]
 
 # IP Socket Interface. Disabled by default
-#IP_SOCKET_BIND_ADDRESS = '0.0.0.0'
-#IP_SOCKET_BIND_PORT = 10000
-#IP_PASSWORD = b'0000'
+IP_INTERFACE_ENABLE = False
+IP_INTERFACE_BIND_ADDRESS = '0.0.0.0'
+IP_INTERFACE_BIND_PORT = 10000
+IP_INTERFACE_PASSWORD = b'0000'
 

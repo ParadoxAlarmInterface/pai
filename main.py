@@ -99,7 +99,7 @@ def main():
     interface_manager = InterfaceManager()
     
     # Load GSM service
-    if GSM_MODEM_PORT is not None and len(GSM_MODEM_PORT) > 0:
+    if GSM_ENABLE:
         try:
             logger.info("Using GSM Interface")
             from gsm_interface import GSMInterface
@@ -110,7 +110,7 @@ def main():
             logger.exception("Unable to start GSM Interface")
 
     # Load Signal service
-    if SIGNAL_CONTACTS is not None and len(SIGNAL_CONTACTS) > 0:
+    if SIGNAL_ENABLE:
         try:
             logger.info("Using Signal Interface")
             from signal_interface import SignalInterface
@@ -121,7 +121,7 @@ def main():
             logger.exception("Unable to start Signal Interface")
     
     # Load an interface for exposing data and accepting commands
-    if MQTT_HOST is not None and len(MQTT_HOST) > 0:
+    if MQTT_ENABLE:
         try:
             logger.info("Using MQTT Interface")
             from mqtt_interface import MQTTInterface
@@ -132,7 +132,7 @@ def main():
             logger.exception("Unable to start MQTT Interface")
 
     # Load Pushbullet service
-    if len(PUSHBULLET_SECRET) > 0 and len(PUSHBULLET_CONTACTS) > 0:
+    if PUSHBULLET_ENABLE:
         try:
             logger.info("Using Pushbullet Interface")
             from pushbullet_interface import PushBulletInterface
@@ -143,7 +143,7 @@ def main():
             logger.exception("Unable to start Pushbullet Interface")
    
      # Load IP Interface
-    if IP_SOCKET_BIND_ADDRESS is not None and IP_SOCKET_BIND_PORT > 0:
+    if IP_INTERFACE_ENABLE:
         try:
              logger.info("Using IP Interface")
              from ip_interface import IPInterface
@@ -163,6 +163,14 @@ def main():
         connection = SerialCommunication(port=SERIAL_PORT)
         if not connection.connect():
             logger.error("Unable to open serial port: {}".format(SERIAL_PORT))
+            sys.exit(-1)
+    if CONNECTION_TYPE == 'IP':
+        logger.info("Using IP Connection")
+        from ip_connection import IPConnection
+
+        connection = IPConnection(host=IP_CONNECTION_HOST, port=IP_CONNECTION_PORT, password=IP_CONNECTION_PASSWORD)
+        if not connection.connect():
+            logger.error("Unable to open IP Connection with: {}".format(IP_CONNECTION_HOST))
             sys.exit(-1)
     else:
         logger.error("Invalid connection type: {}".format(CONNECTION_TYPE))
