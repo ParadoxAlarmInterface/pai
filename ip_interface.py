@@ -129,35 +129,31 @@ class IPInterface(Thread):
                     logging.info("Receiving data")
                     data = r.recv(1024)
                     if len(data) == 0:
-                        logger.info("Client disconnected")
-                        self.key = IP_PASSWORD
-
+                        self.handle_disconnect()
                         s_list = [server_socket]
-                       
-                        self.alarm.resume()
-                        self.client_socket = None
-
+                        break
                     else:
                         self.process_client_message(r, data)
-            for e in ex:
-                self.key = IP_PASSWORD
-                logger.info("Exception: Client disconnected")
-                try:
-                    e.close()
-                except:
-                    pass
+                
+    def handle_disconnect(self):
+        self.key = IP_PASSWORD
+        logger.info("Client disconnected")
+        try:
+            if self.client_socket is not None:
+                self.client_socket.close()
+        except:
+            pass
 
-                s_list = [server_socket]
-                self.client_socket = None
-                self.alarm.resume()
+        self.client_thread.stop()
+        self.client_socket = None
+        self.alarm.resume()
 
-    
     def connection_watch(self):
         while self.client_socket != None:
             tstart = time.time()
             payload = self.alarm.send_wait()
             tend = time.time()
-
+            
             if payload is not None:
                 payload = encrypt(payload, self.key)
                 flags = 0x39
@@ -208,7 +204,6 @@ class IPInterface(Thread):
 
         if payload is not None:
             flags = 0x38
-            print(binascii.hexlify(payload))
             if message.header.encrypt == 0x01 and not force_plain_text:
                 payload = encrypt(payload, self.key)
                 flags = 0x39

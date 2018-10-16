@@ -742,14 +742,14 @@ class Paradox:
             logger.info("Disconnecting from the Alarm Panel")
             self.run = STATE_STOP
             self.loop_wait = False
-            reply = self.send_wait(msg.CloseConnection, None, reply_expected=0x07, wait=False)
+            reply = self.send_wait(msg.CloseConnection, None, reply_expected=0x07)
             
     def pause(self):
         if self.run == STATE_RUN: 
             logger.info("Disconnecting from the Alarm Panel")
             self.run = STATE_PAUSE
             self.loop_wait = False
-            reply = self.send_wait(msg.CloseConnection, None, reply_expected=0x07, wait=False)
+            reply = self.send_wait(msg.CloseConnection, None, reply_expected=0x07)
             
     def resume(self):
         if self.run == STATE_PAUSE:
