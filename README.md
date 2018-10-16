@@ -5,6 +5,7 @@ With this interface it is possible to integrate Paradox panels with HomeAssistan
 
 It supports panels connected through a serial port, which is present in all panels, or through a USB 307 module. If you are using a NanoPi/RPi with the onboard
 serial port, do not forget the level shifter as the panels operate on 5V logic.
+If also has __alfa__ support to connections using the IP150 module.
 
 Tested in the following environment:
 
@@ -22,9 +23,9 @@ Tested in the following environment:
 
 * __Paradox__: Object that interfaces with the panel and keeps some internal state. Accepts commands to control partitions, zones and outputs. Exposes states, changes and events
 
-* __Interfaces__: Expose interfaces to the outside world. Currently, MQTT, Signal and Pushbullet are supported, but others are planned and almost any other is supported.
+* __Interfaces__: Expose interfaces to the outside world. Currently, MQTT (with Homekit support), Signal, Pushbullet and IP (IP150 emulation) are supported, but others are planned and almost any other is supported.
 
-* __Connections__: Handle communications with the panel, at a lower level. Currently, only Serial connections are supported.
+* __Connections__: Handle communications with the panel, at a lower level. Currently, both Serial and IP connections are supported.
 
 
 ## Steps to use it:
