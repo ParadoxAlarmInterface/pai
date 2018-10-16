@@ -13,7 +13,7 @@ from config import *
 logger = logging.getLogger('PAI').getChild(__name__)
 
 class IPConnection:
-    def __init__(self, host='127.0.0.1', port=10000, password='0000', timeout=5):
+    def __init__(self, host='127.0.0.1', port=10000, password=IP_CONNECTION_PASSWORD, timeout=5):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind( ('0.0.0.0', 0))
         self.socket_timeout = int(timeout)
@@ -34,7 +34,7 @@ class IPConnection:
 
             payload = encrypt(self.key, self.key)
 
-            msg = ip_message.build(dict(header=dict(length=len(self.key), flags=0x09, command=0xf0, encrypt=1), payload=payload))
+            msg = ip_message.build(dict(header=dict(length=len(self.key), unknown0=0x03, flags=0x09, command=0xf0, unknown1=0, encrypt=1), payload=payload))
             if LOGGING_DUMP_PACKETS:
                 logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
 
@@ -51,7 +51,7 @@ class IPConnection:
             logger.info("Connected to Panel with Versions {}.{} - {}.{}".format(response.major, response.minor, response.ip_major, response.ip_minor))
             
             #F2
-            msg = ip_message.build(dict(header=dict(length=0, flags=0x09, command=0xf2, encrypt=1), payload=encrypt(b'', self.key)))
+            msg = ip_message.build(dict(header=dict(length=0, unknown0=0x03, flags=0x09, command=0xf2, unknown1=0, encrypt=1), payload=encrypt(b'', self.key)))
             if LOGGING_DUMP_PACKETS:
                 logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
 
@@ -64,7 +64,7 @@ class IPConnection:
             logger.debug("F2 answer: {}".format(binascii.hexlify(message_payload)))
 
             #F3
-            msg = ip_message.build(dict(header=dict(length=0, flags=0x09, command=0xf3, encrypt=1), payload=encrypt(b'', self.key)))
+            msg = ip_message.build(dict(header=dict(length=0, unknown0=0x03, flags=0x09, command=0xf3, unknown1=0, encrypt=1), payload=encrypt(b'', self.key)))
             if LOGGING_DUMP_PACKETS:
                 logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
 
