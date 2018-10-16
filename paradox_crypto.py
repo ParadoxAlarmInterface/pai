@@ -275,8 +275,8 @@ def encrypt(ctxt, key):
 	dtxt = []
 	if len(key) % 32 != 0:
 		key = list(key + b'\xee' * (32-(len(key) % 32)))
-	if len(ctxt) % 32 != 0:
-		ctxt = list(ctxt + b'\xee' * (32-(len(ctxt) % 32)))
+	if len(ctxt) % 16 != 0:
+		ctxt = list(ctxt + b'\xee' * (16-(len(ctxt) % 16)))
 
 	keygen(key, rk)	
 
