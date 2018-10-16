@@ -144,7 +144,6 @@ class IPInterface(Thread):
         except:
             pass
 
-        self.client_thread.stop()
         self.client_socket = None
         self.alarm.resume()
 

@@ -141,7 +141,7 @@ InitializeCommunication = Struct("fields" / RawCopy(
             "revision" / Int8ub, 
             "build" / Int8ub),
         "panel_id" / Int16ub, 
-        "pc_password" / Default(Int16ub, 0x0000),
+        "pc_password" / Default(Bytes(2), b'0000'),
         "not_used1" / Padding(1),
         "source_method" / Default(Enum(Int8ub,
             Winload_Connection=0x00,
