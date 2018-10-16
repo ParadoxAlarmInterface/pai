@@ -98,7 +98,7 @@ class IPConnection:
             self.connected = False
             return False
         
-    def read(self, sz=37, timeout=10):        
+    def read(self, sz=37, timeout=5):        
         """Read data from the IP Port, if available, until the timeout is exceeded"""
         self.socket.settimeout(timeout)
         data = b""
