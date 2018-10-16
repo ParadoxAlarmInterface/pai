@@ -101,25 +101,33 @@ class Paradox:
                     reply.fields.value.application.revision,
                     reply.fields.value.application.build))
             else:
-                logger.warn("Unknown panel")
+                logger.warn("Unknown panel. Some features may not be supported")
 
             reply = self.send_wait(msg.StartCommunication, None, reply_expected=0x00)
             
             if reply is None:
                 self.run = STATE_STOP
                 return False
-             
+
+            password = self.encode_password(PASSWORD, reply.fields.value.product_id in [21, 22, 23])
+
             args = dict(product_id=reply.fields.value.product_id,
                         firmware=reply.fields.value.firmware, 
                         panel_id=reply.fields.value.panel_id,
-                        pc_password=PASSWORD,
+                        pc_password=password,
                         user_code=0x00000000
                         ) 
 
-            #reply = self.send_wait(message=reply.fields.data + reply.checksum, raw=True, reply_expected=0x10)
-            reply = self.send_wait(msg.InitializeCommunication, args=args, reply_expected=0x10)
+            reply = self.send_wait(msg.InitializeCommunication, args=args)
 
             if reply is None:
+                self.run = STATE_STOP
+                return False
+
+            if reply.fields.value.po.command == 0x10:
+                logger.info("Authentication Success")
+            elif reply.fields.value.po.command == 0x07:
+                logger.error("Authentication Failed. Wrong Password?")
                 self.run = STATE_STOP
                 return False
             
@@ -754,3 +762,28 @@ class Paradox:
     def resume(self):
         if self.run == STATE_PAUSE:
             self.connect()
+
+    def encode_password(self, password, is_sp=False):
+        res = [0] * 5
+        
+        try:
+            int_password = int(password)
+        except:
+            return password
+
+        i = len(password)
+        while i >= 0:
+            i2  = int(i / 2)
+            b = int(int_password % 10)
+            if b == 0 and is_sp:
+                b = 0x0a
+
+            int_password /= 10
+            if (i + 1) % 2 == 0:
+                res[i2] = b
+            else:
+                res[i2] = (((b << 4)) | res[i2]) & 0xff
+
+            i -= 1
+
+        return bytes(res[:2])
