@@ -35,8 +35,13 @@ class IPConnection:
             payload = encrypt(self.key, self.key)
 
             msg = ip_message.build(dict(header=dict(length=len(self.key), flags=0x09, command=0xf0, encrypt=1), payload=payload))
+            if LOGGING_DUMP_PACKETS:
+                logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
+
             self.socket.send(msg)
             data = self.socket.recv(1024)
+            if LOGGING_DUMP_PACKETS:
+                logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
 
             message, message_payload = self.get_message_payload(data)
             response = ip_payload_connect_response.parse(message_payload)
@@ -47,16 +52,27 @@ class IPConnection:
             
             #F2
             msg = ip_message.build(dict(header=dict(length=0, flags=0x09, command=0xf2, encrypt=1), payload=encrypt(b'', self.key)))
-            self.socket.send(msg)
+            if LOGGING_DUMP_PACKETS:
+                logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
 
+            self.socket.send(msg)
             data = self.socket.recv(1024)
+            if LOGGING_DUMP_PACKETS:
+                logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
+
             message, message_payload = self.get_message_payload(data)
             logger.debug("F2 answer: {}".format(binascii.hexlify(message_payload)))
 
             #F3
             msg = ip_message.build(dict(header=dict(length=0, flags=0x09, command=0xf3, encrypt=1), payload=encrypt(b'', self.key)))
+            if LOGGING_DUMP_PACKETS:
+                logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
+
             self.socket.send(msg)
             data = self.socket.recv(1024)
+            if LOGGING_DUMP_PACKETS:
+                logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
+
             message, message_payload = self.get_message_payload(data)
             
             logger.debug("F3 answer: {}".format(binascii.hexlify(message_payload)))
@@ -66,8 +82,14 @@ class IPConnection:
             payload_len = len(payload)
             payload = encrypt(payload, self.key)
             msg = ip_message.build(dict(header=dict(length=payload_len, flags=0x09, command=0xf3, encrypt=1), payload=payload))
+
+            if LOGGING_DUMP_PACKETS:
+                logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
+
             self.socket.send(msg)
             data = self.socket.recv(1024)
+            if LOGGING_DUMP_PACKETS:
+                logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
             
             message, message_payload = self.get_message_payload(data)            
             logger.debug("F8 answer: {}".format(binascii.hexlify(message_payload)))
