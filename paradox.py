@@ -109,7 +109,7 @@ class Paradox:
                 self.run = STATE_STOP
                 return False
 
-            password = self.encode_password(PASSWORD, reply.fields.value.product_id in [21, 22, 23])
+            password = self.encode_password(PASSWORD, reply.fields.value.product_id in ['SPECTRA_SP5500', 'SPECTRA_SP6000', 'SPECTRA_SP7000'])
             
             args = dict(product_id=reply.fields.value.product_id,
                         firmware=reply.fields.value.firmware, 
