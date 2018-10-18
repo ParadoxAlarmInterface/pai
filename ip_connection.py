@@ -6,6 +6,9 @@ import time
 from paradox_crypto import encrypt, decrypt
 from paradox_ip_messages import *
 import binascii
+import json
+import stun
+import requests
 
 from config_defaults import *
 from config import *
@@ -21,15 +24,92 @@ class IPConnection:
         self.connected = False
         self.host = host
         self.port = port
+        self.site_info = None
 
     def connect(self):
 
-        logger.debug( "Connecting to IP Panel at : {}".format(self.host))
+        tries = 1
+
+        while tries > 0:
+            try:
+                if IP_CONNECTION_SITEID is not None and IP_CONNECTION_EMAIL is not None:
+                    r = self.connect_to_site()
+                     
+                    if r and self.site_info is not None:
+                        if self.connect_to_panel():
+                            return True
+                    
+                else:
+                    self.socket.settimeout(self.socket_timeout)
+                    self.socket.connect( (self.host, self.port) )
+
+                    if self.connect_to_panel():
+                        return True
+            except:
+                logger.exception("Unable to connect")
+
+            tries -= 1
+
+        return False
+    
+    def connect_to_site(self):
+        logger.info("Connecting to Site: {}".format(IP_CONNECTION_SITEID))
+        if self.site_info is None:
+            self.site_info = self.get_site_info(siteid=IP_CONNECTION_SITEID, email=IP_CONNECTION_EMAIL)
         
+        if self.site_info is None:
+            logger.error("Unable to get site info")
+            return False
         try:
-            self.socket.settimeout(self.socket_timeout)
-            self.socket.connect( (self.host, self.port) )
+            logger.debug("Site Info: {}".format(json.dumps(self.site_info, indent=4)))
+            chost = self.site_info['site'][0]['module'][0]['ipAddress']
+            cport = self.site_info['site'][0]['module'][0]['port']
+            xoraddr = binascii.unhexlify(self.site_info['site'][0]['module'][0]['xoraddr'])
             
+            stun_host = 'turn.paradoxmyhome.com'
+
+            self.client = stun.StunClient(stun_host)
+
+            self.client.send_tcp_change_request()
+            stun_r = self.client.receive_response()
+            if stun.is_error(stun_r):
+                logger.error(stun.get_error(stun_r))
+                return False
+
+            self.client.send_binding_request()
+            stun_r = self.client.receive_response()
+            if stun.is_error(stun_r):
+                logger.error(stun.get_error(stun_r))
+                return False
+
+            self.client.send_connect_request(xoraddr=xoraddr)
+            stun_r = self.client.receive_response()
+            if stun.is_error(stun_r):
+                logger.error(stun.get_error(stun_r))
+                return False
+
+            connection_id = stun_r[0]['attr_body']
+            raddr = self.client.sock.getpeername()
+
+            self.client1 = stun.StunClient(host=raddr[0], port=raddr[1])
+            self.client1.send_connection_bind_request(binascii.unhexlify(connection_id))
+            stun_r = self.client1.receive_response()
+            if stun.is_error(stun_r):
+                logger.error(stun.get_error(stun_r))
+                return False
+
+            self.socket = self.client1.sock
+            logger.info("Connected to Site: {}".format(IP_CONNECTION_SITEID))
+        except:
+            logger.exception("Unable to negotiate connection to site")
+
+        return True
+
+    def connect_to_panel(self):
+
+        logger.debug( "Connecting to IP Panel")
+        
+        try:    
             logger.debug("IP Connection established")
 
             payload = encrypt(self.key, self.key)
@@ -37,18 +117,17 @@ class IPConnection:
             msg = ip_message.build(dict(header=dict(length=len(self.key), unknown0=0x03, flags=0x09, command=0xf0, unknown1=0, encrypt=1), payload=payload))
             if LOGGING_DUMP_PACKETS:
                 logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
-
+            
             self.socket.send(msg)
             data = self.socket.recv(1024)
             if LOGGING_DUMP_PACKETS:
                 logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
 
             message, message_payload = self.get_message_payload(data)
+
             response = ip_payload_connect_response.parse(message_payload)
             self.key = response.key
-            logger.debug("Set new Key to {}".format(self.key))
-
-            logger.info("Connected to Panel with Versions {}.{} - {}.{}".format(response.major, response.minor, response.ip_major, response.ip_minor))
+            logger.info("Connected to Panel with version {}.{} - {}.{}".format(response.major, response.minor, response.ip_major, response.ip_minor))
             
             #F2
             msg = ip_message.build(dict(header=dict(length=0, unknown0=0x03, flags=0x09, command=0xf2, unknown1=0, encrypt=1), payload=encrypt(b'', self.key)))
@@ -81,7 +160,7 @@ class IPConnection:
             payload = binascii.unhexlify('0a500080000000000000000000000000000000000000000000000000000000000000000000d0')
             payload_len = len(payload)
             payload = encrypt(payload, self.key)
-            msg = ip_message.build(dict(header=dict(length=payload_len, flags=0x09, command=0xf3, encrypt=1), payload=payload))
+            msg = ip_message.build(dict(header=dict(length=payload_len, unknown0=0x03, flags=0x09, command=0xf8, unknown1=0, encrypt=1), payload=payload))
 
             if LOGGING_DUMP_PACKETS:
                 logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
@@ -110,7 +189,7 @@ class IPConnection:
         try:
             if self.connected:
                 payload = encrypt(data, self.key)
-                msg = ip_message.build(dict(header=dict(length=len(data), flags=0x09, command=0x00, encrypt=1), payload=payload))
+                msg = ip_message.build(dict(header=dict(length=len(data), unknown0=0x04, flags=0x09, command=0x00, encrypt=1), payload=payload))
                 self.socket.send(msg)
                 return True
             else:
@@ -182,3 +261,19 @@ class IPConnection:
             message_payload = message.payload
 
         return message, message_payload
+
+    def get_site_info(self, email, siteid):
+
+        logger.debug("Getting site info")
+        URL = "https://api.insightgoldatpmh.com/v1/site"
+
+        headers={'User-Agent': 'Mozilla/3.0 (compatible; Indy Library)', 'Accept-Encoding': 'identity', 'Accept': 'text/html, */*'}
+        req = requests.get(URL, headers=headers, params = {'email': email, 'name': siteid})
+        if req.status_code == 200:
+            return req.json()
+
+        return None
+
+
+
+

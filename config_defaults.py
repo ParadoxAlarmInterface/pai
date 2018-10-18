@@ -21,6 +21,8 @@ SERIAL_PORT = '/dev/ttyS1' # Pathname of the Serial Port
 IP_CONNECTION_HOST = '127.0.0.1'
 IP_CONNECTION_PORT = 10000
 IP_CONNECTION_PASSWORD = b'0000'
+IP_CONNECTION_SITEID = None
+IP_CONNECTION_EMAIL = None
 
 # Paradox
 KEEP_ALIVE_INTERVAL = 9     # Interval between status updates

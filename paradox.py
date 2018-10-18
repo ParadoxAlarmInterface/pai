@@ -103,19 +103,21 @@ class Paradox:
             else:
                 logger.warn("Unknown panel. Some features may not be supported")
 
-            reply = self.send_wait(msg.StartCommunication, None, reply_expected=0x00)
+            reply = self.send_wait(msg.StartCommunication, args=dict(source_id=0x02), reply_expected=0x00)
             
             if reply is None:
                 self.run = STATE_STOP
                 return False
 
             password = self.encode_password(PASSWORD, reply.fields.value.product_id in [21, 22, 23])
-
+            
             args = dict(product_id=reply.fields.value.product_id,
                         firmware=reply.fields.value.firmware, 
                         panel_id=reply.fields.value.panel_id,
                         pc_password=password,
-                        user_code=0x00000000
+                        user_code=0x00000000,
+                        not_used1=0x19,
+                        source_id=0x02
                         ) 
 
             reply = self.send_wait(msg.InitializeCommunication, args=args)
@@ -199,7 +201,7 @@ class Paradox:
             data = self.connection.read()
         
         if LOGGING_DUMP_PACKETS:
-            logger.debug("PC <- A {}".format(binascii.hexlify(message)))
+            logger.debug("PC <- A {}".format(binascii.hexlify(data)))
 
         return data
 
@@ -233,7 +235,7 @@ class Paradox:
                 continue
 
             if LOGGING_DUMP_PACKETS:
-                logger.debug("PC <- A {}".format(binascii.hexlify(message)))
+                logger.debug("PC <- A {}".format(binascii.hexlify(data)))
 
             try:
                 recv_message = msg.parse(data)
@@ -254,6 +256,9 @@ class Paradox:
                     self.handle_event(recv_message)
                 except:
                     logger.exception("Handle event")
+                # Clear the message to avoid resending it
+                message = None
+                retries += 1 #Ignore this try
                 continue
             
             if recv_message.fields.value.po.command == 0x70:

@@ -119,7 +119,6 @@ InitiateCommunicationResponse = Struct("fields" / RawCopy(
         Bytes(1), 
         lambda data: calculate_checksum(data), this.fields.data))
 
-
 InitializeCommunication = Struct("fields" / RawCopy(
     Struct(
         "po" / Struct("command" / Const(0x00, Int8ub)),
@@ -142,7 +141,7 @@ InitializeCommunication = Struct("fields" / RawCopy(
             "build" / Int8ub),
         "panel_id" / Int16ub, 
         "pc_password" / Default(Bytes(2), b'0000'),
-        "not_used1" / Padding(1),
+        "not_used1" / Bytes(1),
         "source_method" / Default(Enum(Int8ub,
             Winload_Connection=0x00,
             NEware_Connection=0x55), 0x00),
@@ -515,7 +514,9 @@ CloseConnection = Struct("fields" / RawCopy(
         "not_used0" / Const(0, Int8ub),
         "validation_byte" / Default(Int8ub, 0),
         "not_used1" / Padding(29),
-        "message" / Default(Enum(Int8ub, panel_will_disconnect=0x05), 0x05),
+        "message" / Default(Enum(Int8ub, 
+            authentication_failed=0x12,
+            panel_will_disconnect=0x05), 0x05),
         "source_id" / Default(Enum(Int8ub,
             NonValid_Source=0,
             Winload_Direct=1,

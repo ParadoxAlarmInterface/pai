@@ -182,7 +182,7 @@ class IPInterface(Thread):
             # Generate a new key
             self.key = binascii.hexlify(os.urandom(8)).upper()
             
-            payload = ip_payload_connect_response.build(dict(key=self.key, major=0x0, minor=0x00, ip_major=0x05, ip_minor=0x02))
+            payload = ip_payload_connect_response.build(dict(key=self.key, major=0x0, minor=32, ip_major=4, ip_minor=48))
             force_plain_text = True
 
         elif message.header.command == 0xf2: 

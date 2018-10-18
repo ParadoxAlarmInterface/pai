@@ -170,7 +170,7 @@ def main():
 
         connection = IPConnection(host=IP_CONNECTION_HOST, port=IP_CONNECTION_PORT, password=IP_CONNECTION_PASSWORD)
         if not connection.connect():
-            logger.error("Unable to open IP Connection with: {}".format(IP_CONNECTION_HOST))
+            logger.error("Unable to open IP Connection")
             sys.exit(-1)
     else:
         logger.error("Invalid connection type: {}".format(CONNECTION_TYPE))

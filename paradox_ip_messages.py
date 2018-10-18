@@ -14,11 +14,11 @@ ip_message = Struct(
         "payload" / Aligned(16, GreedyBytes, b'\xee')
       )
 
-ip_payload_connect_response = Aligned(16, Struct(
+ip_payload_connect_response = Struct(
     'command' / Const(0x00, Int8ub),
     'key'   / Bytes(16),
     'major' / Int8ub,
     'minor' / Int8ub,
     'ip_major' / Default(Int8ub, 5),
     'ip_minor' / Default(Int8ub, 2),
-    'unknown'   / Default(Int8ub, 0x00)), b'\xee')
+    'unknown'   / Default(Int8ub, 0x00))
