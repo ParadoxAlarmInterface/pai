@@ -5,7 +5,7 @@ With this interface it is possible to integrate Paradox panels with HomeAssistan
 
 It supports panels connected through a serial port, which is present in all panels, or through a USB 307 module. If you are using a NanoPi/RPi with the onboard
 serial port, do not forget the level shifter as the panels operate on 5V logic.
-If also has __alfa__ support to connections using the IP150 module.
+If also has __alfa__ support to connections using the IP150 module, both directly (version <4.0), and through the SITE ID (version >4.0).
 
 Tested in the following environment:
 
