@@ -96,7 +96,7 @@ class Paradox:
 
             if reply:
                 logger.info("Found Panel {} version {}.{} build {}".format(
-                    (reply.fields.value.label.decode('latin').strip()),
+                    (reply.fields.value.label.strip(b'\0 ').decode('utf-8')),
                     reply.fields.value.application.version,
                     reply.fields.value.application.revision,
                     reply.fields.value.application.build))
@@ -329,7 +329,7 @@ class Paradox:
                 continue
 
             payload = reply.fields.value.data
-            label = payload[:16].strip().decode('latin').replace(" ","_")
+            label = payload[:16].strip(b'\0 ').decode('utf-8').replace(" ","_")
                 
             if label not in labelDictName and i in limit:
                 properties = template.copy()
