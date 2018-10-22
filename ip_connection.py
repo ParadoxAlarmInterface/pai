@@ -25,6 +25,7 @@ class IPConnection:
         self.host = host
         self.port = port
         self.site_info = None
+        self.connection_timestamp = 0
 
     def connect(self):
 
@@ -87,6 +88,8 @@ class IPConnection:
             if stun.is_error(stun_r):
                 logger.error(stun.get_error(stun_r))
                 return False
+
+            self.connection_timestamp = time.time()
 
             connection_id = stun_r[0]['attr_body']
             raddr = self.client.sock.getpeername()
@@ -185,6 +188,9 @@ class IPConnection:
 
     def write(self, data):
         """Write data to socket"""
+        
+        if not self.refresh_stun():
+            return False
 
         try:
             if self.connected:
@@ -201,6 +207,10 @@ class IPConnection:
         
     def read(self, sz=37, timeout=5):        
         """Read data from the IP Port, if available, until the timeout is exceeded"""
+
+        if not self.refresh_stun():
+            return False
+
         self.socket.settimeout(timeout)
         data = b""
         read_sz = sz
@@ -274,6 +284,21 @@ class IPConnection:
 
         return None
 
+    def refresh_stun(self):
+        try:
+            # Refresh session if required
+            if time.time() - self.connection_timestamp >= 500:
+                logger.debug("Refreshing session")
+                self.client.send_refresh_request()
+                stun_r = self.client.receive_response()
+                if stun.is_error(stun_r):
+                    logger.error(stun.get_error(stun_r))
+                    self.connected = False
+                    return False
 
-
-
+                self.connection_timestamp = time.time()
+            
+            return True
+        except:
+            logger.exception("Session refresh")
+            return False
