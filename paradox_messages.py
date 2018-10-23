@@ -1,7 +1,14 @@
 # -*- coding: utf-8 -*-
 
 from construct import *
+import logging
+
 from paradox_message_adapters import *
+
+from config_defaults import *
+from config import *
+
+logger = logging.getLogger('Paradox_Messages').getChild(__name__)
 
 def calculate_checksum(message):
     r = 0
@@ -12,53 +19,60 @@ def calculate_checksum(message):
 
 
 def parse(message):
-    if message is None or len(message) == 0:
-        return None
+    try:
+        if message is None or len(message) == 0:
+            return None
+        
+        if message[0] == 0x70:
+            return CloseConnection.parse(message)
+        elif message[0] == 0x72 and message[1] == 0:
+            return InitiateCommunication.parse(message)
+        elif message[0] == 0x72 and message[1] == 0xFF:
+            return InitiateCommunicationResponse.parse(message)
+        elif message[0] >> 4 == 0x7:
+            return ErrorMessage.parse(message)
+        elif message[0] == 0x5F:
+            return StartCommunication.parse(message)
+        elif message[0] == 0x00 and message[4] > 0:
+            return StartCommunicationResponse.parse(message)
+        elif message[0] == 0x00:
+            return InitializeCommunication.parse(message)
+        elif message[0] == 0x10:
+            return InitializeCommunicationResponse.parse(message)
+        elif message[0] == 0x30:
+            return SetTimeDate.parse(message)
+        elif message[0] >> 4 == 0x03:
+            return SetTimeDateResponse.parse(message)
+        elif message[0] == 0x40:
+            return PerformAction.parse(message)
+        elif message[0] >> 4 == 4:
+            return PerformActionResponse.parse(message)
+        elif message[0] == 0x50 and message[2] == 0x80:
+            return PanelStatus.parse(message)
+        elif message[0] == 0x50 and message[2] < 0x80:
+            return ReadEEPROM.parse(message)
+        elif message[0] >> 4 == 0x05 and message[2] == 0x80:
+            return PanelStatusResponse[message[3]].parse(message)
+        elif message[0] >> 4 == 0x05 and message[2] < 0x80:
+            return ReadEEPROMResponse.parse(message)
+        elif message[0] == 0x60 and message[2] < 0x80:
+            return WriteEEPROM.parse(message)
+        elif message[0] >> 4 == 0x06 and message[2] < 0x80:
+            return WriteEEPROMResponse.parse(message)
+        elif message[0] >> 4 == 0x0e:
+            return LiveEvent.parse(message)
+        else:
+            logger.warn("Unknown message")
+    except:
+        logger.exception("Parsing message")
+
+    s = 'PARSE: '
+    for c in message:
+        s += "{:02x} ".format(c)
+
+    logger.debug(s)
     
-    if message[0] == 0x70:
-        return CloseConnection.parse(message)
-    elif message[0] == 0x72 and message[1] == 0:
-        return InitiateCommunication.parse(message)
-    elif message[0] == 0x72 and message[1] == 0xFF:
-        return InitiateCommunicationResponse.parse(message)
-    elif message[0] >> 4 == 0x7:
-        return ErrorMessage.parse(message)
-    elif message[0] == 0x5F:
-        return StartCommunication.parse(message)
-    elif message[0] == 0x00 and message[4] > 0:
-        return StartCommunicationResponse.parse(message)
-    elif message[0] == 0x00:
-        return InitializeCommunication.parse(message)
-    elif message[0] == 0x10:
-        return InitializeCommunicationResponse.parse(message)
-    elif message[0] == 0x30:
-        return SetTimeDate.parse(message)
-    elif message[0] >> 4 == 0x03:
-        return SetTimeDateResponse.parse(message)
-    elif message[0] == 0x40:
-        return PerformAction.parse(message)
-    elif message[0] >> 4 == 4:
-        return PerformActionResponse.parse(message)
-    elif message[0] == 0x50 and message[2] == 0x80:
-        return PanelStatus.parse(message)
-    elif message[0] == 0x50 and message[2] < 0x80:
-        return ReadEEPROM.parse(message)
-    elif message[0] >> 4 == 0x05 and message[2] == 0x80:
-        return PanelStatusResponse[message[3]].parse(message)
-    elif message[0] >> 4 == 0x05 and message[2] < 0x80:
-        return ReadEEPROMResponse.parse(message)
-    elif message[0] == 0x60 and message[2] < 0x80:
-        return WriteEEPROM.parse(message)
-    elif message[0] >> 4 == 0x06 and message[2] < 0x80:
-        return WriteEEPROMResponse.parse(message)
-    elif message[0] >> 4 == 0x0e:
-        return LiveEvent.parse(message)
-    else:
-        print("Unknown message")
-        for c in message:
-            print("{:02x} ".format(c), end='')
-        print()
-        return None
+    return None
 
 
 InitiateCommunication = Struct("fields" / RawCopy(
