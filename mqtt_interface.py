@@ -172,7 +172,6 @@ class MQTTInterface(Thread):
                         if command == 'disarm':
                             break
 
-
                 elif element in self.partitions:
                     if ('arm' in self.partitions[element] and self.partitions[element]['arm']) or ('exit_delay' in self.partitions[element] and self.partitions[element]['exit_delay']):
                         command = 'disarm'
@@ -302,20 +301,28 @@ class MQTTInterface(Thread):
                           "{}".format(publish_value), 0, MQTT_RETAIN)
 
         if element == 'partition' and MQTT_HOMEBRIDGE_ENABLE:
+            
+            # Property changing to True: Alarm or arm
             if value:
                 if property == 'alarm':
                     state = 'ALARM_TRIGGERED'
-                elif property == 'stay_arm' :
-                    state = 'STAY_ARM'
-                    self.armed = state
-                elif property == 'arm':
-                    state = 'AWAY_ARM'
-                    self.armed = state
-                elif property == 'sleep_arm':
-                    state = 'NIGHT_ARM'
+                
+                # only process if not armed already
+                if not self.armed:
+                    if property == 'stay_arm':
+                        state = 'STAY_ARM'
+                    elif property == 'arm':
+                        state = 'AWAY_ARM'
+                    elif property == 'sleep_arm':
+                        state = 'NIGHT_ARM'
+                    else:
+                        return
+                    
                     self.armed = state
                 else:
-                    return
+                    return # Do not publish a change
+
+            # Property changing to False: Disarm or alarm stop
             else:
                 if property == 'alarm' and self.armed is not None:
                     state = self.armed
@@ -323,7 +330,7 @@ class MQTTInterface(Thread):
                     state = 'DISARMED'
                     self.armed = None
                 else:
-                    return
+                    return # Do not publish a change
 
             self.publish('{}/{}/{}/{}/{}'.format(MQTT_BASE_TOPIC,
                                     MQTT_STATES_TOPIC,
