@@ -37,7 +37,7 @@ MEM_SITE_END = MEM_SITE_START + 0x10
 MEM_SIREN_START = MEM_SITE_END 
 MEM_SIREN_END = MEM_SIREN_START + 0x10 * 4
 
-PARTITION_ACTIONS = dict(arm=0x04, disarm=0x05, arm_stay=0x01, arm_sleep=0x03,  arm_stay_stayd=0x06, arm_sleep_stay=0x07, disarm_all=0x08)
+PARTITION_ACTIONS = dict(arm=0x04, disarm=0x05, arm_stay=0x01, arm_sleep=0x03,  arm_stay_stayd=0x06, arm_sleep_stayd=0x07, disarm_all=0x08)
 ZONE_ACTIONS = dict(bypass=0x10, clear_bypass=0x10)
 PGM_ACTIONS = dict(on_override=0x30, off_override=0x31, on=0x32, off=0x33, pulse=0)
 

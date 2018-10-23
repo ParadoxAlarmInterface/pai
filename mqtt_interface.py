@@ -178,21 +178,21 @@ class MQTTInterface(Thread):
                         command = 'disarm'
                     else:
                         command = 'arm'
-                
                 else:
                     logger.debug("Element {} not found".format(element))
                     return
 
-                logger.debug("Effective command: {} = {}".format(element, command))
-
                 self.notification_handler.notify('mqtt', "Command by {}: {}".format(MQTT_TOGGLE_CODES[tokens[1]], command), logging.INFO)
-
+            
+            logger.debug("Partition command: {} = {}".format(element, command))
             if not self.alarm.control_partition(element, command):
                 logger.warning(
                     "Partition command refused: {}={}".format(element, command))
        
         # Process an Output Command
         elif topics[2] == MQTT_OUTPUT_TOPIC:
+            logger.debug("Output command: {} = {}".format(element, command))
+
             if not self.alarm.control_output(element, command):
                 logger.warning(
                     "Output command refused: {}={}".format(element, command))
