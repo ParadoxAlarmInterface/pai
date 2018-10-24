@@ -178,7 +178,9 @@ class Paradox:
                     args = dict(address=MEM_STATUS_BASE1 + i)
                     reply = self.send_wait(msg.ReadEEPROM, args, reply_expected=0x05)
                     if reply is not None:
+                        tstart = time.time()
                         self.handle_status(reply)
+                        logger.debug("Status handled in {} seconds".format(time.time() - tstart))
             except:
                 logger.exception("Loop")
             
@@ -257,11 +259,13 @@ class Paradox:
             # Events are async
             if recv_message.fields.value.po.command == 0xe:
                 try:
+                    tstart = time.time()
                     self.handle_event(recv_message)
+                    logger.debug("Event handled in {} seconds".format(time.time() - tstart))
                 except:
                     logger.exception("Handle event")
                 # Clear the message to avoid resending it
-                message = None
+                #message = None
                 retries += 1 #Ignore this try
                 continue
             
