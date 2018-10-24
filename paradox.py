@@ -329,7 +329,7 @@ class Paradox:
                 continue
 
             payload = reply.fields.value.data
-            label = payload[:16].strip(b'\0 ').replace(b'\0','_').replace(b" ",b"_").decode('utf-8')
+            label = payload[:16].strip(b'\0 ').replace(b'\0',b'_').replace(b' ',b'_').decode('utf-8')
                 
             if label not in labelDictName and i in limit:
                 properties = template.copy()
