@@ -34,7 +34,7 @@ class MQTTInterface(Thread):
         self.notification_handler = None
         self.cache = dict()
 
-        self.armed = None
+        self.armed = dict()
         self.alarm = None
 
     def run(self):
@@ -302,13 +302,16 @@ class MQTTInterface(Thread):
 
         if element == 'partition' and MQTT_HOMEBRIDGE_ENABLE:
             
+            if not label in self.armed:
+                self.armed[label] = None
+
             # Property changing to True: Alarm or arm
             if value:
                 if property == 'alarm':
                     state = 'ALARM_TRIGGERED'
                 
                 # only process if not armed already
-                if not self.armed:
+                if self.armed[label] is None:
                     if property == 'stay_arm':
                         state = 'STAY_ARM'
                     elif property == 'arm':
@@ -318,17 +321,17 @@ class MQTTInterface(Thread):
                     else:
                         return
                     
-                    self.armed = state
+                    self.armed[label] = state
                 else:
                     return # Do not publish a change
 
             # Property changing to False: Disarm or alarm stop
             else:
-                if property == 'alarm' and self.armed is not None:
-                    state = self.armed
+                if property == 'alarm' and label in self.armed and self.armed[label] is not None:
+                    state = self.armed[label]
                 elif property in ['stay_arm', 'arm', 'sleep_arm']:
                     state = 'DISARMED'
-                    self.armed = None
+                    self.armed[label] = None
                 else:
                     return # Do not publish a change
 
