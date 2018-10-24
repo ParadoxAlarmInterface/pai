@@ -174,6 +174,7 @@ class Paradox:
             tstart = time.time()
             try:
                 for i in STATUS_REQUESTS:
+                    logger.debug("Polling panel for status {}".format(i))
                     args = dict(address=MEM_STATUS_BASE1 + i)
                     reply = self.send_wait(msg.ReadEEPROM, args, reply_expected=0x05)
                     if reply is not None:
@@ -182,7 +183,10 @@ class Paradox:
                 logger.exception("Loop")
             
             # Listen for events
-            while (time.time() - tstart) < KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
+            time_remaining = time.time() - tstart
+            logger.debug("Loop Debug: Remaining: {} Run: {} Loop_Wait: {}".format(time_remaining, self.run, self.loop_wait))
+            while time_remaining < KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
+                logger.debug("Poll wait")
                 self.send_wait(None, timeout=1)
 
     def send_wait_simple(self, message=None, timeout=5, wait=True):
