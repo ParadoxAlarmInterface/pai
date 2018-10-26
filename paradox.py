@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import paradox_messages as msg
+import paradox_mgsp_messages as msg
 from serial_connection import *
 import logging
 import sys
