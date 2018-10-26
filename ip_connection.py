@@ -129,8 +129,17 @@ class IPConnection:
             message, message_payload = self.get_message_payload(data)
 
             response = ip_payload_connect_response.parse(message_payload)
+
+            if response.login_status != 'success':
+                logger.error("Error connecting to IP Module: {}".format(response.login_status))
+                return False
+
+            logger.info("Connected to IP Module. Version {:02x}, Firmware: {}.{}, Serial: {}".format(response.hardware_version, 
+                        response.ip_firmware_major, 
+                        response.ip_firmware_minor, 
+                        binascii.hexlify(response.ip_module_serial).decode('utf-8')))
+            
             self.key = response.key
-            logger.info("Connected to Panel with version {}.{} - {}.{}".format(response.major, response.minor, response.ip_major, response.ip_minor))
             
             #F2
             msg = ip_message.build(dict(header=dict(length=0, unknown0=0x03, flags=0x09, command=0xf2, unknown1=0, encrypt=1), payload=encrypt(b'', self.key)))
