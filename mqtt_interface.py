@@ -310,7 +310,7 @@ class MQTTInterface(Thread):
                     state = 'ALARM_TRIGGERED'
                 
                 # only process if not armed already
-                if self.armed[label] is None:
+                elif self.armed[label] is None:
                     if property == 'stay_arm':
                         state = 'STAY_ARM'
                     elif property == 'arm':
