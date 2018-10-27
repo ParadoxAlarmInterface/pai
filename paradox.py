@@ -185,11 +185,12 @@ class Paradox:
                 logger.exception("Loop")
             
             # Listen for events
-            time_remaining = time.time() - tstart
-            logger.debug("Loop Debug: Remaining: {} Run: {} Loop_Wait: {}".format(time_remaining, self.run, self.loop_wait))
-            while time_remaining < KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
-                logger.debug("Poll wait")
+            time_enlapsed = time.time() - tstart
+            logger.debug("Loop Debug: Remaining: {} Run: {} Loop_Wait: {}".format(time_enlapsed, self.run, self.loop_wait))
+            while time_enlapsed < KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
+                logger.debug("Loop Debug: Remaining: {} Run: {} Loop_Wait: {} (IN)".format(time_enlapsed, self.run, self.loop_wait))
                 self.send_wait(None, timeout=1)
+                time_enlapsed = time.time() - tstart
 
     def send_wait_simple(self, message=None, timeout=5, wait=True):
         if message is not None:
@@ -800,3 +801,4 @@ class Paradox:
             i -= 1
 
         return bytes(res[:2])
+

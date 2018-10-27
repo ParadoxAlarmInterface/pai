@@ -301,7 +301,6 @@ class MQTTInterface(Thread):
                           "{}".format(publish_value), 0, MQTT_RETAIN)
 
         if element == 'partition' and MQTT_HOMEBRIDGE_ENABLE:
-            
             if not label in self.armed:
                 self.armed[label] = None
 
@@ -329,7 +328,7 @@ class MQTTInterface(Thread):
             else:
                 if property == 'alarm' and label in self.armed and self.armed[label] is not None:
                     state = self.armed[label]
-                elif property in ['stay_arm', 'arm', 'sleep_arm']:
+                elif property in ['stay_arm', 'arm', 'sleep_arm'] and self.armed[label] is not None:
                     state = 'DISARMED'
                     self.armed[label] = None
                 else:
