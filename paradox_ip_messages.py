@@ -14,7 +14,7 @@ ip_message = Struct(
         "payload" / Aligned(16, GreedyBytes, b'\xee')
       )
 
-ip_payload_connect_response = Aligned(16, Struct(
+ip_payload_connect_response = Struct(
     'login_status' / Enum(Int8ub,
     	success=0x00,
     	invalid_password=0x01,
@@ -25,4 +25,4 @@ ip_payload_connect_response = Aligned(16, Struct(
     'ip_firmware_major' / Default(Int8ub, 5),
     'ip_firmware_minor' / Default(Int8ub, 2),
     'ip_module_serial'	/ Bytes(4),
-    ), b'\xee')
+    )
