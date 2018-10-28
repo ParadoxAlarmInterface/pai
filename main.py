@@ -164,7 +164,7 @@ def main():
         if not connection.connect():
             logger.error("Unable to open serial port: {}".format(SERIAL_PORT))
             sys.exit(-1)
-    if CONNECTION_TYPE == 'IP':
+    elif CONNECTION_TYPE == 'IP':
         logger.info("Using IP Connection")
         from ip_connection import IPConnection
 
