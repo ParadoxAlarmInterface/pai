@@ -645,7 +645,7 @@ class Paradox:
         return new_event
 
 
-    def update_properties(self, element_type, key, change):
+    def update_properties(self, element_type, key, change, force_publish=False):
 
         elements = self.type_to_element_dict[element_type]
 
@@ -667,12 +667,12 @@ class Paradox:
                         if '_trouble' in kk:
                             r = r or elements[key][kk]
 
-                    self.update_properties(element_type, key, dict(trouble=r))
+                    self.update_properties(element_type, key, dict(trouble=r), force_publish=force_publish)
             
             if property_name in elements[key]:
                 old = elements[key][property_name]
         
-                if old != change[property_name]:
+                if old != change[property_name] or force_publish or PUSH_UPDATE_WITHOUT_CHANGE:
                     logger.debug("Change {}/{}/{} from {} to {}".format(element_type, elements[key]['label'], property_name, old, property_value))
                     elements[key][property_name] = property_value
                     self.interface.change(element_type, elements[key]['label'],
@@ -738,10 +738,10 @@ class Paradox:
         if message.fields.value.status_request == 0:
             if time.time() - self.last_power_update >= POWER_UPDATE_INTERVAL:
                 self.last_power_update = time.time()
-                self.update_properties('system', 'power', dict(vdc=round(message.fields.value.vdc, 2)))
-                self.update_properties('system', 'power', dict(battery=round(message.fields.value.battery, 2)))
-                self.update_properties('system', 'power', dict(dc=round(message.fields.value.dc, 2)))
-                self.update_properties('system', 'rf', dict(rf_noise_floor=round(message.fields.value.rf_noise_floor, 2 )))
+                self.update_properties('system', 'power', dict(vdc=round(message.fields.value.vdc, 2)), force_publish=PUSH_POWER_UPDATE_WITHOUT_CHANGE)
+                self.update_properties('system', 'power', dict(battery=round(message.fields.value.battery, 2)), force_publish=PUSH_POWER_UPDATE_WITHOUT_CHANGE)
+                self.update_properties('system', 'power', dict(dc=round(message.fields.value.dc, 2)), force_publish=PUSH_POWER_UPDATE_WITHOUT_CHANGE)
+                self.update_properties('system', 'rf', dict(rf_noise_floor=round(message.fields.value.rf_noise_floor, 2 )), force_publish=PUSH_POWER_UPDATE_WITHOUT_CHANGE)
             
             for k in message.fields.value.troubles:
                 if "not_used" in k:
