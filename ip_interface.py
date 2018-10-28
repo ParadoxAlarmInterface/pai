@@ -53,7 +53,7 @@ class IPInterface(Thread):
     stop_running = Event()
     thread = None
     loop = None
-    key = IP_PASSWORD
+    key = IP_INTERFACE_PASSWORD
     
     def __init__(self):
         Thread.__init__(self)
@@ -89,7 +89,7 @@ class IPInterface(Thread):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-        server_socket.bind( (IP_SOCKET_BIND_ADDRESS, IP_SOCKET_BIND_PORT))
+        server_socket.bind( (IP_INTERFACE_BIND_ADDRESS, IP_INTERFACE_BIND_PORT))
         server_socket.listen(1)
         logger.info("IP Open")
 
@@ -136,7 +136,7 @@ class IPInterface(Thread):
                         self.process_client_message(r, data)
                 
     def handle_disconnect(self):
-        self.key = IP_PASSWORD
+        self.key = IP_INTERFACE_PASSWORD
         logger.info("Client disconnected")
         try:
             if self.client_socket is not None:
@@ -175,7 +175,7 @@ class IPInterface(Thread):
         if message.header.command == 0xf0:
             password = message_payload[:4]
 
-            if password != IP_PASSWORD:
+            if password != IP_INTERFACE_PASSWORD:
                 logger.warn("Authentication Error")
                 return
 
