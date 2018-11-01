@@ -295,7 +295,7 @@ class IPConnection:
 
     def refresh_stun(self):
         if self.site_info is None:
-            return
+            return True
 
         try:
             # Refresh session if required
