@@ -294,6 +294,9 @@ class IPConnection:
         return None
 
     def refresh_stun(self):
+        if self.site_info is None:
+            return
+
         try:
             # Refresh session if required
             if time.time() - self.connection_timestamp >= 500:
