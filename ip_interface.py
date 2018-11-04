@@ -7,7 +7,7 @@ import logging
 import datetime
 import socket
 import select
-from construct import Struct, Aligned, Const, Int8ub, Bytes, this, Int16ub, Int16ul, BitStruct, Default, BitsInteger, Flag, Enum
+from construct import GreedyBytes, Struct, Aligned, Const, Int8ub, Bytes, this, Int16ub, Int16ul, BitStruct, Default, BitsInteger, Flag, Enum
 from threading import Thread, Event
 import binascii
 import os
@@ -29,7 +29,7 @@ ip_message = Struct(
             'unknown1' / Default(Int8ub, 0x0a),
             'encrypt' / Default(Int8ub, 0x00),
         ), b'\xee'),
-        "payload" / Aligned(16, Bytes(this.header.length), b'\xee')
+        "payload" / Aligned(16, GreedyBytes, b'\xee')
       )
 
 ip_payload_connect_response = Aligned(16, Struct(
@@ -152,12 +152,13 @@ class IPInterface(Thread):
             tstart = time.time()
             payload = self.alarm.send_wait()
             tend = time.time()
-            
+            payload_len = len(payload) 
             if payload is not None:
                 payload = encrypt(payload, self.key)
-                flags = 0x39
+                flags = 0x73
                 
-                m = ip_message.build(dict(header=dict(length=len(payload), flags=flags, command=0), payload=payload))
+                m = ip_message.build(dict(header=dict(length=payload_len, unknown0=2, flags=flags, command=0), payload=payload))
+                logger.debug("IP -> AP: {}".format(binascii.hexlify(m)))
                 client.send(m)
 
             if tend - tstart < 0.1:
@@ -166,12 +167,12 @@ class IPInterface(Thread):
     def process_client_message(self, client, data):
         message = ip_message.parse(data)
         message_payload = data[16:]
-        
+        logger.debug("AP -> IP: {}".format(binascii.hexlify(data)))
         if len(message_payload) >= 16  and message.header.flags & 0x01 != 0 and len(message_payload) % 16 == 0:
             message_payload = decrypt(message_payload, self.key)[:37]
 
         force_plain_text = False
-
+        response_code = 0x01
         if message.header.command == 0xf0:
             password = message_payload[:4]
 
@@ -184,7 +185,7 @@ class IPInterface(Thread):
             
             payload = ip_payload_connect_response.build(dict(key=self.key, major=0x0, minor=32, ip_major=4, ip_minor=48))
             force_plain_text = True
-
+        
         elif message.header.command == 0xf2: 
             payload = b'\x00'
         elif message.header.command == 0xf3: 
@@ -192,6 +193,7 @@ class IPInterface(Thread):
         elif message.header.command == 0xf8: 
             payload = b'\x01'
         elif message.header.command == 0x00:
+            response_code = 0x02
             try:
                 payload = self.alarm.send_wait_simple(message=message_payload[:37])
             except:
@@ -203,10 +205,17 @@ class IPInterface(Thread):
 
         if payload is not None:
             flags = 0x38
-            if message.header.encrypt == 0x01 and not force_plain_text:
+            payload_length = len(payload)
+
+            if message.header.flags & 0x01 != 0 and not force_plain_text:
                 payload = encrypt(payload, self.key)
-                flags = 0x39
-           
-            m = ip_message.build(dict(header=dict(length=len(payload), flags=flags, command=message.header.command), payload=payload))
+
+                if message.header.command == 0x00:
+                    flags = 0x73
+                else:
+                    flags = 0x39
+
+            m = ip_message.build(dict(header=dict(length=payload_length, unknown0=response_code, flags=flags, command=message.header.command), payload=payload))
+            logger.debug("IP -> AP: {}".format(binascii.hexlify(m)))
             client.send(m)
 
