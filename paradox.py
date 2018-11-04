@@ -783,7 +783,10 @@ class Paradox:
         try:
             int_password = int(password)
         except:
-            return password
+            if password is None:
+                return b'\x00\x00'
+            else:
+                return password
 
         i = len(password)
         while i >= 0:
