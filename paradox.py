@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import paradox_messages as msg
+from hardware import create_panel
 from serial_connection import *
 import logging
 import sys
@@ -17,25 +17,6 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 MEM_STATUS_BASE1 = 0x8000
 MEM_STATUS_BASE2 = 0x1fe0
-
-MEM_ZONE_START = 0x010
-MEM_ZONE_END = MEM_ZONE_START + 0x10 * 32
-MEM_OUTPUT_START = MEM_ZONE_END
-MEM_OUTPUT_END = MEM_OUTPUT_START + 0x10 * 16
-MEM_PARTITION_START = MEM_OUTPUT_END
-MEM_PARTITION_END = MEM_PARTITION_START + 0x10 * 2
-MEM_USER_START = MEM_PARTITION_END
-MEM_USER_END = MEM_USER_START + 0x10 * 32
-MEM_BUS_START = MEM_USER_END 
-MEM_BUS_END = MEM_BUS_START + 0x10 * 15
-MEM_REPEATER_START = MEM_BUS_END 
-MEM_REPEATER_END = MEM_REPEATER_START + 0x10 * 2
-MEM_KEYPAD_START = MEM_REPEATER_END
-MEM_KEYPAD_END = MEM_KEYPAD_START + 0x10 * 8
-MEM_SITE_START = MEM_KEYPAD_END
-MEM_SITE_END = MEM_SITE_START + 0x10
-MEM_SIREN_START = MEM_SITE_END 
-MEM_SIREN_END = MEM_SIREN_START + 0x10 * 4
 
 PARTITION_ACTIONS = dict(arm=0x04, disarm=0x05, arm_stay=0x01, arm_sleep=0x03,  arm_stay_stayd=0x06, arm_sleep_stay=0x07, disarm_all=0x08)
 ZONE_ACTIONS = dict(bypass=0x10, clear_bypass=0x10)
@@ -54,6 +35,7 @@ class Paradox:
                  interface,
                  retries=3):
 
+        self.panel = None
         self.connection = connection
         self.connection.timeout(0.5)
         self.retries = retries
@@ -90,9 +72,13 @@ class Paradox:
         self.reset()
 
         self.run = STATE_RUN
+
+        if not self.panel:
+            self.panel = create_panel(self)
         
         try:
-            reply = self.send_wait(msg.InitiateCommunication, None, reply_expected=0x07)
+            logger.info("Initiating communication")
+            reply = self.send_wait(self.panel.get_message('InitiateCommunication'), None, reply_expected=0x07)
 
             if reply:
                 logger.info("Found Panel {} version {}.{} build {}".format(
@@ -103,40 +89,25 @@ class Paradox:
             else:
                 logger.warn("Unknown panel. Some features may not be supported")
 
-            reply = self.send_wait(msg.StartCommunication, args=dict(source_id=0x02), reply_expected=0x00)
+            logger.info("Starting communication")
+            reply = self.send_wait(self.panel.get_message('StartCommunication'), args=dict(source_id=0x02), reply_expected=0x00)
             
             if reply is None:
                 self.run = STATE_STOP
                 return False
 
-            password = self.encode_password(PASSWORD, reply.fields.value.product_id in ['SPECTRA_SP5500', 'SPECTRA_SP6000', 'SPECTRA_SP7000'])
-            
-            args = dict(product_id=reply.fields.value.product_id,
-                        firmware=reply.fields.value.firmware, 
-                        panel_id=reply.fields.value.panel_id,
-                        pc_password=password,
-                        user_code=0x00000000,
-                        not_used1=0x19,
-                        source_id=0x02
-                        ) 
+            self.panel = create_panel(self, reply.fields.value.product_id) # Now we know what panel it is. Let's
+            # recreate panel object.
 
-            reply = self.send_wait(msg.InitializeCommunication, args=args)
-
-            if reply is None:
-                self.run = STATE_STOP
-                return False
-
-            if reply.fields.value.po.command == 0x10:
-                logger.info("Authentication Success")
-            elif reply.fields.value.po.command == 0x07:
-                logger.error("Authentication Failed. Wrong Password?")
+            result = self.panel.initialize_communication(reply, PASSWORD)
+            if not result:
                 self.run = STATE_STOP
                 return False
             
             if SYNC_TIME:
                 self.sync_time()
 
-            self.update_labels()
+            self.panel.update_labels()
                     
             logger.info("Connection OK")
             self.loop_wait = False
@@ -154,7 +125,7 @@ class Paradox:
         now = datetime.datetime.now()
         args = dict(century=int(now.year / 100), year=int(now.year % 100), month=now.month, day=now.day, hour=now.hour,minute=now.minute)
 
-        reply = self.send_wait(msg.SetTimeDate, args, reply_expected=0x03)
+        reply = self.send_wait(self.panel.get_message('SetTimeDate'), args, reply_expected=0x03)
         if reply is None:
             logger.warn("Could not set panel time")
         
@@ -175,7 +146,7 @@ class Paradox:
             try:
                 for i in STATUS_REQUESTS:
                     args = dict(address=MEM_STATUS_BASE1 + i)
-                    reply = self.send_wait(msg.ReadEEPROM, args, reply_expected=0x05)
+                    reply = self.send_wait(self.panel.get_message('ReadEEPROM'), args, reply_expected=0x05)
                     if reply is not None:
                         self.handle_status(reply)
             except:
@@ -238,7 +209,7 @@ class Paradox:
                 logger.debug("PC <- A {}".format(binascii.hexlify(data)))
 
             try:
-                recv_message = msg.parse(data)
+                recv_message = self.panel.parse_message(data)
                 # No message
                 if recv_message is None:
                     continue
@@ -260,7 +231,7 @@ class Paradox:
                 message = None
                 retries += 1 #Ignore this try
                 continue
-            
+
             if recv_message.fields.value.po.command == 0x70:
                 self.handle_error(recv_message)
                 return None
@@ -273,73 +244,6 @@ class Paradox:
             return recv_message
 
         return None
-
-    def update_labels(self):
-        logger.info("Updating Labels from Panel")
-        
-        output_template = dict(
-            on=False,
-            pulse=False)
-
-        self.load_labels(self.zones, self.labels['zone'], MEM_ZONE_START, MEM_ZONE_END)
-        logger.info("Zones: {}".format(', '.join(self.labels['zone'])))
-        self.load_labels(self.outputs, self.labels['output'], MEM_OUTPUT_START, MEM_OUTPUT_END, template=output_template)
-        logger.info("Outputs: {}".format(', '.join(list(self.labels['output']))))
-        self.load_labels(self.partitions, self.labels['partition'], MEM_PARTITION_START, MEM_PARTITION_END)
-        logger.info("Partitions: {}".format(', '.join(list(self.labels['partition']))))
-        self.load_labels(self.users, self.labels['user'], MEM_USER_START, MEM_USER_END)
-        logger.info("Users: {}".format(', '.join(list(self.labels['user']))))
-        self.load_labels(self.buses, self.labels['bus'], MEM_BUS_START, MEM_BUS_END)
-        logger.info("Buses: {}".format(', '.join(list(self.labels['bus']))))
-        self.load_labels(self.repeaters, self.labels['repeater'], MEM_REPEATER_START, MEM_REPEATER_END)
-        logger.info("Repeaters: {}".format(', '.join(list(self.labels['repeater']))))
-        self.load_labels(self.keypads, self.labels['keypad'], MEM_KEYPAD_START, MEM_KEYPAD_END)
-        logger.info("Keypads: {}".format(', '.join(list(self.labels['keypad']))))
-        self.load_labels(self.sites, self.labels['site'], MEM_SITE_START, MEM_SITE_END)
-        logger.info("Sites: {}".format(', '.join(list(self.labels['site']))))
-        self.load_labels(self.sirens, self.labels['siren'], MEM_SIREN_START, MEM_SIREN_END)
-        logger.info("Sirens: {}".format(', '.join(list(self.labels['siren']))))
-
-        logger.debug("Labels updated")
-        
-    def load_labels(self,
-                    labelDictIndex,
-                    labelDictName,
-                    start,
-                    end,
-                    limit=range(1, 33),
-                    template=dict(label='')):
-        """Load labels from panel"""
-        i = 1
-        address = start
-
-        if len(limit) == 0:
-            return
-        
-        while address < end and i <= max(limit):
-            args = dict(address=address)
-            reply = self.send_wait(msg.ReadEEPROM, args, reply_expected=0x05)
-            
-            if reply is None:
-                logger.error("Could not fully load labels")
-                return
-           
-            # Avoid errors due to colision with events
-            if reply.fields.value.address != address:
-                continue
-
-            payload = reply.fields.value.data
-            label = payload[:16].strip().decode('latin').replace(" ","_")
-                
-            if label not in labelDictName and i in limit:
-                properties = template.copy()
-                properties['label'] = label
-                labelDictIndex[i] = properties
-
-                labelDictName[label] = i
-            i += 1
-
-            address += 16
 
     def control_zone(self, zone, command):
         logger.debug("Control Zone: {} - {}".format(zone, command))
@@ -369,7 +273,7 @@ class Paradox:
         accepted = False
         for e in zones_selected:
             args = dict(action=self.ZONES[command], argument=(e-1))
-            reply = self.send_wait(msg.PerformAction, args, reply_expected=0x04)
+            reply = self.send_wait(self.panel.get_message('PerformAction'), args, reply_expected=0x04)
             
             if reply is not None:
                 accepted = True
@@ -408,7 +312,7 @@ class Paradox:
 
         for e in partitions_selected:
             args = dict(action=PARTITION_ACTIONS[command], argument=(e-1))
-            reply = self.send_wait(msg.PerformAction, args, reply_expected=0x04)
+            reply = self.send_wait(self.panel.get_message('PerformAction'), args, reply_expected=0x04)
 
             if reply is not None:
                 accepted = True
@@ -447,18 +351,18 @@ class Paradox:
         for e in outputs:
             if command == 'pulse':
                 args = dict(action=PGM_COMMAND['on'], argument=(e-1))
-                reply = self.send_wait(msg.PerformAction, args, reply_expected=0x04)
+                reply = self.send_wait(self.panel.get_message('PerformAction'), args, reply_expected=0x04)
                 if reply is not None:
                     accepted = True
 
                 time.sleep(1)
                 args = dict(action=PGM_COMMAND['off'], argument=(e-1))
-                reply = self.send_wait(msg.PerformAction, args, reply_expected=0x04)
+                reply = self.send_wait(self.panel.get_message('PerformAction'), args, reply_expected=0x04)
                 if reply is not None:
                     accepted = True
             else:
                 args = dict(action=PGM_COMMAND[command], argument=(e-1))
-                reply = self.send_wait(msg.PerformAction, args, reply_expected=0x04)
+                reply = self.send_wait(self.panel.get_message('PerformAction'), args, reply_expected=0x04)
                 if reply is not None:
                     accepted = True
 
@@ -755,40 +659,15 @@ class Paradox:
             logger.info("Disconnecting from the Alarm Panel")
             self.run = STATE_STOP
             self.loop_wait = False
-            reply = self.send_wait(msg.CloseConnection, None, reply_expected=0x07)
+            reply = self.send_wait(self.panel.get_message('CloseConnection'), None, reply_expected=0x07)
             
     def pause(self):
         if self.run == STATE_RUN: 
             logger.info("Disconnecting from the Alarm Panel")
             self.run = STATE_PAUSE
             self.loop_wait = False
-            reply = self.send_wait(msg.CloseConnection, None, reply_expected=0x07)
+            reply = self.send_wait(self.panel.get_message('CloseConnection'), None, reply_expected=0x07)
             
     def resume(self):
         if self.run == STATE_PAUSE:
             self.connect()
-
-    def encode_password(self, password, is_sp=False):
-        res = [0] * 5
-        
-        try:
-            int_password = int(password)
-        except:
-            return password
-
-        i = len(password)
-        while i >= 0:
-            i2  = int(i / 2)
-            b = int(int_password % 10)
-            if b == 0 and is_sp:
-                b = 0x0a
-
-            int_password /= 10
-            if (i + 1) % 2 == 0:
-                res[i2] = b
-            else:
-                res[i2] = (((b << 4)) | res[i2]) & 0xff
-
-            i -= 1
-
-        return bytes(res[:2])

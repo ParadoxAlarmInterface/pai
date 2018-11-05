@@ -9,6 +9,7 @@ ip_message = Struct(
             "command" / Int8ub,
             "sub_command" / Default(Int8ub, 0x00),
             'unknown1' / Default(Int8ub, 0x0a),
+            'unknown2' / Default(Int8ub, 0x00),
             'encrypt' / Default(Int8ub, 0x00),
         ), b'\xee'),    
         "payload" / Aligned(16, GreedyBytes, b'\xee')
