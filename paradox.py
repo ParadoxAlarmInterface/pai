@@ -118,8 +118,7 @@ class Paradox:
                 self.run = STATE_STOP
                 return False
 
-            password = self.encode_password(PASSWORD, reply.fields.value.product_id in [
-                                            'SPECTRA_SP5500', 'SPECTRA_SP6000', 'SPECTRA_SP7000'])
+                password = self.encode_password(PASSWORD)
 
             args = dict(product_id=reply.fields.value.product_id,
                         firmware=reply.fields.value.firmware,
@@ -830,7 +829,7 @@ class Paradox:
         if self.run == STATE_PAUSE:
             self.connect()
 
-    def encode_password(self, password, is_sp=False):
+    def encode_password(self, password):
         res = [0] * 5
 
         try:
@@ -845,7 +844,8 @@ class Paradox:
         while i >= 0:
             i2 = int(i / 2)
             b = int(int_password % 10)
-            if b == 0 and is_sp:
+            
+            if b == 0:
                 b = 0x0a
 
             int_password /= 10
