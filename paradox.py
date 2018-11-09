@@ -353,7 +353,7 @@ class Paradox:
     def control_zone(self, zone, command):
         logger.debug("Control Zone: {} - {}".format(zone, command))
 
-        if command not in ZONE_COMMANDS:
+        if command not in ZONE_ACTIONS:
             return False
 
         zones_selected = []
@@ -377,7 +377,7 @@ class Paradox:
         # Apply state changes
         accepted = False
         for e in zones_selected:
-            args = dict(action=self.ZONES[command], argument=(e-1))
+            args = dict(action=ZONE_ACTIONS[command], argument=(e-1))
             reply = self.send_wait(msg.PerformAction, args, reply_expected=0x04)
             
             if reply is not None:
