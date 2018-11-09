@@ -240,14 +240,7 @@ class Paradox:
                   timeout: int = 5,
                   raw: bool = False,
                   reply_expected: Union[None, int] = None,
-                  wait: bool = True) -> Union[None, msg.ActionResponse,
-                                              msg.InitializeCommunicationResponse,
-                                              msg.StartCommunicationResponse,
-                                              msg.PanelStatusResponse,
-                                              msg.PerformActionResponse,
-                                              msg.ReadEEPROMResponse,
-                                              msg.InitiateCommunicationResponse,
-                                              msg.ActionResponse]:
+                  wait: bool = True) -> Union[None, type]:
 
         if message is None and message_type is not None:
             message = message_type.build(dict(fields=dict(value=args)))
