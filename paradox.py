@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
-
+from typing import Dict, List, Union, Tuple, Any
 import paradox_mgsp_messages as msg
 from serial_connection import *
 import logging
-import sys
 import time
 import json
 from threading import Lock
 import datetime
 import binascii
-
+from construct import Struct
 from config_defaults import *
 from config import *
 
@@ -38,7 +37,8 @@ MEM_SIREN_START = MEM_SITE_END
 MEM_SIREN_END = MEM_SIREN_START + 0x10 * 4
 
 PARTITION_ACTIONS = dict(arm=0x04, disarm=0x05, arm_stay=0x01, arm_sleep=0x03,
-                         arm_stay_stayd=0x06, arm_sleep_stayd=0x07, disarm_all=0x08)
+                         arm_stay_stayd=0x06, arm_sleep_stayd=0x07,
+                         disarm_all=0x08)
 ZONE_ACTIONS = dict(bypass=0x10, clear_bypass=0x10)
 PGM_ACTIONS = dict(on_override=0x30, off_override=0x31,
                    on=0x32, off=0x33, pulse=0)
@@ -52,11 +52,10 @@ STATE_ERROR = 3
 
 
 class Paradox:
-
     def __init__(self,
-                 connection,
-                 interface,
-                 retries=3):
+                 connection: object,
+                 interface: object,
+                 retries: int=3) -> None:
 
         self.connection = connection
         self.connection.timeout(0.5)
@@ -64,32 +63,38 @@ class Paradox:
         self.interface = interface
         self.reset()
 
-    def reset(self):
-
+    def reset(self) -> None:
         # Keep track of alarm state
-        self.repeaters = dict()
-        self.keypads = dict()
-        self.sirens = dict()
-        self.sites = dict()
-        self.users = dict()
-        self.buses = dict()
-        self.zones = dict()
-        self.partitions = dict()
-        self.outputs = dict()
-        self.system = dict(power=dict(label='power'), rf=dict(
-            label='rf'), troubles=dict(label='troubles'))
-        self.last_power_update = 0
-        self.run = STATE_STOP
-        self.loop_wait = True
+        self.repeaters: Dict[str, dict] = dict()
+        self.keypads: Dict[str, dict] = dict()
+        self.sirens: Dict[str, dict] = dict()
+        self.sites: Dict[str, dict] = dict()
+        self.users: Dict[str, dict] = dict()
+        self.buses: Dict[str, dict] = dict()
+        self.zones: Dict[str, dict] = dict()
+        self.partitions: Dict[str, dict] = dict()
+        self.outputs: Dict[str, dict] = dict()
+        self.system: Dict[str, dict] = dict(power=dict(label='power'),
+                                            rf=dict(label='rf'),
+                                            troubles=dict(label='troubles'))
+        self.last_power_update: float = 0
+        self.run: int = STATE_STOP
+        self.loop_wait: bool = True
 
-        self.type_to_element_dict = dict(repeater=self.repeaters, keypad=self.keypads, siren=self.sirens, user=self.users,
-                                         bus=self.buses, zone=self.zones, partition=self.partitions, output=self.outputs, system=self.system)
+        self.type_to_element_dict: Dict[str, dict] = dict(
+            repeater=self.repeaters, keypad=self.keypads, siren=self.sirens,
+            user=self.users, bus=self.buses, zone=self.zones,
+            partition=self.partitions, output=self.outputs, system=self.system)
 
-        self.labels = {'zone': {}, 'partition': {}, 'output': {}, 'user': {
-        }, 'bus': {}, 'repeater': {}, 'siren': {}, 'site': {}, 'keypad': {}}
-        self.status_cache = dict()
+        self.labels: Dict[str, dict] = dict(zone=dict(), partition=dict(),
+                                            output=dict(), user=dict(),
+                                            bus=dict(), repeater=dict(),
+                                            siren=dict(), site=dict(),
+                                            keypad=dict())
 
-    def connect(self):
+        self.status_cache: Dict[str, dict] = dict()
+
+    def connect(self) -> bool:
         logger.info("Connecting to panel")
 
         # Reset all states
@@ -151,28 +156,27 @@ class Paradox:
             self.loop_wait = False
 
             return True
-        except:
+        except Exception:
             logger.exception("Connect error")
 
         self.run = STATE_STOP
         return False
 
-    def sync_time(self):
+    def sync_time(self) -> None:
         logger.debug("Synchronizing panel time")
 
         now = datetime.datetime.now()
         args = dict(century=int(now.year / 100), year=int(now.year % 100),
-                    month=now.month, day=now.day, hour=now.hour, minute=now.minute)
+                    month=now.month, day=now.day, hour=now.hour,
+                    minute=now.minute)
 
         reply = self.send_wait(msg.SetTimeDate, args, reply_expected=0x03)
         if reply is None:
             logger.warn("Could not set panel time")
 
-        return
-
-    def loop(self):
+    def loop(self) -> None:
         logger.debug("Loop start")
-        args = {}
+        args: Dict[str, dict] = dict()
 
         while self.run != STATE_STOP:
 
@@ -193,20 +197,23 @@ class Paradox:
                         self.handle_status(reply)
                         logger.debug("Status handled in {} seconds".format(
                             time.time() - tstart))
-            except:
+            except Exception:
                 logger.exception("Loop")
 
             # Listen for events
             time_enlapsed = time.time() - tstart
-            logger.debug("Loop Debug: Remaining: {} Run: {} Loop_Wait: {}".format(
+            logger.debug("Loop: Remaining: {} Run: {} Wait: {}".format(
                 time_enlapsed, self.run, self.loop_wait))
-            while time_enlapsed < KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
-                logger.debug("Loop Debug: Remaining: {} Run: {} Loop_Wait: {} (IN)".format(
+            while time_enlapsed < KEEP_ALIVE_INTERVAL \
+                    and self.run == STATE_RUN and self.loop_wait:
+                logger.debug("Loop: Remaining: {} Run: {} Wait: {} (I)".format(
                     time_enlapsed, self.run, self.loop_wait))
                 self.send_wait(None, timeout=1)
                 time_enlapsed = time.time() - tstart
 
-    def send_wait_simple(self, message=None, timeout=5, wait=True):
+    def send_wait_simple(self, message: Union[None, bytes]=None,
+                         timeout: int=5,
+                         wait: bool=True) -> Union[None, bytes]:
         if message is not None:
             if LOGGING_DUMP_PACKETS:
                 logger.debug("PC -> A {}".format(binascii.hexlify(message)))
@@ -226,7 +233,22 @@ class Paradox:
 
         return data
 
-    def send_wait(self, message_type=None, args=None, message=None, retries=5, timeout=5, raw=False, reply_expected=None, wait=True):
+    def send_wait(self, message_type: Union[None, Struct]=None,
+                  args: Union[None, dict]=None,
+                  message: Union[None, bytes]=None,
+                  retries: int = 5,
+                  timeout: int = 5,
+                  raw: bool = False,
+                  reply_expected: Union[None, int] = None,
+                  wait: bool = True) -> Union[None, msg.ActionResponse,
+                                              msg.InitializeCommunicationResponse,
+                                              msg.StartCommunicationResponse,
+                                              msg.PanelStatusResponse,
+                                              msg.PerformActionResponse,
+                                              msg.ReadEEPROMResponse,
+                                              msg.InitiateCommunicationResponse,
+                                              msg.ActionResponse]:
+
         if message is None and message_type is not None:
             message = message_type.build(dict(fields=dict(value=args)))
 
@@ -264,7 +286,7 @@ class Paradox:
                 # No message
                 if recv_message is None:
                     continue
-            except:
+            except Exception:
                 logging.exception("Error parsing message")
                 continue
 
@@ -278,10 +300,9 @@ class Paradox:
                     self.handle_event(recv_message)
                     logger.debug("Event handled in {} seconds".format(
                         time.time() - tstart))
-                except:
+                except Exception:
                     logger.exception("Handle event")
-                # Clear the message to avoid resending it
-                #message = None
+
                 retries += 1  # Ignore this try
                 continue
 
@@ -289,7 +310,8 @@ class Paradox:
                 self.handle_error(recv_message)
                 return None
 
-            if reply_expected is not None and recv_message.fields.value.po.command != reply_expected:
+            if reply_expected is not None \
+                    and recv_message.fields.value.po.command != reply_expected:
                 logging.error("Got message {} but expected {}".format(
                     recv_message.fields.value.po.command, reply_expected))
                 logging.error("Detail:\n{}".format(recv_message))
@@ -299,54 +321,54 @@ class Paradox:
 
         return None
 
-    def update_labels(self):
+    def update_labels(self) -> None:
         logger.info("Updating Labels from Panel")
 
         output_template = dict(
             on=False,
             pulse=False)
 
-        self.load_labels(self.zones, self.labels[
-                         'zone'], MEM_ZONE_START, MEM_ZONE_END)
+        self.load_labels(self.zones, self.labels['zone'], MEM_ZONE_START, 
+                         MEM_ZONE_END)
         logger.info("Zones: {}".format(', '.join(self.labels['zone'])))
-        self.load_labels(self.outputs, self.labels[
-                         'output'], MEM_OUTPUT_START, MEM_OUTPUT_END, template=output_template)
+        self.load_labels(self.outputs, self.labels['output'], MEM_OUTPUT_START, 
+                         MEM_OUTPUT_END, template=output_template)
         logger.info("Outputs: {}".format(
             ', '.join(list(self.labels['output']))))
-        self.load_labels(self.partitions, self.labels[
-                         'partition'], MEM_PARTITION_START, MEM_PARTITION_END)
+        self.load_labels(self.partitions, self.labels['partition'], 
+                         MEM_PARTITION_START, MEM_PARTITION_END)
         logger.info("Partitions: {}".format(
             ', '.join(list(self.labels['partition']))))
-        self.load_labels(self.users, self.labels[
-                         'user'], MEM_USER_START, MEM_USER_END)
+        self.load_labels(self.users, self.labels['user'], MEM_USER_START, 
+                         MEM_USER_END)
         logger.info("Users: {}".format(', '.join(list(self.labels['user']))))
-        self.load_labels(self.buses, self.labels[
-                         'bus'], MEM_BUS_START, MEM_BUS_END)
+        self.load_labels(self.buses, self.labels['bus'], MEM_BUS_START, 
+                         MEM_BUS_END)
         logger.info("Buses: {}".format(', '.join(list(self.labels['bus']))))
-        self.load_labels(self.repeaters, self.labels[
-                         'repeater'], MEM_REPEATER_START, MEM_REPEATER_END)
+        self.load_labels(self.repeaters, self.labels['repeater'], 
+                         MEM_REPEATER_START, MEM_REPEATER_END)
         logger.info("Repeaters: {}".format(
             ', '.join(list(self.labels['repeater']))))
-        self.load_labels(self.keypads, self.labels[
-                         'keypad'], MEM_KEYPAD_START, MEM_KEYPAD_END)
+        self.load_labels(self.keypads, self.labels['keypad'], MEM_KEYPAD_START, 
+                         MEM_KEYPAD_END)
         logger.info("Keypads: {}".format(
             ', '.join(list(self.labels['keypad']))))
-        self.load_labels(self.sites, self.labels[
-                         'site'], MEM_SITE_START, MEM_SITE_END)
+        self.load_labels(self.sites, self.labels['site'], MEM_SITE_START, 
+                         MEM_SITE_END)
         logger.info("Sites: {}".format(', '.join(list(self.labels['site']))))
-        self.load_labels(self.sirens, self.labels[
-                         'siren'], MEM_SIREN_START, MEM_SIREN_END)
+        self.load_labels(self.sirens, self.labels['siren'], MEM_SIREN_START, 
+                         MEM_SIREN_END)
         logger.info("Sirens: {}".format(', '.join(list(self.labels['siren']))))
 
         logger.debug("Labels updated")
 
     def load_labels(self,
-                    labelDictIndex,
-                    labelDictName,
-                    start,
-                    end,
-                    limit=range(1, 33),
-                    template=dict(label='')):
+                    labelDictIndex: Dict[int, dict],
+                    labelDictName: Dict[str, int],
+                    start: int,
+                    end: int,
+                    limit: range=range(1, 33),
+                    template: Dict[str, str]=dict(label='')) -> None:
         """Load labels from panel"""
         i = 1
         address = start
@@ -380,13 +402,14 @@ class Paradox:
 
             address += 16
 
-    def control_zone(self, zone, command):
+    def control_zone(self, zone: str, command: str) -> bool:
         logger.debug("Control Zone: {} - {}".format(zone, command))
 
         if command not in ZONE_COMMANDS:
             return False
 
-        zones_selected = []
+        zones_selected: list = list()
+
         # if all or 0, select all
         if zone == 'all' or zone == '0':
             zones_selected = list(self.zones)
@@ -407,7 +430,7 @@ class Paradox:
         # Apply state changes
         accepted = False
         for e in zones_selected:
-            args = dict(action=self.ZONES[command], argument=(e - 1))
+            args: dict = dict(action=self.zones[command], argument=(e - 1))
             reply = self.send_wait(
                 msg.PerformAction, args, reply_expected=0x04)
 
@@ -418,13 +441,13 @@ class Paradox:
         self.loop_wait = False
         return accepted
 
-    def control_partition(self, partition, command):
+    def control_partition(self, partition: str, command: str) -> bool:
         logger.debug("Control Partition: {} - {}".format(partition, command))
 
         if command not in PARTITION_ACTIONS:
             return False
 
-        partitions_selected = []
+        partitions_selected: list = list()
 
         # if all or 0, select all
         if partition == 'all' or partition == '0':
@@ -459,13 +482,13 @@ class Paradox:
 
         return accepted
 
-    def control_output(self, output, command):
+    def control_output(self, output: str, command: str) -> bool:
         logger.debug("Control Partition: {} - {}".format(output, command))
 
         if command not in PGM_ACTIONS:
             return False
 
-        outputs = []
+        outputs: list = list()
         # if all or 0, select all
         if output == 'all' or output == '0':
             outputs = list(range(1, len(self.outputs)))
@@ -487,7 +510,7 @@ class Paradox:
 
         for e in outputs:
             if command == 'pulse':
-                args = dict(action=PGM_COMMAND['on'], argument=(e - 1))
+                args: dict = dict(action=PGM_COMMAND['on'], argument=(e - 1))
                 reply = self.send_wait(
                     msg.PerformAction, args, reply_expected=0x04)
                 if reply is not None:
@@ -511,12 +534,14 @@ class Paradox:
 
         return accepted
 
-    def handle_event(self, message):
-        """Process Live Event Message and dispatch it to the interface module"""
+    def handle_event(self, message: msg.LiveEvent) -> None:
+        """
+        Process Live Event Message and dispatch it to the interface module
+        """
         event = message.fields.value.event
         logger.debug("Handle Event: {}".format(event))
 
-        new_event = self.process_event(event)
+        new_event: Dict[str, dict] = self.process_event(event)
 
         self.generate_event_notifications(new_event)
 
@@ -524,7 +549,7 @@ class Paradox:
         if self.interface is not None:
             self.interface.event(raw=new_event)
 
-    def generate_event_notifications(self, event):
+    def generate_event_notifications(self, event: Dict[str, dict]) -> None:
         major_code = event['major'][0]
         minor_code = event['minor'][0]
 
@@ -574,7 +599,9 @@ class Paradox:
         # Zone Tamper Restore
         # Non Medical Alarm
         if major_code in [24, 36, 37, 38, 39, 40, 42, 43, 57] or \
-                (major_code in [44, 45] and minor_code in [1, 2, 3, 4, 5, 6, 7]):
+                (major_code in [44, 45] and
+                 minor_code in [1, 2, 3, 4, 5, 6, 7]):
+
             detail = event['minor'][1]
 
             self.interface.notify("Paradox", "{} {}".format(
@@ -597,9 +624,12 @@ class Paradox:
                     "Paradox", event['minor'][1], logging.INFO)
 
         # Special Alarm, New Trouble and Trouble Restore
-        elif major_code in [40, 44, 45] and minor_code in [1, 2, 3, 4, 5, 6, 7]:
+        elif major_code in [40, 44, 45] and \
+                minor_code in [1, 2, 3, 4, 5, 6, 7]:
+
             self.interface.notify("Paradox", "{}: {}".format(
                 event['major'][1], event['minor'][1]), logging.CRITICAL)
+
         # Signal Weak
         elif major_code in [18, 19, 20, 21]:
             if event['minor'][0] >= 0 and event['minor'][0] < len(self.zones):
@@ -614,7 +644,7 @@ class Paradox:
             self.interface.notify("Paradox", "{}: {}".format(
                 event['major'][1], event['minor'][1]), logging.INFO)
 
-    def process_event(self, event):
+    def process_event(self, event: Dict[str, dict]) -> Dict[str, Any]:
 
         major = event['major'][0]
         minor = event['minor'][0]
@@ -668,24 +698,29 @@ class Paradox:
         elif major in (53, 56):
             change = dict(tamper_trouble=(major == 55))
 
-        new_event = {'major': event['major'], 'minor': event[
-            'minor'], 'type': event['type']}
+        new_event: Dict[str, Any] = dict(major=event['major'],
+                                         minor=event['minor'],
+                                         type=event['type'])
 
         if change is not None:
-            if event['type'] == 'Zone' and len(self.zones) > 0 and minor < len(self.zones):
-                self.update_properties('zone',  minor, change)
+            if event['type'] == 'Zone' and len(self.zones) > 0\
+                    and minor < len(self.zones):
+
+                self.update_properties('zone', minor, change)
                 new_event['minor'] = (minor, self.zones[minor]['label'])
             elif event['type'] == 'Partition' and len(self.partitions) > 0:
                 pass
-                #self.update_properties('partition', self.partitions, minor, change)
-                #new_event['minor'] = (minor, self.partitions[minor]['label'])
-            elif event['type'] == 'Output' and len(self.outputs) and minor < len(self.outputs):
-                self.update_properties('output',  minor, change)
+            elif event['type'] == 'Output' and len(self.outputs)\
+                    and minor < len(self.outputs):
+                self.update_properties('output', minor, change)
                 new_event['minor'] = (minor, self.outputs[minor]['label'])
 
         return new_event
 
-    def update_properties(self, element_type, key, change, force_publish=False):
+    def update_properties(self, element_type: str,
+                          key: str,
+                          change: Dict[str, Any],
+                          force_publish: bool=False) -> None:
 
         elements = self.type_to_element_dict[element_type]
 
@@ -714,35 +749,42 @@ class Paradox:
             if property_name in elements[key]:
                 old = elements[key][property_name]
 
-                if old != change[property_name] or force_publish or PUSH_UPDATE_WITHOUT_CHANGE:
-                    logger.debug("Change {}/{}/{} from {} to {}".format(element_type,
-                                                                        elements[key]['label'], property_name, old, property_value))
+                if old != change[property_name] or force_publish \
+                        or PUSH_UPDATE_WITHOUT_CHANGE:
+
+                    logger.debug("Change {}/{}/{} from {} to {}".format(
+                        element_type, elements[key]['label'], property_name,
+                        old, property_value))
                     elements[key][property_name] = property_value
                     self.interface.change(element_type, elements[key]['label'],
-                                          property_name, property_value, initial=False)
+                                          property_name, property_value,
+                                          initial=False)
 
                     # Trigger notifications for Partitions changes
                     # Ignore some changes as defined in the configuration
-                    if (element_type == "partition" and key in PARTITIONS and property_name not in PARTITIONS_CHANGE_NOTIFICATION_IGNORE) \
+                    if (element_type == "partition" and key in PARTITIONS
+                            and property_name not in PARTITIONS_CHANGE_NOTIFICATION_IGNORE) \
                             or ('trouble' in property_name):
                         self.interface.notify("Paradox", "{} {} {}".format(
-                            elements[key]['label'], property_name, property_value), logging.INFO)
+                            elements[key]['label'], property_name,
+                            property_value), logging.INFO)
 
             else:
                 elements[key][property_name] = property_value  # Initial value
                 surpress = 'trouble' not in property_name
 
                 self.interface.change(element_type, elements[key]['label'],
-                                      property_name, property_value, initial=surpress)
+                                      property_name, property_value,
+                                      initial=surpress)
 
-    def process_status_bulk(self, message):
+    def process_status_bulk(self, message: msg.PanelStatusResponse):
 
         for k in message.fields.value:
-            element_type = k.split('_')[0]
+            element_type: str = k.split('_')[0]
 
             if element_type == 'pgm':
                 element_type = 'output'
-                limit_list = OUTPUTS
+                limit_list: List[int] = OUTPUTS
             elif element_type == 'partition':
                 limit_list = PARTITIONS
             elif element_type == 'zone':
@@ -751,14 +793,15 @@ class Paradox:
                 limit_list = BUSES
             elif element_type == 'wireless-repeater':
                 element_type = 'repeater'
-                limit_list == REPEATERS
+                limit_list = REPEATERS
             elif element_type == 'wireless-keypad':
                 element_type = 'keypad'
-                limit_list == KEYPADS
+                limit_list = KEYPADS
             else:
                 continue
 
-            if k in self.status_cache and self.status_cache[k] == message.fields.value[k]:
+            if k in self.status_cache\
+                    and self.status_cache[k] == message.fields.value[k]:
                 continue
 
             self.status_cache[k] = message.fields.value[k]
@@ -776,14 +819,15 @@ class Paradox:
                         self.update_properties(
                             element_type, i, {prop_name: status})
 
-    def handle_status(self, message):
+    def handle_status(self, message: msg.PanelStatusResponse) -> None:
         """Handle MessageStatus"""
 
         if message.fields.value.status_request == 0:
             if time.time() - self.last_power_update >= POWER_UPDATE_INTERVAL:
                 self.last_power_update = time.time()
-                self.update_properties('system', 'power', dict(vdc=round(
-                    message.fields.value.vdc, 2)), force_publish=PUSH_POWER_UPDATE_WITHOUT_CHANGE)
+                self.update_properties('system', 'power',
+                                       dict(vdc=round(message.fields.value.vdc, 2)),
+                                       force_publish=PUSH_POWER_UPDATE_WITHOUT_CHANGE)
                 self.update_properties('system', 'power', dict(battery=round(
                     message.fields.value.battery, 2)), force_publish=PUSH_POWER_UPDATE_WITHOUT_CHANGE)
                 self.update_properties('system', 'power', dict(dc=round(
@@ -803,13 +847,13 @@ class Paradox:
         elif message.fields.value.status_request >= 1 and message.fields.value.status_request <= 5:
             self.process_status_bulk(message)
 
-    def handle_error(self, message):
+    def handle_error(self, message: msg.ErrorMessage) -> None:
         """Handle ErrorMessage"""
         logger.warn("Got ERROR Message: {}".format(
             message.fields.value.message))
         self.run = STATE_STOP
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         if self.run == STATE_RUN:
             logger.info("Disconnecting from the Alarm Panel")
             self.run = STATE_STOP
@@ -817,7 +861,7 @@ class Paradox:
             reply = self.send_wait(msg.CloseConnection,
                                    None, reply_expected=0x07)
 
-    def pause(self):
+    def pause(self) -> None:
         if self.run == STATE_RUN:
             logger.info("Disconnecting from the Alarm Panel")
             self.run = STATE_PAUSE
@@ -825,16 +869,16 @@ class Paradox:
             reply = self.send_wait(msg.CloseConnection,
                                    None, reply_expected=0x07)
 
-    def resume(self):
+    def resume(self) -> None:
         if self.run == STATE_PAUSE:
             self.connect()
 
-    def encode_password(self, password):
+    def encode_password(self, password: bytes) -> bytes:
         res = [0] * 5
 
         try:
             int_password = int(password)
-        except:
+        except Exception:
             if password is None:
                 return b'\x00\x00'
             else:
@@ -844,11 +888,11 @@ class Paradox:
         while i >= 0:
             i2 = int(i / 2)
             b = int(int_password % 10)
-            
+
             if b == 0:
                 b = 0x0a
 
-            int_password /= 10
+            int_password = int(int_password / 10)
             if (i + 1) % 2 == 0:
                 res[i2] = b
             else:
