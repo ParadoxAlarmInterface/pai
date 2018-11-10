@@ -2,7 +2,7 @@
 
 # DO NOT CHANGE THESE IMPORTS
 import logging
-from config.default import *
+from config.defaults import *
 
 # You override values below this line
 
