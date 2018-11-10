@@ -146,8 +146,8 @@ class MQTTInterface(Thread):
         # Process a Partition Command
         elif topics[2] == cfg.MQTT_PARTITION_TOPIC:
 
-            if command in cfg.PARTITION_HOMEBRIDGE_TARGETS and cfg.MQTT_HOMEBRIDGE_ENABLE:
-                command = cfg.PARTITION_HOMEBRIDGE_TARGETS[command]
+            if command in PARTITION_HOMEBRIDGE_TARGETS and cfg.MQTT_HOMEBRIDGE_ENABLE:
+                command = PARTITION_HOMEBRIDGE_TARGETS[command]
 
             if command.startswith('code_toggle-'):
                 tokens = command.split('-')
@@ -216,7 +216,7 @@ class MQTTInterface(Thread):
         logger.info("MQTT Broker Connected")
 
         self.connected = True
-
+        logger.debug("Subscribing to topics in {}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC))
         self.mqtt.subscribe(
             "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
                               cfg.MQTT_CONTROL_TOPIC, "#"))
@@ -238,7 +238,6 @@ class MQTTInterface(Thread):
 
     def handle_event(self, raw):
         """Handle Live Event"""
-        pass
 
         if cfg.MQTT_PUBLISH_RAW_EVENTS:
             self.publish('{}/{}'.format(cfg.MQTT_BASE_TOPIC,
