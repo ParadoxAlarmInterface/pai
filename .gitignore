@@ -1,4 +1,5 @@
 config.py
+config/user.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

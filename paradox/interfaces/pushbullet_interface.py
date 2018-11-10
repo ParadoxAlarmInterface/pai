@@ -16,10 +16,10 @@ import logging
 import datetime
 import json
 
-from utils import SortableTuple
+from paradox.lib.utils import SortableTuple
 
-from config_defaults import *
-from config import *
+from config import user as cfg
+
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -28,7 +28,7 @@ class PushBulletWSClient(WebSocketBaseClient):
     def init(self):
         """ Initializes the PB WS Client"""
 
-        self.pb = Pushbullet(PUSHBULLET_KEY, PUSHBULLET_SECRET)
+        self.pb = Pushbullet(cfg.PUSHBULLET_KEY, cfg.PUSHBULLET_SECRET)
         self.manager = WebSocketManager()
         self.alarm = None
 
