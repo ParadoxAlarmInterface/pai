@@ -34,9 +34,11 @@ Tested in the following environment:
 git clone https://github.com/jpbarraca/pai.git
 ```
 
-2.  Copy config_defaults.py to config.py and edit it to match your setup
+2.  Copy user.py.sample to user.py and edit it to match your setup
 ```
-cp config_sample.py config.py
+cd config
+cp user.py.sample user.py
+cd ..
 ```
 
 3.  Install the python requirements
@@ -46,7 +48,7 @@ pip3 install -r requirements.txt
 ```
 3.  Run the script: 
 ```
-python3 main.py
+python3 run.py
 ```
 
 

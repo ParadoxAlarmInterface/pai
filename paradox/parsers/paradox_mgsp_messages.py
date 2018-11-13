@@ -3,12 +3,12 @@
 from construct import *
 import logging
 
-from paradox_message_adapters import *
+from paradox.parsers.paradox_message_adapters import *
 
-from config_defaults import *
-from config import *
+from config import user as cfg
 
 logger = logging.getLogger('Paradox_Messages').getChild(__name__)
+
 
 def calculate_checksum(message):
     r = 0
@@ -22,7 +22,7 @@ def parse(message):
     try:
         if message is None or len(message) == 0:
             return None
-        
+
         if message[0] == 0x70:
             return CloseConnection.parse(message)
         elif message[0] == 0x72 and message[1] == 0:
@@ -55,15 +55,15 @@ def parse(message):
             return PanelStatusResponse[message[3]].parse(message)
         elif message[0] >> 4 == 0x05 and message[2] < 0x80:
             return ReadEEPROMResponse.parse(message)
-        elif message[0] == 0x60 and message[2] < 0x80:
-            return WriteEEPROM.parse(message)
-        elif message[0] >> 4 == 0x06 and message[2] < 0x80:
-            return WriteEEPROMResponse.parse(message)
+#        elif message[0] == 0x60 and message[2] < 0x80:
+#            return WriteEEPROM.parse(message)
+#        elif message[0] >> 4 == 0x06 and message[2] < 0x80:
+#            return WriteEEPROMResponse.parse(message)
         elif message[0] >> 4 == 0x0e:
             return LiveEvent.parse(message)
         else:
             logger.warn("Unknown message")
-    except:
+    except Exception:
         logger.exception("Parsing message")
 
     s = 'PARSE: '
@@ -71,32 +71,32 @@ def parse(message):
         s += "{:02x} ".format(c)
 
     logger.debug(s)
-    
+
     return None
 
 
 InitiateCommunication = Struct("fields" / RawCopy(
     Struct("po" / BitStruct(
-                "command" / Const(7, Nibble), 
-                "reserved0" / Const(2, Nibble)), 
-            "reserved1" / Padding(35))), 
-    "checksum" / Checksum(Bytes(1), 
+                "command" / Const(7, Nibble),
+                "reserved0" / Const(2, Nibble)),
+            "reserved1" / Padding(35))),
+    "checksum" / Checksum(Bytes(1),
         lambda data: calculate_checksum(data), this.fields.data))
 
 InitiateCommunicationResponse = Struct("fields" / RawCopy(
     Struct(
         "po" / BitStruct(
-            "command" / Const(7, Nibble), 
+            "command" / Const(7, Nibble),
             "message_center" / Nibble
-        ), 
-        "new_protocol" / Const(0xFF, Int8ub), 
-        "protocol_id" / Int8ub, 
+        ),
+        "new_protocol" / Const(0xFF, Int8ub),
+        "protocol_id" / Int8ub,
         "protocol" / Struct(
-            "version" / Int8ub, 
-            "revision" / Int8ub, 
+            "version" / Int8ub,
+            "revision" / Int8ub,
             "build" / Int8ub
         ),
-        "family_id" / Int8ub, 
+        "family_id" / Int8ub,
         "product_id" / Enum(Int8ub,
             DIGIPLEX_v13=0,
             DIGIPLEX_v2=1,
@@ -104,33 +104,33 @@ InitiateCommunicationResponse = Struct("fields" / RawCopy(
             DIGIPLEX_EVO_48=3,
             DIGIPLEX_EVO_96=4,
             DIGIPLEX_EVO_192=5,
-            MAGELLAN_MG5050=38), 
+            MAGELLAN_MG5050=38),
         "talker" / Enum(Int8ub,
             BOOT_LOADER=0,
             CONTROLLER_APPLICATION=1,
-            MODULE_APPLICATION=2), 
+            MODULE_APPLICATION=2),
         "application" / Struct(
-            "version" / Int8ub, 
-            "revision" / Int8ub, 
+            "version" / Int8ub,
+            "revision" / Int8ub,
             "build" / Int8ub),
-        "serial_number" / Bytes(4), 
+        "serial_number" / Bytes(4),
         "hardware" / Struct(
             "version" / Int8ub,
-            "revision" / Int8ub), 
+            "revision" / Int8ub),
         "bootloader" / Struct(
             "version" / Int8ub,
             "revision" / Int8ub,
             "build" / Int8ub,
             "day" / Int8ub,
             "month" / Int8ub,
-            "year" / Int8ub), 
-        "processor_id" / Int8ub, 
+            "year" / Int8ub),
+        "processor_id" / Int8ub,
         "encryption_id" / Int8ub,
-        "reserved0" / Bytes(2), 
+        "reserved0" / Bytes(2),
         "label" / Bytes(8))),
 
     "checksum" / Checksum(
-        Bytes(1), 
+        Bytes(1),
         lambda data: calculate_checksum(data), this.fields.data))
 
 InitializeCommunication = Struct("fields" / RawCopy(
@@ -148,12 +148,12 @@ InitializeCommunication = Struct("fields" / RawCopy(
             SPECTRA_SP6000=22,
             SPECTRA_SP7000=23,
             MAGELLAN_MG5000=64,
-            MAGELLAN_MG5050=65), 
+            MAGELLAN_MG5050=65),
         "firmware" / Struct(
-            "version" / Int8ub, 
-            "revision" / Int8ub, 
+            "version" / Int8ub,
+            "revision" / Int8ub,
             "build" / Int8ub),
-        "panel_id" / Int16ub, 
+        "panel_id" / Int16ub,
         "pc_password" / Default(Bytes(2), b'0000'),
         "not_used1" / Bytes(1),
         "source_method" / Default(Enum(Int8ub,
@@ -185,7 +185,7 @@ InitializeCommunicationResponse = Struct("fields" / RawCopy(
         Struct(
             "po" / Struct("command" / Const(0x10, Int8ub)),
             "neware_connection" / Int16ub,
-            "user_id_low" / Int8ub, 
+            "user_id_low" / Int8ub,
             "partition_rights" / BitStruct(
                 "not_used" / BitsInteger(6),
                 "partition_2" / Flag,
@@ -223,9 +223,9 @@ StartCommunicationResponse = Struct("fields" / RawCopy(
     Struct(
         "po" / BitStruct("command" / Const(0, Nibble),
             "status" / Struct(
-                "reserved" / Flag, 
+                "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag, 
+                "Windload_connected" / Flag,
                 "NeWare_connected" / Flag)
             ),
         "not_used0" / Bytes(3),
@@ -240,12 +240,12 @@ StartCommunicationResponse = Struct("fields" / RawCopy(
             SPECTRA_SP6000=22,
             SPECTRA_SP7000=23,
             MAGELLAN_MG5000=64,
-            MAGELLAN_MG5050=65), 
+            MAGELLAN_MG5050=65),
         "firmware" / Struct(
-            "version" / Int8ub, 
-            "revision" / Int8ub, 
+            "version" / Int8ub,
+            "revision" / Int8ub,
             "build" / Int8ub),
-        "panel_id" / Int16ub, 
+        "panel_id" / Int16ub,
         "not_used1" / Bytes(5),
         "transceiver" / Struct(
             "firmware_build" / Int8ub,
@@ -261,7 +261,7 @@ StartCommunicationResponse = Struct("fields" / RawCopy(
             "hardware_revision" / Int8ub,
             ),
         "not_used2" / Bytes(14),
-        )), 
+        )),
     "checksum" / Checksum(
             Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
@@ -292,14 +292,14 @@ PanelStatus = Struct("fields" / RawCopy(
     "checksum" / Checksum(
         Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
-PanelStatusResponse = [ 
+PanelStatusResponse = [
     Struct("fields" / RawCopy(Struct(
         "po" / BitStruct(
-            "command" / Const(5, Nibble), 
+            "command" / Const(5, Nibble),
             "status" / Struct(
-                "reserved" / Flag, 
+                "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag, 
+                "Windload_connected" / Flag,
                 "NeWare_connected" / Flag)
         ),
         "not_used0" / Padding(1),
@@ -340,7 +340,7 @@ PanelStatusResponse = [
         "vdc" / ExprAdapter(Byte, obj_ * (20.3 - 1.4) / 255.0 + 1.4, 0),
         "dc" / ExprAdapter(Byte, obj_ * 22.8 / 255.0, 0),
         "battery" / ExprAdapter(Byte, obj_ * 22.8 / 255.0, 0),
-        "rf_noise_floor" / Int8ub, 
+        "rf_noise_floor" / Int8ub,
         "zone_open" / StatusAdapter( Bytes(4) ),
         "zone_tamper" / StatusAdapter( Bytes(4) ),
         "pgm_tamper" / StatusAdapter( Bytes(2) ),
@@ -352,11 +352,11 @@ PanelStatusResponse = [
         ,
         Struct("fields" / RawCopy(Struct(
             "po" / BitStruct(
-                "command" / Const(5, Nibble), 
+                "command" / Const(5, Nibble),
                 "status" / Struct(
-                    "reserved" / Flag, 
+                    "reserved" / Flag,
                     "alarm_reporting_pending" / Flag,
-                    "Windload_connected" / Flag, 
+                    "Windload_connected" / Flag,
                     "NeWare_connected" / Flag)),
             "not_used0" / Padding(1),
             "validation" / Const(0x80, Int8ub),
@@ -378,11 +378,11 @@ PanelStatusResponse = [
         ,
         Struct("fields" / RawCopy(Struct(
             "po" / BitStruct(
-                "command" / Const(5, Nibble), 
+                "command" / Const(5, Nibble),
                 "status" / Struct(
-                    "reserved" / Flag, 
+                    "reserved" / Flag,
                     "alarm_reporting_pending" / Flag,
-                    "Windload_connected" / Flag, 
+                    "Windload_connected" / Flag,
                     "NeWare_connected" / Flag)),
             "not_used0" / Padding(1),
             "validation" / Const(0x80, Int8ub),
@@ -393,11 +393,11 @@ PanelStatusResponse = [
         ,
         Struct("fields" / RawCopy(Struct(
             "po" / BitStruct(
-                "command" / Const(5, Nibble), 
+                "command" / Const(5, Nibble),
                 "status" / Struct(
-                    "reserved" / Flag, 
+                    "reserved" / Flag,
                     "alarm_reporting_pending" / Flag,
-                    "Windload_connected" / Flag, 
+                    "Windload_connected" / Flag,
                     "NeWare_connected" / Flag)),
             "not_used0" / Padding(1),
             "validation" / Const(0x80, Int8ub),
@@ -408,11 +408,11 @@ PanelStatusResponse = [
         ,
         Struct("fields" / RawCopy(Struct(
             "po" / BitStruct(
-                "command" / Const(5, Nibble), 
+                "command" / Const(5, Nibble),
                 "status" / Struct(
-                    "reserved" / Flag, 
+                    "reserved" / Flag,
                     "alarm_reporting_pending" / Flag,
-                    "Windload_connected" / Flag, 
+                    "Windload_connected" / Flag,
                     "NeWare_connected" / Flag)),
             "not_used0" / Padding(1),
             "validation" / Const(0x80, Int8ub),
@@ -426,11 +426,11 @@ PanelStatusResponse = [
         ,
         Struct("fields" / RawCopy(Struct(
             "po" / BitStruct(
-                "command" / Const(5, Nibble), 
+                "command" / Const(5, Nibble),
                 "status" / Struct(
-                    "reserved" / Flag, 
+                    "reserved" / Flag,
                     "alarm_reporting_pending" / Flag,
-                    "Windload_connected" / Flag, 
+                    "Windload_connected" / Flag,
                     "NeWare_connected" / Flag)),
             "not_used0" / Padding(1),
             "validation" / Const(0x80, Int8ub),
@@ -444,11 +444,11 @@ PanelStatusResponse = [
 LiveEvent = Struct("fields" / RawCopy(
     Struct(
         "po" / BitStruct(
-            "command" / Const(0xE, Nibble), 
+            "command" / Const(0xE, Nibble),
             "status" / Struct(
-                "reserved" / Flag, 
+                "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag, 
+                "Windload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "time" / DateAdapter(Bytes(6)),
         "event" / EventAdapter(Bytes(2)),
@@ -500,24 +500,24 @@ Action = Struct("fields" / RawCopy(
             VDMP3_GSM=11), 1),
         "user_high" / Default(Int8ub, 0),
         "user_low" / Default(Int8ub, 0),
-    )), 
+    )),
     "checksum" / Checksum(
     Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 ActionResponse = Struct("fields" / RawCopy(
     Struct(
         "po" / BitStruct(
-            "command" / Const(0x4, Nibble), 
+            "command" / Const(0x4, Nibble),
             "status" / Struct(
-                "reserved" / Flag, 
+                "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag, 
+                "Windload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "not_used0" / Default(Int8ub, 0),
         "not_used1" / Default(Int8ub, 0),
         "action" / Int8ub,
-    )), 
-    "reserved0" / Padding(32), 
+    )),
+    "reserved0" / Padding(32),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 CloseConnection = Struct("fields" / RawCopy(
@@ -528,7 +528,7 @@ CloseConnection = Struct("fields" / RawCopy(
         "not_used0" / Const(0, Int8ub),
         "validation_byte" / Default(Int8ub, 0),
         "not_used1" / Padding(29),
-        "message" / Default(Enum(Int8ub, 
+        "message" / Default(Enum(Int8ub,
             authentication_failed=0x12,
             panel_will_disconnect=0x05), 0x05),
         "source_id" / Default(Enum(Int8ub,
@@ -555,9 +555,9 @@ ErrorMessage = Struct("fields" / RawCopy(
       "po" / BitStruct(
           "command" / Const(0x7, Nibble),
           "status" / Struct(
-            "reserved" / Flag, 
+            "reserved" / Flag,
             "alarm_reporting_pending" / Flag,
-            "Windload_connected" / Flag, 
+            "Windload_connected" / Flag,
             "NeWare_connected" / Flag)),
       "not_used0" / Default(Int8ub, 0),
       "message" / Enum(Int8ub,
@@ -613,9 +613,9 @@ ReadEEPROMResponse = Struct("fields" / RawCopy(
         "po" / BitStruct(
           "command" / Const(0x5, Nibble),
           "status" / Struct(
-            "reserved" / Flag, 
+            "reserved" / Flag,
             "alarm_reporting_pending" / Flag,
-            "Windload_connected" / Flag, 
+            "Windload_connected" / Flag,
             "NeWare_connected" / Flag)),
 	"not_used0" / Padding(1),
         "address" / Default(Int16ub, 0),
@@ -659,9 +659,9 @@ SetTimeDateResponse = Struct("fields" / RawCopy(
         "po" / BitStruct(
           "command" / Const(0x3, Nibble),
           "status" / Struct(
-            "reserved" / Flag, 
+            "reserved" / Flag,
             "alarm_reporting_pending" / Flag,
-            "Windload_connected" / Flag, 
+            "Windload_connected" / Flag,
             "NeWare_connected" / Flag)),
          "not_used0" / Padding(35),
         )),
@@ -720,9 +720,9 @@ PerformActionResponse = Struct("fields" / RawCopy(
         "po" / BitStruct(
           "command" / Const(0x4, Nibble),
           "status" / Struct(
-            "reserved" / Flag, 
+            "reserved" / Flag,
             "alarm_reporting_pending" / Flag,
-            "Windload_connected" / Flag, 
+            "Windload_connected" / Flag,
             "NeWare_connected" / Flag)),
 	"not_used0" / Padding(1),
         "action" / Enum(Int8ub,
@@ -747,11 +747,3 @@ PerformActionResponse = Struct("fields" / RawCopy(
         )),
         "checksum" / Checksum(
             Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-
-
-
-
-
-
-
-
