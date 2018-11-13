@@ -9,8 +9,9 @@ from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum
 logger = logging.getLogger('PAI').getChild(__name__)
 
 class Panel:
-  def __init__(self, core):
+  def __init__(self, core, product_id):
     self.core = core
+    self.product_id = product_id
 
   def parse_message(self, message):
     if message is None or len(message) == 0:

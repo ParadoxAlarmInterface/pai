@@ -10,9 +10,13 @@ from .adapters import *
 from ..panel import Panel as PanelBase
 from ..common import CommunicationSourceIDEnum, ProductIdEnum, calculate_checksum
 
-MEM_ZONE_START = 0x00430
-MEM_ZONE_END = MEM_ZONE_START + 0x10 * 192
-MEM_OUTPUT_START = MEM_ZONE_END
+MEM_ZONE_48_START = 0x00430
+MEM_ZONE_48_END = MEM_ZONE_48_START + 0x10 * 48
+MEM_ZONE_96_START = MEM_ZONE_48_END
+MEM_ZONE_96_END = MEM_ZONE_48_END + 0x10 * 48
+MEM_ZONE_192_START = 0x62F7
+MEM_ZONE_192_END = MEM_ZONE_192_START + 0x10 * 96
+MEM_OUTPUT_START = MEM_ZONE_96_END
 MEM_OUTPUT_END = MEM_OUTPUT_START + 0x10 * 16
 MEM_PARTITION_START = MEM_OUTPUT_END
 MEM_PARTITION_END = MEM_PARTITION_START + 0x10 * 2
@@ -49,7 +53,13 @@ class Panel(PanelBase):
       on=False,
       pulse=False)
 
-    self.load_labels(self.core.zones, self.core.labels['zone'], MEM_ZONE_START, MEM_ZONE_END)
+    eeprom_zone_ranges = [range(MEM_ZONE_48_START, MEM_ZONE_48_END, 0x10)]
+    if self.product_id in ['DIGIPLEX_EVO_96', 'DIGIPLEX_EVO_192']:
+      eeprom_zone_ranges.append(range(MEM_ZONE_96_START, MEM_ZONE_96_END, 0x10))
+    if self.product_id in ['DIGIPLEX_EVO_192']:
+      eeprom_zone_ranges.append(range(MEM_ZONE_192_START, MEM_ZONE_192_END, 0x10))
+
+    self.load_labels(self.core.zones, self.core.labels['zone'], eeprom_zone_ranges)
     logger.info("Zones: {}".format(', '.join(self.core.labels['zone'])))
     # self.load_labels(self.core.outputs, self.core.labels['output'], MEM_OUTPUT_START, MEM_OUTPUT_END, template=output_template)
     # logger.info("Outputs: {}".format(', '.join(list(self.core.labels['output']))))
@@ -73,41 +83,35 @@ class Panel(PanelBase):
   def load_labels(self,
                   labelDictIndex,
                   labelDictName,
-                  start,
-                  end,
-                  limit=range(1, 33),
+                  ranges,
+                  field_length=16,
                   template=dict(label='')):
     """Load labels from panel"""
     i = 1
-    address = start
 
-    if len(limit) == 0:
-      return
+    for range in ranges:
+      for address in range:
+        args = dict(address=address, length=field_length)
+        reply = self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=0x05)
 
-    while address < end and i <= max(limit):
-      args = dict(address=address, length=16)
-      reply = self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=0x05)
+        if reply is None:
+          logger.error("Could not fully load labels")
+          return
 
-      if reply is None:
-        logger.error("Could not fully load labels")
-        return
+        # Avoid errors due to colision with events. It should not come here as we use reply_expected=0x05
+        if reply.fields.value.address != address:
+          continue
 
-      # Avoid errors due to colision with events
-      if reply.fields.value.address != address:
-        continue
+        data = reply.fields.value.data
+        label = data.strip().decode('latin').replace(" ", "_")
 
-      payload = reply.fields.value.data
-      label = payload[:16].strip().decode('latin').replace(" ", "_")
+        if label not in labelDictName:
+          properties = template.copy()
+          properties['label'] = label
+          labelDictIndex[i] = properties
 
-      if label not in labelDictName and i in limit:
-        properties = template.copy()
-        properties['label'] = label
-        labelDictIndex[i] = properties
-
-        labelDictName[label] = i
-      i += 1
-
-      address += 16
+          labelDictName[label] = i
+        i += 1
 
   def parse_message(self, message):
       if message is None or len(message) == 0:
