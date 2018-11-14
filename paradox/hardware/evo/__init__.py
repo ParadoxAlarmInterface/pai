@@ -89,21 +89,30 @@ class Panel(PanelBase):
     """Load labels from panel"""
     i = 1
 
-    for range in ranges:
-      for address in range:
+    for range_ in ranges:
+      for address in range_:
         args = dict(address=address, length=field_length)
         reply = self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=0x05)
 
-        if reply is None:
-          logger.error("Could not fully load labels")
-          return
+        retry_count = 3
+        for retry in range(1, retry_count+1):
+          # Avoid errors due to collision with events. It should not come here as we use reply_expected=0x05
+          if reply is None:
+            logger.error("Could not fully load labels")
+            return
 
-        # Avoid errors due to colision with events. It should not come here as we use reply_expected=0x05
-        if reply.fields.value.address != address:
-          continue
+          if reply.fields.value.address != address:
+            logger.debug("Fetched and receive label EEPROM addresses (received: %d, requested: %d) do not match. Retrying %d of %d" % (reply.fields.value.address, address, retry, retry_count))
+            reply = self.core.send_wait(None, None, reply_expected=0x05)
+            continue
+
+          if retry == retry_count:
+            logger.error('Failed to fetch label at address: %d' % address)
+
+          break
 
         data = reply.fields.value.data
-        label = data.strip().decode('latin').replace(" ", "_")
+        label = data.strip(b'\0 ').replace(b'\0', b'_').replace(b' ', b'_').decode('utf-8')
 
         if label not in labelDictName:
           properties = template.copy()
@@ -114,40 +123,50 @@ class Panel(PanelBase):
         i += 1
 
   def parse_message(self, message):
-      if message is None or len(message) == 0:
-          return None
+      try:
+          if message is None or len(message) == 0:
+              return None
 
-      if message[0] >> 4 == 0x7:
-          return ErrorMessage.parse(message)
-      elif message[0] == 0x00:
-          return InitializeCommunication.parse(message)
-      elif message[0] >> 4 == 0x1:
-          return LoginConfirmationResponse.parse(message)
-      elif message[0] == 0x30:
-          return SetTimeDate.parse(message)
-      elif message[0] >> 4 == 0x03:
-          return SetTimeDateResponse.parse(message)
-      elif message[0] == 0x40:
-          return PerformAction.parse(message)
-      elif message[0] >> 4 == 4:
-          return PerformActionResponse.parse(message)
-      elif message[0] == 0x50 and message[2] == 0x80:
-          return PanelStatus.parse(message)
-      elif message[0] == 0x50 and message[2] < 0x80:
-          return ReadEEPROM.parse(message)
-      elif message[0] >> 4 == 0x05 and message[2] == 0x80:
-          return PanelStatusResponse[message[3]].parse(message)
-      elif message[0] >> 4 == 0x05 and message[2] < 0x80:
-          return ReadEEPROMResponse.parse(message)
-      elif message[0] == 0x60 and message[2] < 0x80:
-          return WriteEEPROM.parse(message)
-      elif message[0] >> 4 == 0x06 and message[2] < 0x80:
-          return WriteEEPROMResponse.parse(message)
-      elif message[0] >> 4 == 0x0e:
-          return LiveEvent.parse(message)
-      else:
-          logger.error("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
-          return None
+          if message[0] >> 4 == 0x7:
+              return ErrorMessage.parse(message)
+          elif message[0] == 0x00:
+              return InitializeCommunication.parse(message)
+          elif message[0] >> 4 == 0x1:
+              return LoginConfirmationResponse.parse(message)
+          elif message[0] == 0x30:
+              return SetTimeDate.parse(message)
+          elif message[0] >> 4 == 0x03:
+              return SetTimeDateResponse.parse(message)
+          elif message[0] == 0x40:
+              return PerformAction.parse(message)
+          elif message[0] >> 4 == 4:
+              return PerformActionResponse.parse(message)
+          elif message[0] == 0x50 and message[2] == 0x80:
+              return PanelStatus.parse(message)
+          elif message[0] == 0x50 and message[2] < 0x80:
+              return ReadEEPROM.parse(message)
+          elif message[0] >> 4 == 0x05 and message[2] == 0x80:
+              return PanelStatusResponse[message[3]].parse(message)
+          elif message[0] >> 4 == 0x05 and message[2] < 0x80:
+              return ReadEEPROMResponse.parse(message)
+          elif message[0] == 0x60 and message[2] < 0x80:
+              return WriteEEPROM.parse(message)
+          elif message[0] >> 4 == 0x06 and message[2] < 0x80:
+              return WriteEEPROMResponse.parse(message)
+          elif message[0] >> 4 == 0x0e:
+              return LiveEvent.parse(message)
+          else:
+              logger.error("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
+      except Exception:
+        logger.exception("Parsing message")
+
+      s = 'PARSE: '
+      for c in message:
+        s += "{:02x} ".format(c)
+
+      logger.debug(s)
+
+      return None
 
   def encode_password(self, password):
     return binascii.unhexlify(password)

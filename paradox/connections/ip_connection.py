@@ -3,28 +3,29 @@
 import socket
 import logging
 import time
-from paradox_crypto import encrypt, decrypt
-from paradox_ip_messages import *
+from paradox.lib.crypto import encrypt, decrypt
+from paradox.parsers.paradox_ip_messages import *
+from paradox.lib import stun
 import binascii
 import json
-import stun
 import requests
 
-from config_defaults import *
-from config import *
+from config import user as cfg
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
+
 class IPConnection:
-    def __init__(self, host='127.0.0.1', port=10000, password=IP_CONNECTION_PASSWORD, timeout=5):
+    def __init__(self, host='127.0.0.1', port=10000, password=None, timeout=5):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.bind( ('0.0.0.0', 0))
+        self.socket.bind(('0.0.0.0', 0))
         self.socket_timeout = int(timeout)
         self.key = password
         self.connected = False
         self.host = host
         self.port = port
         self.site_info = None
+        self.connection_timestamp = 0
 
     def connect(self):
 
@@ -32,40 +33,37 @@ class IPConnection:
 
         while tries > 0:
             try:
-                if IP_CONNECTION_SITEID is not None and IP_CONNECTION_EMAIL is not None:
+                if cfg.IP_CONNECTION_SITEID is not None and cfg.IP_CONNECTION_EMAIL is not None:
                     r = self.connect_to_site()
-                     
+
                     if r and self.site_info is not None:
                         if self.connect_to_panel():
                             return True
-                    
                 else:
                     self.socket.settimeout(self.socket_timeout)
-                    self.socket.connect( (self.host, self.port) )
+                    self.socket.connect((self.host, self.port))
 
                     if self.connect_to_panel():
                         return True
-            except:
+            except Exception:
                 logger.exception("Unable to connect")
 
             tries -= 1
 
         return False
-    
+
     def connect_to_site(self):
-        logger.info("Connecting to Site: {}".format(IP_CONNECTION_SITEID))
+        logger.info("Connecting to Site: {}".format(cfg.IP_CONNECTION_SITEID))
         if self.site_info is None:
-            self.site_info = self.get_site_info(siteid=IP_CONNECTION_SITEID, email=IP_CONNECTION_EMAIL)
-        
+            self.site_info = self.get_site_info(siteid=cfg.IP_CONNECTION_SITEID, email=cfg.IP_CONNECTION_EMAIL)
+
         if self.site_info is None:
             logger.error("Unable to get site info")
             return False
         try:
             logger.debug("Site Info: {}".format(json.dumps(self.site_info, indent=4)))
-            chost = self.site_info['site'][0]['module'][0]['ipAddress']
-            cport = self.site_info['site'][0]['module'][0]['port']
             xoraddr = binascii.unhexlify(self.site_info['site'][0]['module'][0]['xoraddr'])
-            
+
             stun_host = 'turn.paradoxmyhome.com'
 
             self.client = stun.StunClient(stun_host)
@@ -88,6 +86,8 @@ class IPConnection:
                 logger.error(stun.get_error(stun_r))
                 return False
 
+            self.connection_timestamp = time.time()
+
             connection_id = stun_r[0]['attr_body']
             raddr = self.client.sock.getpeername()
 
@@ -99,85 +99,93 @@ class IPConnection:
                 return False
 
             self.socket = self.client1.sock
-            logger.info("Connected to Site: {}".format(IP_CONNECTION_SITEID))
-        except:
+            logger.info("Connected to Site: {}".format(cfg.IP_CONNECTION_SITEID))
+        except Exception:
             logger.exception("Unable to negotiate connection to site")
 
         return True
 
     def connect_to_panel(self):
+        logger.debug("Connecting to IP Panel")
 
-        logger.debug( "Connecting to IP Panel")
-        
-        try:    
+        try:
             logger.debug("IP Connection established")
 
             payload = encrypt(self.key, self.key)
 
             msg = ip_message.build(dict(header=dict(length=len(self.key), unknown0=0x03, flags=0x09, command=0xf0, unknown1=0, encrypt=1), payload=payload))
-            if LOGGING_DUMP_PACKETS:
+            if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
-            
+
             self.socket.send(msg)
             data = self.socket.recv(1024)
-            if LOGGING_DUMP_PACKETS:
+            if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
 
             message, message_payload = self.get_message_payload(data)
 
             response = ip_payload_connect_response.parse(message_payload)
+
+            if response.login_status != 'success':
+                logger.error("Error connecting to IP Module: {}".format(response.login_status))
+                return False
+
+            logger.info("Connected to IP Module. Version {:02x}, Firmware: {}.{}, Serial: {}".format(response.hardware_version,
+                        response.ip_firmware_major,
+                        response.ip_firmware_minor,
+                        binascii.hexlify(response.ip_module_serial).decode('utf-8')))
+
             self.key = response.key
-            logger.info("Connected to Panel with version {}.{} - {}.{}".format(response.major, response.minor, response.ip_major, response.ip_minor))
-            
-            #F2
+
+            # F2
             msg = ip_message.build(dict(header=dict(length=0, unknown0=0x03, flags=0x09, command=0xf2, unknown1=0, encrypt=1), payload=encrypt(b'', self.key)))
-            if LOGGING_DUMP_PACKETS:
+            if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
 
             self.socket.send(msg)
             data = self.socket.recv(1024)
-            if LOGGING_DUMP_PACKETS:
+            if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
 
             message, message_payload = self.get_message_payload(data)
             logger.debug("F2 answer: {}".format(binascii.hexlify(message_payload)))
 
-            #F3
+            # F3
             msg = ip_message.build(dict(header=dict(length=0, unknown0=0x03, flags=0x09, command=0xf3, unknown1=0, encrypt=1), payload=encrypt(b'', self.key)))
-            if LOGGING_DUMP_PACKETS:
+            if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
 
             self.socket.send(msg)
             data = self.socket.recv(1024)
-            if LOGGING_DUMP_PACKETS:
+            if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
 
             message, message_payload = self.get_message_payload(data)
-            
+
             logger.debug("F3 answer: {}".format(binascii.hexlify(message_payload)))
-           
-            #F8
+
+            # F8
             payload = binascii.unhexlify('0a500080000000000000000000000000000000000000000000000000000000000000000000d0')
             payload_len = len(payload)
             payload = encrypt(payload, self.key)
             msg = ip_message.build(dict(header=dict(length=payload_len, unknown0=0x03, flags=0x09, command=0xf8, unknown1=0, encrypt=1), payload=payload))
 
-            if LOGGING_DUMP_PACKETS:
+            if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
 
             self.socket.send(msg)
             data = self.socket.recv(1024)
-            if LOGGING_DUMP_PACKETS:
+            if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
-            
-            message, message_payload = self.get_message_payload(data)            
+
+            message, message_payload = self.get_message_payload(data)
             logger.debug("F8 answer: {}".format(binascii.hexlify(message_payload)))
-            
-            
+
+
             logger.info("Connection fully established")
 
             self.connected = True
-        except Exception as e:
+        except Exception:
             self.connected = False
             logger.exception("Unable to connect to IP Module")
 
@@ -186,38 +194,44 @@ class IPConnection:
     def write(self, data):
         """Write data to socket"""
 
+        if not self.refresh_stun():
+            return False
+
         try:
             if self.connected:
                 payload = encrypt(data, self.key)
                 msg = ip_message.build(dict(header=dict(length=len(data), unknown0=0x04, flags=0x09, command=0x00, encrypt=1), payload=payload))
-                if LOGGING_DUMP_PACKETS:
+                if cfg.LOGGING_DUMP_PACKETS:
                     logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
                 self.socket.send(msg)
                 return True
             else:
                 return False
-        except:
+        except Exception:
             logger.exception("Error writing to socket")
             self.connected = False
             return False
-        
-    def read(self, sz=37, timeout=5):        
+
+    def read(self, sz=37, timeout=5):
         """Read data from the IP Port, if available, until the timeout is exceeded"""
+
+        if not self.refresh_stun():
+            return False
+
         self.socket.settimeout(timeout)
         data = b""
-        read_sz = sz
 
-        while True: 
+        while True:
             try:
                 recv_data = self.socket.recv(1024)
-            except:
+            except Exception:
                 return None
 
             if recv_data is None or len(recv_data) == 0:
                 continue
 
             data += recv_data
-            
+
             if data[0] != 0xaa:
                 data = b''
                 continue
@@ -227,13 +241,13 @@ class IPConnection:
 
             if len(data) % 16 != 0:
                 continue
-            if LOGGING_DUMP_PACKETS:
+            if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
             message, payload = self.get_message_payload(data)
             return payload
 
         return None
-    
+
     def timeout(self, timeout=5):
         self.socket_timeout = timeout
 
@@ -256,7 +270,6 @@ class IPConnection:
 
     def get_message_payload(self, data):
         message = ip_message.parse(data)
-    
 
         if len(message.payload) >= 16 and len(message.payload) % 16 == 0 and message.header.flags & 0x01 != 0:
             message_payload = decrypt(data[16:], self.key)[:message.header.length]
@@ -271,12 +284,30 @@ class IPConnection:
         URL = "https://api.insightgoldatpmh.com/v1/site"
 
         headers={'User-Agent': 'Mozilla/3.0 (compatible; Indy Library)', 'Accept-Encoding': 'identity', 'Accept': 'text/html, */*'}
-        req = requests.get(URL, headers=headers, params = {'email': email, 'name': siteid})
+        req = requests.get(URL, headers=headers, params={'email': email, 'name': siteid})
         if req.status_code == 200:
             return req.json()
 
         return None
 
+    def refresh_stun(self):
+        if self.site_info is None:
+            return True
 
+        try:
+            # Refresh session if required
+            if time.time() - self.connection_timestamp >= 500:
+                logger.debug("Refreshing session")
+                self.client.send_refresh_request()
+                stun_r = self.client.receive_response()
+                if stun.is_error(stun_r):
+                    logger.error(stun.get_error(stun_r))
+                    self.connected = False
+                    return False
 
+                self.connection_timestamp = time.time()
 
+            return True
+        except Exception:
+            logger.exception("Session refresh")
+            return False

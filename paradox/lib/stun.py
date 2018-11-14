@@ -29,6 +29,7 @@ CONNECT_RESPONSE_SUCCESS = b'\x01\x0a'
 CONNECTION_BIND_REQUEST = b'\x00\x0b'
 CONNECTION_BIND_SUCCESS = b'\x01\x0b'
 
+CONNECTION_REFRESH_REQUEST = b'\x00\x04'
 
 # STUN Attribute Registry
 MAPPED_ADDRESS = b'\x00\x01'
@@ -107,6 +108,13 @@ def build_connection_bind_request(transaction_id, connection_id):
     return b''.join([CONNECTION_BIND_REQUEST, body_length, MAGIC_COOKIE, transaction_id,
         CONNECTION_ID, b'\x00\x04', connection_id])
 
+def build_connection_refresh_request(transaction_id):
+    if len(transaction_id) != 12:
+        raise Exception('Invalid transaction id')
+
+    body_length = b'\x00\x08'
+    return b''.join([CONNECTION_REFRESH_REQUEST, body_length, MAGIC_COOKIE, transaction_id,
+        LIFETIME, b'\x00\x04', b'\x00\x00\x02\x58'])
 
 def build_connect_request(transaction_id,xoraddr=None):
     if len(transaction_id) != 12:
@@ -283,6 +291,10 @@ class StunClient(object):
         assert len(attributes) == body_length
 
         return read_attributes(attributes, body_length)
+
+    def send_refresh_request(self):
+        self.req = build_connection_refresh_request(self.transaction_id)
+        self.sock.send(self.req)
 
     def get_socket(self):
         return self.sock

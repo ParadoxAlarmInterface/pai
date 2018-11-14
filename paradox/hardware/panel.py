@@ -1,6 +1,5 @@
 import sys
 import inspect
-import importlib
 import logging
 from construct import *
 from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum
@@ -36,7 +35,7 @@ class Panel:
     else:
       raise ResourceWarning('{} parser not found'.format(name))
 
-  def encode_password(self, password, is_sp=False):
+  def encode_password(self, password):
     res = [0] * 5
 
     try:
@@ -48,7 +47,7 @@ class Panel:
     while i >= 0:
       i2 = int(i / 2)
       b = int(int_password % 10)
-      if b == 0 and is_sp:
+      if b == 0:
         b = 0x0a
 
       int_password /= 10

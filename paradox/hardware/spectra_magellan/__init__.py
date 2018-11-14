@@ -95,7 +95,7 @@ class Panel(PanelBase):
         continue
 
       payload = reply.fields.value.data
-      label = payload[:16].strip().decode('latin').replace(" ", "_")
+      label = payload[:16].strip(b'\0 ').replace(b'\0', b'_').replace(b' ', b'_').decode('utf-8')
 
       if label not in labelDictName and i in limit:
         properties = template.copy()
@@ -108,47 +108,56 @@ class Panel(PanelBase):
       address += 16
 
   def parse_message(self, message):
+    try:
       if message is None or len(message) == 0:
-          return None
+        return None
 
       if message[0] == 0x70:
-          return CloseConnection.parse(message)
+        return CloseConnection.parse(message)
       elif message[0] >> 4 == 0x7:
-          return ErrorMessage.parse(message)
+        return ErrorMessage.parse(message)
       elif message[0] == 0x00:
-          return InitializeCommunication.parse(message)
+        return InitializeCommunication.parse(message)
       elif message[0] == 0x10:
-          return InitializeCommunicationResponse.parse(message)
+        return InitializeCommunicationResponse.parse(message)
       elif message[0] == 0x30:
-          return SetTimeDate.parse(message)
+        return SetTimeDate.parse(message)
       elif message[0] >> 4 == 0x03:
-          return SetTimeDateResponse.parse(message)
+        return SetTimeDateResponse.parse(message)
       elif message[0] == 0x40:
-          return PerformAction.parse(message)
+        return PerformAction.parse(message)
       elif message[0] >> 4 == 4:
-          return PerformActionResponse.parse(message)
+        return PerformActionResponse.parse(message)
       elif message[0] == 0x50 and message[2] == 0x80:
-          return PanelStatus.parse(message)
+        return PanelStatus.parse(message)
       elif message[0] == 0x50 and message[2] < 0x80:
-          return ReadEEPROM.parse(message)
+        return ReadEEPROM.parse(message)
       elif message[0] >> 4 == 0x05 and message[2] == 0x80:
-          return PanelStatusResponse[message[3]].parse(message)
+        return PanelStatusResponse[message[3]].parse(message)
       elif message[0] >> 4 == 0x05 and message[2] < 0x80:
-          return ReadEEPROMResponse.parse(message)
-      elif message[0] == 0x60 and message[2] < 0x80:
-          return WriteEEPROM.parse(message)
-      elif message[0] >> 4 == 0x06 and message[2] < 0x80:
-          return WriteEEPROMResponse.parse(message)
+        return ReadEEPROMResponse.parse(message)
+      #        elif message[0] == 0x60 and message[2] < 0x80:
+      #            return WriteEEPROM.parse(message)
+      #        elif message[0] >> 4 == 0x06 and message[2] < 0x80:
+      #            return WriteEEPROMResponse.parse(message)
       elif message[0] >> 4 == 0x0e:
-          return LiveEvent.parse(message)
+        return LiveEvent.parse(message)
       else:
-          logger.error("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
-          return None
+        logger.warn("Unknown message")
+    except Exception:
+      logger.exception("Parsing message")
+
+    s = 'PARSE: '
+    for c in message:
+      s += "{:02x} ".format(c)
+
+    logger.debug(s)
+
+    return None
 
 
   def initialize_communication(self, reply, PASSWORD):
-    password = self.encode_password(PASSWORD, reply.fields.value.product_id in ['SPECTRA_SP5500', 'SPECTRA_SP6000',
-                                                                                'SPECTRA_SP7000'])
+    password = self.encode_password(PASSWORD)
 
     args = dict(product_id=reply.fields.value.product_id,
                 firmware=reply.fields.value.firmware,
@@ -160,7 +169,7 @@ class Panel(PanelBase):
                 )
 
     logger.info("Initializing communication")
-    reply = self.send_wait(self.panel.get_message('InitializeCommunication'), args=args, reply_expected=0x00)
+    reply = self.core.send_wait(self.get_message('InitializeCommunication'), args=args, reply_expected=0x00)
 
     if reply is None:
       return False

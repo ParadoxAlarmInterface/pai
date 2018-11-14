@@ -5,14 +5,14 @@ import datetime
 import json
 from threading import Thread
 import queue
-from config_defaults import *
-from config import *
+from config import user as cfg
 
-from utils import SortableTuple
+from paradox.lib.utils import SortableTuple
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
 PARTITION_HOMEBRIDGE_TARGETS = dict(STAY_ARM='arm_stay', AWAY_ARM='arm', NIGHT_ARM='arm_sleep', DISARM='disarm')
+
 
 class MQTTInterface(Thread):
     """Interface Class using MQTT"""
@@ -34,19 +34,19 @@ class MQTTInterface(Thread):
         self.notification_handler = None
         self.cache = dict()
 
-        self.armed = None
+        self.armed = dict()
         self.alarm = None
 
     def run(self):
-        if MQTT_USERNAME is not None and MQTT_PASSWORD is not None:
+        if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
             self.mqtt.username_pw_set(
-                username=MQTT_USERNAME, password=MQTT_PASSWORD)
+                username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
 
-        self.mqtt.connect(host=MQTT_HOST,
-                          port=MQTT_PORT,
-                          keepalive=MQTT_KEEPALIVE,
-                          bind_address=MQTT_BIND_ADDRESS)
-    
+        self.mqtt.connect(host=cfg.MQTT_HOST,
+                          port=cfg.MQTT_PORT,
+                          keepalive=cfg.MQTT_KEEPALIVE,
+                          bind_address=cfg.MQTT_BIND_ADDRESS)
+
         self.mqtt.loop_start()
         last_republish = time.time()
 
@@ -59,7 +59,7 @@ class MQTTInterface(Thread):
             elif item[1] == 'command':
                 if item[2] == 'stop':
                     break
-            if time.time() - last_republish > MQTT_REPUBLISH_INTERVAL:
+            if time.time() - last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
                 self.republish()
                 last_republish = time.time()
 
@@ -78,7 +78,7 @@ class MQTTInterface(Thread):
     def set_alarm(self, alarm):
         """ Sets the alarm """
         self.alarm = alarm
-    
+
     def set_notify(self, handler):
         """ Set the notification handler"""
         self.notification_handler = handler
@@ -95,7 +95,7 @@ class MQTTInterface(Thread):
     def notify(self, source, message, level):
         pass
 
-    ## Handlers here
+    # Handlers here
     def handle_message(self, client, userdata, message):
         """Handle message received from the MQTT broker"""
         logger.info("message topic={}, payload={}".format(
@@ -114,8 +114,8 @@ class MQTTInterface(Thread):
             logger.error(
                 "Invalid topic in mqtt message: {}".format(message.topic))
             return
-        
-        if topics[1] == MQTT_NOTIFICATIONS_TOPIC:
+
+        if topics[1] == cfg.MQTT_NOTIFICATIONS_TOPIC:
             if topics[2].upper() == "CRITICAL":
                 level = logging.CRITICAL
             elif topics[2].upper() == "INFO":
@@ -129,210 +129,205 @@ class MQTTInterface(Thread):
             #self.notification_handler.notify(self.name, payload, level)
             return
 
-
-        if topics[1] != MQTT_CONTROL_TOPIC:
+        if topics[1] != cfg.MQTT_CONTROL_TOPIC:
             logger.error(
                 "Invalid subtopic in mqtt message: {}".format(message.topic))
-            return        
-        
+            return
+
         command = message.payload.decode("latin").strip()
         element = topics[3]
 
         # Process a Zone Command
-        if topics[2] == MQTT_ZONE_TOPIC:
+        if topics[2] == cfg.MQTT_ZONE_TOPIC:
             if not self.alarm.control_zone(element, command):
                 logger.warning(
                     "Zone command refused: {}={}".format(element, command))
 
         # Process a Partition Command
-        elif topics[2] == MQTT_PARTITION_TOPIC:
+        elif topics[2] == cfg.MQTT_PARTITION_TOPIC:
 
-            if command in PARTITION_HOMEBRIDGE_TARGETS and MQTT_HOMEBRIDGE_ENABLE:
+            if command in PARTITION_HOMEBRIDGE_TARGETS and cfg.MQTT_HOMEBRIDGE_ENABLE:
                 command = PARTITION_HOMEBRIDGE_TARGETS[command]
 
             if command.startswith('code_toggle-'):
                 tokens = command.split('-')
                 if len(tokens) < 2:
                     return
-                
-                if tokens[1] not in MQTT_TOGGLE_CODES:
+
+                if tokens[1] not in cfg.MQTT_TOGGLE_CODES:
                     logger.warning("Invalid toggle code {}".format(tokens[1]))
                     return
 
                 if element.lower() == 'all':
                     command = 'arm'
 
-                    for k,v in self.partitions.items():
+                    for k, v in self.partitions.items():
                         # If "all" and a single partition is armed, default is to desarm
-                        for k1,v1 in self.partitions[k].items():
+                        for k1, v1 in self.partitions[k].items():
                             if (k1 == 'arm' or k1 == 'exit_delay' or k1 == 'entry_delay') and v1:
                                 command = 'disarm'
                                 break
-                        
+
                         if command == 'disarm':
                             break
-
 
                 elif element in self.partitions:
                     if ('arm' in self.partitions[element] and self.partitions[element]['arm']) or ('exit_delay' in self.partitions[element] and self.partitions[element]['exit_delay']):
                         command = 'disarm'
                     else:
                         command = 'arm'
-                
                 else:
                     logger.debug("Element {} not found".format(element))
                     return
 
-                logger.debug("Effective command: {} = {}".format(element, command))
+                self.notification_handler.notify('mqtt', "Command by {}: {}".format(cfg.MQTT_TOGGLE_CODES[tokens[1]], command), logging.INFO)
 
-                self.notification_handler.notify('mqtt', "Command by {}: {}".format(MQTT_TOGGLE_CODES[tokens[1]], command), logging.INFO)
-
+            logger.debug("Partition command: {} = {}".format(element, command))
             if not self.alarm.control_partition(element, command):
                 logger.warning(
                     "Partition command refused: {}={}".format(element, command))
-       
+
         # Process an Output Command
-        elif topics[2] == MQTT_OUTPUT_TOPIC:
+        elif topics[2] == cfg.MQTT_OUTPUT_TOPIC:
+            logger.debug("Output command: {} = {}".format(element, command))
+
             if not self.alarm.control_output(element, command):
                 logger.warning(
                     "Output command refused: {}={}".format(element, command))
         else:
             logger.error("Invalid control property {}".format(topics[2]))
 
-
     def handle_disconnect(self, mqttc, userdata, rc):
         logger.info("MQTT Broker Disconnected")
         self.connected = False
-        
+
         time.sleep(1)
 
-        if MQTT_USERNAME is not None and MQTT_PASSWORD is not None:
+        if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
             self.mqtt.username_pw_set(
-                username=MQTT_USERNAME, password=MQTT_PASSWORD)
+                username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
 
-        self.mqtt.connect(host=MQTT_HOST,
-                          port=MQTT_PORT,
-                          keepalive=MQTT_KEEPALIVE,
-                          bind_address=MQTT_BIND_ADDRESS)
-        
+        self.mqtt.connect(host=cfg.MQTT_HOST,
+                          port=cfg.MQTT_PORT,
+                          keepalive=cfg.MQTT_KEEPALIVE,
+                          bind_address=cfg.MQTT_BIND_ADDRESS)
 
     def handle_connect(self, mqttc, userdata, flags, result):
         logger.info("MQTT Broker Connected")
 
         self.connected = True
+        logger.debug("Subscribing to topics in {}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC))
+        self.mqtt.subscribe(
+            "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
+                              cfg.MQTT_CONTROL_TOPIC, "#"))
 
         self.mqtt.subscribe(
-            "{}/{}/{}".format(MQTT_BASE_TOPIC,
-                              MQTT_CONTROL_TOPIC, "#"))
-        
-        self.mqtt.subscribe(
-            "{}/{}/{}".format(MQTT_BASE_TOPIC,
-                              MQTT_NOTIFICATIONS_TOPIC, "#"))
-        
-        self.mqtt.will_set('{}/{}/{}'.format(MQTT_BASE_TOPIC,
-                                             MQTT_INTERFACE_TOPIC,
-                                             self.__class__.__name__), 
-                            'offline', 0, MQTT_RETAIN)
+            "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
+                              cfg.MQTT_NOTIFICATIONS_TOPIC, "#"))
 
-        
+        self.mqtt.will_set('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+                                             cfg.MQTT_INTERFACE_TOPIC,
+                                             self.__class__.__name__),
+                            'offline', 0, cfg.MQTT_RETAIN)
 
-        self.publish('{}/{}/{}'.format(MQTT_BASE_TOPIC,
-                                            MQTT_INTERFACE_TOPIC,
+
+        self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+                                            cfg.MQTT_INTERFACE_TOPIC,
                                             self.__class__.__name__),
-                          'online', 0, MQTT_RETAIN)
-
+                            'online', 0, cfg.MQTT_RETAIN)
 
     def handle_event(self, raw):
         """Handle Live Event"""
-        #logger.debug("Live Event: raw={}".format(
-        #    raw))
-        
 
-        if MQTT_PUBLISH_RAW_EVENTS:
-            self.publish('{}/{}'.format(MQTT_BASE_TOPIC,
-                                                MQTT_EVENTS_TOPIC,
-                                                MQTT_RAW_TOPIC),
-                              json.dumps(raw), 0, MQTT_RETAIN)
+        if cfg.MQTT_PUBLISH_RAW_EVENTS:
+            self.publish('{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+                                                cfg.MQTT_EVENTS_TOPIC,
+                                                cfg.MQTT_RAW_TOPIC),
+                              json.dumps(raw), 0, cfg.MQTT_RETAIN)
 
     def handle_change(self, raw):
-        element, label, property, value = raw 
+        element, label, property, value = raw
         """Handle Property Change"""
-        #logger.debug("Property Change: element={}, label={}, property={}, value={}".format(
-        #    element,
-        #    label,
-        #    property,
-        #    value))
 
         # Keep track of ARM state
         if element == 'partition':
-            if not label in self.partitions:
+            if label not in self.partitions:
                 self.partitions[label] = dict()
 
             self.partitions[label][property] = value
-        
+
         if element == 'partition':
-            element_topic = MQTT_PARTITION_TOPIC
+            element_topic = cfg.MQTT_PARTITION_TOPIC
         elif element == 'zone':
-            element_topic = MQTT_ZONE_TOPIC
+            element_topic = cfg.MQTT_ZONE_TOPIC
         elif element == 'output':
-            element_topic = MQTT_OUTPUT_TOPIC
+            element_topic = cfg.MQTT_OUTPUT_TOPIC
         elif element == 'repeater':
-            element_topic = MQTT_REPEATER_TOPIC
+            element_topic = cfg.MQTT_REPEATER_TOPIC
         elif element == 'bus':
-            element_topic = MQTT_BUS_TOPIC
+            element_topic = cfg.MQTT_BUS_TOPIC
         elif element == 'keypad':
-            element_topic = MQTT_KEYPAD_TOPIC
+            element_topic = cfg.MQTT_KEYPAD_TOPIC
         elif element == 'system':
-            element_topic = MQTT_SYSTEM_TOPIC
+            element_topic = cfg.MQTT_SYSTEM_TOPIC
         elif element == 'user':
-            element_topic = MQTT_USER_TOPIC
+            element_topic = cfg.MQTT_USER_TOPIC
         else:
             element_topic = element
-        
-        if MQTT_USE_NUMERIC_STATES:
+
+        if cfg.MQTT_USE_NUMERIC_STATES:
             publish_value = int(value)
         else:
             publish_value = value
 
-        self.publish('{}/{}/{}/{}/{}'.format(MQTT_BASE_TOPIC,
-                                            MQTT_STATES_TOPIC,
+        self.publish('{}/{}/{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+                                            cfg.MQTT_STATES_TOPIC,
                                             element_topic,
                                             label,
                                             property),
-                          "{}".format(publish_value), 0, MQTT_RETAIN)
+                          "{}".format(publish_value), 0, cfg.MQTT_RETAIN)
 
-        if element == 'partition' and MQTT_HOMEBRIDGE_ENABLE:
+        if element == 'partition' and cfg.MQTT_HOMEBRIDGE_ENABLE:
+            if not label in self.armed:
+                self.armed[label] = None
+
+            # Property changing to True: Alarm or arm
             if value:
                 if property == 'alarm':
                     state = 'ALARM_TRIGGERED'
-                elif property == 'stay_arm' :
-                    state = 'STAY_ARM'
-                    self.armed = state
-                elif property == 'arm':
-                    state = 'AWAY_ARM'
-                    self.armed = state
-                elif property == 'sleep_arm':
-                    state = 'NIGHT_ARM'
-                    self.armed = state
-                else:
-                    return
-            else:
-                if property == 'alarm' and self.armed is not None:
-                    state = self.armed
-                elif property in ['stay_arm', 'arm', 'sleep_arm']:
-                    state = 'DISARMED'
-                    self.armed = None
-                else:
-                    return
 
-            self.publish('{}/{}/{}/{}/{}'.format(MQTT_BASE_TOPIC,
-                                    MQTT_STATES_TOPIC,
+                # only process if not armed already
+                elif self.armed[label] is None:
+                    if property == 'stay_arm':
+                        state = 'STAY_ARM'
+                    elif property == 'arm':
+                        state = 'AWAY_ARM'
+                    elif property == 'sleep_arm':
+                        state = 'NIGHT_ARM'
+                    else:
+                        return
+
+                    self.armed[label] = state
+                else:
+                    return  # Do not publish a change
+
+            # Property changing to False: Disarm or alarm stop
+            else:
+                if property == 'alarm' and label in self.armed and self.armed[label] is not None:
+                    state = self.armed[label]
+                elif property in ['stay_arm', 'arm', 'sleep_arm'] and self.armed[label] is not None:
+                    state = 'DISARMED'
+                    self.armed[label] = None
+                else:
+                    return  # Do not publish a change
+
+            self.publish('{}/{}/{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+                                    cfg.MQTT_STATES_TOPIC,
                                     element_topic,
                                     label,
-                                    MQTT_SUMMARY_TOPIC),
-                       "{}".format(state), 0, MQTT_RETAIN)
+                                    cfg.MQTT_SUMMARY_TOPIC),
+                       "{}".format(state), 0, cfg.MQTT_RETAIN)
 
-    
     def publish(self, topic, value, qos, retain):
         self.cache[topic] = {'value': value, 'qos': qos, 'retain': retain}
         self.mqtt.publish(topic, value, qos, retain)
@@ -341,4 +336,3 @@ class MQTTInterface(Thread):
         for k in list(self.cache.keys()):
             v = self.cache[k]
             self.mqtt.publish(k, v['value'], v['qos'], v['retain'])
-

@@ -12,12 +12,13 @@ import logging
 import datetime
 import json
 
-from threading import Thread, Event
-from utils import SortableTuple
 
-from config_defaults import *
-from config import *
+from threading import Thread, Event
 import queue
+
+from paradox.lib.utils import SortableTuple
+from config import user as cfg
+
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -31,14 +32,12 @@ class SignalInterface(Thread):
     stop_running = Event()
     thread = None
     loop = None
-    
-    
+
     def __init__(self):
         Thread.__init__(self)
-        
+
         self.queue = queue.PriorityQueue()
         self.partitions = dict()
-        
 
     def stop(self):
         """ Stops the Signal Interface Thread"""
@@ -52,7 +51,7 @@ class SignalInterface(Thread):
     def set_alarm(self, alarm):
         """ Sets the alarm """
         self.alarm = alarm
-    
+
     def set_notify(self, handler):
         """ Set the notification handler"""
         self.notification_handler = handler
@@ -68,12 +67,12 @@ class SignalInterface(Thread):
     def notify(self, source, message, level):
         if source == self.name:
             return
-        
+
         if level < logging.INFO:
             return
-        
-        self.queue.put_nowait(SortableTuple((2, 'notify', (source, message, level))))
 
+        self.queue.put_nowait(SortableTuple(
+            (2, 'notify', (source, message, level))))
 
     def run(self):
 
@@ -84,25 +83,25 @@ class SignalInterface(Thread):
         self.signal = bus.get('org.asamk.Signal')
         self.signal.onMessageReceived = self.handle_message
         self.loop = GLib.MainLoop()
-    
+
         self.timer = GObject.idle_add(self.run_loop)
 
         logger.debug("Signal Interface Running")
         try:
             self.loop.run()
-        
+
         except (KeyboardInterrupt, SystemExit):
             logger.debug("Signal loop stopping")
             if self.alarm is not None:
                 self.loop.quit()
                 self.alarm.disconnect()
-        except :
+        except Exception:
             logger.exception("Signal loop")
-    
+
     def run_loop(self):
         try:
             item = self.queue.get(block=True, timeout=1)
-            
+
             if item[1] == 'change':
                 self.handle_change(item[2])
             elif item[1] == 'event':
@@ -112,7 +111,7 @@ class SignalInterface(Thread):
 
         except queue.Empty as e:
             return True
-        except:
+        except Exception:
             logger.exception("loop")
 
         return True
@@ -121,20 +120,21 @@ class SignalInterface(Thread):
         if self.signal is None:
             logger.warning("Signal not available when sending message")
             return
-        try:    
-            self.signal.sendMessage(str(message), [], SIGNAL_CONTACTS)
-        except:
+        try:
+            self.signal.sendMessage(str(message), [], cfg.SIGNAL_CONTACTS)
+        except Exception:
             logger.exception("Signal send message")
 
-    def handle_message (self, timestamp, source, groupID, message, attachments):
+    def handle_message(self, timestamp, source, groupID, message, attachments):
         """ Handle Signal message. It should be a command """
 
-        logger.debug("Received Message {} {} {} {} {}".format(timestamp, message, groupID, message, attachments))
+        logger.debug("Received Message {} {} {} {} {}".format(
+            timestamp, message, groupID, message, attachments))
 
-        if self.alarm == None:
+        if self.alarm is None:
             return
 
-        if source in SIGNAL_CONTACTS:
+        if source in cfg.SIGNAL_CONTACTS:
             ret = self.send_command(message)
 
             if ret:
@@ -147,8 +147,6 @@ class SignalInterface(Thread):
             logger.warning("REJECTED: {}".format(message))
             self.send_message("REJECTED: {}".format(message))
 
-
-
     def send_command(self, message):
         """Handle message received from the MQTT broker"""
         """Format TYPE LABEL COMMAND """
@@ -158,14 +156,14 @@ class SignalInterface(Thread):
             logger.warning("Message format is invalid")
             return False
 
-        if self.alarm == None:
+        if self.alarm is None:
             logger.error("No alarm registered")
             return False
 
         element_type = tokens[0].lower()
         element = tokens[1]
         command = self.normalize_payload(tokens[2].lower())
-        
+
         # Process a Zone Command
         if element_type == 'zone':
             if command not in ['bypass', 'clear_bypass']:
@@ -202,16 +200,15 @@ class SignalInterface(Thread):
         else:
             logger.error("Invalid control property {}".format(element))
             return False
-        
+
         return True
-    
 
     def handle_notify(self, raw):
         source, message, level = raw
 
         try:
             self.send_message(message)
-        except:
+        except Exception:
             logger.exception("handle_notify")
 
     def handle_event(self, raw):
@@ -221,10 +218,10 @@ class SignalInterface(Thread):
         #m = "{}: {}".format(raw['major'][1], raw['minor'][1])
         major_code = raw['major'][0]
         minor_code = raw['minor'][1]
-        
+
         # Ignore some events
 
-        for ev in SIGNAL_IGNORE_EVENTS:
+        for ev in cfg.SIGNAL_IGNORE_EVENTS:
             if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
                 return
 
@@ -234,12 +231,11 @@ class SignalInterface(Thread):
             self.send_message("Disarming by user {}".format(minor_code))
         else:
             self.send_message(str(raw))
-        
 
-    def handle_change(self, raw ):
+    def handle_change(self, raw):
         element, label, property, value = raw
         """Handle Property Change"""
-        #logger.debug("Property Change: element={}, label={}, property={}, value={}".format(
+        # logger.debug("Property Change: element={}, label={}, property={}, value={}".format(
         #    element,
         #    label,
         #    property,
@@ -248,19 +244,19 @@ class SignalInterface(Thread):
         if element == 'partition':
             if element not in self.partitions:
                 self.partitions[label] = dict()
-            
+
             self.partitions[label][property] = value
 
             if property == 'arm_sleep':
                 return
-            elif property == 'exit_delay' :
+            elif property == 'exit_delay':
                 if not value:
                     return
                 else:
                     message = "Partition {} in Exit Delay".format(label)
                     if 'arm_sleep' in self.partitions[label] and self.partitions[label]['arm_sleep']:
-                        m = ''.join([m, ' (Sleep)'])
-            elif property == 'entry_delay' :
+                        message = ''.join([message, ' (Sleep)'])
+            elif property == 'entry_delay':
                 if not value:
                     return
                 else:
@@ -270,10 +266,10 @@ class SignalInterface(Thread):
                     if value:
                         message = "Partition {} is Armed".format(label)
                         if 'arm_sleep' in self.partitions[label] and self.partitions[label]['arm_sleep']:
-                            m = ''.join([m, ' (Sleep)'])
+                            message = ''.join([message, ' (Sleep)'])
                     else:
                         message = "Partition {} is Disarmed".format(label)
-                except:
+                except Exception:
                     logger.exception("ARM")
 
             elif property == 'arm_full':
@@ -287,7 +283,6 @@ class SignalInterface(Thread):
 
         self.send_message(message)
 
-
     def normalize_payload(self, message):
         message = message.strip().lower()
 
@@ -299,4 +294,3 @@ class SignalInterface(Thread):
             return message
 
         return None
-
