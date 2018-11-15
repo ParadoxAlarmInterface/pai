@@ -169,7 +169,7 @@ class Panel(PanelBase):
                 )
 
     logger.info("Initializing communication")
-    reply = self.core.send_wait(self.get_message('InitializeCommunication'), args=args, reply_expected=0x00)
+    reply = self.core.send_wait(self.get_message('InitializeCommunication'), args=args)
 
     if reply is None:
       return False

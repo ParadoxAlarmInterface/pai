@@ -38,6 +38,9 @@ class Panel:
   def encode_password(self, password):
     res = [0] * 5
 
+    if password is None:
+        return b'\x00\x00'
+
     try:
       int_password = int(password)
     except:
