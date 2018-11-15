@@ -201,6 +201,8 @@ class IPConnection:
             if self.connected:
                 payload = encrypt(data, self.key)
                 msg = ip_message.build(dict(header=dict(length=len(data), unknown0=0x04, flags=0x09, command=0x00, encrypt=1), payload=payload))
+                if cfg.LOGGING_DUMP_PACKETS:
+                    logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
                 self.socket.send(msg)
                 return True
             else:
@@ -239,7 +241,8 @@ class IPConnection:
 
             if len(data) % 16 != 0:
                 continue
-
+            if cfg.LOGGING_DUMP_PACKETS:
+                logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
             message, payload = self.get_message_payload(data)
             return payload
 
