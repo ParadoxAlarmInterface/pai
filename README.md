@@ -52,6 +52,12 @@ If some requirement fails to install, it may not be critical.
 python3 run.py
 ```
 
+5. Run in docker:
+```
+docker build -t pai .
+docker run -it -v <projectFolder>/config/user.py:/opt/paradox/config/user.py pai
+```
+
 If something goes wrong, you can edit the ```config/user.py``` to increase the debug level.
 
 ## Authors

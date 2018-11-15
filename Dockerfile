@@ -16,7 +16,7 @@ RUN chown -R paradox /opt/paradox
 USER paradox
 
 # conf file from host
-VOLUME ["/opt/paradox/config"]
+VOLUME ["/opt/paradox/config/user.py"]
 
 # run process
 CMD python run.py
