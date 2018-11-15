@@ -3,10 +3,10 @@
 from construct import Adapter
 import datetime
 
+
 class DateAdapter(Adapter):
     def _decode(self, obj, context, path):
-        return datetime.datetime(obj[0]*100+obj[1], obj[2], obj[3], obj[4], obj[5])
-
+        return datetime.datetime(obj[0] * 100 + obj[1], obj[2], obj[3], obj[4], obj[5])
 
     def _encode(self, obj, context, path):
         return [obj.year / 100, obj.year % 100, obj.month, obj.day, obj.hour, obj.minute]
@@ -14,122 +14,126 @@ class DateAdapter(Adapter):
 
 class ModuleSerialAdapter(Adapter):
     def _decode(self, obj, context, path):
-      return hex(int(obj[0]) * 10^8 + int(obj[1]) * 10^4 + int(obj[2]) * 10^2 + int(
-                obj[3]) * 10^0)
+        return hex(int(obj[0]) * 10 ^ 8 + int(obj[1]) * 10 ^ 4 + int(obj[2]) * 10 ^ 2 + int(
+            obj[3]) * 10 ^ 0)
+
 
 class PartitionStateAdapter(Adapter):
     states = dict(arm=4, disarm=5, arm_sleep=3, arm_stay=1, none=0)
 
     def _decode(self, obj, context, path):
 
-        for k,v in enumerate(self.states):
-          if v == obj[0]:
-            return k
+        for k, v in enumerate(self.states):
+            if v == obj[0]:
+                return k
 
         return "unknown"
 
     def _encode(self, obj, context, path):
-      if obj in self.states:
-        return self.states[obj]
+        if obj in self.states:
+            return self.states[obj]
 
-      return 0
+        return 0
+
 
 class ZoneStateAdapter(Adapter):
     states = dict(bypass=0x10)
 
     def _decode(self, obj, context, path):
 
-        for k,v in enumerate(self.states):
-          if v == obj[0]:
-            return k
+        for k, v in enumerate(self.states):
+            if v == obj[0]:
+                return k
 
         return "unknown"
 
     def _encode(self, obj, context, path):
-      if obj in self.states:
-        return self.states[obj]
+        if obj in self.states:
+            return self.states[obj]
 
-      return 0
+        return 0
 
 
 class StatusAdapter(Adapter):
     def _decode(self, obj, context, path):
         r = dict()
         for i in range(0, len(obj)):
-          status = obj[i]
-          for j in range(0, 8):
-              r[i * 8 + j + 1]=(((status >> j) & 0x01) == 0x01) 
-        
-        return r
+            status = obj[i]
+            for j in range(0, 8):
+                r[i * 8 + j + 1] = (((status >> j) & 0x01) == 0x01)
 
+        return r
 
 
 class PartitionStatusAdapter(Adapter):
     def _decode(self, obj, context, path):
-        partition_status= dict()
+        partition_status = dict()
 
         for i in range(0, 2):
-            partition_status[i+1] = dict(
-	        alarm = (obj[0 + i*4] & 0xf0 != 0) or (obj[2 + i*4] & 0x80 != 0), # Combined status
-                pulse_fire_alarm = obj[0 + i*4] & 0x80 != 0,
-                audible_alarm = obj[0 + i*4] & 0x40 != 0,
-                silent_alarm = obj[0 + i*4] & 0x20 != 0,
-                strobe_alarm = obj[0 + i*4] & 0x10 != 0,
-                stay_arm = obj[0 + i*4] & 0x04 != 0,
-                sleep_arm = obj[0 + i*4] & 0x02 != 0,
-                arm = obj[0 + i*4] & 0x01 != 0,
-                bell_activated = obj[1 + i*4] & 0x80 != 0,
-                auto_arming_engaged = obj[1 + i*4] & 0x40 != 0,
-                recent_closing_delay = obj[1 + i*4] & 0x20 != 0,
-                intellizone_delay = obj[1 + i*4] & 0x10 != 0,
-                zone_bypassed = obj[1 + i*4] & 0x08 != 0,
-                alarms_in_memory = obj[1 + i*4] & 0x04 != 0,
-                entry_delay = obj[1 + i*4] & 0x02 != 0,
-                exit_delay = obj[1 + i*4] & 0x01 != 0,
-                paramedic_alarm = obj[2 + i*4] & 0x80 != 0,
-                not_used1 = obj[2 + i*4] & 0x40 != 0,
-                arm_with_remote = obj[2 + i*4] & 0x20 != 0,
-                transmission_delay_finished = obj[2 + i*4] & 0x10 != 0,
-                bell_delay_finished = obj[2 + i*4] & 0x08 != 0,
-                entry_delay_finished = obj[2 + i*4] & 0x04 != 0,
-                exit_delay_finished = obj[2 + i*4] & 0x02 != 0,
-                intellizone_delay_finished = obj[2 + i*4] & 0x01 != 0,
-                not_used2 = obj[3 + i*4] & 0x80 != 0,
-                wait_window = obj[3 + i*4] & 0x40 != 0,
-                not_used3 = obj[3 + i*4] & 0x20 != 0,
-                in_remote_delay = obj[3 + i*4] & 0x10 != 0,
-                not_used4 = obj[3 + i*4] & 0x08 != 0,
-                stayd_mode_active = obj[3 + i*4] & 0x04 != 0,
-                force_arm = obj[3 + i*4] & 0x02 != 0,
-                ready_status = obj[3 + i*4] & 0x01 != 0,
-              )
-              
+            partition_status[i + 1] = dict(
+                alarm=(obj[0 + i * 4] & 0xf0 != 0) or (obj[2 + i * 4] & 0x80 != 0),  # Combined status
+                pulse_fire_alarm=obj[0 + i * 4] & 0x80 != 0,
+                audible_alarm=obj[0 + i * 4] & 0x40 != 0,
+                silent_alarm=obj[0 + i * 4] & 0x20 != 0,
+                strobe_alarm=obj[0 + i * 4] & 0x10 != 0,
+                stay_arm=obj[0 + i * 4] & 0x04 != 0,
+                sleep_arm=obj[0 + i * 4] & 0x02 != 0,
+                arm=obj[0 + i * 4] & 0x01 != 0,
+                bell_activated=obj[1 + i * 4] & 0x80 != 0,
+                auto_arming_engaged=obj[1 + i * 4] & 0x40 != 0,
+                recent_closing_delay=obj[1 + i * 4] & 0x20 != 0,
+                intellizone_delay=obj[1 + i * 4] & 0x10 != 0,
+                zone_bypassed=obj[1 + i * 4] & 0x08 != 0,
+                alarms_in_memory=obj[1 + i * 4] & 0x04 != 0,
+                entry_delay=obj[1 + i * 4] & 0x02 != 0,
+                exit_delay=obj[1 + i * 4] & 0x01 != 0,
+                paramedic_alarm=obj[2 + i * 4] & 0x80 != 0,
+                not_used1=obj[2 + i * 4] & 0x40 != 0,
+                arm_with_remote=obj[2 + i * 4] & 0x20 != 0,
+                transmission_delay_finished=obj[2 + i * 4] & 0x10 != 0,
+                bell_delay_finished=obj[2 + i * 4] & 0x08 != 0,
+                entry_delay_finished=obj[2 + i * 4] & 0x04 != 0,
+                exit_delay_finished=obj[2 + i * 4] & 0x02 != 0,
+                intellizone_delay_finished=obj[2 + i * 4] & 0x01 != 0,
+                not_used2=obj[3 + i * 4] & 0x80 != 0,
+                wait_window=obj[3 + i * 4] & 0x40 != 0,
+                not_used3=obj[3 + i * 4] & 0x20 != 0,
+                in_remote_delay=obj[3 + i * 4] & 0x10 != 0,
+                not_used4=obj[3 + i * 4] & 0x08 != 0,
+                stayd_mode_active=obj[3 + i * 4] & 0x04 != 0,
+                force_arm=obj[3 + i * 4] & 0x02 != 0,
+                ready_status=obj[3 + i * 4] & 0x01 != 0,
+            )
+
         return partition_status
+
 
 class ZoneStatusAdapter(Adapter):
     def _decode(self, obj, context, path):
         zone_status = dict()
         for i in range(0, len(obj)):
-            zone_status[i+1] = dict(
-              was_in_alarm=(obj[i] & 0x80) != 0,
-              alarm=(obj[i] & 0x40) != 0,
-              fire_delay=(obj[i] & 0b00110000) == 0b00110000,
-              entry_delay=(obj[i] & 0b00010000) == 0b00010000,
-              intellizone_delay=(obj[i] & 0b00100000) == 0b00010000,
-              no_delay=(obj[i] & 0b00110000) == 0,
-              bypassed=(obj[i] & 0x08) != 0,
-              shutdown=(obj[i] & 0x04) != 0,
-              in_tx_delay=(obj[i] & 0x02) != 0,
-              was_bypassed=(obj[i] & 0x01) != 0)
+            zone_status[i + 1] = dict(
+                was_in_alarm=(obj[i] & 0x80) != 0,
+                alarm=(obj[i] & 0x40) != 0,
+                fire_delay=(obj[i] & 0b00110000) == 0b00110000,
+                entry_delay=(obj[i] & 0b00010000) == 0b00010000,
+                intellizone_delay=(obj[i] & 0b00100000) == 0b00010000,
+                no_delay=(obj[i] & 0b00110000) == 0,
+                bypassed=(obj[i] & 0x08) != 0,
+                shutdown=(obj[i] & 0x04) != 0,
+                in_tx_delay=(obj[i] & 0x02) != 0,
+                was_bypassed=(obj[i] & 0x01) != 0)
 
         return zone_status
+
 
 class SignalStrengthAdapter(Adapter):
     def _decode(self, obj, context, path):
         strength = dict()
         for i in range(0, len(obj)):
-            strength[i+1] = obj[i]
+            strength[i + 1] = obj[i]
         return strength
+
 
 eventGroupMap = {0: 'Zone OK',
                  1: 'Zone open',
@@ -221,7 +225,6 @@ _bellStatus = {-1: 'Bell',
                3: ' Bell squawk disarm',
                99: 'Any bell status event'}
 
-
 _nonReportableEvents = {-1: 'NonReportable',
                         0: 'Telephone line trouble',
                         1: '[ENTER]/[CLEAR]/[POWER] key was pressed (Partition 1 only)',
@@ -253,75 +256,75 @@ _nonReportableEvents = {-1: 'NonReportable',
                         99: 'Any non-reportable event'}
 
 _userLabel = {-1: 'User',
-               1: 'User Number 1',
-               2: 'User Number 2',
-               3: 'User Number 3',
-               4: 'User Number 4',
-               5: 'User Number 5',
-               6: 'User Number 6',
-               7: 'User Number 7',
-               8: 'User Number 8',
-               9: 'User Number 9',
-               10: 'User Number 10',
-               11: 'User Number 11',
-               12: 'User Number 12',
-               13: 'User Number 13',
-               14: 'User Number 14',
-               15: 'User Number 15',
-               16: 'User Number 16',
-               17: 'User Number 17',
-               18: 'User Number 18',
-               19: 'User Number 19',
-               20: 'User Number 20',
-               21: 'User Number 21',
-               22: 'User Number 22',
-               23: 'User Number 23',
-               24: 'User Number 24',
-               25: 'User Number 25',
-               26: 'User Number 26',
-               27: 'User Number 27',
-               28: 'User Number 28',
-               29: 'User Number 29',
-               30: 'User Number 30',
-               31: 'User Number 31',
-               32: 'User Number 32'
-               }
+              1: 'User Number 1',
+              2: 'User Number 2',
+              3: 'User Number 3',
+              4: 'User Number 4',
+              5: 'User Number 5',
+              6: 'User Number 6',
+              7: 'User Number 7',
+              8: 'User Number 8',
+              9: 'User Number 9',
+              10: 'User Number 10',
+              11: 'User Number 11',
+              12: 'User Number 12',
+              13: 'User Number 13',
+              14: 'User Number 14',
+              15: 'User Number 15',
+              16: 'User Number 16',
+              17: 'User Number 17',
+              18: 'User Number 18',
+              19: 'User Number 19',
+              20: 'User Number 20',
+              21: 'User Number 21',
+              22: 'User Number 22',
+              23: 'User Number 23',
+              24: 'User Number 24',
+              25: 'User Number 25',
+              26: 'User Number 26',
+              27: 'User Number 27',
+              28: 'User Number 28',
+              29: 'User Number 29',
+              30: 'User Number 30',
+              31: 'User Number 31',
+              32: 'User Number 32'
+              }
 
 _remoteLabel = {-1: 'Remote',
-                 1: 'Remote control number 1',
-                 2: 'Remote control number 2',
-                 3: 'Remote control number 3',
-                 4: 'Remote control number 4',
-                 5: 'Remote control number 5',
-                 6: 'Remote control number 6',
-                 7: 'Remote control number 7',
-                 8: 'Remote control number 8',
-                 9: 'Remote control number 9',
-                 10: 'Remote control number 10',
-                 11: 'Remote control number 11',
-                 12: 'Remote control number 12',
-                 13: 'Remote control number 13',
-                 14: 'Remote control number 14',
-                 15: 'Remote control number 15',
-                 16: 'Remote control number 16',
-                 17: 'Remote control number 17',
-                 18: 'Remote control number 18',
-                 19: 'Remote control number 19',
-                 20: 'Remote control number 20',
-                 21: 'Remote control number 21',
-                 22: 'Remote control number 22',
-                 23: 'Remote control number 23',
-                 24: 'Remote control number 24',
-                 25: 'Remote control number 25',
-                 26: 'Remote control number 26',
-                 27: 'Remote control number 27',
-                 28: 'Remote control number 28',
-                 29: 'Remote control number 29',
-                 30: 'Remote control number 30',
-                 31: 'Remote control number 31',
-                 32: 'Remote control number 32',
-                 99: 'Any remote control number'
-                 }
+                1: 'Remote control number 1',
+                2: 'Remote control number 2',
+                3: 'Remote control number 3',
+                4: 'Remote control number 4',
+                5: 'Remote control number 5',
+                6: 'Remote control number 6',
+                7: 'Remote control number 7',
+                8: 'Remote control number 8',
+                9: 'Remote control number 9',
+                10: 'Remote control number 10',
+                11: 'Remote control number 11',
+                12: 'Remote control number 12',
+                13: 'Remote control number 13',
+                14: 'Remote control number 14',
+                15: 'Remote control number 15',
+                16: 'Remote control number 16',
+                17: 'Remote control number 17',
+                18: 'Remote control number 18',
+                19: 'Remote control number 19',
+                20: 'Remote control number 20',
+                21: 'Remote control number 21',
+                22: 'Remote control number 22',
+                23: 'Remote control number 23',
+                24: 'Remote control number 24',
+                25: 'Remote control number 25',
+                26: 'Remote control number 26',
+                27: 'Remote control number 27',
+                28: 'Remote control number 28',
+                29: 'Remote control number 29',
+                30: 'Remote control number 30',
+                31: 'Remote control number 31',
+                32: 'Remote control number 32',
+                99: 'Any remote control number'
+                }
 
 _specialArming = {-1: 'Special',
                   0: 'Auto-arming (on time/no movement)',
@@ -347,16 +350,16 @@ _specialDisarming = {-1: 'Special',
                      }
 
 _specialAlarm = {
-                -1: 'Special',
-                 0: 'Panic non-medical emergency',
-                 1: 'Panic medical',
-                 2: 'Panic fire',
-                 3: 'Recent closing',
-                 4: 'Global shutdown',
-                 5: 'Duress alarm',
-                 6: 'Keypad lockout (Partition 1)',
-                 99: 'Any special alarm event'
-                 }
+    -1: 'Special',
+    0: 'Panic non-medical emergency',
+    1: 'Panic medical',
+    2: 'Panic fire',
+    3: 'Recent closing',
+    4: 'Global shutdown',
+    5: 'Duress alarm',
+    6: 'Keypad lockout (Partition 1)',
+    99: 'Any special alarm event'
+}
 
 _newTrouble = {-1: 'Trouble',
                0: 'N/A',
@@ -368,7 +371,7 @@ _newTrouble = {-1: 'Trouble',
                6: 'Clock loss',
                7: 'Fire loop trouble',
                8: 'Fail to communicate to monitoring station telephone #1',
-               9:  'Fail to communicate to monitoring station telephone #2',
+               9: 'Fail to communicate to monitoring station telephone #2',
                11: 'Fail to communicate to voice report',
                12: 'RF jamming',
                13: 'GSM RF jamming',
@@ -423,24 +426,24 @@ _softwareAccess = {-1: 'Software',
                    }
 
 _outputLabel = {
-              -1: 'Output',
-              1: 'PGM Number 1',
-              2: 'PGM Number 2',
-              3: 'PGM Number 3',
-              4: 'PGM Number 4',
-              5: 'PGM Number 5',
-              6: 'PGM Number 6',
-              7: 'PGM Number 7',
-              8: 'PGM Number 8',
-              9: 'PGM Number 9',
-              10: 'PGM Number 10',
-              11: 'PGM Number 11',
-              12: 'PGM Number 12',
-              13: 'PGM Number 13',
-              14: 'PGM Number 14',
-              15: 'PGM Number 15',
-              16: 'PGM Number 16'
-              }
+    -1: 'Output',
+    1: 'PGM Number 1',
+    2: 'PGM Number 2',
+    3: 'PGM Number 3',
+    4: 'PGM Number 4',
+    5: 'PGM Number 5',
+    6: 'PGM Number 6',
+    7: 'PGM Number 7',
+    8: 'PGM Number 8',
+    9: 'PGM Number 9',
+    10: 'PGM Number 10',
+    11: 'PGM Number 11',
+    12: 'PGM Number 12',
+    13: 'PGM Number 13',
+    14: 'PGM Number 14',
+    15: 'PGM Number 15',
+    16: 'PGM Number 16'
+}
 
 _wirelessRepeater = {-1: 'Wireless',
                      1: 'Wireless repeater 1',
@@ -486,7 +489,7 @@ _moduleTroubleRestore = {1: 'Bus Module',
                          99: 'Any bus module trouble restored event'
                          }
 
-_special = {-1: 'Special', 
+_special = {-1: 'Special',
             0: 'System power up',
             1: 'Reporting test',
             2: 'Software log on',
@@ -499,7 +502,7 @@ _special = {-1: 'Special',
             99: 'Any special event'
             }
 
-_systemStatus = {-1: 'System', 
+_systemStatus = {-1: 'System',
                  0: 'Follow Arm LED status',
                  1: 'PGM pulse fast in alarm',
                  2: 'PGM pulse fast in exit delay below 10 sec.',
@@ -508,41 +511,40 @@ _systemStatus = {-1: 'System',
                  5: 'PGM OFF if disarmed',
                  }
 
-_zoneLabel = {-1:  'Zone',
-               1: 'Zone 1',
-               2: 'Zone 2',
-               3: 'Zone 3',
-               4: 'Zone 4',
-               5: 'Zone 5',
-               6: 'Zone 6',
-               7: 'Zone 7',
-               8: 'Zone 8',
-               9: 'Zone 9',
-               10: 'Zone 10',
-               11: 'Zone 11',
-               12: 'Zone 12',
-               13: 'Zone 13',
-               14: 'Zone 14',
-               15: 'Zone 15',
-               16: 'Zone 16',
-               17: 'Zone 17',
-               18: 'Zone 18',
-               19: 'Zone 19',
-               20: 'Zone 20',
-               21: 'Zone 21',
-               22: 'Zone 22',
-               23: 'Zone 23',
-               24: 'Zone 24',
-               25: 'Zone 25',
-               26: 'Zone 26',
-               27: 'Zone 27',
-               28: 'Zone 28',
-               29: 'Zone 29',
-               30: 'Zone 30',
-               31: 'Zone 31',
-               32: 'Zone 32',
-               99: 'Any zone'}
-
+_zoneLabel = {-1: 'Zone',
+              1: 'Zone 1',
+              2: 'Zone 2',
+              3: 'Zone 3',
+              4: 'Zone 4',
+              5: 'Zone 5',
+              6: 'Zone 6',
+              7: 'Zone 7',
+              8: 'Zone 8',
+              9: 'Zone 9',
+              10: 'Zone 10',
+              11: 'Zone 11',
+              12: 'Zone 12',
+              13: 'Zone 13',
+              14: 'Zone 14',
+              15: 'Zone 15',
+              16: 'Zone 16',
+              17: 'Zone 17',
+              18: 'Zone 18',
+              19: 'Zone 19',
+              20: 'Zone 20',
+              21: 'Zone 21',
+              22: 'Zone 22',
+              23: 'Zone 23',
+              24: 'Zone 24',
+              25: 'Zone 25',
+              26: 'Zone 26',
+              27: 'Zone 27',
+              28: 'Zone 28',
+              29: 'Zone 29',
+              30: 'Zone 30',
+              31: 'Zone 31',
+              32: 'Zone 32',
+              99: 'Any zone'}
 
 _eventOpt1 = {1: _outputLabel[1],
               2: _outputLabel[2],
@@ -635,25 +637,25 @@ subEventGroupMap = {0: _zoneLabel,
                     }
 
 partitionLabel = {1: 'Partition 1',
-                    2: 'Partition 2'
-                    }
+                  2: 'Partition 2'
+                  }
 
 busModuleLabel = {1: 'Bus Module 1',
-                    2: 'Bus Module 2',
-                    3: 'Bus Module 3',
-                    4: 'Bus Module 4',
-                    5: 'Bus Module 5',
-                    6: 'Bus Module 6',
-                    7: 'Bus Module 7',
-                    8: 'Bus Module 8',
-                    9: 'Bus Module 9',
-                    10: 'Bus Module 10',
-                    11: 'Bus Module 11',
-                    12: 'Bus Module 12',
-                    13: 'Bus Module 13',
-                    14: 'Bus Module 14',
-                    15: 'Bus Module 15'
-                    }
+                  2: 'Bus Module 2',
+                  3: 'Bus Module 3',
+                  4: 'Bus Module 4',
+                  5: 'Bus Module 5',
+                  6: 'Bus Module 6',
+                  7: 'Bus Module 7',
+                  8: 'Bus Module 8',
+                  9: 'Bus Module 9',
+                  10: 'Bus Module 10',
+                  11: 'Bus Module 11',
+                  12: 'Bus Module 12',
+                  13: 'Bus Module 13',
+                  14: 'Bus Module 14',
+                  15: 'Bus Module 15'
+                  }
 
 siteNameLabel = {1: 'Site Name'}
 
@@ -668,8 +670,7 @@ labelTypeMap = {0: 'Zone Label',
 
 
 class EventAdapter(Adapter):
-    def _decode(self, obj, context, path):      
-      return {'major': (obj[0], eventGroupMap[obj[0]]), 
-                'minor': (obj[1], subEventGroupMap[obj[0]][obj[1]]), 
+    def _decode(self, obj, context, path):
+        return {'major': (obj[0], eventGroupMap[obj[0]]),
+                'minor': (obj[1], subEventGroupMap[obj[0]][obj[1]]),
                 'type': subEventGroupMap[obj[0]][-1]}
-

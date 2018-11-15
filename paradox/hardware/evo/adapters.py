@@ -3,10 +3,10 @@
 from construct import Adapter
 import datetime
 
+
 class DateAdapter(Adapter):
     def _decode(self, obj, context, path):
-        return datetime.datetime(obj[0]*100+obj[1], obj[2], obj[3], obj[4], obj[5])
-
+        return datetime.datetime(obj[0] * 100 + obj[1], obj[2], obj[3], obj[4], obj[5])
 
     def _encode(self, obj, context, path):
         return [obj.year / 100, obj.year % 100, obj.month, obj.day, obj.hour, obj.minute]
@@ -14,122 +14,124 @@ class DateAdapter(Adapter):
 
 class ModuleSerialAdapter(Adapter):
     def _decode(self, obj, context, path):
-      return hex(int(obj[0]) * 10^8 + int(obj[1]) * 10^4 + int(obj[2]) * 10^2 + int(
-                obj[3]) * 10^0)
+        return hex(int(obj[0]) * 10 ^ 8 + int(obj[1]) * 10 ^ 4 + int(obj[2]) * 10 ^ 2 + int(
+            obj[3]) * 10 ^ 0)
+
 
 class PartitionStateAdapter(Adapter):
     states = dict(arm=4, disarm=5, arm_sleep=3, arm_stay=1, none=0)
 
     def _decode(self, obj, context, path):
-
-        for k,v in enumerate(self.states):
-          if v == obj[0]:
-            return k
+        for k, v in enumerate(self.states):
+            if v == obj[0]:
+                return k
 
         return "unknown"
 
     def _encode(self, obj, context, path):
-      if obj in self.states:
-        return self.states[obj]
+        if obj in self.states:
+            return self.states[obj]
 
-      return 0
+        return 0
+
 
 class ZoneStateAdapter(Adapter):
     states = dict(bypass=0x10)
 
     def _decode(self, obj, context, path):
-
-        for k,v in enumerate(self.states):
-          if v == obj[0]:
-            return k
+        for k, v in enumerate(self.states):
+            if v == obj[0]:
+                return k
 
         return "unknown"
 
     def _encode(self, obj, context, path):
-      if obj in self.states:
-        return self.states[obj]
+        if obj in self.states:
+            return self.states[obj]
 
-      return 0
+        return 0
 
 
 class StatusAdapter(Adapter):
     def _decode(self, obj, context, path):
         r = dict()
         for i in range(0, len(obj)):
-          status = obj[i]
-          for j in range(0, 8):
-              r[i * 8 + j + 1]=(((status >> j) & 0x01) == 0x01) 
-        
-        return r
+            status = obj[i]
+            for j in range(0, 8):
+                r[i * 8 + j + 1] = (((status >> j) & 0x01) == 0x01)
 
+        return r
 
 
 class PartitionStatusAdapter(Adapter):
     def _decode(self, obj, context, path):
-        partition_status= dict()
+        partition_status = dict()
 
         for i in range(0, 2):
-            partition_status[i+1] = dict(
-	        alarm = (obj[0 + i*4] & 0xf0 != 0) or (obj[2 + i*4] & 0x80 != 0), # Combined status
-                pulse_fire_alarm = obj[0 + i*4] & 0x80 != 0,
-                audible_alarm = obj[0 + i*4] & 0x40 != 0,
-                silent_alarm = obj[0 + i*4] & 0x20 != 0,
-                strobe_alarm = obj[0 + i*4] & 0x10 != 0,
-                stay_arm = obj[0 + i*4] & 0x04 != 0,
-                sleep_arm = obj[0 + i*4] & 0x02 != 0,
-                arm = obj[0 + i*4] & 0x01 != 0,
-                bell_activated = obj[1 + i*4] & 0x80 != 0,
-                auto_arming_engaged = obj[1 + i*4] & 0x40 != 0,
-                recent_closing_delay = obj[1 + i*4] & 0x20 != 0,
-                intellizone_delay = obj[1 + i*4] & 0x10 != 0,
-                zone_bypassed = obj[1 + i*4] & 0x08 != 0,
-                alarms_in_memory = obj[1 + i*4] & 0x04 != 0,
-                entry_delay = obj[1 + i*4] & 0x02 != 0,
-                exit_delay = obj[1 + i*4] & 0x01 != 0,
-                paramedic_alarm = obj[2 + i*4] & 0x80 != 0,
-                not_used1 = obj[2 + i*4] & 0x40 != 0,
-                arm_with_remote = obj[2 + i*4] & 0x20 != 0,
-                transmission_delay_finished = obj[2 + i*4] & 0x10 != 0,
-                bell_delay_finished = obj[2 + i*4] & 0x08 != 0,
-                entry_delay_finished = obj[2 + i*4] & 0x04 != 0,
-                exit_delay_finished = obj[2 + i*4] & 0x02 != 0,
-                intellizone_delay_finished = obj[2 + i*4] & 0x01 != 0,
-                not_used2 = obj[3 + i*4] & 0x80 != 0,
-                wait_window = obj[3 + i*4] & 0x40 != 0,
-                not_used3 = obj[3 + i*4] & 0x20 != 0,
-                in_remote_delay = obj[3 + i*4] & 0x10 != 0,
-                not_used4 = obj[3 + i*4] & 0x08 != 0,
-                stayd_mode_active = obj[3 + i*4] & 0x04 != 0,
-                force_arm = obj[3 + i*4] & 0x02 != 0,
-                ready_status = obj[3 + i*4] & 0x01 != 0,
-              )
-              
+            partition_status[i + 1] = dict(
+                alarm=(obj[0 + i * 4] & 0xf0 != 0) or (obj[2 + i * 4] & 0x80 != 0),  # Combined status
+                pulse_fire_alarm=obj[0 + i * 4] & 0x80 != 0,
+                audible_alarm=obj[0 + i * 4] & 0x40 != 0,
+                silent_alarm=obj[0 + i * 4] & 0x20 != 0,
+                strobe_alarm=obj[0 + i * 4] & 0x10 != 0,
+                stay_arm=obj[0 + i * 4] & 0x04 != 0,
+                sleep_arm=obj[0 + i * 4] & 0x02 != 0,
+                arm=obj[0 + i * 4] & 0x01 != 0,
+                bell_activated=obj[1 + i * 4] & 0x80 != 0,
+                auto_arming_engaged=obj[1 + i * 4] & 0x40 != 0,
+                recent_closing_delay=obj[1 + i * 4] & 0x20 != 0,
+                intellizone_delay=obj[1 + i * 4] & 0x10 != 0,
+                zone_bypassed=obj[1 + i * 4] & 0x08 != 0,
+                alarms_in_memory=obj[1 + i * 4] & 0x04 != 0,
+                entry_delay=obj[1 + i * 4] & 0x02 != 0,
+                exit_delay=obj[1 + i * 4] & 0x01 != 0,
+                paramedic_alarm=obj[2 + i * 4] & 0x80 != 0,
+                not_used1=obj[2 + i * 4] & 0x40 != 0,
+                arm_with_remote=obj[2 + i * 4] & 0x20 != 0,
+                transmission_delay_finished=obj[2 + i * 4] & 0x10 != 0,
+                bell_delay_finished=obj[2 + i * 4] & 0x08 != 0,
+                entry_delay_finished=obj[2 + i * 4] & 0x04 != 0,
+                exit_delay_finished=obj[2 + i * 4] & 0x02 != 0,
+                intellizone_delay_finished=obj[2 + i * 4] & 0x01 != 0,
+                not_used2=obj[3 + i * 4] & 0x80 != 0,
+                wait_window=obj[3 + i * 4] & 0x40 != 0,
+                not_used3=obj[3 + i * 4] & 0x20 != 0,
+                in_remote_delay=obj[3 + i * 4] & 0x10 != 0,
+                not_used4=obj[3 + i * 4] & 0x08 != 0,
+                stayd_mode_active=obj[3 + i * 4] & 0x04 != 0,
+                force_arm=obj[3 + i * 4] & 0x02 != 0,
+                ready_status=obj[3 + i * 4] & 0x01 != 0,
+            )
+
         return partition_status
+
 
 class ZoneStatusAdapter(Adapter):
     def _decode(self, obj, context, path):
         zone_status = dict()
         for i in range(0, len(obj)):
-            zone_status[i+1] = dict(
-              was_in_alarm=(obj[i] & 0x80) != 0,
-              alarm=(obj[i] & 0x40) != 0,
-              fire_delay=(obj[i] & 0b00110000) == 0b00110000,
-              entry_delay=(obj[i] & 0b00010000) == 0b00010000,
-              intellizone_delay=(obj[i] & 0b00100000) == 0b00010000,
-              no_delay=(obj[i] & 0b00110000) == 0,
-              bypassed=(obj[i] & 0x08) != 0,
-              shutdown=(obj[i] & 0x04) != 0,
-              in_tx_delay=(obj[i] & 0x02) != 0,
-              was_bypassed=(obj[i] & 0x01) != 0)
+            zone_status[i + 1] = dict(
+                was_in_alarm=(obj[i] & 0x80) != 0,
+                alarm=(obj[i] & 0x40) != 0,
+                fire_delay=(obj[i] & 0b00110000) == 0b00110000,
+                entry_delay=(obj[i] & 0b00010000) == 0b00010000,
+                intellizone_delay=(obj[i] & 0b00100000) == 0b00010000,
+                no_delay=(obj[i] & 0b00110000) == 0,
+                bypassed=(obj[i] & 0x08) != 0,
+                shutdown=(obj[i] & 0x04) != 0,
+                in_tx_delay=(obj[i] & 0x02) != 0,
+                was_bypassed=(obj[i] & 0x01) != 0)
 
         return zone_status
+
 
 class SignalStrengthAdapter(Adapter):
     def _decode(self, obj, context, path):
         strength = dict()
         for i in range(0, len(obj)):
-            strength[i+1] = obj[i]
+            strength[i + 1] = obj[i]
         return strength
+
 
 eventGroupMap = {0: 'Zone OK',
                  1: 'Zone open',
@@ -209,7 +211,7 @@ _nonReportableEvents = {-1: 'NonReportable',
                         4: 'Arm in Away mode',
                         5: 'Full arm when in Stay mode',
                         6: 'Voice module access',
-                        7: 'Remote control access', # event 2: user number
+                        7: 'Remote control access',  # event 2: user number
                         8: 'PC fail to communicate',
                         9: 'Midnight',
                         10: 'Neware user login',
@@ -221,8 +223,8 @@ _nonReportableEvents = {-1: 'NonReportable',
                         16: 'Auxiliary output manually activated',
                         17: 'Auxiliary output manually deactivated',
                         18: 'Voice reporting failed',
-                        19: 'Fail to communicate restore', # event 2: tel number
-                        20: 'Software access (VDMP3, Ip100, Neware, WinLoad)', # event 2: module
+                        19: 'Fail to communicate restore',  # event 2: tel number
+                        20: 'Software access (VDMP3, Ip100, Neware, WinLoad)',  # event 2: module
                         21: 'IPR512 1 registration status',
                         22: 'IPR512 2 registration status',
                         23: 'IPR512 3 registration status',
@@ -260,24 +262,24 @@ _specialDisarming = {-1: 'Special',
                      }
 
 _specialAlarm = {
-                -1: 'Special',
-                 0: 'Panic non-medical emergency',
-                 1: 'Panic medical',
-                 2: 'Panic fire',
-                 3: 'Recent closing',
-                 4: 'Police code',
-                 5: 'Zone shutdown',
-                 6: 'Future use',
-                 7: 'Future use',
-                 8: 'TLM alarm',
-                 9: 'Central communication failure alarm',
-                 10: 'Module tamper alarm',
-                 11: 'Missing GSM module alarm',
-                 12: 'GSM no service alarm',
-                 13: 'Missing IP module alarm',
-                 14: 'IP no service alarm',
-                 15: 'Missing voice module alarm',
-                 }
+    -1: 'Special',
+    0: 'Panic non-medical emergency',
+    1: 'Panic medical',
+    2: 'Panic fire',
+    3: 'Recent closing',
+    4: 'Police code',
+    5: 'Zone shutdown',
+    6: 'Future use',
+    7: 'Future use',
+    8: 'TLM alarm',
+    9: 'Central communication failure alarm',
+    10: 'Module tamper alarm',
+    11: 'Missing GSM module alarm',
+    12: 'GSM no service alarm',
+    13: 'Missing IP module alarm',
+    14: 'IP no service alarm',
+    15: 'Missing voice module alarm',
+}
 
 _newTrouble = {-1: 'Trouble',
                0: 'TLM trouble',
@@ -289,7 +291,7 @@ _newTrouble = {-1: 'Trouble',
                6: 'Clock loss',
                7: 'Fire loop trouble',
                8: 'Fail to communicate to monitoring station telephone #1',
-               9:  'Fail to communicate to monitoring station telephone #2',
+               9: 'Fail to communicate to monitoring station telephone #2',
                11: 'Fail to communicate to voice report',
                12: 'RF jamming',
                13: 'GSM RF jamming',
@@ -365,12 +367,12 @@ _moduleTroubleRestore = {-1: 'Bus Module',
 _specialTamper = {-1: 'Special',
                   0: 'Keypad Lockout',
                   1: 'Voice lockout'
-                 }
+                  }
 
 _nonSavedEvent = {-1: 'Non-saved event',
                   0: 'Remote control rejected',
                   1: 'Future use'
-                 }
+                  }
 
 _specialEvent = {-1: 'Special',
                  0: 'Power-up after total power down',
@@ -462,11 +464,11 @@ _specialStatus = {-1: 'Special status',
                   }
 
 _specialStatus.update(dict((i, 'Chime in partition {}'.format(i)) for i in range(0, 4)))
-_specialStatus.update(dict((i, 'Bell on partition {}'.format(i-7)) for i in range(8, 16)))
-_specialStatus.update(dict((i, 'Pulsed alarm in partition {}'.format(i-15)) for i in range(16, 24)))
-_specialStatus.update(dict((i, 'Open/close Kiss off in partition {}'.format(i-23)) for i in range(24, 32)))
-_specialStatus.update(dict((i, 'Keyswitch/PGM input {}'.format(i-31)) for i in range(32, 64)))
-_specialStatus.update(dict((i, 'Status of access door {}'.format(i-63)) for i in range(64, 96)))
+_specialStatus.update(dict((i, 'Bell on partition {}'.format(i - 7)) for i in range(8, 16)))
+_specialStatus.update(dict((i, 'Pulsed alarm in partition {}'.format(i - 15)) for i in range(16, 24)))
+_specialStatus.update(dict((i, 'Open/close Kiss off in partition {}'.format(i - 23)) for i in range(24, 32)))
+_specialStatus.update(dict((i, 'Keyswitch/PGM input {}'.format(i - 31)) for i in range(32, 64)))
+_specialStatus.update(dict((i, 'Status of access door {}'.format(i - 63)) for i in range(64, 96)))
 
 _keyswitchLabel = {-1: 'Keyswitch'}
 _keyswitchLabel.update(dict((i, 'Keyswitch {}'.format(i)) for i in range(1, 33)))
@@ -551,7 +553,7 @@ subEventGroupMap = {0: _zoneLabel,  # Zone OK
                     64: _status1,  # Status 1
                     65: _status2,  # Status 2
                     66: _status3,  # Status 3
-                    67: _specialStatus # Special status
+                    67: _specialStatus  # Special status
                     }
 
 '''mapping of Label Types'''
@@ -563,18 +565,19 @@ labelTypeMap = {0: 'No label',
                 5: 'Module label',
                 6: 'Future'}
 
-class EventAdapter(Adapter):
-  def _decode(self, obj, context, path):
-    event_group = obj[0]
-    event_high_nibble = obj[1] >> 4
-    event_1 = obj[2] + (event_high_nibble << 8)
-    event_2 = obj[3] + (event_high_nibble << 8)
-    partition = obj[1] & 0x0f
 
-    return {
-      'major': (event_group, eventGroupMap[event_group]),
-      'minor': (event_1, subEventGroupMap[event_group][event_1]),
-      'minor2' : (event_2, None),
-      'type': subEventGroupMap[event_group][-1],
-      'partition': partition
-    }
+class EventAdapter(Adapter):
+    def _decode(self, obj, context, path):
+        event_group = obj[0]
+        event_high_nibble = obj[1] >> 4
+        event_1 = obj[2] + (event_high_nibble << 8)
+        event_2 = obj[3] + (event_high_nibble << 8)
+        partition = obj[1] & 0x0f
+
+        return {
+            'major': (event_group, eventGroupMap[event_group]),
+            'minor': (event_1, subEventGroupMap[event_group][event_1]),
+            'minor2': (event_2, None),
+            'type': subEventGroupMap[event_group][-1],
+            'partition': partition
+        }

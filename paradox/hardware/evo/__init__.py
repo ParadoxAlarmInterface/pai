@@ -35,162 +35,166 @@ MEM_SIREN_END = MEM_SIREN_START + 0x10 * 4
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
+
 class Panel(PanelBase):
-  def get_message(self, name):
-    try:
-      return super(Panel, self).get_message(name)
-    except ResourceWarning as e:
-      clsmembers = dict(inspect.getmembers(sys.modules[__name__]))
-      if name in clsmembers:
-        return clsmembers[name]
-      else:
-        raise e
+    def get_message(self, name):
+        try:
+            return super(Panel, self).get_message(name)
+        except ResourceWarning as e:
+            clsmembers = dict(inspect.getmembers(sys.modules[__name__]))
+            if name in clsmembers:
+                return clsmembers[name]
+            else:
+                raise e
 
-  def update_labels(self):
-    logger.info("Updating Labels from Panel")
+    def update_labels(self):
+        logger.info("Updating Labels from Panel")
 
-    output_template = dict(
-      on=False,
-      pulse=False)
+        output_template = dict(
+            on=False,
+            pulse=False)
 
-    eeprom_zone_ranges = [range(MEM_ZONE_48_START, MEM_ZONE_48_END, 0x10)]
-    if self.product_id in ['DIGIPLEX_EVO_96', 'DIGIPLEX_EVO_192']:
-      eeprom_zone_ranges.append(range(MEM_ZONE_96_START, MEM_ZONE_96_END, 0x10))
-    if self.product_id in ['DIGIPLEX_EVO_192']:
-      eeprom_zone_ranges.append(range(MEM_ZONE_192_START, MEM_ZONE_192_END, 0x10))
+        eeprom_zone_ranges = [range(MEM_ZONE_48_START, MEM_ZONE_48_END, 0x10)]
+        if self.product_id in ['DIGIPLEX_EVO_96', 'DIGIPLEX_EVO_192']:
+            eeprom_zone_ranges.append(range(MEM_ZONE_96_START, MEM_ZONE_96_END, 0x10))
+        if self.product_id in ['DIGIPLEX_EVO_192']:
+            eeprom_zone_ranges.append(range(MEM_ZONE_192_START, MEM_ZONE_192_END, 0x10))
 
-    self.load_labels(self.core.zones, self.core.labels['zone'], eeprom_zone_ranges)
-    logger.info("Zones: {}".format(', '.join(self.core.labels['zone'])))
-    # self.load_labels(self.core.outputs, self.core.labels['output'], MEM_OUTPUT_START, MEM_OUTPUT_END, template=output_template)
-    # logger.info("Outputs: {}".format(', '.join(list(self.core.labels['output']))))
-    # self.load_labels(self.core.partitions, self.core.labels['partition'], MEM_PARTITION_START, MEM_PARTITION_END)
-    # logger.info("Partitions: {}".format(', '.join(list(self.core.labels['partition']))))
-    # self.load_labels(self.core.users, self.core.labels['user'], MEM_USER_START, MEM_USER_END)
-    # logger.info("Users: {}".format(', '.join(list(self.core.labels['user']))))
-    # self.load_labels(self.core.buses, self.core.labels['bus'], MEM_BUS_START, MEM_BUS_END)
-    # logger.info("Buses: {}".format(', '.join(list(self.core.labels['bus']))))
-    # # self.load_labels(self.core.repeaters, self.core.labels['repeater'], MEM_REPEATER_START, MEM_REPEATER_END)
-    # # logger.info("Repeaters: {}".format(', '.join(list(self.core.labels['repeater']))))
-    # self.load_labels(self.core.keypads, self.core.labels['keypad'], MEM_KEYPAD_START, MEM_KEYPAD_END)
-    # logger.info("Keypads: {}".format(', '.join(list(self.core.labels['keypad']))))
-    # self.load_labels(self.core.sites, self.core.labels['site'], MEM_SITE_START, MEM_SITE_END)
-    # logger.info("Sites: {}".format(', '.join(list(self.core.labels['site']))))
-    # self.load_labels(self.core.sirens, self.core.labels['siren'], MEM_SIREN_START, MEM_SIREN_END)
-    # logger.info("Sirens: {}".format(', '.join(list(self.core.labels['siren']))))
+        self.load_labels(self.core.zones, self.core.labels['zone'], eeprom_zone_ranges)
+        logger.info("Zones: {}".format(', '.join(self.core.labels['zone'])))
+        # self.load_labels(self.core.outputs, self.core.labels['output'], MEM_OUTPUT_START, MEM_OUTPUT_END, template=output_template)
+        # logger.info("Outputs: {}".format(', '.join(list(self.core.labels['output']))))
+        # self.load_labels(self.core.partitions, self.core.labels['partition'], MEM_PARTITION_START, MEM_PARTITION_END)
+        # logger.info("Partitions: {}".format(', '.join(list(self.core.labels['partition']))))
+        # self.load_labels(self.core.users, self.core.labels['user'], MEM_USER_START, MEM_USER_END)
+        # logger.info("Users: {}".format(', '.join(list(self.core.labels['user']))))
+        # self.load_labels(self.core.buses, self.core.labels['bus'], MEM_BUS_START, MEM_BUS_END)
+        # logger.info("Buses: {}".format(', '.join(list(self.core.labels['bus']))))
+        # # self.load_labels(self.core.repeaters, self.core.labels['repeater'], MEM_REPEATER_START, MEM_REPEATER_END)
+        # # logger.info("Repeaters: {}".format(', '.join(list(self.core.labels['repeater']))))
+        # self.load_labels(self.core.keypads, self.core.labels['keypad'], MEM_KEYPAD_START, MEM_KEYPAD_END)
+        # logger.info("Keypads: {}".format(', '.join(list(self.core.labels['keypad']))))
+        # self.load_labels(self.core.sites, self.core.labels['site'], MEM_SITE_START, MEM_SITE_END)
+        # logger.info("Sites: {}".format(', '.join(list(self.core.labels['site']))))
+        # self.load_labels(self.core.sirens, self.core.labels['siren'], MEM_SIREN_START, MEM_SIREN_END)
+        # logger.info("Sirens: {}".format(', '.join(list(self.core.labels['siren']))))
 
-    logger.debug("Labels updated")
+        logger.debug("Labels updated")
 
-  def load_labels(self,
-                  labelDictIndex,
-                  labelDictName,
-                  ranges,
-                  field_length=16,
-                  template=dict(label='')):
-    """Load labels from panel"""
-    i = 1
+    def load_labels(self,
+                    labelDictIndex,
+                    labelDictName,
+                    ranges,
+                    field_length=16,
+                    template=dict(label='')):
+        """Load labels from panel"""
+        i = 1
 
-    for range_ in ranges:
-      for address in range_:
-        args = dict(address=address, length=field_length)
-        reply = self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=0x05)
+        for range_ in ranges:
+            for address in range_:
+                args = dict(address=address, length=field_length)
+                reply = self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=0x05)
 
-        retry_count = 3
-        for retry in range(1, retry_count+1):
-          # Avoid errors due to collision with events. It should not come here as we use reply_expected=0x05
-          if reply is None:
-            logger.error("Could not fully load labels")
-            return
+                retry_count = 3
+                for retry in range(1, retry_count + 1):
+                    # Avoid errors due to collision with events. It should not come here as we use reply_expected=0x05
+                    if reply is None:
+                        logger.error("Could not fully load labels")
+                        return
 
-          if reply.fields.value.address != address:
-            logger.debug("Fetched and receive label EEPROM addresses (received: %d, requested: %d) do not match. Retrying %d of %d" % (reply.fields.value.address, address, retry, retry_count))
-            reply = self.core.send_wait(None, None, reply_expected=0x05)
-            continue
+                    if reply.fields.value.address != address:
+                        logger.debug(
+                            "Fetched and receive label EEPROM addresses (received: %d, requested: %d) do not match. Retrying %d of %d" % (
+                            reply.fields.value.address, address, retry, retry_count))
+                        reply = self.core.send_wait(None, None, reply_expected=0x05)
+                        continue
 
-          if retry == retry_count:
-            logger.error('Failed to fetch label at address: %d' % address)
+                    if retry == retry_count:
+                        logger.error('Failed to fetch label at address: %d' % address)
 
-          break
+                    break
 
-        data = reply.fields.value.data
-        label = data.strip(b'\0 ').replace(b'\0', b'_').replace(b' ', b'_').decode('utf-8')
+                data = reply.fields.value.data
+                label = data.strip(b'\0 ').replace(b'\0', b'_').replace(b' ', b'_').decode('utf-8')
 
-        if label not in labelDictName:
-          properties = template.copy()
-          properties['label'] = label
-          labelDictIndex[i] = properties
+                if label not in labelDictName:
+                    properties = template.copy()
+                    properties['label'] = label
+                    labelDictIndex[i] = properties
 
-          labelDictName[label] = i
-        i += 1
+                    labelDictName[label] = i
+                i += 1
 
-  def parse_message(self, message):
-      try:
-          if message is None or len(message) == 0:
-              return None
+    def parse_message(self, message):
+        try:
+            if message is None or len(message) == 0:
+                return None
 
-          if message[0] >> 4 == 0x7:
-              return ErrorMessage.parse(message)
-          elif message[0] == 0x00:
-              return InitializeCommunication.parse(message)
-          elif message[0] >> 4 == 0x1:
-              return LoginConfirmationResponse.parse(message)
-          elif message[0] == 0x30:
-              return SetTimeDate.parse(message)
-          elif message[0] >> 4 == 0x03:
-              return SetTimeDateResponse.parse(message)
-          elif message[0] == 0x40:
-              return PerformAction.parse(message)
-          elif message[0] >> 4 == 4:
-              return PerformActionResponse.parse(message)
-          elif message[0] == 0x50 and message[2] == 0x80:
-              return PanelStatus.parse(message)
-          elif message[0] == 0x50 and message[2] < 0x80:
-              return ReadEEPROM.parse(message)
-          elif message[0] >> 4 == 0x05 and message[2] == 0x80:
-              return PanelStatusResponse[message[3]].parse(message)
-          elif message[0] >> 4 == 0x05 and message[2] < 0x80:
-              return ReadEEPROMResponse.parse(message)
-          elif message[0] == 0x60 and message[2] < 0x80:
-              return WriteEEPROM.parse(message)
-          elif message[0] >> 4 == 0x06 and message[2] < 0x80:
-              return WriteEEPROMResponse.parse(message)
-          elif message[0] >> 4 == 0x0e:
-              return LiveEvent.parse(message)
-          else:
-              logger.error("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
-      except Exception:
-        logger.exception("Parsing message")
+            if message[0] >> 4 == 0x7:
+                return ErrorMessage.parse(message)
+            elif message[0] == 0x00:
+                return InitializeCommunication.parse(message)
+            elif message[0] >> 4 == 0x1:
+                return LoginConfirmationResponse.parse(message)
+            elif message[0] == 0x30:
+                return SetTimeDate.parse(message)
+            elif message[0] >> 4 == 0x03:
+                return SetTimeDateResponse.parse(message)
+            elif message[0] == 0x40:
+                return PerformAction.parse(message)
+            elif message[0] >> 4 == 4:
+                return PerformActionResponse.parse(message)
+            elif message[0] == 0x50 and message[2] == 0x80:
+                return PanelStatus.parse(message)
+            elif message[0] == 0x50 and message[2] < 0x80:
+                return ReadEEPROM.parse(message)
+            elif message[0] >> 4 == 0x05 and message[2] == 0x80:
+                return PanelStatusResponse[message[3]].parse(message)
+            elif message[0] >> 4 == 0x05 and message[2] < 0x80:
+                return ReadEEPROMResponse.parse(message)
+            elif message[0] == 0x60 and message[2] < 0x80:
+                return WriteEEPROM.parse(message)
+            elif message[0] >> 4 == 0x06 and message[2] < 0x80:
+                return WriteEEPROMResponse.parse(message)
+            elif message[0] >> 4 == 0x0e:
+                return LiveEvent.parse(message)
+            else:
+                logger.error("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
+        except Exception:
+            logger.exception("Parsing message")
 
-      s = 'PARSE: '
-      for c in message:
-        s += "{:02x} ".format(c)
+        s = 'PARSE: '
+        for c in message:
+            s += "{:02x} ".format(c)
 
-      logger.debug(s)
+        logger.debug(s)
 
-      return None
+        return None
 
-  def encode_password(self, password):
-    return binascii.unhexlify(password)
+    def encode_password(self, password):
+        return binascii.unhexlify(password)
 
-  def initialize_communication(self, reply, PASSWORD):
-    password = self.encode_password(PASSWORD)
+    def initialize_communication(self, reply, PASSWORD):
+        password = self.encode_password(PASSWORD)
 
-    raw_data = reply.fields.data + reply.checksum
-    parsed = InitializeCommunication.parse(raw_data)
-    parsed.fields.value.pc_password = password
-    payload = InitializeCommunication.build(dict(fields=dict(value=parsed.fields.value)))
+        raw_data = reply.fields.data + reply.checksum
+        parsed = InitializeCommunication.parse(raw_data)
+        parsed.fields.value.pc_password = password
+        payload = InitializeCommunication.build(dict(fields=dict(value=parsed.fields.value)))
 
-    logger.info("Initializing communication")
-    reply = self.core.send_wait(message=payload, reply_expected=0x1)
+        logger.info("Initializing communication")
+        reply = self.core.send_wait(message=payload, reply_expected=0x1)
 
-    if reply is None:
-      return False
+        if reply is None:
+            return False
 
-    if reply.fields.value.po.status.Windload_connected == True:
-      logger.info("Authentication Success")
-      return True
-    else:
-      logger.error("Authentication Failed. Wrong Password?")
-      return False
+        if reply.fields.value.po.status.Windload_connected == True:
+            logger.info("Authentication Success")
+            return True
+        else:
+            logger.error("Authentication Failed. Wrong Password?")
+            return False
+
 
 LoginConfirmationResponse = Struct("fields" / RawCopy(
     Struct(
@@ -210,8 +214,8 @@ LoginConfirmationResponse = Struct("fields" / RawCopy(
         ),
         "callback" / Int16ub
     )),
-    "checksum" / Checksum(
-        Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+                                   "checksum" / Checksum(
+                                       Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 InitializeCommunication = Struct("fields" / RawCopy(
     Struct(
@@ -227,16 +231,16 @@ InitializeCommunication = Struct("fields" / RawCopy(
         "pc_password" / Default(Bytes(2), b'0000'),
         "modem_speed" / Bytes(1),
         "source_method" / Default(Enum(Int8ub,
-            Winload_Connection=0x00,
-            NEware_Connection=0x55), 0x00),
+                                       Winload_Connection=0x00,
+                                       NEware_Connection=0x55), 0x00),
         "user_code" / Default(Int24ub, 0x000000),
         "serial_number" / Bytes(4),
-        "evo_sections" / Bytes(9), # EVO section data 3030-3038
+        "evo_sections" / Bytes(9),  # EVO section data 3030-3038
         "not_used1" / Padding(4),
         "source_id" / Default(CommunicationSourceIDEnum, 1),
         "carrier_length" / Bytes(1))),
-        "checksum" / Checksum(
-            Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+                                 "checksum" / Checksum(
+                                     Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 # InitializeCommunicationResponse = Struct("fields" / RawCopy(
 #         Struct(
@@ -535,104 +539,108 @@ ErrorMessage = Struct("fields" / RawCopy(
                       "checksum" / Checksum(
                           Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
+
 class EvoEEPROMAddressAdapter(Subconstruct):
-  def deep_update(self, d, u):
-    for k, v in u.items():
-      if isinstance(v, collections.Mapping):
-        d[k] = self.deep_update(d.get(k, {}), v)
-      else:
-        d[k] = v
-    return d
+    def deep_update(self, d, u):
+        for k, v in u.items():
+            if isinstance(v, collections.Mapping):
+                d[k] = self.deep_update(d.get(k, {}), v)
+            else:
+                d[k] = v
+        return d
 
-  def _build(self, obj, stream, context, path):
-    if "control" in obj and obj["control"].get("ram_access") == True: # for ram block
-      ram_block = (obj["address"] & 0xf0000) >> 16
-      self.deep_update(obj, dict(po=dict(block = ram_block)))
-    else: # for eeprom
-      if obj["address"] >> 16 > 0x3:
-        raise ValidationError("EEPROM address is out of range")
-      eeprom_address_high_bits = (obj["address"] & 0x30000) >> 16
-      self.deep_update(obj, dict(control=dict(eeprom_address_bits=eeprom_address_high_bits)))
-    return self.subcon._build(obj, stream, context, path)
+    def _build(self, obj, stream, context, path):
+        if "control" in obj and obj["control"].get("ram_access") == True:  # for ram block
+            ram_block = (obj["address"] & 0xf0000) >> 16
+            self.deep_update(obj, dict(po=dict(block=ram_block)))
+        else:  # for eeprom
+            if obj["address"] >> 16 > 0x3:
+                raise ValidationError("EEPROM address is out of range")
+            eeprom_address_high_bits = (obj["address"] & 0x30000) >> 16
+            self.deep_update(obj, dict(control=dict(eeprom_address_bits=eeprom_address_high_bits)))
+        return self.subcon._build(obj, stream, context, path)
 
-  def _parse(self, stream, context, path):
-    obj = self.subcon._parsereport(stream, context, path)
-    return obj
+    def _parse(self, stream, context, path):
+        obj = self.subcon._parsereport(stream, context, path)
+        return obj
+
 
 ReadEEPROM = Struct("fields" / RawCopy(
-  EvoEEPROMAddressAdapter(Struct(
+    EvoEEPROMAddressAdapter(Struct(
         "po" / BitStruct(
-          "command" / Const(0x5, Nibble),
-          "block" / Default(Nibble, 0),
+            "command" / Const(0x5, Nibble),
+            "block" / Default(Nibble, 0),
         ),
-        "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+        "packet_length" / Rebuild(Int8ub, lambda
+            this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
         "control" / BitStruct(
-          "ram_access" / Default(Flag, False),
-          "alarm_reporting_pending" / Default(Flag, False),
-          "Windload_connected" / Default(Flag, False),
-          "NeWare_connected" / Default(Flag, False),
-          "not_used" / Const(0x00, Padding(2)),
-          "eeprom_address_bits" / Default(BitsInteger(2), 0)
+            "ram_access" / Default(Flag, False),
+            "alarm_reporting_pending" / Default(Flag, False),
+            "Windload_connected" / Default(Flag, False),
+            "NeWare_connected" / Default(Flag, False),
+            "not_used" / Const(0x00, Padding(2)),
+            "eeprom_address_bits" / Default(BitsInteger(2), 0)
         ),
-        "bus_address" / Default(Int8ub, 0x00), # 00 - Panel, 01-FF - Modules
+        "bus_address" / Default(Int8ub, 0x00),  # 00 - Panel, 01-FF - Modules
         "address" / ExprSymmetricAdapter(Int16ub, obj_ & 0xffff),
         "length" / Int8ub
     ))),
-    "checksum" / Checksum(
-        Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+                    "checksum" / Checksum(
+                        Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 ReadEEPROMResponse = Struct("fields" / RawCopy(
     Struct(
-      "po" / BitStruct(
-          "command" / Const(0x5, Nibble),
-          "status" / Struct(
-              "reserved" / Flag,
-              "alarm_reporting_pending" / Flag,
-              "Windload_connected" / Flag,
-              "NeWare_connected" / Flag)
-      ),
-      "packet_length" / Int8ub,
-      "control" / BitStruct(
-        "ram_access" / Flag,
-        "not_used" / Padding(5),
-        "eeprom_address_bits" / BitsInteger(2)
-      ),
-      "bus_address" / Int8ub,  # 00 - Panel, 01-FF - Modules
-      "address" / Int16ub,
-      "data" / Bytes(lambda this: this.packet_length - 7)
+        "po" / BitStruct(
+            "command" / Const(0x5, Nibble),
+            "status" / Struct(
+                "reserved" / Flag,
+                "alarm_reporting_pending" / Flag,
+                "Windload_connected" / Flag,
+                "NeWare_connected" / Flag)
+        ),
+        "packet_length" / Int8ub,
+        "control" / BitStruct(
+            "ram_access" / Flag,
+            "not_used" / Padding(5),
+            "eeprom_address_bits" / BitsInteger(2)
+        ),
+        "bus_address" / Int8ub,  # 00 - Panel, 01-FF - Modules
+        "address" / Int16ub,
+        "data" / Bytes(lambda this: this.packet_length - 7)
     )),
-    "checksum" / Checksum(
-        Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+                            "checksum" / Checksum(
+                                Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 SetTimeDate = Struct("fields" / RawCopy(Struct(
-        "po" / Struct(
-            "command" / Const(0x30, Int8ub)),
-        "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
-	      "not_used0" / Padding(4),
-        "century" / Int8ub,
-        "year" / Int8ub,
-        "month" /Int8ub,
-        "day" / Int8ub,
-        "hour" / Int8ub,
-        "minute" / Int8ub,
-        )),
-        "checksum" / Checksum(
-        Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "po" / Struct(
+        "command" / Const(0x30, Int8ub)),
+    "packet_length" / Rebuild(Int8ub,
+                              lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+    "not_used0" / Padding(4),
+    "century" / Int8ub,
+    "year" / Int8ub,
+    "month" / Int8ub,
+    "day" / Int8ub,
+    "hour" / Int8ub,
+    "minute" / Int8ub,
+)),
+                     "checksum" / Checksum(
+                         Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 SetTimeDateResponse = Struct("fields" / RawCopy(
-     Struct(
+    Struct(
         "po" / BitStruct(
-          "command" / Const(0x3, Nibble),
-          "status" / Struct(
-            "reserved" / Flag,
-            "alarm_reporting_pending" / Flag,
-            "Windload_connected" / Flag,
-            "NeWare_connected" / Flag)),
+            "command" / Const(0x3, Nibble),
+            "status" / Struct(
+                "reserved" / Flag,
+                "alarm_reporting_pending" / Flag,
+                "Windload_connected" / Flag,
+                "NeWare_connected" / Flag)),
         "length" / Int8ub,
         "not_used0" / Padding(4),
-        )),
-    "checksum" / Checksum(
-        Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    )),
+                             "checksum" / Checksum(
+                                 Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 PerformAction = Struct("fields" / RawCopy(Struct(
     "po" / Struct(
@@ -702,36 +710,34 @@ PerformActionResponse = Struct("fields" / RawCopy(
                                "checksum" / Checksum(
                                    Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
-
 ErrorMessage = Struct("fields" / RawCopy(
     Struct(
-      "po" / BitStruct(
-          "command" / Const(0x7, Nibble),
-          "status" / Struct(
-            "reserved" / Flag,
-            "alarm_reporting_pending" / Flag,
-            "Windload_connected" / Flag,
-            "NeWare_connected" / Flag)),
-      "length" / Default(Int8ub, 0),
-      "message" / Enum(Int8ub,
-        requested_command_failed=0x00,
-        invalid_user_code=0x01,
-        partition_in_code_lockout=0x02,
-        panel_will_disconnect=0x05,
-        panel_not_connected=0x10,
-        panel_already_connected=0x11,
-        invalid_pc_password=0x12,
-        winload_on_phone_line=0x13,
-        invalid_module_address=0x14,
-        cannot_write_in_ram=0x15,
-        upgrade_request_fail=0x16,
-        record_number_out_of_range=0x17,
-        invalid_record_type=0x19,
-        multibus_not_supported=0x1a,
-        incorrect_number_of_users=0x1b,
-        invalid_label_number=0x1c
-        ),
+        "po" / BitStruct(
+            "command" / Const(0x7, Nibble),
+            "status" / Struct(
+                "reserved" / Flag,
+                "alarm_reporting_pending" / Flag,
+                "Windload_connected" / Flag,
+                "NeWare_connected" / Flag)),
+        "length" / Default(Int8ub, 0),
+        "message" / Enum(Int8ub,
+                         requested_command_failed=0x00,
+                         invalid_user_code=0x01,
+                         partition_in_code_lockout=0x02,
+                         panel_will_disconnect=0x05,
+                         panel_not_connected=0x10,
+                         panel_already_connected=0x11,
+                         invalid_pc_password=0x12,
+                         winload_on_phone_line=0x13,
+                         invalid_module_address=0x14,
+                         cannot_write_in_ram=0x15,
+                         upgrade_request_fail=0x16,
+                         record_number_out_of_range=0x17,
+                         invalid_record_type=0x19,
+                         multibus_not_supported=0x1a,
+                         incorrect_number_of_users=0x1b,
+                         invalid_label_number=0x1c
+                         ),
     )),
-    "checksum" / Checksum(
-        Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-
+                      "checksum" / Checksum(
+                          Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
