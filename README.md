@@ -56,9 +56,9 @@ If something goes wrong, you can edit the ```config/user.py``` to increase the d
 
 ## Authors
 
-* João Paulo Barraca (@jpbarraca) - Main code and MG/SP devices
-* Ion Darie (@iondarie) - Homebridge integration
-* Jevgeni Kiski (@yozik04) - EVO devices
+* João Paulo Barraca - [@jpbarraca](https://github.com/jpbarraca) - Main code and MG/SP devices
+* Ion Darie - [@iondarie](https://github.com/iondarie) - Homebridge integration
+* Jevgeni Kiski - [@yozik04](https://github.com/yozik04) - EVO devices
 
 
 ## Acknowledgments
