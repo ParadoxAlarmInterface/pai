@@ -45,7 +45,7 @@ If some requirement fails to install, it may not be critical.
 * ```gi```, ```pygobject``` and ```pydbus``` are only required when using Signal
 * ```Pushbullet.py``` and ```ws4py``` are only required for Pushbullet
 * ```paho_mqtt``` is only required for MQTT support
-* ```pyserial``` is only required when connecting to the panel directly through the serial port
+* ```pyserial``` is only required when connecting to the panel directly through the serial port or using a GSM modem.
 
 4.  Run the script:
 ```
