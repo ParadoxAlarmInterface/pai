@@ -25,11 +25,11 @@ MEM_PARTITION_48_END = MEM_PARTITION_START + 0x6b * 4
 MEM_PARTITION_END = MEM_PARTITION_START + 0x6b * 8
 
 MEM_USER_START = 0x03e47
-MEM_USER_END = MEM_USER_START + 0x10 * 256 # EVO192
+MEM_USER_END = MEM_USER_START + 0x10 * 256  # EVO192
 
 MEM_MODULE_START = MEM_USER_END
 MEM_MODULE_48_END = MEM_MODULE_START + 0x10 * 127
-MEM_MODULE_END = MEM_MODULE_START + 0x10 * 254 # EVO192
+MEM_MODULE_END = MEM_MODULE_START + 0x10 * 254  # EVO192
 
 MEM_DOOR_START = 0x0345c
 MEM_DOOR_END = MEM_DOOR_START + 0x10 * 32
@@ -102,11 +102,11 @@ class Panel(PanelBase):
 
         logger.debug("Labels updated")
 
-    def dump_memory_to_file(self, file, range_, ram = False):
+    def dump_memory_to_file(self, file, range_, ram=False):
         mem_type = "RAM" if ram else "EEPROM"
         logger.info("Dump " + mem_type)
 
-        packet_length = 64 # 64 is max
+        packet_length = 64  # 64 is max
         with open(file, 'wb') as fh:
             for address in range_:
                 args = dict(address=address, length=packet_length, control=dict(ram_access=ram))
@@ -121,8 +121,9 @@ class Panel(PanelBase):
 
                     if reply.fields.value.address != address:
                         logger.debug(
-                            "Fetched and receive %s addresses (received: %d, requested: %d) do not match. Retrying %d of %d" % (mem_type,
-                                reply.fields.value.address, address, retry, retry_count))
+                            "Fetched and receive %s addresses (received: %d, requested: %d) do not match. Retrying %d of %d" % (
+                            mem_type,
+                            reply.fields.value.address, address, retry, retry_count))
                         reply = self.core.send_wait(None, None, reply_expected=0x05)
                         continue
 
@@ -159,7 +160,7 @@ class Panel(PanelBase):
                     if reply.fields.value.address != address:
                         logger.debug(
                             "Fetched and receive label EEPROM addresses (received: %d, requested: %d) do not match. Retrying %d of %d" % (
-                            reply.fields.value.address, address, retry, retry_count))
+                                reply.fields.value.address, address, retry, retry_count))
                         reply = self.core.send_wait(None, None, reply_expected=0x05)
                         continue
 
@@ -184,7 +185,9 @@ class Panel(PanelBase):
             if message is None or len(message) == 0:
                 return None
 
-            if message[0] >> 4 == 0x7:
+            if message[0] == 0x70:
+                return CloseConnection.parse(message)
+            elif message[0] >> 4 == 0x7:
                 return ErrorMessage.parse(message)
             elif message[0] == 0x00:
                 return InitializeCommunication.parse(message)
@@ -548,15 +551,26 @@ CloseConnection = Struct("fields" / RawCopy(
         "po" / Struct(
             "command" / Const(0x70, Int8ub)
         ),
-        "not_used0" / Const(0, Int8ub),
-        "validation_byte" / Default(Int8ub, 0),
-        "not_used1" / Padding(29),
-        "message" / Default(Enum(Int8ub,
-                                 authentication_failed=0x12,
-                                 panel_will_disconnect=0x05), 0x05),
-        "source_id" / Default(CommunicationSourceIDEnum, 1),
-        "user_high" / Default(Int8ub, 0),
-        "user_low" / Default(Int8ub, 0),
+        "not_used0" / Default(Int8ub, 0),
+        "message" / Enum(Int8ub,
+                         requested_command_failed=0x00,
+                         invalid_user_code=0x01,
+                         partition_in_code_lockout=0x02,
+                         panel_will_disconnect=0x05,
+                         panel_not_connected=0x10,
+                         panel_already_connected=0x11,
+                         invalid_pc_password=0x12,
+                         winload_on_phone_line=0x13,
+                         invalid_module_address=0x14,
+                         cannot_write_in_ram=0x15,
+                         upgrade_request_fail=0x16,
+                         record_number_out_of_range=0x17,
+                         invalid_record_type=0x19,
+                         multibus_not_supported=0x1a,
+                         incorrect_number_of_users=0x1b,
+                         invalid_label_number=0x1c
+                         ),
+        "not_used1" / Padding(33),
     )),
                          "checksum" / Checksum(
                              Bytes(1), lambda data: calculate_checksum(data), this.fields.data))

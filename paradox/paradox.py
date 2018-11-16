@@ -212,7 +212,7 @@ class Paradox:
                 logger.debug(recv_message)
 
             # Events are async
-            if recv_message.fields.value.po.command == 0xe:
+            if recv_message.fields.value.po.command == 0xe: # Events
                 try:
                     self.handle_event(recv_message)
 
@@ -225,7 +225,7 @@ class Paradox:
 
                 retries += 1  # Ignore this try
 
-            elif recv_message.fields.value.po.command == 0x70:
+            elif recv_message.fields.value.po.command == 0x70: # Terminate connection
                 self.handle_error(recv_message)
                 return None
 
