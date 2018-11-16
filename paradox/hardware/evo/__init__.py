@@ -16,22 +16,23 @@ MEM_ZONE_96_START = MEM_ZONE_48_END
 MEM_ZONE_96_END = MEM_ZONE_48_END + 0x10 * 48
 MEM_ZONE_192_START = 0x62F7
 MEM_ZONE_192_END = MEM_ZONE_192_START + 0x10 * 96
-MEM_OUTPUT_START = MEM_ZONE_96_END
-MEM_OUTPUT_END = MEM_OUTPUT_START + 0x10 * 16
-MEM_PARTITION_START = MEM_OUTPUT_END
-MEM_PARTITION_END = MEM_PARTITION_START + 0x10 * 2
-MEM_USER_START = MEM_PARTITION_END
-MEM_USER_END = MEM_USER_START + 0x10 * 32
-MEM_BUS_START = MEM_USER_END
-MEM_BUS_END = MEM_BUS_START + 0x10 * 15
-MEM_REPEATER_START = MEM_BUS_END
-MEM_REPEATER_END = MEM_REPEATER_START + 0x10 * 2
-MEM_KEYPAD_START = MEM_REPEATER_END
-MEM_KEYPAD_END = MEM_KEYPAD_START + 0x10 * 8
-MEM_SITE_START = MEM_KEYPAD_END
-MEM_SITE_END = MEM_SITE_START + 0x10
-MEM_SIREN_START = MEM_SITE_END
-MEM_SIREN_END = MEM_SIREN_START + 0x10 * 4
+
+MEM_OUTPUT_START = 0x07082
+MEM_OUTPUT_END = MEM_OUTPUT_START + 0x10 * 32 * 2
+
+MEM_PARTITION_START = 0x03a6b
+MEM_PARTITION_48_END = MEM_PARTITION_START + 0x6b * 4
+MEM_PARTITION_END = MEM_PARTITION_START + 0x6b * 8
+
+MEM_USER_START = 0x03e47
+MEM_USER_END = MEM_USER_START + 0x10 * 256 # EVO192
+
+MEM_MODULE_START = MEM_USER_END
+MEM_MODULE_48_END = MEM_MODULE_START + 0x10 * 127
+MEM_MODULE_END = MEM_MODULE_START + 0x10 * 254 # EVO192
+
+MEM_DOOR_START = 0x0345c
+MEM_DOOR_END = MEM_DOOR_START + 0x10 * 32
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -48,12 +49,16 @@ class Panel(PanelBase):
                 raise e
 
     def update_labels(self):
+        # self.dump_memory_to_file('eeprom.bin', range(0, 0xffff, 64))
+        # self.dump_memory_to_file('ram.bin', range(0, 59), True)
+
         logger.info("Updating Labels from Panel")
 
         output_template = dict(
             on=False,
             pulse=False)
 
+        # Zones
         eeprom_zone_ranges = [range(MEM_ZONE_48_START, MEM_ZONE_48_END, 0x10)]
         if self.product_id in ['DIGIPLEX_EVO_96', 'DIGIPLEX_EVO_192']:
             eeprom_zone_ranges.append(range(MEM_ZONE_96_START, MEM_ZONE_96_END, 0x10))
@@ -62,24 +67,73 @@ class Panel(PanelBase):
 
         self.load_labels(self.core.zones, self.core.labels['zone'], eeprom_zone_ranges)
         logger.info("Zones: {}".format(', '.join(self.core.labels['zone'])))
-        # self.load_labels(self.core.outputs, self.core.labels['output'], MEM_OUTPUT_START, MEM_OUTPUT_END, template=output_template)
-        # logger.info("Outputs: {}".format(', '.join(list(self.core.labels['output']))))
-        # self.load_labels(self.core.partitions, self.core.labels['partition'], MEM_PARTITION_START, MEM_PARTITION_END)
-        # logger.info("Partitions: {}".format(', '.join(list(self.core.labels['partition']))))
-        # self.load_labels(self.core.users, self.core.labels['user'], MEM_USER_START, MEM_USER_END)
-        # logger.info("Users: {}".format(', '.join(list(self.core.labels['user']))))
-        # self.load_labels(self.core.buses, self.core.labels['bus'], MEM_BUS_START, MEM_BUS_END)
-        # logger.info("Buses: {}".format(', '.join(list(self.core.labels['bus']))))
-        # # self.load_labels(self.core.repeaters, self.core.labels['repeater'], MEM_REPEATER_START, MEM_REPEATER_END)
-        # # logger.info("Repeaters: {}".format(', '.join(list(self.core.labels['repeater']))))
-        # self.load_labels(self.core.keypads, self.core.labels['keypad'], MEM_KEYPAD_START, MEM_KEYPAD_END)
-        # logger.info("Keypads: {}".format(', '.join(list(self.core.labels['keypad']))))
-        # self.load_labels(self.core.sites, self.core.labels['site'], MEM_SITE_START, MEM_SITE_END)
-        # logger.info("Sites: {}".format(', '.join(list(self.core.labels['site']))))
-        # self.load_labels(self.core.sirens, self.core.labels['siren'], MEM_SIREN_START, MEM_SIREN_END)
-        # logger.info("Sirens: {}".format(', '.join(list(self.core.labels['siren']))))
+
+        # Users
+        eeprom_user_ranges = [range(MEM_USER_START, MEM_USER_END, 0x10)]
+        self.load_labels(self.core.users, self.core.labels['user'], eeprom_user_ranges)
+        logger.info("Users: {}".format(', '.join(self.core.labels['user'])))
+
+        # # Modules
+        # if self.product_id in ['DIGIPLEX_EVO_48']:
+        #     eeprom_module_ranges = [range(MEM_MODULE_START, MEM_MODULE_END, 0x10)]
+        # else:
+        #     eeprom_module_ranges = [range(MEM_MODULE_START, MEM_MODULE_48_END, 0x10)]
+        # self.load_labels(self.core.modules, self.core.labels['module'], eeprom_module_ranges)
+        # logger.info("Modules: {}".format(', '.join(self.core.labels['module'])))
+
+        # Output/PGMs
+        eeprom_output_ranges = [range(MEM_OUTPUT_START, MEM_OUTPUT_END, 0x20)]
+        self.load_labels(self.core.outputs, self.core.labels['output'], eeprom_output_ranges)
+        logger.info("Output/PGMs: {}".format(', '.join(self.core.labels['output'])))
+
+        # Partitions
+        if self.product_id in ['DIGIPLEX_EVO_48']:
+            eeprom_partition_ranges = [range(MEM_PARTITION_START, MEM_PARTITION_48_END, 107)]
+        else:
+            eeprom_partition_ranges = [range(MEM_PARTITION_START, MEM_PARTITION_END, 107)]
+
+        self.load_labels(self.core.partitions, self.core.labels['partition'], eeprom_partition_ranges)
+        logger.info("Partitions: {}".format(', '.join(self.core.labels['partition'])))
+
+        # # Doors
+        # eeprom_door_ranges = [range(MEM_DOOR_START, MEM_DOOR_END, 0x10)]
+        # self.load_labels(self.core.doors, self.core.labels['door'], eeprom_door_ranges)
+        # logger.info("Doors: {}".format(', '.join(self.core.labels['door'])))
 
         logger.debug("Labels updated")
+
+    def dump_memory_to_file(self, file, range_, ram = False):
+        mem_type = "RAM" if ram else "EEPROM"
+        logger.info("Dump " + mem_type)
+
+        packet_length = 64 # 64 is max
+        with open(file, 'wb') as fh:
+            for address in range_:
+                args = dict(address=address, length=packet_length, control=dict(ram_access=ram))
+                reply = self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=0x05)
+
+                retry_count = 3
+                for retry in range(1, retry_count + 1):
+                    # Avoid errors due to collision with events. It should not come here as we use reply_expected=0x05
+                    if reply is None:
+                        logger.error("Could not fully read " + mem_type)
+                        return
+
+                    if reply.fields.value.address != address:
+                        logger.debug(
+                            "Fetched and receive %s addresses (received: %d, requested: %d) do not match. Retrying %d of %d" % (mem_type,
+                                reply.fields.value.address, address, retry, retry_count))
+                        reply = self.core.send_wait(None, None, reply_expected=0x05)
+                        continue
+
+                    if retry == retry_count:
+                        logger.error('Failed to fetch %s at address: %d' % (mem_type, address))
+
+                    break
+
+                data = reply.fields.value.data
+
+                fh.write(data)
 
     def load_labels(self,
                     labelDictIndex,
@@ -144,13 +198,14 @@ class Panel(PanelBase):
                 return PerformAction.parse(message)
             elif message[0] >> 4 == 4:
                 return PerformActionResponse.parse(message)
-            elif message[0] == 0x50 and message[2] == 0x80:
-                return PanelStatus.parse(message)
-            elif message[0] == 0x50 and message[2] < 0x80:
-                return ReadEEPROM.parse(message)
-            elif message[0] >> 4 == 0x05 and message[2] == 0x80:
-                return PanelStatusResponse[message[3]].parse(message)
-            elif message[0] >> 4 == 0x05 and message[2] < 0x80:
+            # elif message[0] == 0x50 and message[2] == 0x80:
+            #     return PanelStatus.parse(message)
+            # elif message[0] == 0x50 and message[2] < 0x80:
+            #     return ReadEEPROM.parse(message)
+            # elif message[0] >> 4 == 0x05 and message[2] == 0x80:
+            #     return PanelStatusResponse[message[3]].parse(message)
+            # elif message[0] >> 4 == 0x05 and message[2] < 0x80:
+            elif message[0] >> 4 == 0x05:
                 return ReadEEPROMResponse.parse(message)
             elif message[0] == 0x60 and message[2] < 0x80:
                 return WriteEEPROM.parse(message)
@@ -578,7 +633,7 @@ ReadEEPROM = Struct("fields" / RawCopy(
             "alarm_reporting_pending" / Default(Flag, False),
             "Windload_connected" / Default(Flag, False),
             "NeWare_connected" / Default(Flag, False),
-            "not_used" / Const(0x00, Padding(2)),
+            "not_used" / Default(BitsInteger(2), 0),
             "eeprom_address_bits" / Default(BitsInteger(2), 0)
         ),
         "bus_address" / Default(Int8ub, 0x00),  # 00 - Panel, 01-FF - Modules
