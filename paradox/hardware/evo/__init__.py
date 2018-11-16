@@ -122,8 +122,8 @@ class Panel(PanelBase):
                     if reply.fields.value.address != address:
                         logger.debug(
                             "Fetched and receive %s addresses (received: %d, requested: %d) do not match. Retrying %d of %d" % (
-                            mem_type,
-                            reply.fields.value.address, address, retry, retry_count))
+                                mem_type,
+                                reply.fields.value.address, address, retry, retry_count))
                         reply = self.core.send_wait(None, None, reply_expected=0x05)
                         continue
 
@@ -551,7 +551,7 @@ CloseConnection = Struct("fields" / RawCopy(
         "po" / Struct(
             "command" / Const(0x70, Int8ub)
         ),
-        "not_used0" / Default(Int8ub, 0),
+        "length" / Default(Int8ub, 0),
         "message" / Enum(Int8ub,
                          requested_command_failed=0x00,
                          invalid_user_code=0x01,
@@ -570,43 +570,9 @@ CloseConnection = Struct("fields" / RawCopy(
                          incorrect_number_of_users=0x1b,
                          invalid_label_number=0x1c
                          ),
-        "not_used1" / Padding(33),
     )),
                          "checksum" / Checksum(
                              Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-
-ErrorMessage = Struct("fields" / RawCopy(
-    Struct(
-        "po" / BitStruct(
-            "command" / Const(0x7, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
-                "NeWare_connected" / Flag)),
-        "not_used0" / Default(Int8ub, 0),
-        "message" / Enum(Int8ub,
-                         requested_command_failed=0x00,
-                         invalid_user_code=0x01,
-                         partition_in_code_lockout=0x02,
-                         panel_will_disconnect=0x05,
-                         panel_not_connected=0x10,
-                         panel_already_connected=0x11,
-                         invalid_pc_password=0x12,
-                         winload_on_phone_line=0x13,
-                         invalid_module_address=0x14,
-                         cannot_write_in_ram=0x15,
-                         upgrade_request_fail=0x16,
-                         record_number_out_of_range=0x17,
-                         invalid_record_type=0x19,
-                         multibus_not_supported=0x1a,
-                         incorrect_number_of_users=0x1b,
-                         invalid_label_number=0x1c
-                         ),
-        "not_used1" / Padding(33),
-    )),
-                      "checksum" / Checksum(
-                          Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 
 class EvoEEPROMAddressAdapter(Subconstruct):
