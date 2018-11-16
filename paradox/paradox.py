@@ -140,23 +140,17 @@ class Paradox:
             tstart = time.time()
             try:
                 for i in cfg.STATUS_REQUESTS:
-                    logger.debug("Polling panel for status {}".format(i))
                     args = dict(address=MEM_STATUS_BASE1 + i)
                     reply = self.send_wait(self.panel.get_message('ReadEEPROM'), args, reply_expected=0x05)
                     if reply is not None:
                         tstart = time.time()
                         self.handle_status(reply)
-                        logger.debug("Status handled in {} seconds".format(time.time() - tstart))
             except Exception:
                 logger.exception("Loop")
 
             # cfg.Listen for events
-            time_enlapsed = time.time() - tstart
-            logger.debug("Loop: Remaining: {} Run: {} Wait: {}".format(time_enlapsed, self.run, self.loop_wait))
-            while time_enlapsed < cfg.KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
-                logger.debug("Loop: Remaining: {} Run: {} Wait: {} (IN)".format(time_enlapsed, self.run, self.loop_wait))
-                self.send_wait(None, timeout=1)
-                time_enlapsed = time.time() - tstart
+            while time.time() - tstart < cfg.KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
+                self.send_wait(None, timeout=min(time.time() - tstart, 1))
 
     def send_wait_simple(self, message=None, timeout=5, wait=True):
         if message is not None:
@@ -178,15 +172,15 @@ class Paradox:
 
         return data
 
-    def send_wait(self, message_type=None, args=None, message=None, retries=5, timeout=5, raw=False, reply_expected=None, wait=True):
+    def send_wait(self, message_type=None, args=None, message=None, retries=5, timeout=5, reply_expected=None):
+
         if message is None and message_type is not None:
             message = message_type.build(dict(fields=dict(value=args)))
 
         while retries >= 0:
             retries -= 1
 
-            if message is not None:
-                if cfg.LOGGING_DUMP_PACKETS:
+            if message is not None and cfg.LOGGING_DUMP_PACKETS:
                     logger.debug("PC -> A {}".format(binascii.hexlify(message)))
 
             with serial_lock:
@@ -194,12 +188,7 @@ class Paradox:
                     self.connection.timeout(timeout)
                     self.connection.write(message)
 
-                if not wait:
-                    return None
-
                 data = self.connection.read()
-                if raw:
-                    return data
 
             # Retry if no data was available
             if data is None or len(data) == 0:
@@ -225,25 +214,26 @@ class Paradox:
             # Events are async
             if recv_message.fields.value.po.command == 0xe:
                 try:
-                    tstart = time.time()
                     self.handle_event(recv_message)
-                    logger.debug("Event handled in {} seconds".format(time.time() - tstart))
+
                 except Exception:
                     logger.exception("Handle event")
 
-                retries += 1  # Ignore this try
-                continue
+                # Prevent events from blocking further messages
+                if message is None:
+                    return None
 
-            if recv_message.fields.value.po.command == 0x70:
+                retries += 1  # Ignore this try
+
+            elif recv_message.fields.value.po.command == 0x70:
                 self.handle_error(recv_message)
                 return None
 
-            if reply_expected is not None and recv_message.fields.value.po.command != reply_expected:
+            elif reply_expected is not None and recv_message.fields.value.po.command != reply_expected:
                 logging.error("Got message {} but expected {}".format(recv_message.fields.value.po.command, reply_expected))
                 logging.error("Detail:\n{}".format(recv_message))
-                continue
-
-            return recv_message
+            else:
+                return recv_message
 
         return None
 
@@ -276,7 +266,7 @@ class Paradox:
         for e in zones_selected:
             args = dict(action=ZONE_ACTIONS[command], argument=(e - 1))
             reply = self.send_wait(self.panel.get_message('PerformAction'), args, reply_expected=0x04)
-            
+
             if reply is not None:
                 accepted = True
 
