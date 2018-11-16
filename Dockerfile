@@ -17,6 +17,7 @@ USER paradox
 
 # conf file from host
 VOLUME ["/opt/paradox/config/user.py"]
+VOLUME ["/opt/paradox/paradox.log"]
 
 # run process
 CMD python run.py
