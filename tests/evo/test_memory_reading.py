@@ -1,5 +1,5 @@
 import binascii
-from paradox.hardware.evo import ReadEEPROM, ReadEEPROMResponse
+from paradox.hardware.evo.parsers import ReadEEPROM, ReadEEPROMResponse
 
 eeprom_request_bin = binascii.unhexlify('500800009f004037')
 eeprom_response_bin = binascii.unhexlify(

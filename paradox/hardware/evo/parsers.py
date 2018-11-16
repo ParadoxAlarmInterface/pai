@@ -14,7 +14,8 @@ LoginConfirmationResponse = Struct("fields" / RawCopy(
                 "Windload_connected" / Flag,
                 "NeWare_connected" / Flag)
         ),
-        "length" / Int8ub,
+        "length" / Rebuild(Int8ub, lambda
+            this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
         "result" / BitStruct(
             "not_used0" / BitsInteger(4),
             "partition_2" / Flag,
@@ -301,8 +302,9 @@ CloseConnection = Struct("fields" / RawCopy(
         "po" / Struct(
             "command" / Const(0x70, Int8ub)
         ),
-        "length" / Default(Int8ub, 0),
-        "message" / Enum(Int8ub,
+        "length" / Rebuild(Int8ub, lambda
+            this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+        "message" / Default(Enum(Int8ub,
                          requested_command_failed=0x00,
                          invalid_user_code=0x01,
                          partition_in_code_lockout=0x02,
@@ -319,7 +321,7 @@ CloseConnection = Struct("fields" / RawCopy(
                          multibus_not_supported=0x1a,
                          incorrect_number_of_users=0x1b,
                          invalid_label_number=0x1c
-                         ),
+                         ), 0x05),
     )),
                          "checksum" / Checksum(
                              Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
@@ -383,7 +385,8 @@ ReadEEPROMResponse = Struct("fields" / RawCopy(
                 "Windload_connected" / Flag,
                 "NeWare_connected" / Flag)
         ),
-        "packet_length" / Int8ub,
+        "packet_length" / Rebuild(Int8ub, lambda
+            this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
         "control" / BitStruct(
             "ram_access" / Flag,
             "not_used" / Padding(5),
@@ -504,7 +507,8 @@ ErrorMessage = Struct("fields" / RawCopy(
                 "alarm_reporting_pending" / Flag,
                 "Windload_connected" / Flag,
                 "NeWare_connected" / Flag)),
-        "length" / Default(Int8ub, 0),
+        "length" / Rebuild(Int8ub, lambda
+            this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
         "message" / Enum(Int8ub,
                          requested_command_failed=0x00,
                          invalid_user_code=0x01,
