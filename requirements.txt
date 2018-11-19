@@ -20,6 +20,6 @@ ws4py>=0.4.2
 requests>=2.20.0
 #
 # Signal support
-pygobject>=3.20.0
-pydbus>=0.6.0
-gi>=1.2
+# pygobject>=3.20.0
+# pydbus>=0.6.0
+# gi>=1.2
