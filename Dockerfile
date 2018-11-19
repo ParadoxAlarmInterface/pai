@@ -3,7 +3,7 @@ FROM python:3.6
 # build /opt/mqttwarn
 RUN mkdir -p /opt/paradox
 RUN mkdir -p /opt/log
-RUN git clone https://github.com/marcantoineveilleux/pai.git /opt/paradox
+RUN git clone https://github.com/jpbarraca/pai.git /opt/paradox
 WORKDIR /opt/paradox
 
 # install python library
