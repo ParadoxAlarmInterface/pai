@@ -5,7 +5,7 @@ import datetime
 import json
 from threading import Thread
 import queue
-import secrets
+import os
 
 from config import user as cfg
 
@@ -24,7 +24,7 @@ class MQTTInterface(Thread):
         Thread.__init__(self)
 
         self.callback = None
-        self.mqtt = mqtt.Client("paradox_mqtt/{}".format(secrets.token_hex(8)))
+        self.mqtt = mqtt.Client("paradox_mqtt/{}".format(os.urandom(8).hex()))
         self.mqtt.on_message = self.handle_message
         self.mqtt.on_connect = self.handle_connect
         self.mqtt.on_disconnect = self.handle_disconnect
