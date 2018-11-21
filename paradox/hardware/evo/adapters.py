@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 
-from construct import Adapter
+from construct import *
 import datetime
 
 
 class DateAdapter(Adapter):
     def _decode(self, obj, context, path):
-        return datetime.datetime(obj[0] * 100 + obj[1], obj[2], obj[3], obj[4], obj[5])
+        return datetime.datetime(obj[0] * 100 + obj[1], obj[2], obj[3], obj[4], obj[5], obj[6] if len(obj) > 6 else 0)
 
     def _encode(self, obj, context, path):
-        return [obj.year / 100, obj.year % 100, obj.month, obj.day, obj.hour, obj.minute]
+        return [obj.year / 100, obj.year % 100, obj.month, obj.day, obj.hour, obj.minute, obj.second]
 
 
 class ModuleSerialAdapter(Adapter):
@@ -34,22 +34,31 @@ class PartitionStateAdapter(Adapter):
 
         return 0
 
+class ZoneFlagsAdapter(Adapter):
+    flag_parser = BitStruct(
+        "supervision_trouble" / Flag,
+        "tx_delay" / Flag,
+        "shutted_down" / Flag,
+        "bypassed" / Flag,
+        "activated_intellizone_delay" / Flag,
+        "activated_entry_delay" / Flag,
+        "presently_in_alarm" / Flag,
+        "generated_alarm" / Flag
+    )
 
-class ZoneStateAdapter(Adapter):
-    states = dict(bypass=0x10)
+    def __init__(self, subcon, start_index_from = 1):
+        super(ZoneFlagsAdapter, self).__init__(subcon)
+
+        self.start_index_from = start_index_from
 
     def _decode(self, obj, context, path):
-        for k, v in enumerate(self.states):
-            if v == obj[0]:
-                return k
-
-        return "unknown"
+        r = dict()
+        for i in range(0, len(obj)):
+            r[self.start_index_from+i] = self.flag_parser.parse(obj)
+        return r
 
     def _encode(self, obj, context, path):
-        if obj in self.states:
-            return self.states[obj]
-
-        return 0
+        return b"".join([self.flag_parser.build(i) for i in obj])
 
 
 class StatusAdapter(Adapter):
@@ -62,51 +71,94 @@ class StatusAdapter(Adapter):
 
         return r
 
-
 class PartitionStatusAdapter(Adapter):
+    first2 = BitStruct(
+        'armed' / Flag,
+        'armed_away' / Flag,
+        'armed_stay' / Flag,
+        'armed_no_entry' / Flag,
+        'was_in_alarm' / Flag,  # is in alarm
+        'silent_alarm' / Flag,
+        'audible_alarm' / Flag,
+        'fire_alarm' / Flag,
+
+        'ready' / Flag,
+        'exit_delay' / Flag,
+        'entry_delay' / Flag,
+        'trouble' / Flag,
+        'alarm_in_memory' / Flag,
+        'zone_bypass' / Flag,
+        'programming' / Flag,
+        'lockout' / Flag
+    )
+
+    last4 = BitStruct(
+        'intellizone_engage' / Flag,
+        'fire_delay_in_progress' / Flag,
+        'auto_arming_engaged' / Flag,
+        'voice_arming' / Flag,
+        'zone_tamper_trouble' / Flag,
+        'zone_low_battery_trouble' / Flag,
+        'zone_fire_loop_trouble' / Flag,
+        'zone_supervision_trouble' / Flag,
+
+        'cancel_alarm_reporting_on_disarming' / Flag,
+        'partition_recently_close' / Flag,
+        'stay_arming_auto' / Flag,  # if no entry zone is tripped
+        'remote_arming' / Flag,
+        'follow_become_delay' / Flag,  # Follow become delay when is bypassed
+        'police_code_delay' / Flag,  # Within police code delay
+        'panic_alarm' / Flag,
+        'time_to_refresh_zone_status' / Flag,
+
+        'intellizone_delay_finished' / Flag,
+        'exit_delay_finished' / Flag,
+        'entry_delay_finished' / Flag,
+        'alarm_duration_finished' / Flag,
+        'no_movement_delay_end' / Flag,
+        'fire_delay_end' / Flag,
+        'auto_arm_reach' / Flag,
+        'tx_delay_finished' / Flag,  # (Time Out / instant alarm)
+
+        'stay_instant_ready' / Flag,
+        'force_ready' / Flag,
+        'bypass_ready' / Flag,
+        'inhibit_ready' / Flag,
+        'all_zone_closed' / Flag,  # (Bypass or not)
+        'free0' / BitsInteger(3)
+    )
+
     def _decode(self, obj, context, path):
-        partition_status = dict()
+        partitions = dict()
 
-        for i in range(0, 2):
-            partition_status[i + 1] = dict(
-                alarm=(obj[0 + i * 4] & 0xf0 != 0) or (obj[2 + i * 4] & 0x80 != 0),  # Combined status
-                pulse_fire_alarm=obj[0 + i * 4] & 0x80 != 0,
-                audible_alarm=obj[0 + i * 4] & 0x40 != 0,
-                silent_alarm=obj[0 + i * 4] & 0x20 != 0,
-                strobe_alarm=obj[0 + i * 4] & 0x10 != 0,
-                stay_arm=obj[0 + i * 4] & 0x04 != 0,
-                sleep_arm=obj[0 + i * 4] & 0x02 != 0,
-                arm=obj[0 + i * 4] & 0x01 != 0,
-                bell_activated=obj[1 + i * 4] & 0x80 != 0,
-                auto_arming_engaged=obj[1 + i * 4] & 0x40 != 0,
-                recent_closing_delay=obj[1 + i * 4] & 0x20 != 0,
-                intellizone_delay=obj[1 + i * 4] & 0x10 != 0,
-                zone_bypassed=obj[1 + i * 4] & 0x08 != 0,
-                alarms_in_memory=obj[1 + i * 4] & 0x04 != 0,
-                entry_delay=obj[1 + i * 4] & 0x02 != 0,
-                exit_delay=obj[1 + i * 4] & 0x01 != 0,
-                paramedic_alarm=obj[2 + i * 4] & 0x80 != 0,
-                not_used1=obj[2 + i * 4] & 0x40 != 0,
-                arm_with_remote=obj[2 + i * 4] & 0x20 != 0,
-                transmission_delay_finished=obj[2 + i * 4] & 0x10 != 0,
-                bell_delay_finished=obj[2 + i * 4] & 0x08 != 0,
-                entry_delay_finished=obj[2 + i * 4] & 0x04 != 0,
-                exit_delay_finished=obj[2 + i * 4] & 0x02 != 0,
-                intellizone_delay_finished=obj[2 + i * 4] & 0x01 != 0,
-                not_used2=obj[3 + i * 4] & 0x80 != 0,
-                wait_window=obj[3 + i * 4] & 0x40 != 0,
-                not_used3=obj[3 + i * 4] & 0x20 != 0,
-                in_remote_delay=obj[3 + i * 4] & 0x10 != 0,
-                not_used4=obj[3 + i * 4] & 0x08 != 0,
-                stayd_mode_active=obj[3 + i * 4] & 0x04 != 0,
-                force_arm=obj[3 + i * 4] & 0x02 != 0,
-                ready_status=obj[3 + i * 4] & 0x01 != 0,
-            )
-
-        return partition_status
+        if len(obj) == 32: # ram block 3
+            raws = dict([(i+1, obj[i*6:(i+1)*6]) for i in range(0, 6)])
+        elif len(obj) == 16: # ram block 4
+            raws = dict([(6, obj[0:4])] + [(i+7, obj[i*6+4:(i+1)*6+4]) for i in range(0, 2)])
+        else:
+            raise Exception('Not supported')
 
 
-class ZoneStatusAdapter(Adapter):
+        for key, raw in raws.items():
+            size = len(raw)
+
+            if size == 6:  # full
+                result = Struct("a" / self.first2, "b" / self.last4).parse(raw)
+                partition = {}
+                partition.update(result.a)
+                partition.update(result.b)
+            elif size == 2: # first part
+                partition = self.first2.parse(raw)
+            elif size == 4: # second part
+                partition = self.last4.parse(raw)
+            else:
+                raise Exception('Not supported size: %d' % size)
+
+            partitions[key] = partition
+
+        return partitions
+
+class PGMFlagsAdapter(Adapter):
     def _decode(self, obj, context, path):
         zone_status = dict()
         for i in range(0, len(obj)):
@@ -123,14 +175,6 @@ class ZoneStatusAdapter(Adapter):
                 was_bypassed=(obj[i] & 0x01) != 0)
 
         return zone_status
-
-
-class SignalStrengthAdapter(Adapter):
-    def _decode(self, obj, context, path):
-        strength = dict()
-        for i in range(0, len(obj)):
-            strength[i + 1] = obj[i]
-        return strength
 
 
 eventGroupMap = {0: 'Zone OK',

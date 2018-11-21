@@ -11,9 +11,6 @@ from config import user as cfg
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
-MEM_STATUS_BASE1 = 0x8000
-MEM_STATUS_BASE2 = 0x1fe0
-
 PARTITION_ACTIONS = dict(arm=0x04, disarm=0x05, arm_stay=0x01, arm_sleep=0x03,  arm_stay_stayd=0x06, arm_sleep_stay=0x07, disarm_all=0x08)
 ZONE_ACTIONS = dict(bypass=0x10, clear_bypass=0x10)
 PGM_ACTIONS = dict(on_override=0x30, off_override=0x31, on=0x32, off=0x33, pulse=0)
@@ -140,11 +137,10 @@ class Paradox:
             tstart = time.time()
             try:
                 for i in cfg.STATUS_REQUESTS:
-                    args = dict(address=MEM_STATUS_BASE1 + i)
-                    reply = self.send_wait(self.panel.get_message('ReadEEPROM'), args, reply_expected=0x05)
+                    reply = self.panel.request_status(i)
                     if reply is not None:
                         tstart = time.time()
-                        self.handle_status(reply)
+                        self.panel.handle_status(reply)
             except Exception:
                 logger.exception("Loop")
 
@@ -461,7 +457,6 @@ class Paradox:
             self.interface.notify("Paradox", "{}: {}".format(event['major'][1], event['minor'][1]), logging.INFO)
 
     def process_event(self, event):
-
         major = event['major'][0]
         minor = event['minor'][0]
 
@@ -570,67 +565,6 @@ class Paradox:
 
                 self.interface.change(element_type, elements[key]['label'],
                                       property_name, property_value, initial=surpress)
-
-    def process_status_bulk(self, message):
-
-        for k in message.fields.value:
-            element_type = k.split('_')[0]
-
-            if element_type == 'pgm':
-                element_type = 'output'
-                limit_list = cfg.OUTPUTS
-            elif element_type == 'partition':
-                limit_list = cfg.PARTITIONS
-            elif element_type == 'zone':
-                limit_list = cfg.ZONES
-            elif element_type == 'bus':
-                limit_list = cfg.BUSES
-            elif element_type == 'wireless-repeater':
-                element_type = 'repeater'
-                limit_list == cfg.REPEATERS
-            elif element_type == 'wireless-keypad':
-                element_type = 'keypad'
-                limit_list == cfg.KEYPADS
-            else:
-                continue
-
-            if k in self.status_cache and self.status_cache[k] == message.fields.value[k]:
-                continue
-
-            self.status_cache[k] = message.fields.value[k]
-
-            prop_name = '_'.join(k.split('_')[1:])
-            if prop_name == 'status':
-                for i in message.fields.value[k]:
-                    if i in limit_list:
-                        self.update_properties(element_type, i, message.fields.value[k][i])
-            else:
-                for i in message.fields.value[k]:
-                    if i in limit_list:
-                        status = message.fields.value[k][i]
-                        self.update_properties(element_type, i, {prop_name: status})
-
-    def handle_status(self, message):
-        """Handle MessageStatus"""
-
-        if message.fields.value.status_request == 0:
-            if time.time() - self.last_power_update >= cfg.POWER_UPDATE_INTERVAL:
-                self.last_power_update = time.time()
-                self.update_properties('system', 'power', dict(vdc=round(message.fields.value.vdc, 2)), force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
-                self.update_properties('system', 'power', dict(battery=round(message.fields.value.battery, 2)), force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
-                self.update_properties('system', 'power', dict(dc=round(message.fields.value.dc, 2)), force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
-                self.update_properties('system', 'rf', dict(rf_noise_floor=round(message.fields.value.rf_noise_floor, 2 )), force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
-
-            for k in message.fields.value.troubles:
-                if "not_used" in k:
-                    continue
-
-                self.update_properties('system', 'trouble', {k: message.fields.value.troubles[k]})
-
-            self.process_status_bulk(message)
-
-        elif message.fields.value.status_request >= 1 and message.fields.value.status_request <= 5:
-            self.process_status_bulk(message)
 
     def handle_error(self, message):
         """Handle ErrorMessage"""

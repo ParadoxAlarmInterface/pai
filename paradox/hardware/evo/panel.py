@@ -4,10 +4,13 @@ import inspect
 import sys
 import logging
 import binascii
+import time
+import itertools
 
 from .parsers import *
 from ..panel import Panel as PanelBase
 
+from config import user as cfg
 
 MEM_ZONE_48_START = 0x00430
 MEM_ZONE_48_END = MEM_ZONE_48_START + 0x10 * 48
@@ -58,18 +61,22 @@ class Panel(PanelBase):
             pulse=False)
 
         # Zones
-        eeprom_zone_ranges = [range(MEM_ZONE_48_START, MEM_ZONE_48_END, 0x10)]
+        eeprom_zone_addresses = list(range(MEM_ZONE_48_START, MEM_ZONE_48_END, 0x10))
         if self.product_id in ['DIGIPLEX_EVO_96', 'DIGIPLEX_EVO_192']:
-            eeprom_zone_ranges.append(range(MEM_ZONE_96_START, MEM_ZONE_96_END, 0x10))
+            eeprom_zone_addresses += list(range(MEM_ZONE_96_START, MEM_ZONE_96_END, 0x10))
         if self.product_id in ['DIGIPLEX_EVO_192']:
-            eeprom_zone_ranges.append(range(MEM_ZONE_192_START, MEM_ZONE_192_END, 0x10))
+            eeprom_zone_addresses += list(range(MEM_ZONE_192_START, MEM_ZONE_192_END, 0x10))
 
-        self.load_labels(self.core.zones, self.core.labels['zone'], eeprom_zone_ranges)
+        eeprom_zone_addresses = [eeprom_zone_addresses[i-1] for i in cfg.ZONES]
+
+        self.load_labels(self.core.zones, self.core.labels['zone'], eeprom_zone_addresses)
         logger.info("Zones: {}".format(', '.join(self.core.labels['zone'])))
 
         # Users
-        eeprom_user_ranges = [range(MEM_USER_START, MEM_USER_END, 0x10)]
-        self.load_labels(self.core.users, self.core.labels['user'], eeprom_user_ranges)
+        eeprom_user_addresses = list(range(MEM_USER_START, MEM_USER_END, 0x10))
+        eeprom_user_addresses = [eeprom_user_addresses[i-1] for i in cfg.USERS]
+
+        self.load_labels(self.core.users, self.core.labels['user'], eeprom_user_addresses)
         logger.info("Users: {}".format(', '.join(self.core.labels['user'])))
 
         # # Modules
@@ -81,17 +88,19 @@ class Panel(PanelBase):
         # logger.info("Modules: {}".format(', '.join(self.core.labels['module'])))
 
         # Output/PGMs
-        eeprom_output_ranges = [range(MEM_OUTPUT_START, MEM_OUTPUT_END, 0x20)]
-        self.load_labels(self.core.outputs, self.core.labels['output'], eeprom_output_ranges)
+        eeprom_output_addresses = list(range(MEM_OUTPUT_START, MEM_OUTPUT_END, 0x20))
+        eeprom_output_addresses = [eeprom_output_addresses[i-1] for i in cfg.OUTPUTS]
+        self.load_labels(self.core.outputs, self.core.labels['output'], eeprom_output_addresses)
         logger.info("Output/PGMs: {}".format(', '.join(self.core.labels['output'])))
 
         # Partitions
         if self.product_id in ['DIGIPLEX_EVO_48']:
-            eeprom_partition_ranges = [range(MEM_PARTITION_START, MEM_PARTITION_48_END, 107)]
+            eeprom_partition_addresses = list(range(MEM_PARTITION_START, MEM_PARTITION_48_END, 107))
         else:
-            eeprom_partition_ranges = [range(MEM_PARTITION_START, MEM_PARTITION_END, 107)]
+            eeprom_partition_addresses = list(range(MEM_PARTITION_START, MEM_PARTITION_END, 107))
 
-        self.load_labels(self.core.partitions, self.core.labels['partition'], eeprom_partition_ranges)
+        eeprom_partition_addresses = [eeprom_partition_addresses[i-1] for i in cfg.PARTITIONS]
+        self.load_labels(self.core.partitions, self.core.labels['partition'], eeprom_partition_addresses)
         logger.info("Partitions: {}".format(', '.join(self.core.labels['partition'])))
 
         # # Doors
@@ -138,46 +147,45 @@ class Panel(PanelBase):
     def load_labels(self,
                     labelDictIndex,
                     labelDictName,
-                    ranges,
+                    addresses,
                     field_length=16,
                     template=dict(label='')):
         """Load labels from panel"""
         i = 1
 
-        for range_ in ranges:
-            for address in range_:
-                args = dict(address=address, length=field_length)
-                reply = self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=0x05)
+        for address in addresses:
+            args = dict(address=address, length=field_length)
+            reply = self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=0x05)
 
-                retry_count = 3
-                for retry in range(1, retry_count + 1):
-                    # Avoid errors due to collision with events. It should not come here as we use reply_expected=0x05
-                    if reply is None:
-                        logger.error("Could not fully load labels")
-                        return
+            retry_count = 3
+            for retry in range(1, retry_count + 1):
+                # Avoid errors due to collision with events. It should not come here as we use reply_expected=0x05
+                if reply is None:
+                    logger.error("Could not fully load labels")
+                    return
 
-                    if reply.fields.value.address != address:
-                        logger.debug(
-                            "Fetched and receive label EEPROM addresses (received: %d, requested: %d) do not match. Retrying %d of %d" % (
-                                reply.fields.value.address, address, retry, retry_count))
-                        reply = self.core.send_wait(None, None, reply_expected=0x05)
-                        continue
+                if reply.fields.value.address != address:
+                    logger.debug(
+                        "Fetched and receive label EEPROM addresses (received: %d, requested: %d) do not match. Retrying %d of %d" % (
+                            reply.fields.value.address, address, retry, retry_count))
+                    reply = self.core.send_wait(None, None, reply_expected=0x05)
+                    continue
 
-                    if retry == retry_count:
-                        logger.error('Failed to fetch label at address: %d' % address)
+                if retry == retry_count:
+                    logger.error('Failed to fetch label at address: %d' % address)
 
-                    break
+                break
 
-                data = reply.fields.value.data
-                label = data.strip(b'\0 ').replace(b'\0', b'_').replace(b' ', b'_').decode('utf-8')
+            data = reply.fields.value.data
+            label = data.strip(b'\0 ').replace(b'\0', b'_').replace(b' ', b'_').decode('utf-8')
 
-                if label not in labelDictName:
-                    properties = template.copy()
-                    properties['label'] = label
-                    labelDictIndex[i] = properties
+            if label not in labelDictName:
+                properties = template.copy()
+                properties['label'] = label
+                labelDictIndex[i] = properties
 
-                    labelDictName[label] = i
-                i += 1
+                labelDictName[label] = i
+            i += 1
 
     def parse_message(self, message):
         try:
@@ -209,10 +217,10 @@ class Panel(PanelBase):
             # elif message[0] >> 4 == 0x05 and message[2] < 0x80:
             elif message[0] >> 4 == 0x05:
                 return ReadEEPROMResponse.parse(message)
-            elif message[0] == 0x60 and message[2] < 0x80:
-                return WriteEEPROM.parse(message)
-            elif message[0] >> 4 == 0x06 and message[2] < 0x80:
-                return WriteEEPROMResponse.parse(message)
+            # elif message[0] == 0x60 and message[2] < 0x80:
+            #     return WriteEEPROM.parse(message)
+            # elif message[0] >> 4 == 0x06 and message[2] < 0x80:
+            #     return WriteEEPROMResponse.parse(message)
             elif message[0] >> 4 == 0x0e:
                 return LiveEvent.parse(message)
             else:
@@ -251,3 +259,83 @@ class Panel(PanelBase):
         else:
             logger.error("Authentication Failed. Wrong Password?")
             return False
+
+    def request_status(self, i):
+        args = dict(address=i, length=64, control=dict(ram_access=True))
+        reply = self.core.send_wait(ReadEEPROM, args, reply_expected=0x05)
+
+        return reply
+
+    def process_status_bulk(self, message):
+        for k in message.fields.value:
+            element_type = k.split('_')[0]
+
+            if element_type == 'pgm':
+                element_type = 'output'
+                limit_list = cfg.OUTPUTS
+            elif element_type == 'partition':
+                limit_list = cfg.PARTITIONS
+            elif element_type == 'zone':
+                limit_list = cfg.ZONES
+            elif element_type == 'bus':
+                limit_list = cfg.BUSES
+            else:
+                continue
+
+            if k in self.core.status_cache and self.core.status_cache[k] == message.fields.value[k]:
+                continue
+
+            self.core.status_cache[k] = message.fields.value[k]
+
+            prop_name = '_'.join(k.split('_')[1:])
+            if prop_name == 'status':
+                for i in message.fields.value[k]:
+                    if i in limit_list:
+                        self.core.update_properties(element_type, i, message.fields.value[k][i])
+            else:
+                for i in message.fields.value[k]:
+                    if i in limit_list:
+                        status = message.fields.value[k][i]
+                        self.core.update_properties(element_type, i, {prop_name: status})
+
+    def handle_status(self, message):
+        """Handle MessageStatus"""
+
+        vars = message.fields.value
+        # Check message
+
+        assert vars.po.command == 0x5
+        assert vars.control.ram_access == True
+        assert vars.control.eeprom_address_bits == 0x0
+        assert vars.bus_address == 0x00 # panel
+
+        assert vars.address in RAMDataParserMap
+        assert len(vars.data) == 64
+
+        parser = RAMDataParserMap[vars.address]
+
+        properties = parser.parse(vars.data)
+
+        # if message.fields.value.address == 1:
+        #     if time.time() - self.core.last_power_update >= cfg.POWER_UPDATE_INTERVAL:
+        #         self.core.last_power_update = time.time()
+        #         self.core.update_properties('system', 'power', dict(vdc=round(message.fields.value.vdc, 2)),
+        #                                     force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
+        #         self.core.update_properties('system', 'power', dict(battery=round(message.fields.value.battery, 2)),
+        #                                     force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
+        #         self.core.update_properties('system', 'power', dict(dc=round(message.fields.value.dc, 2)),
+        #                                     force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
+        #         self.core.update_properties('system', 'rf',
+        #                                     dict(rf_noise_floor=round(message.fields.value.rf_noise_floor, 2)),
+        #                                     force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
+        #
+        #     for k in message.fields.value.troubles:
+        #         if "not_used" in k:
+        #             continue
+        #
+        #         self.core.update_properties('system', 'trouble', {k: message.fields.value.troubles[k]})
+        #
+        #     self.process_status_bulk(message)
+        #
+        # elif message.fields.value.status_request >= 1 and message.fields.value.status_request <= 5:
+        #     self.process_status_bulk(message)
