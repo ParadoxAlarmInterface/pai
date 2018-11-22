@@ -23,8 +23,7 @@ LoginConfirmationResponse = Struct("fields" / RawCopy(
         ),
         "callback" / Int16ub
     )),
-                                   "checksum" / Checksum(
-                                       Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 InitializeCommunication = Struct("fields" / RawCopy(
     Struct(
@@ -47,9 +46,9 @@ InitializeCommunication = Struct("fields" / RawCopy(
         "evo_sections" / Bytes(9),  # EVO section data 3030-3038
         "not_used1" / Padding(4),
         "source_id" / Default(CommunicationSourceIDEnum, 1),
-        "carrier_length" / Bytes(1))),
-                                 "checksum" / Checksum(
-                                     Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+        "carrier_length" / Bytes(1)
+    )),
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 
 RAMDataParserMap = {
@@ -186,8 +185,7 @@ Action = Struct("fields" / RawCopy(
         "user_high" / Default(Int8ub, 0),
         "user_low" / Default(Int8ub, 0),
     )),
-                "checksum" / Checksum(
-                    Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 ActionResponse = Struct("fields" / RawCopy(
     Struct(
@@ -202,8 +200,8 @@ ActionResponse = Struct("fields" / RawCopy(
         "not_used1" / Default(Int8ub, 0),
         "action" / Int8ub,
     )),
-                        "reserved0" / Padding(32),
-                        "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "reserved0" / Padding(32),
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 CloseConnection = Struct("fields" / RawCopy(
     Struct(
@@ -231,8 +229,7 @@ CloseConnection = Struct("fields" / RawCopy(
                          invalid_label_number=0x1c
                          ), 0x05),
     )),
-                         "checksum" / Checksum(
-                             Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 
 class EvoEEPROMAddressAdapter(Subconstruct):
@@ -245,7 +242,7 @@ class EvoEEPROMAddressAdapter(Subconstruct):
         return d
 
     def _build(self, obj, stream, context, path):
-        if "control" in obj and obj["control"].get("ram_access") == True:  # for ram block
+        if "control" in obj and obj["control"].get("ram_access"):  # for ram block
             ram_block = (obj["address"] & 0xf0000) >> 16
             self.deep_update(obj, dict(po=dict(block=ram_block)))
         else:  # for eeprom
@@ -280,8 +277,7 @@ ReadEEPROM = Struct("fields" / RawCopy(
         "address" / ExprSymmetricAdapter(Int16ub, obj_ & 0xffff),
         "length" / Int8ub
     ))),
-                    "checksum" / Checksum(
-                        Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 ReadEEPROMResponse = Struct("fields" / RawCopy(
     Struct(
@@ -304,24 +300,22 @@ ReadEEPROMResponse = Struct("fields" / RawCopy(
         "address" / Int16ub,
         "data" / Bytes(lambda this: this.packet_length - 7)
     )),
-                            "checksum" / Checksum(
-                                Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 SetTimeDate = Struct("fields" / RawCopy(Struct(
-    "po" / Struct(
-        "command" / Const(0x30, Int8ub)),
-    "packet_length" / Rebuild(Int8ub,
-                              lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
-    "not_used0" / Padding(4),
-    "century" / Int8ub,
-    "year" / Int8ub,
-    "month" / Int8ub,
-    "day" / Int8ub,
-    "hour" / Int8ub,
-    "minute" / Int8ub,
-)),
-                     "checksum" / Checksum(
-                         Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+        "po" / Struct(
+            "command" / Const(0x30, Int8ub)),
+        "packet_length" / Rebuild(Int8ub,
+                                  lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+        "not_used0" / Padding(4),
+        "century" / Int8ub,
+        "year" / Int8ub,
+        "month" / Int8ub,
+        "day" / Int8ub,
+        "hour" / Int8ub,
+        "minute" / Int8ub,
+    )),
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 SetTimeDateResponse = Struct("fields" / RawCopy(
     Struct(
@@ -335,43 +329,41 @@ SetTimeDateResponse = Struct("fields" / RawCopy(
         "length" / Int8ub,
         "not_used0" / Padding(4),
     )),
-                             "checksum" / Checksum(
-                                 Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 PerformAction = Struct("fields" / RawCopy(Struct(
-    "po" / Struct(
-        "command" / Const(0x40, Int8ub)),
-    "not_used0" / Padding(1),
-    "action" / Enum(Int8ub,
-                    Stay_Arm=0x01,
-                    Stay_Arm1=0x02,
-                    Sleep_Arm=0x03,
-                    Full_Arm=0x04,
-                    Disarm=0x05,
-                    Stay_Arm_StayD=0x06,
-                    Sleep_Arm_StayD=0x07,
-                    Disarm_Both_Disable_StayD=0x08,
-                    Bypass=0x10,
-                    Beep=0x10,
-                    PGM_On_Override=0x30,
-                    PGM_Off_Override=0x31,
-                    PGM_On=0x32,
-                    PGM_Off=0x33,
-                    Reload_RAM=0x80,
-                    Bus_Scan=0x85,
-                    Future_Use=0x90),
-    "argument" / Enum(Int8ub,
-                      One_Beep=0x04,
-                      Fail_Beep=0x08,
-                      Beep_Twice=0x0c,
-                      Accept_Beep=0x10),
-    "not_used1" / Padding(29),
-    "source_id" / Default(CommunicationSourceIDEnum, 1),
-    "user_high" / Default(Int8ub, 0),
-    "user_low" / Default(Int8ub, 0),
-)),
-                       "checksum" / Checksum(
-                           Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+        "po" / Struct(
+            "command" / Const(0x40, Int8ub)),
+        "not_used0" / Padding(1),
+        "action" / Enum(Int8ub,
+                        Stay_Arm=0x01,
+                        Stay_Arm1=0x02,
+                        Sleep_Arm=0x03,
+                        Full_Arm=0x04,
+                        Disarm=0x05,
+                        Stay_Arm_StayD=0x06,
+                        Sleep_Arm_StayD=0x07,
+                        Disarm_Both_Disable_StayD=0x08,
+                        Bypass=0x10,
+                        Beep=0x10,
+                        PGM_On_Override=0x30,
+                        PGM_Off_Override=0x31,
+                        PGM_On=0x32,
+                        PGM_Off=0x33,
+                        Reload_RAM=0x80,
+                        Bus_Scan=0x85,
+                        Future_Use=0x90),
+        "argument" / Enum(Int8ub,
+                          One_Beep=0x04,
+                          Fail_Beep=0x08,
+                          Beep_Twice=0x0c,
+                          Accept_Beep=0x10),
+        "not_used1" / Padding(29),
+        "source_id" / Default(CommunicationSourceIDEnum, 1),
+        "user_high" / Default(Int8ub, 0),
+        "user_low" / Default(Int8ub, 0),
+    )),
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 PerformActionResponse = Struct("fields" / RawCopy(
     Struct(
@@ -403,8 +395,7 @@ PerformActionResponse = Struct("fields" / RawCopy(
                         Future_Use=0x90),
         "not_used1" / Padding(33),
     )),
-                               "checksum" / Checksum(
-                                   Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 ErrorMessage = Struct("fields" / RawCopy(
     Struct(
@@ -436,5 +427,4 @@ ErrorMessage = Struct("fields" / RawCopy(
                          invalid_label_number=0x1c
                          ),
     )),
-                      "checksum" / Checksum(
-                          Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))

@@ -67,14 +67,14 @@ class Panel(PanelBase):
         if self.product_id in ['DIGIPLEX_EVO_192']:
             eeprom_zone_addresses += list(range(MEM_ZONE_192_START, MEM_ZONE_192_END, 0x10))
 
-        eeprom_zone_addresses = [eeprom_zone_addresses[i-1] for i in cfg.ZONES]
+        eeprom_zone_addresses = [eeprom_zone_addresses[i - 1] for i in cfg.ZONES]
 
         self.load_labels(self.core.zones, self.core.labels['zone'], eeprom_zone_addresses)
         logger.info("Zones: {}".format(', '.join(self.core.labels['zone'])))
 
         # Users
         eeprom_user_addresses = list(range(MEM_USER_START, MEM_USER_END, 0x10))
-        eeprom_user_addresses = [eeprom_user_addresses[i-1] for i in cfg.USERS]
+        eeprom_user_addresses = [eeprom_user_addresses[i - 1] for i in cfg.USERS]
 
         self.load_labels(self.core.users, self.core.labels['user'], eeprom_user_addresses)
         logger.info("Users: {}".format(', '.join(self.core.labels['user'])))
@@ -89,7 +89,7 @@ class Panel(PanelBase):
 
         # Output/PGMs
         eeprom_output_addresses = list(range(MEM_OUTPUT_START, MEM_OUTPUT_END, 0x20))
-        eeprom_output_addresses = [eeprom_output_addresses[i-1] for i in cfg.OUTPUTS]
+        eeprom_output_addresses = [eeprom_output_addresses[i - 1] for i in cfg.OUTPUTS]
         self.load_labels(self.core.outputs, self.core.labels['output'], eeprom_output_addresses)
         logger.info("Output/PGMs: {}".format(', '.join(self.core.labels['output'])))
 
@@ -99,7 +99,7 @@ class Panel(PanelBase):
         else:
             eeprom_partition_addresses = list(range(MEM_PARTITION_START, MEM_PARTITION_END, 107))
 
-        eeprom_partition_addresses = [eeprom_partition_addresses[i-1] for i in cfg.PARTITIONS]
+        eeprom_partition_addresses = [eeprom_partition_addresses[i - 1] for i in cfg.PARTITIONS]
         self.load_labels(self.core.partitions, self.core.labels['partition'], eeprom_partition_addresses)
         logger.info("Partitions: {}".format(', '.join(self.core.labels['partition'])))
 
@@ -253,7 +253,7 @@ class Panel(PanelBase):
         if reply is None:
             return False
 
-        if reply.fields.value.po.status.Windload_connected == True:
+        if reply.fields.value.po.status.Windload_connected:
             logger.info("Authentication Success")
             return True
         else:

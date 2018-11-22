@@ -34,6 +34,7 @@ class PartitionStateAdapter(Adapter):
 
         return 0
 
+
 class ZoneFlagsAdapter(Adapter):
     flag_parser = BitStruct(
         "supervision_trouble" / Flag,
@@ -46,7 +47,7 @@ class ZoneFlagsAdapter(Adapter):
         "generated_alarm" / Flag
     )
 
-    def __init__(self, subcon, start_index_from = 1):
+    def __init__(self, subcon, start_index_from=1):
         super(ZoneFlagsAdapter, self).__init__(subcon)
 
         self.start_index_from = start_index_from
@@ -54,7 +55,7 @@ class ZoneFlagsAdapter(Adapter):
     def _decode(self, obj, context, path):
         r = dict()
         for i in range(0, len(obj)):
-            r[self.start_index_from+i] = self.flag_parser.parse(obj)
+            r[self.start_index_from + i] = self.flag_parser.parse(obj)
         return r
 
     def _encode(self, obj, context, path):
@@ -70,6 +71,7 @@ class StatusAdapter(Adapter):
                 r[i * 8 + j + 1] = (((status >> j) & 0x01) == 0x01)
 
         return r
+
 
 class PartitionStatusAdapter(Adapter):
     first2 = BitStruct(
@@ -131,13 +133,12 @@ class PartitionStatusAdapter(Adapter):
     def _decode(self, obj, context, path):
         partitions = dict()
 
-        if len(obj) == 32: # ram block 3
-            raws = dict([(i+1, obj[i*6:(i+1)*6]) for i in range(0, 6)])
-        elif len(obj) == 16: # ram block 4
-            raws = dict([(6, obj[0:4])] + [(i+7, obj[i*6+4:(i+1)*6+4]) for i in range(0, 2)])
+        if len(obj) == 32:  # ram block 3
+            raws = dict([(i + 1, obj[i * 6:(i + 1) * 6]) for i in range(0, 6)])
+        elif len(obj) == 16:  # ram block 4
+            raws = dict([(6, obj[0:4])] + [(i + 7, obj[i * 6 + 4:(i + 1) * 6 + 4]) for i in range(0, 2)])
         else:
             raise Exception('Not supported')
-
 
         for key, raw in raws.items():
             size = len(raw)
@@ -147,9 +148,9 @@ class PartitionStatusAdapter(Adapter):
                 partition = {}
                 partition.update(result.a)
                 partition.update(result.b)
-            elif size == 2: # first part
+            elif size == 2:  # first part
                 partition = self.first2.parse(raw)
-            elif size == 4: # second part
+            elif size == 4:  # second part
                 partition = self.last4.parse(raw)
             else:
                 raise Exception('Not supported size: %d' % size)
@@ -157,6 +158,7 @@ class PartitionStatusAdapter(Adapter):
             partitions[key] = partition
 
         return partitions
+
 
 class PGMFlagsAdapter(Adapter):
     def _decode(self, obj, context, path):
