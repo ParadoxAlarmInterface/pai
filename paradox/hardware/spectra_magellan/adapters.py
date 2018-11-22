@@ -637,6 +637,8 @@ subEventGroupMap = {0: _zoneLabel,
                     57: _userLabel,
                     58: _zoneLabel,
                     59: _zoneLabel,
+                    60: _userLabel,
+                    61: _userLabel,
                     64: _systemStatus
                     }
 
