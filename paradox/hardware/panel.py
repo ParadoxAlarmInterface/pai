@@ -8,6 +8,8 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 
 class Panel:
+    mem_map = {}
+
     def __init__(self, core, product_id):
         self.core = core
         self.product_id = product_id
@@ -63,6 +65,71 @@ class Panel:
 
         return bytes(res[:2])
 
+    def update_labels(self):
+        logger.info("Updating Labels from Panel")
+
+        output_template = dict(
+            on=False,
+            pulse=False)
+
+        eeprom_zone_addresses = range(self.mem_map['zone']['start'], self.mem_map['zone']['end'], self.core_mem_map['zone']['size'])
+        self.load_labels(self.core.zones, self.core.labels['zone'], eeprom_zone_addresses)
+        logger.info("Zones: {}".format(', '.join(self.core.labels['zone'])))
+
+        eeprom_partition_addresses = range(self.mem_map['partition']['start'], self.mem_map['partition']['end'], self.core_mem_map['partition']['size'])
+        self.load_labels(self.core.partitions, self.core.labels['partition'], eeprom_partition_addresses)
+        logger.info("Partitions: {}".format(', '.join(list(self.core.labels['partition']))))
+
+        eeprom_output_addresses = range(self.mem_map['output']['start'], self.mem_map['output']['end'], self.core_mem_map['output']['size'])
+        self.load_labels(self.core.outputs, self.core.labels['output'], eeprom_output_addresses, template=output_template)
+        logger.info("Output: {}".format(', '.join(self.core.labels['output'])))
+
+        eeprom_user_addresses = range(self.mem_map['user']['start'], self.mem_map['user']['end'], self.core_mem_map['user']['size'])
+        self.load_labels(self.core.users, self.core.labels['user'], eeprom_user_addresses)
+        logger.info("Users: {}".format(', '.join(list(self.core.labels['user']))))
+
+    def load_labels(self,
+                    labelDictIndex,
+                    labelDictName,
+                    addresses,
+                    field_length=16,
+                    template=dict(label='')):
+        """Load labels from panel"""
+        i = 1
+
+        for address in addresses:
+            args = dict(address=address, length=field_length)
+            reply = self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=0x05)
+
+            retry_count = 3
+            for retry in range(1, retry_count + 1):
+                # Avoid errors due to collision with events. It should not come here as we use reply_expected=0x05
+                if reply is None:
+                    logger.error("Could not fully load labels")
+                    return
+
+                if reply.fields.value.address != address:
+                    logger.debug(
+                        "Fetched and receive label EEPROM addresses (received: %d, requested: %d) do not match. Retrying %d of %d" % (
+                            reply.fields.value.address, address, retry, retry_count))
+                    reply = self.core.send_wait(None, None, reply_expected=0x05)
+                    continue
+
+                if retry == retry_count:
+                    logger.error('Failed to fetch label at address: %d' % address)
+
+                break
+
+            data = reply.fields.value.data
+            label = data.strip(b'\0 ').replace(b'\0', b'_').replace(b' ', b'_').decode('utf-8')
+
+            if label not in labelDictName:
+                properties = template.copy()
+                properties['label'] = label
+                labelDictIndex[i] = properties
+
+                labelDictName[label] = i
+            i += 1
 
 InitiateCommunication = Struct("fields" / RawCopy(
     Struct("po" / BitStruct(

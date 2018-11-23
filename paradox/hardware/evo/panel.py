@@ -40,6 +40,8 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 
 class Panel(PanelBase):
+
+
     def get_message(self, name):
         try:
             return super(Panel, self).get_message(name)
@@ -144,48 +146,7 @@ class Panel(PanelBase):
 
                 fh.write(data)
 
-    def load_labels(self,
-                    labelDictIndex,
-                    labelDictName,
-                    addresses,
-                    field_length=16,
-                    template=dict(label='')):
-        """Load labels from panel"""
-        i = 1
 
-        for address in addresses:
-            args = dict(address=address, length=field_length)
-            reply = self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=0x05)
-
-            retry_count = 3
-            for retry in range(1, retry_count + 1):
-                # Avoid errors due to collision with events. It should not come here as we use reply_expected=0x05
-                if reply is None:
-                    logger.error("Could not fully load labels")
-                    return
-
-                if reply.fields.value.address != address:
-                    logger.debug(
-                        "Fetched and receive label EEPROM addresses (received: %d, requested: %d) do not match. Retrying %d of %d" % (
-                            reply.fields.value.address, address, retry, retry_count))
-                    reply = self.core.send_wait(None, None, reply_expected=0x05)
-                    continue
-
-                if retry == retry_count:
-                    logger.error('Failed to fetch label at address: %d' % address)
-
-                break
-
-            data = reply.fields.value.data
-            label = data.strip(b'\0 ').replace(b'\0', b'_').replace(b' ', b'_').decode('utf-8')
-
-            if label not in labelDictName:
-                properties = template.copy()
-                properties['label'] = label
-                labelDictIndex[i] = properties
-
-                labelDictName[label] = i
-            i += 1
 
     def parse_message(self, message):
         try:
