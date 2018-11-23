@@ -108,7 +108,7 @@ PanelStatusResponse = [
         "bus_tamper" / StatusAdapter(Bytes(2)),
         "zone_fire" / StatusAdapter(Bytes(4)),
         "not_used1" / Int8ub)),
-    "checksum" / Checksum(sBytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
     ,
     Struct("fields" / RawCopy(Struct(
         "po" / BitStruct(
