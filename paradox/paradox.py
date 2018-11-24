@@ -22,6 +22,7 @@ STATE_RUN = 1
 STATE_PAUSE = 2
 STATE_ERROR = 3
 
+
 class Paradox:
     def __init__(self,
                  connection,
@@ -34,27 +35,20 @@ class Paradox:
         self.retries = retries
         self.interface = interface
         self.reset()
+        self.data = dict()
+        self.labels = dict()
 
     def reset(self):
 
         # Keep track of alarm state
-        self.repeaters = dict()
-        self.keypads = dict()
-        self.sirens = dict()
-        self.sites = dict()
-        self.users = dict()
-        self.buses = dict()
-        self.zones = dict()
-        self.partitions = dict()
-        self.outputs = dict()
-        self.system = dict(power=dict(label='power'), rf=dict(label='rf'), troubles=dict(label='troubles'))
+        self.data = dict(
+            system=dict(power=dict(label='power'), rf=dict(label='rf'), troubles=dict(label='troubles'))
+        )
+
         self.last_power_update = 0
         self.run = STATE_STOP
         self.loop_wait = True
-
-        self.type_to_element_dict = dict(repeater=self.repeaters, keypad=self.keypads, siren=self.sirens, user=self.users, bus=self.buses, zone=self.zones, partition=self.partitions, output=self.outputs, system=self.system)
-
-        self.labels = {'zone': {}, 'partition': {}, 'output': {}, 'user': {}, 'bus': {}, 'repeater': {}, 'siren':{}, 'site': {}, 'keypad': {} }
+        self.labels = dict()
         self.status_cache = dict()
 
     def connect(self):
@@ -242,7 +236,7 @@ class Paradox:
         zones_selected = []
         # if all or 0, select all
         if zone == 'all' or zone == '0':
-            zones_selected = list(self.zones)
+            zones_selected = list(self.data['zone'])
         else:
             # if set by name, look for it
             if zone in self.labels['zone']:
@@ -250,7 +244,7 @@ class Paradox:
             # if set by number, look for it
             elif zone.isdigit():
                 number = int(zone)
-                if number in self.zones:
+                if number in self.data['zone']:
                     zones_selected = [number]
 
         # Not Found
@@ -280,7 +274,7 @@ class Paradox:
 
         # if all or 0, select all
         if partition == 'all' or partition == '0':
-            partitions_selected = list(self.partitions)
+            partitions_selected = list(self.data['partition'])
         else:
             # if set by name, look for it
             if partition in self.labels['partition']:
@@ -288,7 +282,7 @@ class Paradox:
             # if set by number, look for it
             elif partition.isdigit():
                 number = int(partition)
-                if number in self.partitions:
+                if number in self.data['partition']:
                     partitions_selected = [number]
 
         # Not Found
@@ -319,7 +313,7 @@ class Paradox:
         outputs = []
         # if all or 0, select all
         if output == 'all' or output == '0':
-            outputs = list(range(1, len(self.outputs)))
+            outputs = list(range(1, len(self.data['output'])))
         else:
             # if set by name, look for it
             if output in self.labels['output']:
@@ -327,7 +321,7 @@ class Paradox:
             # if set by number, look for it
             elif output.isdigit():
                 number = int(output)
-                if number > 0 and number < len(self.outputs):
+                if number > 0 and number < len(self.data['output']):
                     outputs = [number]
 
         # Not Found
@@ -446,8 +440,8 @@ class Paradox:
             self.interface.notify("Paradox", "{}: {}".format(event['major'][1], event['minor'][1]), logging.CRITICAL)
         # Signal Weak
         elif major_code in [18, 19, 20, 21]:
-            if event['minor'][0] >= 0 and event['minor'][0] < len(self.zones):
-                label = self.zones[event['minor'][0]]['label']
+            if event['minor'][0] >= 0 and event['minor'][0] < len(self.data['zone']):
+                label = self.data['zone'][event['minor'][0]]['label']
             else:
                 label = event['minor'][1]
 
@@ -466,7 +460,7 @@ class Paradox:
         if major in (0, 1):
             change = dict(open=(major == 1))
         elif major == 35:
-            change = dict(bypass=not self.zones[minor])
+            change = dict(bypass=not self.data['zone'][minor])
         elif major in (36, 38):
             change = dict(alarm=(major == 36))
         elif major in (37, 39):
@@ -509,20 +503,20 @@ class Paradox:
         new_event = {'major': event['major'], 'minor': event['minor'], 'type': event['type']}
 
         if change is not None:
-            if event['type'] == 'Zone' and len(self.zones) > 0 and minor < len(self.zones):
+            if event['type'] == 'Zone' and len(self.data['zone']) > 0 and minor < len(self.data['zone']):
                 self.update_properties('zone', minor, change)
-                new_event['minor'] = (minor, self.zones[minor]['label'])
-            elif event['type'] == 'Partition' and len(self.partitions) > 0:
+                new_event['minor'] = (minor, self.data['zone'][minor]['label'])
+            elif event['type'] == 'Partition' and len(self.data['partition']) > 0:
                 pass
-            elif event['type'] == 'Output' and len(self.outputs) and minor < len(self.outputs):
+            elif event['type'] == 'Output' and len(self.data['output']) and minor < len(self.data['output']):
                 self.update_properties('output', minor, change)
-                new_event['minor'] = (minor, self.outputs[minor]['label'])
+                new_event['minor'] = (minor, self.data['output'][minor]['label'])
 
         return new_event
 
     def update_properties(self, element_type, key, change, force_publish=False):
 
-        elements = self.type_to_element_dict[element_type]
+        elements = self.data[element_type]
 
         if key not in elements:
             return

@@ -16,25 +16,28 @@ class Panel(PanelBase):
     mem_map = dict(
         status_base1=0x8000,
         status_base2=0x1fe0,
-
-        zone=dict(
-            start=0x010, end=0x210, size=0x10),
-        output=dict(
-            start=0x210, end=0x270, size=0x10),
-        partition=dict(
-            start=0x270, end=0x290, size=0x10),
-        user=dict(
-            start=0x290, end=0x490, size=0x10),
-        bus=dict(
-            start=0x490, end=0x580, size=0x10),
-        repeater=dict(
-            start=0x580, end=0x5a0, size=0x10),
-        keypad=dict(
-            start=0x5a0, end=0x620, size=0x10),
-        site=dict(
-            start=0x620, end=0x630, size=0x10),
-        siren=dict(
-            start=0x630, end=0x670, size=0x10)
+        elements=dict(
+            zone=dict(
+                label_offset=0, addresses=[range(0x010, 0x210, 0x10)]),
+            output=dict(
+                label_offset=0, addresses=[range(0x210, 0x270, 0x10)], template=dict(
+                    on=False,
+                    pulse=False)
+                ),
+            partition=dict(
+                label_offset=0, addresses=[range(0x270, 0x290, 0x10)]),
+            user=dict(
+                label_offset=0, addresses=[range(0x290, 0x490, 0x10)]),
+            bus=dict(
+                label_offset=0, addresses=[range(0x490, 0x580, 0x10)]),
+            repeater=dict(
+                label_offset=0, addresses=[range(0x580, 0x5a0, 0x10)]),
+            keypad=dict(
+                label_offset=0, addresses=[range(0x5a0, 0x620, 0x10)]),
+            site=dict(
+                label_offset=0, addresses=[range(0x620, 0x630, 0x10)]),
+            siren=dict(label_offset=0, addresses=[range(0x630, 0x670, 0x10)])
+        )
     )
 
     def get_message(self, name):
@@ -51,26 +54,6 @@ class Panel(PanelBase):
         logger.info("Updating Labels from Panel")
 
         super(Panel, self).update_labels()
-
-        eeprom_buses_addresses = range(self.mem_map['bus']['start'], self.mem_map['bus']['end'], self.mem_map['bus']['size'])
-        self.load_labels(self.core.buses, self.core.labels['bus'], eeprom_buses_addresses)
-        logger.info("Buses: {}".format(', '.join(list(self.core.labels['bus']))))
-
-        eeprom_repeaters_addresses = range(self.mem_map['reapeater']['start'], self.mem_map['repeater']['end'], self.mem_map['repeater']['size'])
-        self.load_labels(self.core.repeaters, self.core.labels['repeater'], eeprom_repeaters_addresses)
-        logger.info("Repeaters: {}".format(', '.join(list(self.core.labels['repeater']))))
-
-        eeprom_keypads_addresses = range(self.mem_map['keypad']['start'], self.mem_map['keypad']['end'], self.mem_map['keypad']['size'])
-        self.load_labels(self.core.keypads, self.core.labels['keypad'], eeprom_keypads_addresses)
-        logger.info("Keypads: {}".format(', '.join(list(self.core.labels['keypad']))))
-
-        eeprom_sites_addresses = range(self.mem_map['site']['start'], self.mem_map['site']['end'], self.mem_map['site']['size'])
-        self.load_labels(self.core.sites, self.core.labels['site'], eeprom_sites_addresses)
-        logger.info("Sites: {}".format(', '.join(list(self.core.labels['site']))))
-
-        eeprom_sirens_addresses = range(self.mem_map['siren']['start'], self.mem_map['siren']['end'], self.mem_map['siren'][size])
-        self.load_labels(self.core.sirens, self.core.labels['siren'], eeprom_sirens_addresses)
-        logger.info("Sirens: {}".format(', '.join(list(self.core.labels['siren']))))
 
         logger.debug("Labels updated")
 
@@ -148,7 +131,7 @@ class Panel(PanelBase):
             return False
 
     def request_status(self, i):
-        args = dict(address=self.mem_map['STATUS_BASE1'] + i)
+        args = dict(address=self.mem_map['status_base1'] + i)
         reply = self.core.send_wait(ReadEEPROM, args, reply_expected=0x05)
 
         return reply

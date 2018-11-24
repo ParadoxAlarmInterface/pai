@@ -68,36 +68,32 @@ class Panel:
     def update_labels(self):
         logger.info("Updating Labels from Panel")
 
-        output_template = dict(
-            on=False,
-            pulse=False)
+        for elem_type in self.mem_map['elements']:
+            elem_def = self.mem_map['elements'][elem_type]
+            if elem_type not in self.core.labels:
+                self.core.labels[elem_type] = dict()
 
-        eeprom_zone_addresses = range(self.mem_map['zone']['start'], self.mem_map['zone']['end'], self.core_mem_map['zone']['size'])
-        self.load_labels(self.core.zones, self.core.labels['zone'], eeprom_zone_addresses)
-        logger.info("Zones: {}".format(', '.join(self.core.labels['zone'])))
+            if elem_type not in self.core.data:
+                self.core.data[elem_type] = dict()
 
-        eeprom_partition_addresses = range(self.mem_map['partition']['start'], self.mem_map['partition']['end'], self.core_mem_map['partition']['size'])
-        self.load_labels(self.core.partitions, self.core.labels['partition'], eeprom_partition_addresses)
-        logger.info("Partitions: {}".format(', '.join(list(self.core.labels['partition']))))
-
-        eeprom_output_addresses = range(self.mem_map['output']['start'], self.mem_map['output']['end'], self.core_mem_map['output']['size'])
-        self.load_labels(self.core.outputs, self.core.labels['output'], eeprom_output_addresses, template=output_template)
-        logger.info("Output: {}".format(', '.join(self.core.labels['output'])))
-
-        eeprom_user_addresses = range(self.mem_map['user']['start'], self.mem_map['user']['end'], self.core_mem_map['user']['size'])
-        self.load_labels(self.core.users, self.core.labels['user'], eeprom_user_addresses)
-        logger.info("Users: {}".format(', '.join(list(self.core.labels['user']))))
+            for addresses in elem_def['addresses']:
+                self.load_labels(self.core.data[elem_type],
+                                 self.core.labels[elem_type],
+                                 addresses,
+                                 label_offset=elem_def['label_offset'])
+                logger.info("{}: {}".format(elem_type.title(), ', '.join(self.core.labels[elem_type])))
 
     def load_labels(self,
                     labelDictIndex,
                     labelDictName,
                     addresses,
                     field_length=16,
-                    template=dict(label='')):
+                    label_offset=0,
+                    template={}):
         """Load labels from panel"""
         i = 1
 
-        for address in addresses:
+        for address in list(addresses):
             args = dict(address=address, length=field_length)
             reply = self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=0x05)
 
@@ -121,7 +117,7 @@ class Panel:
                 break
 
             data = reply.fields.value.data
-            label = data.strip(b'\0 ').replace(b'\0', b'_').replace(b' ', b'_').decode('utf-8')
+            label = data[label_offset:].strip(b'\0 ').replace(b'\0', b'_').replace(b' ', b'_').decode('utf-8')
 
             if label not in labelDictName:
                 properties = template.copy()
