@@ -141,38 +141,6 @@ class Panel_EVOBase(PanelBase):
 
         return reply
 
-    def process_status_bulk(self, message):
-        for k in message.fields.value:
-            element_type = k.split('_')[0]
-
-            if element_type == 'pgm':
-                element_type = 'output'
-                limit_list = cfg.OUTPUTS
-            elif element_type == 'partition':
-                limit_list = cfg.PARTITIONS
-            elif element_type == 'zone':
-                limit_list = cfg.ZONES
-            elif element_type == 'bus':
-                limit_list = cfg.BUSES
-            else:
-                continue
-
-            if k in self.core.status_cache and self.core.status_cache[k] == message.fields.value[k]:
-                continue
-
-            self.core.status_cache[k] = message.fields.value[k]
-
-            prop_name = '_'.join(k.split('_')[1:])
-            if prop_name == 'status':
-                for i in message.fields.value[k]:
-                    if i in limit_list:
-                        self.core.update_properties(element_type, i, message.fields.value[k][i])
-            else:
-                for i in message.fields.value[k]:
-                    if i in limit_list:
-                        status = message.fields.value[k][i]
-                        self.core.update_properties(element_type, i, {prop_name: status})
-
     def handle_status(self, message):
         """Handle MessageStatus"""
 
@@ -191,26 +159,46 @@ class Panel_EVOBase(PanelBase):
 
         properties = parser.parse(vars.data)
 
-        # if message.fields.value.address == 1:
-        #     if time.time() - self.core.last_power_update >= cfg.POWER_UPDATE_INTERVAL:
-        #         self.core.last_power_update = time.time()
-        #         self.core.update_properties('system', 'power', dict(vdc=round(message.fields.value.vdc, 2)),
-        #                                     force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
-        #         self.core.update_properties('system', 'power', dict(battery=round(message.fields.value.battery, 2)),
-        #                                     force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
-        #         self.core.update_properties('system', 'power', dict(dc=round(message.fields.value.dc, 2)),
-        #                                     force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
-        #         self.core.update_properties('system', 'rf',
-        #                                     dict(rf_noise_floor=round(message.fields.value.rf_noise_floor, 2)),
-        #                                     force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
-        #
-        #     for k in message.fields.value.troubles:
-        #         if "not_used" in k:
-        #             continue
-        #
-        #         self.core.update_properties('system', 'trouble', {k: message.fields.value.troubles[k]})
-        #
-        #     self.process_status_bulk(message)
-        #
-        # elif message.fields.value.status_request >= 1 and message.fields.value.status_request <= 5:
-        #     self.process_status_bulk(message)
+        if vars.address == 1:
+            for k in properties.troubles:
+                if "not_used" in k:
+                    continue
+
+                self.core.update_properties('system', 'trouble', {k: properties.troubles[k]})
+
+        self.process_properties_bulk(properties)
+
+    def process_properties_bulk(self, properties):
+        for k in properties:
+            element_type = k.split('_')[0]
+
+            if element_type == 'pgm':
+                element_type = 'output'
+                limit_list = cfg.OUTPUTS
+            elif element_type == 'partition':
+                limit_list = cfg.PARTITIONS
+            elif element_type == 'zone':
+                limit_list = cfg.ZONES
+            elif element_type == 'door':
+                limit_list = cfg.DOORS
+            elif element_type == 'module':
+                element_type = 'bus'
+                limit_list = cfg.BUSES
+            else:
+                continue
+
+            if k in self.core.status_cache and self.core.status_cache[k] == properties[k]:
+                continue
+
+            self.core.status_cache[k] = properties[k]
+
+            prop_name = '_'.join(k.split('_')[1:])
+            if prop_name == 'status': # struct with properties
+                for i in properties[k]:
+                    if i in limit_list:
+                        self.core.update_properties(element_type, i, properties[k][i])
+            else:
+                for i in properties[k]:
+                    if i in limit_list:
+                        status = properties[k][i]
+                        self.core.update_properties(element_type, i, {prop_name: status})

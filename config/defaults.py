@@ -28,6 +28,7 @@ IP_CONNECTION_EMAIL = None 		# Email registered in the site
 KEEP_ALIVE_INTERVAL = 9     		# Interval between status updates
 ZONES = range(1, 17)			# Zones to monitor and control
 USERS = [1, 2, 3, 4]   			# Users to consider
+DOORS = range(1, 32)            # Doors to consider
 OUTPUTS = range(1, 17)  		# Outputs to monitor and control
 PARTITIONS = [1, 2]     		# Partitions to monitor and control
 BUSES = range(1, 17)			# Buses to monitor

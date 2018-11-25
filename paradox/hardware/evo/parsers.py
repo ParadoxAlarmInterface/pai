@@ -54,9 +54,9 @@ InitializeCommunication = Struct("fields" / RawCopy(
 RAMDataParserMap = {
     1: Struct(
         "weekday" / Int8ub,
-        "pgm" / Bytes(4),
+        "pgm_flags" / PGMFlagsAdapter(Bytes(4)),
         "key_switch" / StatusAdapter(Bytes(4)),
-        "door_state" / StatusAdapter(Bytes(4)),
+        "door_open" / StatusAdapter(Bytes(4)),
         "troubles" / BitStruct(
             "Trbl_System" / Flag,
             "Trbl_Dialer" / Flag,
@@ -112,15 +112,15 @@ RAMDataParserMap = {
         "zone_low_battery" / StatusAdapter(Bytes(12))
     ),
     2: Struct(
-        "zone_flags" / ZoneFlagsAdapter(Bytes(64))
+        "zone_status" / ZoneFlagsAdapter(Bytes(64))
     ),
     3: Struct(
-        "zone_flags" / ZoneFlagsAdapter(Bytes(32), start_index_from=65),
+        "zone_status" / ZoneFlagsAdapter(Bytes(32), start_index_from=65),
         "partition_status" / PartitionStatusAdapter(Bytes(32)),
     ),
     4: Struct(
         "partition_status" / PartitionStatusAdapter(Bytes(16)),
-        "panel_state" / BitStruct(
+        "panel_status" / BitStruct(
             "installer_lock_active" / Flag,
             "_free" / Padding(7)
         ),

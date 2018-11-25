@@ -61,6 +61,14 @@ class ZoneFlagsAdapter(Adapter):
     def _encode(self, obj, context, path):
         return b"".join([self.flag_parser.build(i) for i in obj])
 
+class StatusFlagArrayAdapter(Adapter):
+    def _decode(self, obj, context, path):
+        r = dict()
+        for i in range(0, len(obj)):
+            status = obj[i]
+            r[i + 1] = status
+
+        return r
 
 class StatusAdapter(Adapter):
     def _decode(self, obj, context, path):
@@ -161,22 +169,22 @@ class PartitionStatusAdapter(Adapter):
 
 
 class PGMFlagsAdapter(Adapter):
-    def _decode(self, obj, context, path):
-        zone_status = dict()
-        for i in range(0, len(obj)):
-            zone_status[i + 1] = dict(
-                was_in_alarm=(obj[i] & 0x80) != 0,
-                alarm=(obj[i] & 0x40) != 0,
-                fire_delay=(obj[i] & 0b00110000) == 0b00110000,
-                entry_delay=(obj[i] & 0b00010000) == 0b00010000,
-                intellizone_delay=(obj[i] & 0b00100000) == 0b00010000,
-                no_delay=(obj[i] & 0b00110000) == 0,
-                bypassed=(obj[i] & 0x08) != 0,
-                shutdown=(obj[i] & 0x04) != 0,
-                in_tx_delay=(obj[i] & 0x02) != 0,
-                was_bypassed=(obj[i] & 0x01) != 0)
+    parser = BitStruct(
+        'CHIME_ZONE_PARTITION' / StatusFlagArrayAdapter(Array(4, Flag)),
+        'POWER_SMOKE' / Flag,
+        'GROUND_START' / Flag,
+        'KISS_OFF' / Flag,
+        'LINE_RING' / Flag,
 
-        return zone_status
+        'Bell Partition' / StatusFlagArrayAdapter(Array(8, Flag)),
+
+        'Fire Alarm' / StatusFlagArrayAdapter(Array(8, Flag)),
+
+        'Open/Close Kiss Off' / StatusFlagArrayAdapter(Array(8, Flag))
+    )
+
+    def _decode(self, obj, context, path):
+        return self.parser.parse(obj)
 
 
 eventGroupMap = {0: 'Zone OK',
