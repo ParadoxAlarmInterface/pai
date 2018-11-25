@@ -12,35 +12,39 @@ from ..panel import Panel as PanelBase
 
 from config import user as cfg
 
-MEM_ZONE_48_START = 0x00430
-MEM_ZONE_48_END = MEM_ZONE_48_START + 0x10 * 48
-MEM_ZONE_96_START = MEM_ZONE_48_END
-MEM_ZONE_96_END = MEM_ZONE_48_END + 0x10 * 48
-MEM_ZONE_192_START = 0x62F7
-MEM_ZONE_192_END = MEM_ZONE_192_START + 0x10 * 96
-
-MEM_OUTPUT_START = 0x07082
-MEM_OUTPUT_END = MEM_OUTPUT_START + 0x10 * 32 * 2
-
-MEM_PARTITION_START = 0x03a6b
-MEM_PARTITION_48_END = MEM_PARTITION_START + 0x6b * 4
-MEM_PARTITION_END = MEM_PARTITION_START + 0x6b * 8
-
-MEM_USER_START = 0x03e47
-MEM_USER_END = MEM_USER_START + 0x10 * 256  # EVO192
-
-MEM_MODULE_START = MEM_USER_END
-MEM_MODULE_48_END = MEM_MODULE_START + 0x10 * 127
-MEM_MODULE_END = MEM_MODULE_START + 0x10 * 254  # EVO192
-
-MEM_DOOR_START = 0x0345c
-MEM_DOOR_END = MEM_DOOR_START + 0x10 * 32
-
 logger = logging.getLogger('PAI').getChild(__name__)
 
 
 class Panel(PanelBase):
-
+    mem_map = dict(
+        elements=dict(
+            zone=dict(
+                label_offset=0, addresses=[
+                    range(0x00430, 0x00730, 0x10),  # EVO48
+                    range(0x00730, 0x00a30, 0x10),  # EVO96 = EVO48 + 48 zones
+                    range(0x062f7, 0x068f7, 0x10)  # EVO192 = EVO96 + 96 zones
+                ]),
+            output=dict(
+                label_offset=0, addresses=[range(0x07082, 0x7482, 0x20)], template=dict(
+                    on=False,
+                    pulse=False)
+                ),
+            partition=dict(
+                label_offset=0, addresses=[
+                    range(0x03a6b, 0x03c17, 0x6b),  # EVO48
+                    range(0x03c17, 0x03dc3, 0x6b)  # EVO96 & EVO192 = EVO48 + 4 partitions
+                ]),
+            user=dict(
+                label_offset=0, addresses=[range(0x03e47, 0x04e47, 0x10)]),
+            bus=dict(  # modules
+                label_offset=0, addresses=[
+                    range(0x04e47, 0x05637, 0x10),  # EVO48
+                    range(0x05637, 0x05e27, 0x10)  # EVO96 & EVO192 = EVO48 + 127 modules
+                ]),
+            door=dict(
+                label_offset=0, addresses=[range(0x0345c, 0x365c, 0x10)]),
+        )
+    )
 
     def get_message(self, name):
         try:
@@ -51,66 +55,6 @@ class Panel(PanelBase):
                 return clsmembers[name]
             else:
                 raise e
-
-    def update_labels(self):
-        # self.dump_memory_to_file('eeprom.bin', range(0, 0xffff, 64))
-        # self.dump_memory_to_file('ram.bin', range(0, 59), True)
-
-        logger.info("Updating Labels from Panel")
-
-        output_template = dict(
-            on=False,
-            pulse=False)
-
-        # Zones
-        eeprom_zone_addresses = list(range(MEM_ZONE_48_START, MEM_ZONE_48_END, 0x10))
-        if self.product_id in ['DIGIPLEX_EVO_96', 'DIGIPLEX_EVO_192']:
-            eeprom_zone_addresses += list(range(MEM_ZONE_96_START, MEM_ZONE_96_END, 0x10))
-        if self.product_id in ['DIGIPLEX_EVO_192']:
-            eeprom_zone_addresses += list(range(MEM_ZONE_192_START, MEM_ZONE_192_END, 0x10))
-
-        eeprom_zone_addresses = [eeprom_zone_addresses[i - 1] for i in cfg.ZONES]
-
-        self.load_labels(self.core.zones, self.core.labels['zone'], eeprom_zone_addresses)
-        logger.info("Zones: {}".format(', '.join(self.core.labels['zone'])))
-
-        # Users
-        eeprom_user_addresses = list(range(MEM_USER_START, MEM_USER_END, 0x10))
-        eeprom_user_addresses = [eeprom_user_addresses[i - 1] for i in cfg.USERS]
-
-        self.load_labels(self.core.users, self.core.labels['user'], eeprom_user_addresses)
-        logger.info("Users: {}".format(', '.join(self.core.labels['user'])))
-
-        # # Modules
-        # if self.product_id in ['DIGIPLEX_EVO_48']:
-        #     eeprom_module_ranges = [range(MEM_MODULE_START, MEM_MODULE_END, 0x10)]
-        # else:
-        #     eeprom_module_ranges = [range(MEM_MODULE_START, MEM_MODULE_48_END, 0x10)]
-        # self.load_labels(self.core.modules, self.core.labels['module'], eeprom_module_ranges)
-        # logger.info("Modules: {}".format(', '.join(self.core.labels['module'])))
-
-        # Output/PGMs
-        eeprom_output_addresses = list(range(MEM_OUTPUT_START, MEM_OUTPUT_END, 0x20))
-        eeprom_output_addresses = [eeprom_output_addresses[i - 1] for i in cfg.OUTPUTS]
-        self.load_labels(self.core.outputs, self.core.labels['output'], eeprom_output_addresses)
-        logger.info("Output/PGMs: {}".format(', '.join(self.core.labels['output'])))
-
-        # Partitions
-        if self.product_id in ['DIGIPLEX_EVO_48']:
-            eeprom_partition_addresses = list(range(MEM_PARTITION_START, MEM_PARTITION_48_END, 107))
-        else:
-            eeprom_partition_addresses = list(range(MEM_PARTITION_START, MEM_PARTITION_END, 107))
-
-        eeprom_partition_addresses = [eeprom_partition_addresses[i - 1] for i in cfg.PARTITIONS]
-        self.load_labels(self.core.partitions, self.core.labels['partition'], eeprom_partition_addresses)
-        logger.info("Partitions: {}".format(', '.join(self.core.labels['partition'])))
-
-        # # Doors
-        # eeprom_door_ranges = [range(MEM_DOOR_START, MEM_DOOR_END, 0x10)]
-        # self.load_labels(self.core.doors, self.core.labels['door'], eeprom_door_ranges)
-        # logger.info("Doors: {}".format(', '.join(self.core.labels['door'])))
-
-        logger.debug("Labels updated")
 
     def dump_memory_to_file(self, file, range_, ram=False):
         mem_type = "RAM" if ram else "EEPROM"
