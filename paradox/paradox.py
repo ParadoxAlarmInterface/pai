@@ -89,9 +89,11 @@ class Paradox:
             if not result:
                 self.run = STATE_STOP
                 return False
+            self.send_wait()  # Read WinLoad in (connected) event
 
             if cfg.SYNC_TIME:
                 self.sync_time()
+                self.send_wait()  # Read Clock loss restore event
 
             self.panel.update_labels()
                     
