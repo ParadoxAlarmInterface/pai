@@ -527,6 +527,9 @@ class Paradox:
         for property_name, property_value in change.items():
             old = None
 
+            if property_name.startswith('_'): # skip private properties
+                continue
+
             # Virtual property "Trouble"
             # True if element has ANY type of alarm
             if '_trouble' in property_name:
