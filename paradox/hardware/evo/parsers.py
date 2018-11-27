@@ -112,14 +112,14 @@ RAMDataParserMap = {
         "zone_low_battery" / StatusAdapter(Bytes(12))
     ),
     2: Struct(
-        "zone_status" / ZoneFlagsAdapter(Bytes(64))
+        "zone_status" / ZoneFlags(64)
     ),
     3: Struct(
-        "zone_status" / ZoneFlagsAdapter(Bytes(32), start_index_from=65),
-        "partition_status" / PartitionStatusAdapter(Bytes(32)),
+        "zone_status" / ZoneFlags(32, start_index_from=65),
+        "partition_status" / PartitionStatus(Bytes(32)),
     ),
     4: Struct(
-        "partition_status" / PartitionStatusAdapter(Bytes(16)),
+        "partition_status" / PartitionStatus(Bytes(16)),
         "panel_status" / BitStruct(
             "installer_lock_active" / Flag,
             "_free" / Padding(7)

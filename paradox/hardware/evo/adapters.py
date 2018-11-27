@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from construct import *
 import datetime
+from construct import *
 
 
 class DateAdapter(Adapter):
@@ -35,7 +35,7 @@ class PartitionStateAdapter(Adapter):
         return 0
 
 
-class ZoneFlagsAdapter(Adapter):
+class ZoneFlags(Subconstruct):
     flag_parser = BitStruct(
         "supervision_trouble" / Flag,
         "tx_delay" / Flag,
@@ -47,16 +47,18 @@ class ZoneFlagsAdapter(Adapter):
         "generated_alarm" / Flag
     )
 
-    def __init__(self, subcon, start_index_from=1):
-        super(ZoneFlagsAdapter, self).__init__(subcon)
+    def __init__(self, count, start_index_from=1):
+        super(ZoneFlags, self).__init__(self.flag_parser)
 
+        self.count = count
         self.start_index_from = start_index_from
 
-    def _decode(self, obj, context, path):
-        r = dict()
-        for i in range(0, len(obj)):
-            r[self.start_index_from + i] = self.flag_parser.parse(obj)
-        return r
+    def _parse(self, stream, context, path):
+        count = self.count
+        obj = Container()
+        for i in range(self.start_index_from, self.start_index_from + count):
+            obj[i] = self.subcon._parsereport(stream, context, path)
+        return obj
 
     def _encode(self, obj, context, path):
         return b"".join([self.flag_parser.build(i) for i in obj])
@@ -81,7 +83,7 @@ class StatusAdapter(Adapter):
         return r
 
 
-class PartitionStatusAdapter(Adapter):
+class PartitionStatus(Subconstruct):
     first2 = BitStruct(
         'armed' / Flag,
         'armed_away' / Flag,
@@ -138,35 +140,33 @@ class PartitionStatusAdapter(Adapter):
         'free0' / BitsInteger(3)
     )
 
-    def _decode(self, obj, context, path):
-        partitions = dict()
-
-        if len(obj) == 32:  # ram block 3
-            raws = dict([(i + 1, obj[i * 6:(i + 1) * 6]) for i in range(0, 6)])
-        elif len(obj) == 16:  # ram block 4
-            raws = dict([(6, obj[0:4])] + [(i + 7, obj[i * 6 + 4:(i + 1) * 6 + 4]) for i in range(0, 2)])
+    def __init__(self, subcons_or_size):
+        if isinstance(subcons_or_size, Construct):
+            self.size = subcons_or_size.sizeof()
+            subcons = subcons_or_size
         else:
-            raise Exception('Not supported')
+            self.size = subcons_or_size
+            subcons = Bytes(subcons_or_size)
+        super(PartitionStatus, self).__init__(subcons)
 
-        for key, raw in raws.items():
-            size = len(raw)
+    def _parse(self, stream, context, path):
+        obj = Container()
 
-            if size == 6:  # full
-                result = Struct("a" / self.first2, "b" / self.last4).parse(raw)
-                partition = {}
-                partition.update(result.a)
-                partition.update(result.b)
-            elif size == 2:  # first part
-                partition = self.first2.parse(raw)
-            elif size == 4:  # second part
-                partition = self.last4.parse(raw)
-            else:
-                raise Exception('Not supported size: %d' % size)
+        if self.size == 32:
+            for i in range(1, 6):
+                obj[i] = self.first2._parsereport(stream, context, path)
+                obj[i].update(self.last4._parsereport(stream, context, path))
 
-            partitions[key] = partition
+            obj[6] = self.first2._parsereport(stream, context, path)
+        elif self.size == 16:
+            obj[6] = self.last4._parsereport(stream, context, path)
+            for i in range(7, 9):
+                obj[i] = self.first2._parsereport(stream, context, path)
+                obj[i].update(self.last4._parsereport(stream, context, path))
+        else:
+            raise Exception('Not supported size. Only 32 or 16')
 
-        return partitions
-
+        return obj
 
 class PGMFlagsAdapter(Adapter):
     parser = BitStruct(

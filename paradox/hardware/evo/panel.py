@@ -101,7 +101,7 @@ class Panel_EVOBase(PanelBase):
             else:
                 logger.error("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
         except Exception:
-            logger.exception("Parsing message")
+            logger.exception("Parsing message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
 
         s = 'PARSE: '
         for c in message:
@@ -166,9 +166,9 @@ class Panel_EVOBase(PanelBase):
 
                 self.core.update_properties('system', 'trouble', {k: properties.troubles[k]})
 
-        self.process_properties_bulk(properties)
+        self.process_properties_bulk(properties, vars.address)
 
-    def process_properties_bulk(self, properties):
+    def process_properties_bulk(self, properties, address):
         for k in properties:
             element_type = k.split('_')[0]
 
@@ -187,10 +187,12 @@ class Panel_EVOBase(PanelBase):
             else:
                 continue
 
-            if k in self.core.status_cache and self.core.status_cache[k] == properties[k]:
+            if k in self.core.status_cache and self.core.status_cache[address][k] == properties[k]:
                 continue
 
-            self.core.status_cache[k] = properties[k]
+            if address not in self.core.status_cache:
+                self.core.status_cache[address] = {}
+            self.core.status_cache[address][k] = properties[k]
 
             prop_name = '_'.join(k.split('_')[1:])
             if prop_name == 'status': # struct with properties
