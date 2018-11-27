@@ -1,6 +1,7 @@
 import sys
 import inspect
 import logging
+from itertools import chain
 from construct import *
 from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum
 
@@ -76,12 +77,13 @@ class Panel:
             if elem_type not in self.core.data:
                 self.core.data[elem_type] = dict()
 
-            for addresses in elem_def['addresses']:
-                self.load_labels(self.core.data[elem_type],
-                                 self.core.labels[elem_type],
-                                 addresses,
-                                 label_offset=elem_def['label_offset'])
-                logger.info("{}: {}".format(elem_type.title(), ', '.join(self.core.labels[elem_type])))
+
+            addresses = list(chain.from_iterable(elem_def['addresses']))
+            self.load_labels(self.core.data[elem_type],
+                             self.core.labels[elem_type],
+                             addresses,
+                             label_offset=elem_def['label_offset'])
+            logger.info("{}: {}".format(elem_type.title(), ', '.join(self.core.labels[elem_type])))
 
     def load_labels(self,
                     labelDictIndex,
@@ -122,7 +124,9 @@ class Panel:
             if label not in labelDictName:
                 properties = template.copy()
                 properties['label'] = label
-                labelDictIndex[i] = properties
+                if i not in labelDictIndex:
+                    labelDictIndex[i] = {}
+                labelDictIndex[i].update(properties)
 
                 labelDictName[label] = i
             i += 1
