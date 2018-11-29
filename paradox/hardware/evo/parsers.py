@@ -54,7 +54,7 @@ InitializeCommunication = Struct("fields" / RawCopy(
 RAMDataParserMap = {
     1: Struct(
         "weekday" / Int8ub,
-        "pgm_flags" / PGMFlagsAdapter(Bytes(4)),
+        "pgm_flags" / PGMFlags(),
         "key_switch" / StatusAdapter(Bytes(4)),
         "door_open" / StatusAdapter(Bytes(4)),
         "troubles" / BitStruct(

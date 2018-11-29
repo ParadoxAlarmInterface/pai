@@ -168,7 +168,7 @@ class PartitionStatus(Subconstruct):
 
         return obj
 
-class PGMFlagsAdapter(Adapter):
+class PGMFlags(Subconstruct):
     parser = BitStruct(
         'CHIME_ZONE_PARTITION' / StatusFlagArrayAdapter(Array(4, Flag)),
         'POWER_SMOKE' / Flag,
@@ -183,8 +183,8 @@ class PGMFlagsAdapter(Adapter):
         'Open/Close Kiss Off' / StatusFlagArrayAdapter(Array(8, Flag))
     )
 
-    def _decode(self, obj, context, path):
-        return self.parser.parse(obj)
+    def __init__(self):
+        super(PGMFlags, self).__init__(self.parser)
 
 
 eventGroupMap = {0: 'Zone OK',
