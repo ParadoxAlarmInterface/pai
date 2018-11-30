@@ -119,7 +119,7 @@ class Panel:
                 break
 
             data = reply.fields.value.data
-            label = data[label_offset:].strip(b'\0 ').replace(b'\0', b'_').replace(b' ', b'_').decode('utf-8')
+            label = data[label_offset:label_offset + field_length].strip(b'\0 ').replace(b'\0', b'_').replace(b' ', b'_').decode('utf-8')
 
             if label not in labelDictName:
                 properties = template.copy()
