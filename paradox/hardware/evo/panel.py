@@ -4,102 +4,27 @@ import inspect
 import sys
 import logging
 import binascii
+import time
+import itertools
 
 from .parsers import *
 from ..panel import Panel as PanelBase
 
-
-MEM_ZONE_48_START = 0x00430
-MEM_ZONE_48_END = MEM_ZONE_48_START + 0x10 * 48
-MEM_ZONE_96_START = MEM_ZONE_48_END
-MEM_ZONE_96_END = MEM_ZONE_48_END + 0x10 * 48
-MEM_ZONE_192_START = 0x62F7
-MEM_ZONE_192_END = MEM_ZONE_192_START + 0x10 * 96
-
-MEM_OUTPUT_START = 0x07082
-MEM_OUTPUT_END = MEM_OUTPUT_START + 0x10 * 32 * 2
-
-MEM_PARTITION_START = 0x03a6b
-MEM_PARTITION_48_END = MEM_PARTITION_START + 0x6b * 4
-MEM_PARTITION_END = MEM_PARTITION_START + 0x6b * 8
-
-MEM_USER_START = 0x03e47
-MEM_USER_END = MEM_USER_START + 0x10 * 256  # EVO192
-
-MEM_MODULE_START = MEM_USER_END
-MEM_MODULE_48_END = MEM_MODULE_START + 0x10 * 127
-MEM_MODULE_END = MEM_MODULE_START + 0x10 * 254  # EVO192
-
-MEM_DOOR_START = 0x0345c
-MEM_DOOR_END = MEM_DOOR_START + 0x10 * 32
+from config import user as cfg
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
 
-class Panel(PanelBase):
+class Panel_EVOBase(PanelBase):
     def get_message(self, name):
         try:
-            return super(Panel, self).get_message(name)
+            return super(Panel_EVOBase, self).get_message(name)
         except ResourceWarning as e:
             clsmembers = dict(inspect.getmembers(sys.modules[__name__]))
             if name in clsmembers:
                 return clsmembers[name]
             else:
                 raise e
-
-    def update_labels(self):
-        # self.dump_memory_to_file('eeprom.bin', range(0, 0xffff, 64))
-        # self.dump_memory_to_file('ram.bin', range(0, 59), True)
-
-        logger.info("Updating Labels from Panel")
-
-        output_template = dict(
-            on=False,
-            pulse=False)
-
-        # Zones
-        eeprom_zone_ranges = [range(MEM_ZONE_48_START, MEM_ZONE_48_END, 0x10)]
-        if self.product_id in ['DIGIPLEX_EVO_96', 'DIGIPLEX_EVO_192']:
-            eeprom_zone_ranges.append(range(MEM_ZONE_96_START, MEM_ZONE_96_END, 0x10))
-        if self.product_id in ['DIGIPLEX_EVO_192']:
-            eeprom_zone_ranges.append(range(MEM_ZONE_192_START, MEM_ZONE_192_END, 0x10))
-
-        self.load_labels(self.core.zones, self.core.labels['zone'], eeprom_zone_ranges)
-        logger.info("Zones: {}".format(', '.join(self.core.labels['zone'])))
-
-        # Users
-        eeprom_user_ranges = [range(MEM_USER_START, MEM_USER_END, 0x10)]
-        self.load_labels(self.core.users, self.core.labels['user'], eeprom_user_ranges)
-        logger.info("Users: {}".format(', '.join(self.core.labels['user'])))
-
-        # # Modules
-        # if self.product_id in ['DIGIPLEX_EVO_48']:
-        #     eeprom_module_ranges = [range(MEM_MODULE_START, MEM_MODULE_END, 0x10)]
-        # else:
-        #     eeprom_module_ranges = [range(MEM_MODULE_START, MEM_MODULE_48_END, 0x10)]
-        # self.load_labels(self.core.modules, self.core.labels['module'], eeprom_module_ranges)
-        # logger.info("Modules: {}".format(', '.join(self.core.labels['module'])))
-
-        # Output/PGMs
-        eeprom_output_ranges = [range(MEM_OUTPUT_START, MEM_OUTPUT_END, 0x20)]
-        self.load_labels(self.core.outputs, self.core.labels['output'], eeprom_output_ranges)
-        logger.info("Output/PGMs: {}".format(', '.join(self.core.labels['output'])))
-
-        # Partitions
-        if self.product_id in ['DIGIPLEX_EVO_48']:
-            eeprom_partition_ranges = [range(MEM_PARTITION_START, MEM_PARTITION_48_END, 107)]
-        else:
-            eeprom_partition_ranges = [range(MEM_PARTITION_START, MEM_PARTITION_END, 107)]
-
-        self.load_labels(self.core.partitions, self.core.labels['partition'], eeprom_partition_ranges)
-        logger.info("Partitions: {}".format(', '.join(self.core.labels['partition'])))
-
-        # # Doors
-        # eeprom_door_ranges = [range(MEM_DOOR_START, MEM_DOOR_END, 0x10)]
-        # self.load_labels(self.core.doors, self.core.labels['door'], eeprom_door_ranges)
-        # logger.info("Doors: {}".format(', '.join(self.core.labels['door'])))
-
-        logger.debug("Labels updated")
 
     def dump_memory_to_file(self, file, range_, ram=False):
         mem_type = "RAM" if ram else "EEPROM"
@@ -135,49 +60,7 @@ class Panel(PanelBase):
 
                 fh.write(data)
 
-    def load_labels(self,
-                    labelDictIndex,
-                    labelDictName,
-                    ranges,
-                    field_length=16,
-                    template=dict(label='')):
-        """Load labels from panel"""
-        i = 1
 
-        for range_ in ranges:
-            for address in range_:
-                args = dict(address=address, length=field_length)
-                reply = self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=0x05)
-
-                retry_count = 3
-                for retry in range(1, retry_count + 1):
-                    # Avoid errors due to collision with events. It should not come here as we use reply_expected=0x05
-                    if reply is None:
-                        logger.error("Could not fully load labels")
-                        return
-
-                    if reply.fields.value.address != address:
-                        logger.debug(
-                            "Fetched and receive label EEPROM addresses (received: %d, requested: %d) do not match. Retrying %d of %d" % (
-                                reply.fields.value.address, address, retry, retry_count))
-                        reply = self.core.send_wait(None, None, reply_expected=0x05)
-                        continue
-
-                    if retry == retry_count:
-                        logger.error('Failed to fetch label at address: %d' % address)
-
-                    break
-
-                data = reply.fields.value.data
-                label = data.strip(b'\0 ').replace(b'\0', b'_').replace(b' ', b'_').decode('utf-8')
-
-                if label not in labelDictName:
-                    properties = template.copy()
-                    properties['label'] = label
-                    labelDictIndex[i] = properties
-
-                    labelDictName[label] = i
-                i += 1
 
     def parse_message(self, message):
         try:
@@ -209,16 +92,16 @@ class Panel(PanelBase):
             # elif message[0] >> 4 == 0x05 and message[2] < 0x80:
             elif message[0] >> 4 == 0x05:
                 return ReadEEPROMResponse.parse(message)
-            elif message[0] == 0x60 and message[2] < 0x80:
-                return WriteEEPROM.parse(message)
-            elif message[0] >> 4 == 0x06 and message[2] < 0x80:
-                return WriteEEPROMResponse.parse(message)
+            # elif message[0] == 0x60 and message[2] < 0x80:
+            #     return WriteEEPROM.parse(message)
+            # elif message[0] >> 4 == 0x06 and message[2] < 0x80:
+            #     return WriteEEPROMResponse.parse(message)
             elif message[0] >> 4 == 0x0e:
                 return LiveEvent.parse(message)
             else:
                 logger.error("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
         except Exception:
-            logger.exception("Parsing message")
+            logger.exception("Parsing message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
 
         s = 'PARSE: '
         for c in message:
@@ -245,9 +128,79 @@ class Panel(PanelBase):
         if reply is None:
             return False
 
-        if reply.fields.value.po.status.Windload_connected == True:
+        if reply.fields.value.po.status.Windload_connected:
             logger.info("Authentication Success")
             return True
         else:
             logger.error("Authentication Failed. Wrong Password?")
             return False
+
+    def request_status(self, i):
+        args = dict(address=i, length=64, control=dict(ram_access=True))
+        reply = self.core.send_wait(ReadEEPROM, args, reply_expected=0x05)
+
+        return reply
+
+    def handle_status(self, message):
+        """Handle MessageStatus"""
+
+        vars = message.fields.value
+        # Check message
+
+        assert vars.po.command == 0x5
+        assert vars.control.ram_access == True
+        assert vars.control.eeprom_address_bits == 0x0
+        assert vars.bus_address == 0x00 # panel
+
+        assert vars.address in RAMDataParserMap
+        assert len(vars.data) == 64
+
+        parser = RAMDataParserMap[vars.address]
+
+        properties = parser.parse(vars.data)
+
+        if vars.address == 1:
+            for k in properties.troubles:
+                if "not_used" in k:
+                    continue
+
+                self.core.update_properties('system', 'trouble', {k: properties.troubles[k]})
+
+        self.process_properties_bulk(properties, vars.address)
+
+    def process_properties_bulk(self, properties, address):
+        for k in properties:
+            element_type = k.split('_')[0]
+
+            if element_type == 'pgm':
+                element_type = 'output'
+                limit_list = cfg.OUTPUTS
+            elif element_type == 'partition':
+                limit_list = cfg.PARTITIONS
+            elif element_type == 'zone':
+                limit_list = cfg.ZONES
+            elif element_type == 'door':
+                limit_list = cfg.DOORS
+            elif element_type == 'module':
+                element_type = 'bus'
+                limit_list = cfg.BUSES
+            else:
+                continue
+
+            if k in self.core.status_cache and self.core.status_cache[address][k] == properties[k]:
+                continue
+
+            if address not in self.core.status_cache:
+                self.core.status_cache[address] = {}
+            self.core.status_cache[address][k] = properties[k]
+
+            prop_name = '_'.join(k.split('_')[1:])
+            if prop_name == 'status': # struct with properties
+                for i in properties[k]:
+                    if i in limit_list:
+                        self.core.update_properties(element_type, i, properties[k][i])
+            else:
+                for i in properties[k]:
+                    if i in limit_list:
+                        status = properties[k][i]
+                        self.core.update_properties(element_type, i, {prop_name: status})

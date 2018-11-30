@@ -1,6 +1,7 @@
 import sys
 import inspect
 import logging
+from itertools import chain
 from construct import *
 from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum
 
@@ -8,6 +9,8 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 
 class Panel:
+    mem_map = {}
+
     def __init__(self, core, product_id):
         self.core = core
         self.product_id = product_id
@@ -63,6 +66,70 @@ class Panel:
 
         return bytes(res[:2])
 
+    def update_labels(self):
+        logger.info("Updating Labels from Panel")
+
+        for elem_type in self.mem_map['elements']:
+            elem_def = self.mem_map['elements'][elem_type]
+            if elem_type not in self.core.labels:
+                self.core.labels[elem_type] = dict()
+
+            if elem_type not in self.core.data:
+                self.core.data[elem_type] = dict()
+
+
+            addresses = list(chain.from_iterable(elem_def['addresses']))
+            self.load_labels(self.core.data[elem_type],
+                             self.core.labels[elem_type],
+                             addresses,
+                             label_offset=elem_def['label_offset'])
+            logger.info("{}: {}".format(elem_type.title(), ', '.join(self.core.labels[elem_type])))
+
+    def load_labels(self,
+                    labelDictIndex,
+                    labelDictName,
+                    addresses,
+                    field_length=16,
+                    label_offset=0,
+                    template={}):
+        """Load labels from panel"""
+        i = 1
+
+        for address in list(addresses):
+            args = dict(address=address, length=field_length)
+            reply = self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=0x05)
+
+            retry_count = 3
+            for retry in range(1, retry_count + 1):
+                # Avoid errors due to collision with events. It should not come here as we use reply_expected=0x05
+                if reply is None:
+                    logger.error("Could not fully load labels")
+                    return
+
+                if reply.fields.value.address != address:
+                    logger.debug(
+                        "Fetched and receive label EEPROM addresses (received: %d, requested: %d) do not match. Retrying %d of %d" % (
+                            reply.fields.value.address, address, retry, retry_count))
+                    reply = self.core.send_wait(None, None, reply_expected=0x05)
+                    continue
+
+                if retry == retry_count:
+                    logger.error('Failed to fetch label at address: %d' % address)
+
+                break
+
+            data = reply.fields.value.data
+            label = data[label_offset:].strip(b'\0 ').replace(b'\0', b'_').replace(b' ', b'_').decode('utf-8')
+
+            if label not in labelDictName:
+                properties = template.copy()
+                properties['label'] = label
+                if i not in labelDictIndex:
+                    labelDictIndex[i] = {}
+                labelDictIndex[i].update(properties)
+
+                labelDictName[label] = i
+            i += 1
 
 InitiateCommunication = Struct("fields" / RawCopy(
     Struct("po" / BitStruct(

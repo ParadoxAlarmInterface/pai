@@ -23,8 +23,7 @@ LoginConfirmationResponse = Struct("fields" / RawCopy(
         ),
         "callback" / Int16ub
     )),
-                                   "checksum" / Checksum(
-                                       Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 InitializeCommunication = Struct("fields" / RawCopy(
     Struct(
@@ -47,187 +46,95 @@ InitializeCommunication = Struct("fields" / RawCopy(
         "evo_sections" / Bytes(9),  # EVO section data 3030-3038
         "not_used1" / Padding(4),
         "source_id" / Default(CommunicationSourceIDEnum, 1),
-        "carrier_length" / Bytes(1))),
-                                 "checksum" / Checksum(
-                                     Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-
-# InitializeCommunicationResponse = Struct("fields" / RawCopy(
-#         Struct(
-#             "po" / Struct("command" / Const(0x10, Int8ub)),
-#             "neware_connection" / Int16ub,
-#             "user_id_low" / Int8ub,
-#             "partition_rights" / BitStruct(
-#                 "not_used" / BitsInteger(6),
-#                 "partition_2" / Flag,
-#                 "partition_1" / Flag),
-#             "not_used0" / Padding(31),
-#                )),
-#         "checksum" / Checksum(
-#         Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-
-PanelStatus = Struct("fields" / RawCopy(
-    Struct(
-        "po" / Struct("command" / Const(0x50, Int8ub)),
-        "not_used0" / Default(Int8ub, 0x00),
-        "validation" / Default(Int8ub, 0x00),
-        "status_request" / Default(Int8ub, 0x00),
-        "not_used0" / Padding(29),
-        "source_id" / Default(CommunicationSourceIDEnum, 1),
-        "user_high" / Default(Int8ub, 0),
-        "user_low" / Default(Int8ub, 0),
+        "carrier_length" / Bytes(1)
     )),
-                     Padding(31),
-                     "checksum" / Checksum(
-                         Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
-PanelStatusResponse = [
-    Struct("fields" / RawCopy(Struct(
-        "po" / BitStruct(
-            "command" / Const(5, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
-                "NeWare_connected" / Flag)
-        ),
-        "not_used0" / Padding(1),
-        "validation" / Const(0x80, Int8ub),
-        "status_request" / Const(0, Int8ub),
+
+RAMDataParserMap = {
+    1: Struct(
+        "weekday" / Int8ub,
+        "pgm_flags" / PGMFlags(),
+        "key_switch" / StatusAdapter(Bytes(4)),
+        "door_open" / StatusAdapter(Bytes(4)),
         "troubles" / BitStruct(
-            "timer_loss_trouble" / Flag,
-            "fire_loop_trouble" / Flag,
-            "module_tamper_trouble" / Flag,
-            "zone_tamper_trouble" / Flag,
-            "communication_trouble" / Flag,
-            "bell_trouble" / Flag,
-            "power_trouble" / Flag,
-            "rf_low_battery_trouble" / Flag,
-            "rf_interference_trouble" / Flag,
-            "not_used0" / BitsInteger(5),
-            "module_supervision_trouble" / Flag,
-            "zone_supervision_trouble" / Flag,
-            "not_used0" / BitsInteger(1),
-            "wireless_repeater_battery_trouble" / Flag,
-            "wireless_repeater_ac_loss_trouble" / Flag,
-            "wireless_leypaad _battery_trouble" / Flag,
-            "wireless_leypad_ac_trouble" / Flag,
-            "auxiliary_output_overload_trouble" / Flag,
-            "ac_failure_trouble" / Flag,
-            "low_battery_trouble" / Flag,
-            "not_used1" / BitsInteger(6),
-            "bell_output_overload_trouble" / Flag,
-            "bell_output_disconnected_trouble" / Flag,
-            "not_used2" / BitsInteger(2),
-            "computer_fail_to_communicate_trouble" / Flag,
-            "voice_fail_to_communicate_trouble" / Flag,
-            "pager_fail_to_communicate_trouble" / Flag,
-            "central_2_reporting_ftc_indicator_trouble" / Flag,
-            "central_1_reporting_ftc_indicator_trouble" / Flag,
-            "telephone_line" / Flag),
-        "time" / DateAdapter(Bytes(6)),
+            "Trbl_System" / Flag,
+            "Trbl_Dialer" / Flag,
+            "Trbl_Mdl" / Flag,
+            "Trbl_BusCom" / Flag,
+            "Trbl_ZnTmpr" / Flag,
+            "Trbl_ZnLoBat" / Flag,
+            "Trbl_ZnFault" / Flag,
+            "Trbl_TimeLost" / Flag,
+
+            "AC_Trouble" / Flag,
+            "Battery_Fail" / Flag,
+            "Aux_Limit" / Flag,
+            "Bell_Limit" / Flag,
+            "Bell_Absent" / Flag,
+            "Rom_Error" / Flag,
+            "Future_Use_0" / Flag,
+            "Future_Use_1" / Flag,
+
+            "TLM_Trouble" / Flag,
+            "Fail_Tel_1" / Flag,
+            "Fail_Tel_2" / Flag,
+            "Fail_Tel_3" / Flag,
+            "Fail_Tel_4" / Flag,
+            "Fail_Com_PC" / Flag,
+            "Future_Use_2" / Flag,
+            "Future_Use_3" / Flag,
+
+            "Mdl_Tamper" / Flag,
+            "Mdl_Rom_Error" / Flag,
+            "Mdl_TLM_TROUBLE" / Flag,
+            "Mdl_Fail_To_Com" / Flag,
+            "Mdl_Printer_Trbl" / Flag,
+            "Mdl_AC_Trouble" / Flag,
+            "Mdl_Battery_Fail" / Flag,
+            "Mdl_Aux_Trouble" / Flag,
+
+            "Missing_Keypad" / Flag,
+            "Missing_Module" / Flag,
+            "Future_Use_4" / Flag,
+            "Future_Use_5" / Flag,
+            "Safety_Mismatch" / Flag,
+            "Bus_Global_Fail" / Flag,
+            "Bus_Overload" / Flag,
+            "Mdl_Com_Error" / Flag
+        ),
+        "time" / DateAdapter(Bytes(7)),
         "vdc" / ExprAdapter(Byte, obj_ * (20.3 - 1.4) / 255.0 + 1.4, 0),
-        "dc" / ExprAdapter(Byte, obj_ * 22.8 / 255.0, 0),
         "battery" / ExprAdapter(Byte, obj_ * 22.8 / 255.0, 0),
-        "rf_noise_floor" / Int8ub,
-        "zone_open" / StatusAdapter(Bytes(4)),
-        "zone_tamper" / StatusAdapter(Bytes(4)),
-        "pgm_tamper" / StatusAdapter(Bytes(2)),
-        "bus_tamper" / StatusAdapter(Bytes(2)),
-        "zone_fire" / StatusAdapter(Bytes(4)),
-        "not_used1" / Int8ub)),
-           "checksum" / Checksum(
-               Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-    ,
-    Struct("fields" / RawCopy(Struct(
-        "po" / BitStruct(
-            "command" / Const(5, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
-                "NeWare_connected" / Flag)),
-        "not_used0" / Padding(1),
-        "validation" / Const(0x80, Int8ub),
-        "status_request" / Const(1, Int8ub),
-        "zone_rf_supervision_trouble" / StatusAdapter(Bytes(4)),
-        "pgm_supervision_trouble" / StatusAdapter(Bytes(2)),
-        "bus_supervision_trouble" / StatusAdapter(Bytes(2)),
-        "wireless-repeater_supervision_trouble" / StatusAdapter(Bytes(1)),
-        "zone_rf_low_battery_trouble" / StatusAdapter(Bytes(4)),
-        "partition_status" / PartitionStatusAdapter(Bytes(8)),
-        "wireless-repeater_ac_loss_trouble" / StatusAdapter(Bytes(1)),
-        "wireless-repeater_battery_failure_trouble" / StatusAdapter(Bytes(1)),
-        "wireless-keypad_ac_loss_trouble" / StatusAdapter(Bytes(1)),
-        "wireless-keypad_battery_failure_trouble" / StatusAdapter(Bytes(1)),
-        "wireless-keypad_supervision_failure_trouble" / StatusAdapter(Bytes(1)),
-        "not_used1" / Padding(6)
-    )),
-           "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-    ,
-    Struct("fields" / RawCopy(Struct(
-        "po" / BitStruct(
-            "command" / Const(5, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
-                "NeWare_connected" / Flag)),
-        "not_used0" / Padding(1),
-        "validation" / Const(0x80, Int8ub),
-        "status_request" / Const(2, Int8ub),
-        "zone_status" / ZoneStatusAdapter(Bytes(32))
-    )),
-           "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-    ,
-    Struct("fields" / RawCopy(Struct(
-        "po" / BitStruct(
-            "command" / Const(5, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
-                "NeWare_connected" / Flag)),
-        "not_used0" / Padding(1),
-        "validation" / Const(0x80, Int8ub),
-        "status_request" / Const(3, Int8ub),
-        "zone_signal_strength" / SignalStrengthAdapter(Bytes(32))
-    )),
-           "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-    ,
-    Struct("fields" / RawCopy(Struct(
-        "po" / BitStruct(
-            "command" / Const(5, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
-                "NeWare_connected" / Flag)),
-        "not_used0" / Padding(1),
-        "validation" / Const(0x80, Int8ub),
-        "status_request" / Const(4, Int8ub),
-        "pgm_signal_strength" / SignalStrengthAdapter(Bytes(16)),
-        "wireless-repeater_signal_strength" / SignalStrengthAdapter(Bytes(2)),
-        "wireless-keypad_signal_strength" / SignalStrengthAdapter(Bytes(8)),
-        "not_used1" / Padding(6)
-    )),
-           "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-    ,
-    Struct("fields" / RawCopy(Struct(
-        "po" / BitStruct(
-            "command" / Const(5, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
-                "NeWare_connected" / Flag)),
-        "not_used0" / Padding(1),
-        "validation" / Const(0x80, Int8ub),
-        "status_request" / Const(5, Int8ub),
-        "zone_exit_delay" / StatusAdapter(Bytes(4)),
-        "not_used1" / Padding(28)
-    )),
-           "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-]
+        "dc" / ExprAdapter(Byte, obj_ * 22.8 / 255.0, 0),
+        "zone_open" / StatusAdapter(Bytes(12)),
+        "zone_tamper" / StatusAdapter(Bytes(12)),
+        "zone_low_battery" / StatusAdapter(Bytes(12))
+    ),
+    2: Struct(
+        "zone_status" / ZoneFlags(64)
+    ),
+    3: Struct(
+        "zone_status" / ZoneFlags(32, start_index_from=65),
+        "partition_status" / PartitionStatus(Bytes(32)),
+    ),
+    4: Struct(
+        "partition_status" / PartitionStatus(Bytes(16)),
+        "panel_status" / BitStruct(
+            "installer_lock_active" / Flag,
+            "_free" / Padding(7)
+        ),
+        "event_pointer" / Int16ub,
+        "event_pointer_bus" / Int16ub,
+        "recycle_system" / Array(8, Int8ub),
+        "arm_disarm_report_delay_timer" / Int8ub,
+        "_free" / Padding(34)
+    ),
+    5: Struct(
+        "_free" / Padding(1),
+        "module_trouble" / StatusAdapter(Bytes(63))
+    )
+}
 
 LiveEvent = Struct("fields" / RawCopy(
     Struct(
@@ -278,8 +185,7 @@ Action = Struct("fields" / RawCopy(
         "user_high" / Default(Int8ub, 0),
         "user_low" / Default(Int8ub, 0),
     )),
-                "checksum" / Checksum(
-                    Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 ActionResponse = Struct("fields" / RawCopy(
     Struct(
@@ -294,8 +200,8 @@ ActionResponse = Struct("fields" / RawCopy(
         "not_used1" / Default(Int8ub, 0),
         "action" / Int8ub,
     )),
-                        "reserved0" / Padding(32),
-                        "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "reserved0" / Padding(32),
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 CloseConnection = Struct("fields" / RawCopy(
     Struct(
@@ -323,8 +229,7 @@ CloseConnection = Struct("fields" / RawCopy(
                          invalid_label_number=0x1c
                          ), 0x05),
     )),
-                         "checksum" / Checksum(
-                             Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 
 class EvoEEPROMAddressAdapter(Subconstruct):
@@ -337,7 +242,7 @@ class EvoEEPROMAddressAdapter(Subconstruct):
         return d
 
     def _build(self, obj, stream, context, path):
-        if "control" in obj and obj["control"].get("ram_access") == True:  # for ram block
+        if "control" in obj and obj["control"].get("ram_access"):  # for ram block
             ram_block = (obj["address"] & 0xf0000) >> 16
             self.deep_update(obj, dict(po=dict(block=ram_block)))
         else:  # for eeprom
@@ -372,8 +277,7 @@ ReadEEPROM = Struct("fields" / RawCopy(
         "address" / ExprSymmetricAdapter(Int16ub, obj_ & 0xffff),
         "length" / Int8ub
     ))),
-                    "checksum" / Checksum(
-                        Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 ReadEEPROMResponse = Struct("fields" / RawCopy(
     Struct(
@@ -396,24 +300,22 @@ ReadEEPROMResponse = Struct("fields" / RawCopy(
         "address" / Int16ub,
         "data" / Bytes(lambda this: this.packet_length - 7)
     )),
-                            "checksum" / Checksum(
-                                Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 SetTimeDate = Struct("fields" / RawCopy(Struct(
-    "po" / Struct(
-        "command" / Const(0x30, Int8ub)),
-    "packet_length" / Rebuild(Int8ub,
-                              lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
-    "not_used0" / Padding(4),
-    "century" / Int8ub,
-    "year" / Int8ub,
-    "month" / Int8ub,
-    "day" / Int8ub,
-    "hour" / Int8ub,
-    "minute" / Int8ub,
-)),
-                     "checksum" / Checksum(
-                         Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+        "po" / Struct(
+            "command" / Const(0x30, Int8ub)),
+        "packet_length" / Rebuild(Int8ub,
+                                  lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+        "not_used0" / Padding(4),
+        "century" / Int8ub,
+        "year" / Int8ub,
+        "month" / Int8ub,
+        "day" / Int8ub,
+        "hour" / Int8ub,
+        "minute" / Int8ub,
+    )),
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 SetTimeDateResponse = Struct("fields" / RawCopy(
     Struct(
@@ -427,43 +329,41 @@ SetTimeDateResponse = Struct("fields" / RawCopy(
         "length" / Int8ub,
         "not_used0" / Padding(4),
     )),
-                             "checksum" / Checksum(
-                                 Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 PerformAction = Struct("fields" / RawCopy(Struct(
-    "po" / Struct(
-        "command" / Const(0x40, Int8ub)),
-    "not_used0" / Padding(1),
-    "action" / Enum(Int8ub,
-                    Stay_Arm=0x01,
-                    Stay_Arm1=0x02,
-                    Sleep_Arm=0x03,
-                    Full_Arm=0x04,
-                    Disarm=0x05,
-                    Stay_Arm_StayD=0x06,
-                    Sleep_Arm_StayD=0x07,
-                    Disarm_Both_Disable_StayD=0x08,
-                    Bypass=0x10,
-                    Beep=0x10,
-                    PGM_On_Override=0x30,
-                    PGM_Off_Override=0x31,
-                    PGM_On=0x32,
-                    PGM_Off=0x33,
-                    Reload_RAM=0x80,
-                    Bus_Scan=0x85,
-                    Future_Use=0x90),
-    "argument" / Enum(Int8ub,
-                      One_Beep=0x04,
-                      Fail_Beep=0x08,
-                      Beep_Twice=0x0c,
-                      Accept_Beep=0x10),
-    "not_used1" / Padding(29),
-    "source_id" / Default(CommunicationSourceIDEnum, 1),
-    "user_high" / Default(Int8ub, 0),
-    "user_low" / Default(Int8ub, 0),
-)),
-                       "checksum" / Checksum(
-                           Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+        "po" / Struct(
+            "command" / Const(0x40, Int8ub)),
+        "not_used0" / Padding(1),
+        "action" / Enum(Int8ub,
+                        Stay_Arm=0x01,
+                        Stay_Arm1=0x02,
+                        Sleep_Arm=0x03,
+                        Full_Arm=0x04,
+                        Disarm=0x05,
+                        Stay_Arm_StayD=0x06,
+                        Sleep_Arm_StayD=0x07,
+                        Disarm_Both_Disable_StayD=0x08,
+                        Bypass=0x10,
+                        Beep=0x10,
+                        PGM_On_Override=0x30,
+                        PGM_Off_Override=0x31,
+                        PGM_On=0x32,
+                        PGM_Off=0x33,
+                        Reload_RAM=0x80,
+                        Bus_Scan=0x85,
+                        Future_Use=0x90),
+        "argument" / Enum(Int8ub,
+                          One_Beep=0x04,
+                          Fail_Beep=0x08,
+                          Beep_Twice=0x0c,
+                          Accept_Beep=0x10),
+        "not_used1" / Padding(29),
+        "source_id" / Default(CommunicationSourceIDEnum, 1),
+        "user_high" / Default(Int8ub, 0),
+        "user_low" / Default(Int8ub, 0),
+    )),
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 PerformActionResponse = Struct("fields" / RawCopy(
     Struct(
@@ -495,8 +395,7 @@ PerformActionResponse = Struct("fields" / RawCopy(
                         Future_Use=0x90),
         "not_used1" / Padding(33),
     )),
-                               "checksum" / Checksum(
-                                   Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 ErrorMessage = Struct("fields" / RawCopy(
     Struct(
@@ -528,5 +427,4 @@ ErrorMessage = Struct("fields" / RawCopy(
                          invalid_label_number=0x1c
                          ),
     )),
-                      "checksum" / Checksum(
-                          Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
