@@ -64,7 +64,7 @@ class InterfaceManager():
 
         self.interfaces.append(dict(name=interface.name, object=interface, initial=initial))
         try:
-            object.set_notify(self)
+            interface.set_notify(self)
         except Exception:
             logger("Error registering interface {}".format(interface.name))
 
