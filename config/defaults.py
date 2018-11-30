@@ -56,6 +56,7 @@ MQTT_RETAIN = True      		# Publish messages with Retain
 MQTT_BIND_ADDRESS = ''
 MQTT_REPUBLISH_INTERVAL = 60 * 60 * 12  # Interval for republishing all data
 MQTT_HOMEBRIDGE_ENABLE = False
+MQTT_HOMEASSISTANT_ENABLE = False
 
 # MQTT Topics
 MQTT_BASE_TOPIC = 'paradox'             # Root of all topics
@@ -63,14 +64,16 @@ MQTT_ZONE_TOPIC = 'zones'               # Base for zone states
 MQTT_PARTITION_TOPIC = 'partitions'     # Base for partition states
 MQTT_BUS_TOPIC = 'buses'                # Base for buses states
 MQTT_SYSTEM_TOPIC = 'system'            # Base for panel states
-MQTT_REPEATER_TOPIC = 'repeaters'       # Base for repeater states      
+MQTT_REPEATER_TOPIC = 'repeaters'       # Base for repeater states
 MQTT_EVENTS_TOPIC = 'events'            # Base for events
 MQTT_CONTROL_TOPIC = 'control'          # Base for control of othe elements (ROOT/CONTROL/TYPE)
 MQTT_OUTPUT_TOPIC = 'outputs'
 MQTT_KEYPAD_TOPIC = 'keypads'
 MQTT_STATES_TOPIC = 'states'
 MQTT_RAW_TOPIC = 'raw'
-MQTT_SUMMARY_TOPIC = 'current'
+MQTT_HOMEBRIDGE_SUMMARY_TOPIC = 'current'
+MQTT_HOMEASSISTANT_SUMMARY_TOPIC = 'current_hass'
+
 MQTT_NOTIFICATIONS_TOPIC = 'notifications'
 MQTT_PUBLISH_RAW_EVENTS = True
 MQTT_INTERFACE_TOPIC = 'interface'
