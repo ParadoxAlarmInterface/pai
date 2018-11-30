@@ -62,7 +62,10 @@ class Panel(PanelBase):
             if message is None or len(message) == 0:
                 return None
 
-            if message[0] == 0x70:
+            parent_parsed = super(Panel, self).parse_message(message)
+            if parent_parsed:
+                return parent_parsed
+            elif message[0] == 0x70:
                 return CloseConnection.parse(message)
             elif message[0] >> 4 == 0x7:
                 return ErrorMessage.parse(message)
@@ -92,16 +95,8 @@ class Panel(PanelBase):
             #            return WriteEEPROMResponse.parse(message)
             elif message[0] >> 4 == 0x0e:
                 return LiveEvent.parse(message)
-            else:
-                logger.warn("Unknown message")
         except Exception:
-            logger.exception("Parsing message")
-
-        s = 'PARSE: '
-        for c in message:
-            s += "{:02x} ".format(c)
-
-        logger.debug(s)
+            logger.exception("Parsing message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
 
         return None
 

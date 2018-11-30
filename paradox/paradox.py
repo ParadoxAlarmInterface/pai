@@ -52,6 +52,12 @@ class Paradox:
         self.status_cache = dict()
 
     def connect(self):
+        logger.info("Connecting to interface")
+        if not self.connection.connect():
+            logger.error('Failed to connect to interface')
+            self.run = STATE_STOP
+            return False
+
         logger.info("Connecting to panel")
 
         # Reset all states
@@ -137,6 +143,8 @@ class Paradox:
                     if reply is not None:
                         tstart = time.time()
                         self.panel.handle_status(reply)
+            except ConnectionError:
+                raise
             except Exception:
                 logger.exception("Loop")
 
@@ -195,6 +203,7 @@ class Paradox:
                 recv_message = self.panel.parse_message(data)
                 # No message
                 if recv_message is None:
+                    logger.debug("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in data)))
                     continue
             except Exception:
                 logging.exception("Error parsing message")
@@ -428,6 +437,7 @@ class Paradox:
             self.run = STATE_STOP
             self.loop_wait = False
             reply = self.send_wait(self.panel.get_message('CloseConnection'), None, reply_expected=0x07)
+            self.connection.close()
             
     def pause(self):
         if self.run == STATE_RUN:
@@ -435,6 +445,7 @@ class Paradox:
             self.run = STATE_PAUSE
             self.loop_wait = False
             reply = self.send_wait(self.panel.get_message('CloseConnection'), None, reply_expected=0x07)
+            self.connection.close()
             
     def resume(self):
         if self.run == STATE_PAUSE:

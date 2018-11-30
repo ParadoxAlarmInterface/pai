@@ -104,47 +104,48 @@ def main():
         from paradox.connections.serial_connection import SerialCommunication
 
         connection = SerialCommunication(port=cfg.SERIAL_PORT)
-        if not connection.connect():
-            logger.error("Unable to open serial port: {}".format(cfg.SERIAL_PORT))
-            sys.exit(-1)
     elif cfg.CONNECTION_TYPE == 'IP':
         logger.info("Using IP Connection")
         from paradox.connections.ip_connection import IPConnection
 
         connection = IPConnection(host=cfg.IP_CONNECTION_HOST, port=cfg.IP_CONNECTION_PORT, password=cfg.IP_CONNECTION_PASSWORD)
-        if not connection.connect():
-            logger.error("Unable to open IP Connection")
-            sys.exit(-1)
     else:
         logger.error("Invalid connection type: {}".format(cfg.CONNECTION_TYPE))
         sys.exit(-1)
 
-    logger.info("Starting...")
     # Start interacting with the alarm
-    stop = False
+    alarm = Paradox(connection=connection, interface=interface_manager)
+    retry = 1
     while True:
+        logger.info("Starting...")
+        retry_time_wait = 2 ^ retry
+        retry_time_wait = 30 if retry_time_wait > 30 else retry_time_wait
+
         try:
-            alarm = Paradox(connection=connection, interface=interface_manager)
             alarm.disconnect()
             if alarm.connect():
+                retry = 1
                 interface_manager.set_alarm(alarm)
                 alarm.loop()
-                break
             else:
                 logger.error("Unable to connect to alarm")
-                break
 
-            time.sleep(1)
+            time.sleep(retry_time_wait)
+        except (ConnectionError, OSError):  # Connection to IP Module or MQTT lost
+            logger.exception("Restarting")
+            time.sleep(retry_time_wait)
+
         except (KeyboardInterrupt, SystemExit):
             logger.info("Exit start")
-            stop = True
-            alarm.disconnect()
-            break
+            if alarm:
+                alarm.disconnect()
+            break  # break exits the retry loop
 
         except Exception:
-            if not stop:
-                logger.exception("Restarting")
-                time.sleep(1)
+            logger.exception("Restarting")
+            time.sleep(retry_time_wait)
+
+        retry += 1
 
     interface_manager.stop()
     logger.info("Good bye!")
