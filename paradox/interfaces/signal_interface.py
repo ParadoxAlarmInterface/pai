@@ -7,12 +7,7 @@ from pydbus import SystemBus
 from gi.repository import GLib
 from gi.repository import GObject
 
-import time
 import logging
-import datetime
-import json
-
-
 from threading import Thread, Event
 import queue
 
@@ -27,17 +22,16 @@ class SignalInterface(Thread):
     """Interface Class using Signal"""
     name = 'signal'
 
-    signal = None
-    alarm = None
-    stop_running = Event()
-    thread = None
-    loop = None
-
     def __init__(self):
         Thread.__init__(self)
 
         self.queue = queue.PriorityQueue()
         self.partitions = dict()
+        self.signal = None
+        self.alarm = None
+        self.stop_running = Event()
+        self.thread = None
+        self.loop = None
 
     def stop(self):
         """ Stops the Signal Interface Thread"""
@@ -213,9 +207,8 @@ class SignalInterface(Thread):
 
     def handle_event(self, raw):
         """Handle Live Event"""
-        #logger.debug("Live Event: raw={}".format(raw))
+        # logger.debug("Live Event: raw={}".format(raw))
 
-        #m = "{}: {}".format(raw['major'][1], raw['minor'][1])
         major_code = raw['major'][0]
         minor_code = raw['minor'][1]
 
