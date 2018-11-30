@@ -20,23 +20,23 @@ class Panel(PanelBase):
             zone=dict(
                 label_offset=0, addresses=[range(0x010, 0x210, 0x10)]),
             output=dict(
-                label_offset=0, addresses=[range(0x210, 0x270, 0x10)], template=dict(
+                label_offset=0, addresses=[range(0x210, 0x310, 0x10)], template=dict(
                     on=False,
                     pulse=False)
                 ),
             partition=dict(
-                label_offset=0, addresses=[range(0x270, 0x290, 0x10)]),
+                label_offset=0, addresses=[range(0x310, 0x330, 0x10)]),
             user=dict(
-                label_offset=0, addresses=[range(0x290, 0x490, 0x10)]),
+                label_offset=0, addresses=[range(0x330, 0x530, 0x10)]),
             bus=dict(
-                label_offset=0, addresses=[range(0x490, 0x580, 0x10)]),
+                label_offset=0, addresses=[range(0x530, 0x620, 0x10)]),
             repeater=dict(
-                label_offset=0, addresses=[range(0x580, 0x5a0, 0x10)]),
+                label_offset=0, addresses=[range(0x620, 0x640, 0x10)]),
             keypad=dict(
-                label_offset=0, addresses=[range(0x5a0, 0x620, 0x10)]),
+                label_offset=0, addresses=[range(0x640, 0x6c0, 0x10)]),
             site=dict(
-                label_offset=0, addresses=[range(0x620, 0x630, 0x10)]),
-            siren=dict(label_offset=0, addresses=[range(0x630, 0x670, 0x10)])
+                label_offset=0, addresses=[range(0x6c0, 0x6d0, 0x10)]),
+            siren=dict(label_offset=0, addresses=[range(0x6d0, 0x700, 0x10)])
         )
     )
 
