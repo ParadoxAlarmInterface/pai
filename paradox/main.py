@@ -39,7 +39,7 @@ def main():
     logger.info("Starting Paradox Alarm Interface")
     logger.info("Console Log level set to {}".format(cfg.LOGGING_LEVEL_CONSOLE))
 
-    interface_manager = InterfaceManager()
+    interface_manager = InterfaceManager(config=cfg)
     interface_manager.start()
 
     time.sleep(1)
