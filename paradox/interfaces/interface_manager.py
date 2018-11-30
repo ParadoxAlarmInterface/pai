@@ -12,14 +12,61 @@ class InterfaceManager():
         self.conf = config
         self.interfaces = []
 
-    def register(self, name, object, initial=False):
-        logger.debug("Registering Interface {}".format(name))
+    def start(self):
 
-        self.interfaces.append(dict(name=name, object=object, initial=initial))
+        if self.conf.GSM_ENABLE:
+            try:
+                logger.info("Using GSM Interface")
+                from paradox.interfaces.gsm_interface import GSMInterface
+                self.register(GSMInterface())
+            except Exception:
+                logger.exception("Unable to start GSM Interface")
+
+        # Load Signal service
+        if self.conf.SIGNAL_ENABLE:
+            try:
+                logger.info("Using Signal Interface")
+                from paradox.interfaces.signal_interface import SignalInterface
+                self.register(SignalInterface())
+            except Exception:
+                logger.exception("Unable to start Signal Interface")
+
+        # Load an interface for exposing data and accepting commands
+        if self.conf.MQTT_ENABLE:
+            try:
+                logger.info("Using MQTT Interface")
+                from paradox.interfaces.mqtt_interface import MQTTInterface
+                self.register(MQTTInterface(), initial=True)
+            except Exception:
+                logger.exception("Unable to start MQTT Interface")
+
+        # Load Pushbullet service
+        if self.conf.PUSHBULLET_ENABLE:
+            try:
+                logger.info("Using Pushbullet Interface")
+                from paradox.interfaces.pushbullet_interface import PushBulletInterface
+                self.register(PushBulletInterface())
+            except Exception:
+                logger.exception("Unable to start Pushbullet Interface")
+
+        # Load IP Interface
+        if self.conf.IP_INTERFACE_ENABLE:
+            try:
+                logger.info("Using IP Interface")
+                from paradox.interfaces.ip_interface import IPInterface
+                self.register(IPInterface())
+            except Exception:
+                logger.exception("Unable to start IP Interface")
+
+    def register(self, interface, initial=False):
+        logger.debug("Registering Interface {}".format(interface.name))
+        interface.start()
+
+        self.interfaces.append(dict(name=interface.name, object=interface, initial=initial))
         try:
             object.set_notify(self)
         except Exception:
-            logger("Error registering interface {}".format(name))
+            logger("Error registering interface {}".format(interface.name))
 
     def event(self, raw):
         for interface in self.interfaces:
