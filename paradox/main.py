@@ -40,61 +40,7 @@ def main():
     logger.info("Console Log level set to {}".format(cfg.LOGGING_LEVEL_CONSOLE))
 
     interface_manager = InterfaceManager()
-
-    # Load GSM service
-    if cfg.GSM_ENABLE:
-        try:
-            logger.info("Using GSM Interface")
-            from paradox.interfaces.gsm_interface import GSMInterface
-            interface = GSMInterface()
-            interface.start()
-            interface_manager.register(interface.name, interface)
-        except Exception:
-            logger.exception("Unable to start GSM Interface")
-
-    # Load Signal service
-    if cfg.SIGNAL_ENABLE:
-        try:
-            logger.info("Using Signal Interface")
-            from paradox.interfaces.signal_interface import SignalInterface
-            interface = SignalInterface()
-            interface.start()
-            interface_manager.register(interface.name, interface)
-        except Exception:
-            logger.exception("Unable to start Signal Interface")
-
-    # Load an interface for exposing data and accepting commands
-    if cfg.MQTT_ENABLE:
-        try:
-            logger.info("Using MQTT Interface")
-            from paradox.interfaces.mqtt_interface import MQTTInterface
-            interface = MQTTInterface()
-            interface.start()
-            interface_manager.register(interface.name, interface, initial=True)
-        except Exception:
-            logger.exception("Unable to start MQTT Interface")
-
-    # Load Pushbullet service
-    if cfg.PUSHBULLET_ENABLE:
-        try:
-            logger.info("Using Pushbullet Interface")
-            from paradox.interfaces.pushbullet_interface import PushBulletInterface
-            interface = PushBulletInterface()
-            interface.start()
-            interface_manager.register(interface.name, interface)
-        except Exception:
-            logger.exception("Unable to start Pushbullet Interface")
-
-    # Load IP Interface
-    if cfg.IP_INTERFACE_ENABLE:
-        try:
-            logger.info("Using IP Interface")
-            from paradox.interfaces.ip_interface import IPInterface
-            interface = IPInterface()
-            interface.start()
-            interface_manager.register(interface.name, interface)
-        except Exception:
-            logger.exception("Unable to start IP Interface")
+    interface_manager.start()
 
     time.sleep(1)
 
