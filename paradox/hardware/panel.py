@@ -43,11 +43,10 @@ class Panel:
         if password is None:
             return b'\x00\x00'
 
-        try:
-            int_password = int(password)
-        except:
+        if not password.isdigit():
             return password
 
+        int_password = int(password)
         i = len(password)
         while i >= 0:
             i2 = int(i / 2)
@@ -75,7 +74,6 @@ class Panel:
 
             if elem_type not in self.core.data:
                 self.core.data[elem_type] = dict()
-
 
             addresses = list(chain.from_iterable(elem_def['addresses']))
             self.load_labels(self.core.data[elem_type],
@@ -107,7 +105,7 @@ class Panel:
 
                 if reply.fields.value.address != address:
                     logger.debug(
-                        "Fetched and receive label EEPROM addresses (received: %d, requested: %d) do not match. Retrying %d of %d" % (
+                        "EEPROM label addresses do not match (received: %d, requested: %d). Retrying %d of %d" % (
                             reply.fields.value.address, address, retry, retry_count))
                     reply = self.core.send_wait(None, None, reply_expected=0x05)
                     continue
@@ -130,13 +128,13 @@ class Panel:
                 labelDictName[label] = i
             i += 1
 
+
 InitiateCommunication = Struct("fields" / RawCopy(
     Struct("po" / BitStruct(
         "command" / Const(7, Nibble),
         "reserved0" / Const(2, Nibble)),
-           "reserved1" / Padding(35))),
-                               "checksum" / Checksum(Bytes(1),
-                                                     lambda data: calculate_checksum(data), this.fields.data))
+        "reserved1" / Padding(35))),
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 InitiateCommunicationResponse = Struct("fields" / RawCopy(
     Struct(
@@ -176,10 +174,7 @@ InitiateCommunicationResponse = Struct("fields" / RawCopy(
         "encryption_id" / Int8ub,
         "reserved0" / Bytes(2),
         "label" / Bytes(8))),
-
-                                       "checksum" / Checksum(
-                                           Bytes(1),
-                                           lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 StartCommunication = Struct("fields" / RawCopy(
     Struct(
@@ -190,8 +185,7 @@ StartCommunication = Struct("fields" / RawCopy(
         "user_id" / Struct(
             "high" / Default(Int8ub, 0),
             "low" / Default(Int8ub, 0)),
-    )), "checksum" / Checksum(
-    Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    )), "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 StartCommunicationResponse = Struct("fields" / RawCopy(
     Struct(
@@ -225,5 +219,4 @@ StartCommunicationResponse = Struct("fields" / RawCopy(
         ),
         "not_used2" / Bytes(14),
     )),
-                                    "checksum" / Checksum(
-                                        Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
