@@ -27,36 +27,43 @@ class IPConnection:
         self.site_info = None
         self.connection_timestamp = 0
 
-    def reconnect(self):
-        self.close()
-        self.connect()
-
     def connect(self):
+        try: # if reconnect
+            if self.socket:
+                self.close()
+        except Exception:
+            pass
+
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
         self.socket.bind(('0.0.0.0', 0))
 
         tries = 1
+        max_tries = 3
 
-        while tries > 0:
-            try:
-                if cfg.IP_CONNECTION_SITEID is not None and cfg.IP_CONNECTION_EMAIL is not None:
+        while tries <= max_tries:
+
+            if cfg.IP_CONNECTION_SITEID is not None and cfg.IP_CONNECTION_EMAIL is not None:
+                try:
                     r = self.connect_to_site()
 
                     if r and self.site_info is not None:
                         if self.connect_to_panel():
                             return True
-                else:
+                except Exception:
+                    logger.exception('Try %d/%d. Unable to connect to SITE ID' % (tries, max_tries))
+            else:
+                try:
                     self.socket.settimeout(self.socket_timeout)
                     self.socket.connect((self.host, self.port))
 
                     if self.connect_to_panel():
                         return True
-            except Exception:
-                logger.exception("Unable to connect")
+                except Exception:
+                    logger.exception("Try %d/%d. Unable to connect to IP Module" % (tries, max_tries))
 
-            tries -= 1
+            tries += 1
 
         return False
 
@@ -217,9 +224,8 @@ class IPConnection:
             else:
                 return False
         except Exception as e:
-            logger.exception("Error writing to socket. Reconnecting...")
-            self.reconnect() # TODO: Some retry mechanism required
-            return False
+            logger.exception("Error writing to socket.")
+            raise ConnectionError()
 
     def read(self, sz=37, timeout=5):
         """Read data from the IP Port, if available, until the timeout is exceeded"""
@@ -234,15 +240,13 @@ class IPConnection:
             try:
                 recv_data = self.socket.recv(1024)
                 if recv_data == b'': # Socket was closed. Restart the connection.
-                    logger.info('Connection to IP module lost. Reconnecting...')
-                    self.reconnect()
-                    continue
-            except socket.timeout as e:
+                    logger.info('Connection to IP module lost.')
+                    raise ConnectionResetError()
+            except socket.timeout:
                 return None
-            except socket.error as e:
-                logger.exception("Error reading from socket. Reconnecting...")
-                self.reconnect()
-                continue
+            except socket.error:
+                logger.exception("Error reading from socket.")
+                raise ConnectionError()
 
             if recv_data is None or len(recv_data) == 0:
                 continue
@@ -270,10 +274,12 @@ class IPConnection:
 
     def close(self):
         """Closes the serial port"""
-        if self.connected:
-            self.connected = False
+
+        if self.socket:
             self.socket.close()
             self.socket = None
+
+        self.connected = False
 
     def flush(self):
         """Write any pending data"""

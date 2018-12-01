@@ -16,6 +16,12 @@ class SerialCommunication:
     def connect(self, baud=9600, timeout=1):
         """Connects the serial port"""
 
+        try: # if reconnect
+            if self.comm:
+                self.close()
+        except Exception:
+            pass
+
         logger.debug("Opening Serial port: {}".format(self.serialport))
         self.comm = serial.Serial()
         self.comm.baudrate = baud
@@ -27,7 +33,7 @@ class SerialCommunication:
             logger.debug("Serial port open!")
             return True
         except Exception as e:
-            logger.error(e)
+            logger.exception("Unable to open serial port: {}".format(self.serialport))
             return False
 
     def write(self, data):
@@ -88,6 +94,7 @@ class SerialCommunication:
     def close(self):
         """Closes the serial port"""
         self.comm.close()
+        self.comm = None
 
     def flush(self):
         """Write any pending data"""

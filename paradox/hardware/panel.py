@@ -28,7 +28,6 @@ class Panel:
         elif message[0] == 0x00 and message[4] > 0:
             return StartCommunicationResponse.parse(message)
         else:
-            logger.error("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
             return None
 
     def get_message(self, name):

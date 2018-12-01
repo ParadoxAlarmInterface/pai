@@ -196,11 +196,10 @@ ActionResponse = Struct("fields" / RawCopy(
                 "alarm_reporting_pending" / Flag,
                 "Windload_connected" / Flag,
                 "NeWare_connected" / Flag)),
-        "not_used0" / Default(Int8ub, 0),
-        "not_used1" / Default(Int8ub, 0),
-        "action" / Int8ub,
+        "length" / Rebuild(Int8ub, lambda
+            this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+        "data" / Bytes(lambda this: this.packet_length - 3)
     )),
-    "reserved0" / Padding(32),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 CloseConnection = Struct("fields" / RawCopy(

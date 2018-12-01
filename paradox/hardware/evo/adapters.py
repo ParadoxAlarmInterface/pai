@@ -137,7 +137,7 @@ class PartitionStatus(Subconstruct):
         'bypass_ready' / Flag,
         'inhibit_ready' / Flag,
         'all_zone_closed' / Flag,  # (Bypass or not)
-        'free0' / BitsInteger(3)
+        '_free0' / BitsInteger(3)
     )
 
     def __init__(self, subcons_or_size):
