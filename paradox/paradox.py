@@ -378,6 +378,8 @@ class Paradox:
             self.interface.event(raw=new_event)
 
     def update_properties(self, element_type, key, change, force_publish=False):
+        if element_type not in self.data:
+            return
 
         elements = self.data[element_type]
 
@@ -415,7 +417,8 @@ class Paradox:
 
                     # Trigger notifications for Partitions changes
                     # Ignore some changes as defined in the configuration
-                    if (element_type == "partition" and key in cfg.PARTITIONS and property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE) \
+                    partition_limit = cfg.LIMITS.get('partition')
+                    if (element_type == "partition" and (partition_limit is None or key in partition_limit) and property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE) \
                             or ('trouble' in property_name):
                         self.interface.notify("Paradox", "{} {} {}".format(elements[key]['label'], property_name, property_value), logging.INFO)
 
