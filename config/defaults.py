@@ -65,6 +65,7 @@ MQTT_PARTITION_TOPIC = 'partitions'     # Base for partition states
 MQTT_BUS_TOPIC = 'buses'                # Base for buses states
 MQTT_SYSTEM_TOPIC = 'system'            # Base for panel states
 MQTT_REPEATER_TOPIC = 'repeaters'       # Base for repeater states
+MQTT_USER_TOPIC = 'users'               # Base for user states
 MQTT_EVENTS_TOPIC = 'events'            # Base for events
 MQTT_CONTROL_TOPIC = 'control'          # Base for control of othe elements (ROOT/CONTROL/TYPE)
 MQTT_OUTPUT_TOPIC = 'outputs'
