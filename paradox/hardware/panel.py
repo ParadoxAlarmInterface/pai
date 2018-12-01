@@ -7,6 +7,17 @@ from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
+from config import user as cfg
+
+def iterate_properties(data):
+    if isinstance(data, list):
+        for key, value in enumerate(data):
+            yield (key, value)
+    elif isinstance(data, dict):
+        for key, value in data.items():
+            if type(key) == str and key.startswith('_'):  # ignore private properties
+                continue
+            yield (key, value)
 
 class Panel:
     mem_map = {}
@@ -28,7 +39,6 @@ class Panel:
         elif message[0] == 0x00 and message[4] > 0:
             return StartCommunicationResponse.parse(message)
         else:
-            logger.error("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
             return None
 
     def get_message(self, name):
@@ -77,6 +87,10 @@ class Panel:
                 self.core.data[elem_type] = dict()
 
             addresses = list(chain.from_iterable(elem_def['addresses']))
+            limits = cfg.LIMITS.get(elem_type)
+            if limits is not None:
+                addresses = [a for i, a in enumerate(addresses) if i+1 in limits]
+
             self.load_labels(self.core.data[elem_type],
                              self.core.labels[elem_type],
                              addresses,
