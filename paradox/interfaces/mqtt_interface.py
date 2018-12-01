@@ -27,9 +27,6 @@ ELEMENT_TOPIC_MAP = dict(partition=cfg.MQTT_PARTITION_TOPIC, zone=cfg.MQTT_ZONE_
                          bus=cfg.MQTT_BUS_TOPIC, keypad=cfg.MQTT_KEYPAD_TOPIC,
                          system=cfg.MQTT_SYSTEM_TOPIC, user=cfg.MQTT_USER_TOPIC)
 
-# Compatibility with old config
-cfg.MQTT_HOMEBRIDGE_SUMMARY_TOPIC = cfg.MQTT_SUMMARY_TOPIC
-
 
 class MQTTInterface(Thread):
     """Interface Class using MQTT"""
