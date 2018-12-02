@@ -266,7 +266,7 @@ class MQTTInterface(Thread):
                          json.dumps(raw), 0, cfg.MQTT_RETAIN)
 
     def handle_change(self, raw):
-        element, label, property, value = raw
+        element, label, attribute, value = raw
         """Handle Property Change"""
 
         # Keep track of ARM state
@@ -274,7 +274,7 @@ class MQTTInterface(Thread):
             if label not in self.partitions:
                 self.partitions[label] = dict()
 
-            self.partitions[label][property] = value
+            self.partitions[label][attribute] = value
 
         if element in ELEMENT_TOPIC_MAP:
             element_topic = ELEMENT_TOPIC_MAP[element]
@@ -290,34 +290,34 @@ class MQTTInterface(Thread):
                                              cfg.MQTT_STATES_TOPIC,
                                              element_topic,
                                              label,
-                                             property),
+                                             attribute),
                      "{}".format(publish_value), 0, cfg.MQTT_RETAIN)
 
         if element == 'partition':
             if cfg.MQTT_HOMEBRIDGE_ENABLE:
-                self.handle_change_external(element, label, value, element_topic,
+                self.handle_change_external(element, label, attribute, value, element_topic,
                                             PARTITION_HOMEBRIDGE_STATES, cfg.MQTT_HOMEBRIDGE_SUMMARY_TOPIC)
 
             if cfg.MQTT_HOMEASSISTANT_ENABLE:
-                self.handle_change_external(element, label, value, element_topic,
+                self.handle_change_external(element, label, attribute, value, element_topic,
                                             PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC)
 
-    def handle_change_external(self, element, label, value, element_topic, states_map, summary_topic):
+    def handle_change_external(self, element, label, attribute, value, element_topic, states_map, summary_topic):
         if label not in self.armed:
             self.armed[label] = None
 
         # Property changing to True: Alarm or arm
         if value:
-            if property == 'alarm':
+            if attribute == 'alarm':
                 state = states_map['alarm']
 
             # only process if not armed already
             elif self.armed[label] is None:
-                if property == 'stay_arm':
+                if attribute == 'stay_arm':
                     state = states_map['stay_arm']
-                elif property == 'arm':
+                elif attribute == 'arm':
                     state = states_map['arm']
-                elif property == 'sleep_arm':
+                elif attribute == 'sleep_arm':
                     state = states_map['sleep_arm']
                 else:
                     return
@@ -328,9 +328,9 @@ class MQTTInterface(Thread):
 
         # Property changing to False: Disarm or alarm stop
         else:
-            if property == 'alarm' and label in self.armed and self.armed[label] is not None:
+            if attribute == 'alarm' and label in self.armed and self.armed[label] is not None:
                 state = self.armed[label]
-            elif property in ['stay_arm', 'arm', 'sleep_arm'] and self.armed[label] is not None:
+            elif attribute in ['stay_arm', 'arm', 'sleep_arm'] and self.armed[label] is not None:
                 state = states_map['disarm']
                 self.armed[label] = None
             else:
