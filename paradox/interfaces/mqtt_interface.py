@@ -296,15 +296,19 @@ class MQTTInterface(Thread):
         if element == 'partition':
             if cfg.MQTT_HOMEBRIDGE_ENABLE:
                 self.handle_change_external(element, label, attribute, value, element_topic,
-                                            PARTITION_HOMEBRIDGE_STATES, cfg.MQTT_HOMEBRIDGE_SUMMARY_TOPIC)
+                                            PARTITION_HOMEBRIDGE_STATES, cfg.MQTT_HOMEBRIDGE_SUMMARY_TOPIC, 'hb')
 
             if cfg.MQTT_HOMEASSISTANT_ENABLE:
                 self.handle_change_external(element, label, attribute, value, element_topic,
-                                            PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC)
+                                            PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC,
+                                            'hass')
 
-    def handle_change_external(self, element, label, attribute, value, element_topic, states_map, summary_topic):
-        if label not in self.armed:
-            self.armed[label] = None
+    def handle_change_external(self, element, label, attribute, value, element_topic, states_map, summary_topic, service):
+        if service not in self.armed:
+            self.armed = dict(service=dict())
+
+        if label not in self.armed[service]:
+            self.armed[service][label] = dict()
 
         # Property changing to True: Alarm or arm
         if value:
@@ -312,7 +316,7 @@ class MQTTInterface(Thread):
                 state = states_map['alarm']
 
             # only process if not armed already
-            elif self.armed[label] is None:
+            elif self.armed[service][label] is None:
                 if attribute == 'stay_arm':
                     state = states_map['stay_arm']
                 elif attribute == 'arm':
@@ -322,17 +326,17 @@ class MQTTInterface(Thread):
                 else:
                     return
 
-                self.armed[label] = state
+                self.armed[service][label] = state
             else:
                 return  # Do not publish a change
 
         # Property changing to False: Disarm or alarm stop
         else:
-            if attribute == 'alarm' and label in self.armed and self.armed[label] is not None:
-                state = self.armed[label]
-            elif attribute in ['stay_arm', 'arm', 'sleep_arm'] and self.armed[label] is not None:
+            if attribute == 'alarm' and label in self.armed[service] and self.armed[service][label] is not None:
+                state = self.armed[service][label]
+            elif attribute in ['stay_arm', 'arm', 'sleep_arm'] and self.armed[service][label] is not None:
                 state = states_map['disarm']
-                self.armed[label] = None
+                self.armed[service][label] = None
             else:
                 return  # Do not publish a change
 
