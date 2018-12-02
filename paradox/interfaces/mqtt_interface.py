@@ -303,20 +303,24 @@ class MQTTInterface(Thread):
                                             PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC,
                                             'hass')
 
-    def handle_change_external(self, element, label, attribute, value, element_topic, states_map, summary_topic, service):
+    def handle_change_external(self, element, label, attribute,
+                               value, element_topic, states_map,
+                               summary_topic, service):
+
         if service not in self.armed:
-            self.armed = dict(service=dict())
+            self.armed[service] = dict()
 
         if label not in self.armed[service]:
-            self.armed[service][label] = dict()
+            self.armed[service][label] = (None, None, False)
 
         # Property changing to True: Alarm or arm
         if value:
             if attribute == 'alarm':
                 state = states_map['alarm']
+                self.armed[service][label][2] = True
 
             # only process if not armed already
-            elif self.armed[service][label] is None:
+            elif self.armed[service][label][0] is None:
                 if attribute == 'stay_arm':
                     state = states_map['stay_arm']
                 elif attribute == 'arm':
@@ -326,17 +330,20 @@ class MQTTInterface(Thread):
                 else:
                     return
 
-                self.armed[service][label] = state
+                self.armed[service][label] = (attribute, state, self.armed[service][label][2])
             else:
                 return  # Do not publish a change
 
         # Property changing to False: Disarm or alarm stop
         else:
-            if attribute == 'alarm' and label in self.armed[service] and self.armed[service][label] is not None:
-                state = self.armed[service][label]
-            elif attribute in ['stay_arm', 'arm', 'sleep_arm'] and self.armed[service][label] is not None:
+            # Alarm stopped
+            if attribute == 'alarm' and self.armed[service][label][2]:
+                state = self.armed[service][label][1]
+                self.armed[service][label][2] = False
+
+            elif attribute in ['stay_arm', 'arm', 'sleep_arm'] and self.armed[service][label][0] == attribute:
                 state = states_map['disarm']
-                self.armed[service][label] = None
+                self.armed[service][label] = (None, None, self.armed[service][label][2])
             else:
                 return  # Do not publish a change
 
