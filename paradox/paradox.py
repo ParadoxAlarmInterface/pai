@@ -31,7 +31,6 @@ class Paradox:
 
         self.panel = None
         self.connection = connection
-        self.connection.timeout(0.5)
         self.retries = retries
         self.interface = interface
         self.reset()
@@ -57,6 +56,8 @@ class Paradox:
             logger.error('Failed to connect to interface')
             self.run = STATE_STOP
             return False
+
+        self.connection.timeout(0.5)
 
         logger.info("Connecting to panel")
 
