@@ -5,8 +5,10 @@ import sys
 import logging
 import time
 from .parsers import *
-from ..panel import Panel as PanelBase
+from ..panel import Panel as PanelBase, iterate_properties
+
 from config import user as cfg
+
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -79,16 +81,15 @@ class Panel(PanelBase):
                 return SetTimeDateResponse.parse(message)
             elif message[0] == 0x40:
                 return PerformAction.parse(message)
-            elif message[0] >> 4 == 4:
+            elif message[0] >> 4 == 0x04:
                 return PerformActionResponse.parse(message)
-            elif message[0] == 0x50 and message[2] == 0x80:
-                return PanelStatus.parse(message)
+            elif message[0] >> 4 == 0x05 and message[2] == 0x80:
+                return ReadStatusResponse.parse(message)
             elif message[0] == 0x50 and message[2] < 0x80:
                 return ReadEEPROM.parse(message)
-            elif message[0] >> 4 == 0x05 and message[2] == 0x80:
-                return PanelStatusResponse[message[3]].parse(message)
             elif message[0] >> 4 == 0x05 and message[2] < 0x80:
                 return ReadEEPROMResponse.parse(message)
+
             #        elif message[0] == 0x60 and message[2] < 0x80:
             #            return WriteEEPROM.parse(message)
             #        elif message[0] >> 4 == 0x06 and message[2] < 0x80:
@@ -131,70 +132,44 @@ class Panel(PanelBase):
 
         return reply
 
-    def process_status_bulk(self, message):
-        for k in message.fields.value:
-            element_type = k.split('_')[0]
-
-            if element_type == 'pgm':
-                element_type = 'output'
-                limit_list = cfg.OUTPUTS
-            elif element_type == 'partition':
-                limit_list = cfg.PARTITIONS
-            elif element_type == 'zone':
-                limit_list = cfg.ZONES
-            elif element_type == 'bus':
-                limit_list = cfg.BUSES
-            elif element_type == 'wireless-repeater':
-                element_type = 'repeater'
-                limit_list == cfg.REPEATERS
-            elif element_type == 'wireless-keypad':
-                element_type = 'keypad'
-                limit_list == cfg.KEYPADS
-            else:
-                continue
-
-            if k in self.core.status_cache and self.core.status_cache[k] == message.fields.value[k]:
-                continue
-
-            self.core.status_cache[k] = message.fields.value[k]
-
-            prop_name = '_'.join(k.split('_')[1:])
-            if prop_name == 'status':
-                for i in message.fields.value[k]:
-                    if i in limit_list:
-                        self.core.update_properties(element_type, i, message.fields.value[k][i])
-            else:
-                for i in message.fields.value[k]:
-                    if i in limit_list:
-                        status = message.fields.value[k][i]
-                        self.core.update_properties(element_type, i, {prop_name: status})
-
     def handle_status(self, message):
         """Handle MessageStatus"""
+        vars = message.fields.value
 
-        if message.fields.value.status_request == 0:
+        if vars.address not in RAMDataParserMap:
+            logger.warn("Unknown memory address {}".format(vars.address))
+            return
+
+        parser = RAMDataParserMap[vars.address]
+        try:
+            properties = parser.parse(vars.data)
+        except Exception:
+            logger.exception("Unable to parse RAM Status Block")
+            return
+
+        if vars.address == 0:
             if time.time() - self.core.last_power_update >= cfg.POWER_UPDATE_INTERVAL:
                 self.core.last_power_update = time.time()
-                self.core.update_properties('system', 'power', dict(vdc=round(message.fields.value.vdc, 2)),
+                self.core.update_properties('system', 'power', dict(vdc=round(properties.vdc, 2)),
                                             force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
-                self.core.update_properties('system', 'power', dict(battery=round(message.fields.value.battery, 2)),
+                self.core.update_properties('system', 'power', dict(battery=round(properties.battery, 2)),
                                             force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
-                self.core.update_properties('system', 'power', dict(dc=round(message.fields.value.dc, 2)),
+                self.core.update_properties('system', 'power', dict(dc=round(properties.dc, 2)),
                                             force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
                 self.core.update_properties('system', 'rf',
-                                            dict(rf_noise_floor=round(message.fields.value.rf_noise_floor, 2)),
+                                            dict(rf_noise_floor=round(properties.rf_noise_floor, 2)),
                                             force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
 
-            for k in message.fields.value.troubles:
+            for k in properties.troubles:
                 if "not_used" in k:
                     continue
 
-                self.core.update_properties('system', 'trouble', {k: message.fields.value.troubles[k]})
+                self.core.update_properties('system', 'trouble', {k: properties.troubles[k]})
 
-            self.process_status_bulk(message)
+            self.process_properties_bulk(properties, vars.address)
 
-        elif message.fields.value.status_request >= 1 and message.fields.value.status_request <= 5:
-            self.process_status_bulk(message)
+        elif vars.address >= 1 and vars.address <= 5:
+            self.process_properties_bulk(properties, vars.address)
 
     def process_event(self, event):
         major = event['major'][0]

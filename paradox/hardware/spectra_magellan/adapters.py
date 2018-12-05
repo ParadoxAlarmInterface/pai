@@ -430,7 +430,7 @@ _softwareAccess = {-1: 'Software',
                    }
 
 _outputLabel = {
-    -1: 'Output',
+    -1: 'PGM',
     1: 'PGM Number 1',
     2: 'PGM Number 2',
     3: 'PGM Number 3',
