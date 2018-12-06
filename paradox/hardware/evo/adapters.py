@@ -85,59 +85,59 @@ class StatusAdapter(Adapter):
 
 class PartitionStatus(Subconstruct):
     first2 = BitStruct(
-        'armed' / Flag,
-        'armed_away' / Flag,
-        'armed_stay' / Flag,
-        'armed_no_entry' / Flag,
-        'was_in_alarm' / Flag,  # is in alarm
-        'silent_alarm' / Flag,
-        'audible_alarm' / Flag,
         'fire_alarm' / Flag,
+        'audible_alarm' / Flag,
+        'silent_alarm' / Flag,
+        'was_in_alarm' / Flag,  # is in alarm
+        'armed_no_entry' / Flag,
+        'armed_stay' / Flag,
+        'armed_away' / Flag,
+        'armed' / Flag,
 
-        'ready' / Flag,
-        'exit_delay' / Flag,
-        'entry_delay' / Flag,
-        'trouble' / Flag,
-        'alarm_in_memory' / Flag,
-        'zone_bypass' / Flag,
+        'lockout' / Flag,
         'programming' / Flag,
-        'lockout' / Flag
+        'zone_bypass' / Flag,
+        'alarm_in_memory' / Flag,
+        'trouble' / Flag,
+        'entry_delay' / Flag,
+        'exit_delay' / Flag,
+        'ready' / Flag
     )
 
     last4 = BitStruct(
-        'intellizone_engage' / Flag,
-        'fire_delay_in_progress' / Flag,
-        'auto_arming_engaged' / Flag,
-        'voice_arming' / Flag,
-        'zone_tamper_trouble' / Flag,
-        'zone_low_battery_trouble' / Flag,
-        'zone_fire_loop_trouble' / Flag,
         'zone_supervision_trouble' / Flag,
+        'zone_fire_loop_trouble' / Flag,
+        'zone_low_battery_trouble' / Flag,
+        'zone_tamper_trouble' / Flag,
+        'voice_arming' / Flag,
+        'auto_arming_engaged' / Flag,
+        'fire_delay_in_progress' / Flag,
+        'intellizone_engage' / Flag,
 
-        'cancel_alarm_reporting_on_disarming' / Flag,
-        'partition_recently_close' / Flag,
-        'stay_arming_auto' / Flag,  # if no entry zone is tripped
-        'remote_arming' / Flag,
-        'follow_become_delay' / Flag,  # Follow become delay when is bypassed
-        'police_code_delay' / Flag,  # Within police code delay
-        'panic_alarm' / Flag,
         'time_to_refresh_zone_status' / Flag,
+        'panic_alarm' / Flag,
+        'police_code_delay' / Flag,  # Within police code delay
+        'follow_become_delay' / Flag,  # Follow become delay when is bypassed
+        'remote_arming' / Flag,
+        'stay_arming_auto' / Flag,  # if no entry zone is tripped
+        'partition_recently_close' / Flag,
+        'cancel_alarm_reporting_on_disarming' / Flag,
 
-        'intellizone_delay_finished' / Flag,
-        'exit_delay_finished' / Flag,
-        'entry_delay_finished' / Flag,
-        'alarm_duration_finished' / Flag,
-        'no_movement_delay_end' / Flag,
-        'fire_delay_end' / Flag,
-        'auto_arm_reach' / Flag,
         'tx_delay_finished' / Flag,  # (Time Out / instant alarm)
+        'auto_arm_reach' / Flag,
+        'fire_delay_end' / Flag,
+        'no_movement_delay_end' / Flag,
+        'alarm_duration_finished' / Flag,
+        'entry_delay_finished' / Flag,
+        'exit_delay_finished' / Flag,
+        'intellizone_delay_finished' / Flag,
 
-        'stay_instant_ready' / Flag,
-        'force_ready' / Flag,
-        'bypass_ready' / Flag,
-        'inhibit_ready' / Flag,
+        '_free0' / BitsInteger(3),
         'all_zone_closed' / Flag,  # (Bypass or not)
-        '_free0' / BitsInteger(3)
+        'inhibit_ready' / Flag,
+        'bypass_ready' / Flag,
+        'force_ready' / Flag,
+        'stay_instant_ready' / Flag,
     )
 
     def __init__(self, subcons_or_size):
@@ -170,17 +170,17 @@ class PartitionStatus(Subconstruct):
 
 class PGMFlags(Subconstruct):
     parser = BitStruct(
-        'CHIME_ZONE_PARTITION' / StatusFlagArrayAdapter(Array(4, Flag)),
-        'POWER_SMOKE' / Flag,
-        'GROUND_START' / Flag,
-        'KISS_OFF' / Flag,
-        'LINE_RING' / Flag,
+        'chime_zone_partition' / StatusFlagArrayAdapter(Array(4, Flag)),
+        'power_smoke' / Flag,
+        'ground_start' / Flag,
+        'kiss_off' / Flag,
+        'line_ring' / Flag,
 
-        'Bell Partition' / StatusFlagArrayAdapter(Array(8, Flag)),
+        'bell_partition' / StatusFlagArrayAdapter(Array(8, Flag)),
 
-        'Fire Alarm' / StatusFlagArrayAdapter(Array(8, Flag)),
+        'fire_alarm' / StatusFlagArrayAdapter(Array(8, Flag)),
 
-        'Open/Close Kiss Off' / StatusFlagArrayAdapter(Array(8, Flag))
+        'open_close_kiss_off' / StatusFlagArrayAdapter(Array(8, Flag))
     )
 
     def __init__(self):

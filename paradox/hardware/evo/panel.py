@@ -8,12 +8,11 @@ import time
 import itertools
 
 from .parsers import *
-from ..panel import Panel as PanelBase
+from ..panel import Panel as PanelBase, iterate_properties
 
 from config import user as cfg
 
 logger = logging.getLogger('PAI').getChild(__name__)
-
 
 class Panel_EVOBase(PanelBase):
     def get_message(self, name):
@@ -160,43 +159,6 @@ class Panel_EVOBase(PanelBase):
                 self.core.update_properties('system', 'trouble', {k: properties.troubles[k]})
 
         self.process_properties_bulk(properties, vars.address)
-
-    def process_properties_bulk(self, properties, address):
-        for k in properties:
-            element_type = k.split('_')[0]
-
-            if element_type == 'pgm':
-                element_type = 'output'
-                limit_list = cfg.OUTPUTS
-            elif element_type == 'partition':
-                limit_list = cfg.PARTITIONS
-            elif element_type == 'zone':
-                limit_list = cfg.ZONES
-            elif element_type == 'door':
-                limit_list = cfg.DOORS
-            elif element_type == 'module':
-                element_type = 'bus'
-                limit_list = cfg.BUSES
-            else:
-                continue
-
-            if k in self.core.status_cache and self.core.status_cache[address][k] == properties[k]:
-                continue
-
-            if address not in self.core.status_cache:
-                self.core.status_cache[address] = {}
-            self.core.status_cache[address][k] = properties[k]
-
-            prop_name = '_'.join(k.split('_')[1:])
-            if prop_name == 'status': # struct with properties
-                for i in properties[k]:
-                    if i in limit_list:
-                        self.core.update_properties(element_type, i, properties[k][i])
-            else:
-                for i in properties[k]:
-                    if i in limit_list:
-                        status = properties[k][i]
-                        self.core.update_properties(element_type, i, {prop_name: status})
 
     def process_event(self, event):
         major = event['major'][0]

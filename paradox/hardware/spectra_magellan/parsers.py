@@ -53,19 +53,8 @@ PanelStatus = Struct("fields" / RawCopy(
     Padding(31),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
-PanelStatusResponse = [
-    Struct("fields" / RawCopy(Struct(
-        "po" / BitStruct(
-            "command" / Const(5, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
-                "NeWare_connected" / Flag)
-        ),
-        "not_used0" / Padding(1),
-        "validation" / Const(0x80, Int8ub),
-        "status_request" / Const(0, Int8ub),
+RAMDataParserMap = {
+    0: Struct(
         "troubles" / BitStruct(
             "timer_loss_trouble" / Flag,
             "fire_loop_trouble" / Flag,
@@ -105,101 +94,41 @@ PanelStatusResponse = [
         "zone_open" / StatusAdapter(Bytes(4)),
         "zone_tamper" / StatusAdapter(Bytes(4)),
         "pgm_tamper" / StatusAdapter(Bytes(2)),
-        "bus_tamper" / StatusAdapter(Bytes(2)),
+        "bus-module_tamper" / StatusAdapter(Bytes(2)),
         "zone_fire" / StatusAdapter(Bytes(4)),
-        "not_used1" / Int8ub)),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-    ,
-    Struct("fields" / RawCopy(Struct(
-        "po" / BitStruct(
-            "command" / Const(5, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
-                "NeWare_connected" / Flag)),
-        "not_used0" / Padding(1),
-        "validation" / Const(0x80, Int8ub),
-        "status_request" / Const(1, Int8ub),
+        "not_used1" / Int8ub
+    ),
+    1: Struct(
         "zone_rf_supervision_trouble" / StatusAdapter(Bytes(4)),
         "pgm_supervision_trouble" / StatusAdapter(Bytes(2)),
-        "bus_supervision_trouble" / StatusAdapter(Bytes(2)),
-        "wireless-repeater_supervision_trouble" / StatusAdapter(Bytes(1)),
+        "bus-module_supervision_trouble" / StatusAdapter(Bytes(2)),
+        "repeater_supervision_trouble" / StatusAdapter(Bytes(1)),
         "zone_rf_low_battery_trouble" / StatusAdapter(Bytes(4)),
         "partition_status" / PartitionStatusAdapter(Bytes(8)),
-        "wireless-repeater_ac_loss_trouble" / StatusAdapter(Bytes(1)),
-        "wireless-repeater_battery_failure_trouble" / StatusAdapter(Bytes(1)),
-        "wireless-keypad_ac_loss_trouble" / StatusAdapter(Bytes(1)),
-        "wireless-keypad_battery_failure_trouble" / StatusAdapter(Bytes(1)),
-        "wireless-keypad_supervision_failure_trouble" / StatusAdapter(Bytes(1)),
+        "repeater_ac_loss_trouble" / StatusAdapter(Bytes(1)),
+        "repeater_battery_failure_trouble" / StatusAdapter(Bytes(1)),
+        "keypad_ac_loss_trouble" / StatusAdapter(Bytes(1)),
+        "keypad_battery_failure_trouble" / StatusAdapter(Bytes(1)),
+        "keypad_supervision_failure_trouble" / StatusAdapter(Bytes(1)),
         "not_used1" / Padding(6)
-    )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-    ,
-    Struct("fields" / RawCopy(Struct(
-        "po" / BitStruct(
-            "command" / Const(5, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
-                "NeWare_connected" / Flag)),
-        "not_used0" / Padding(1),
-        "validation" / Const(0x80, Int8ub),
-        "status_request" / Const(2, Int8ub),
+    ),
+    2: Struct(
         "zone_status" / ZoneStatusAdapter(Bytes(32))
-    )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-    ,
-    Struct("fields" / RawCopy(Struct(
-        "po" / BitStruct(
-            "command" / Const(5, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
-                "NeWare_connected" / Flag)),
-        "not_used0" / Padding(1),
-        "validation" / Const(0x80, Int8ub),
-        "status_request" / Const(3, Int8ub),
+    ),
+    3: Struct(
         "zone_signal_strength" / SignalStrengthAdapter(Bytes(32))
-    )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-    ,
-    Struct("fields" / RawCopy(Struct(
-        "po" / BitStruct(
-            "command" / Const(5, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
-                "NeWare_connected" / Flag)),
-        "not_used0" / Padding(1),
-        "validation" / Const(0x80, Int8ub),
-        "status_request" / Const(4, Int8ub),
+    ),
+    4: Struct(
         "pgm_signal_strength" / SignalStrengthAdapter(Bytes(16)),
-        "wireless-repeater_signal_strength" / SignalStrengthAdapter(Bytes(2)),
-        "wireless-keypad_signal_strength" / SignalStrengthAdapter(Bytes(8)),
+        "repeater_signal_strength" / SignalStrengthAdapter(Bytes(2)),
+        "keypad_signal_strength" / SignalStrengthAdapter(Bytes(8)),
         "not_used1" / Padding(6)
-    )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-    ,
-    Struct("fields" / RawCopy(Struct(
-        "po" / BitStruct(
-            "command" / Const(5, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
-                "NeWare_connected" / Flag)),
-        "not_used0" / Padding(1),
-        "validation" / Const(0x80, Int8ub),
-        "status_request" / Const(5, Int8ub),
+    ),
+    5: Struct(
         "zone_exit_delay" / StatusAdapter(Bytes(4)),
         "not_used1" / Padding(28)
-    )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-]
+    ),
+}
 
 LiveEvent = Struct("fields" / RawCopy(
     Struct(
@@ -338,7 +267,24 @@ ReadEEPROMResponse = Struct("fields" / RawCopy(
                 "Windload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "not_used0" / Padding(1),
-        "address" / Default(Int16ub, 0),
+        "address" / Int16ub,
+        "data" / Bytes(32),
+    )),
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
+
+ReadStatusResponse = Struct("fields" / RawCopy(
+    Struct(
+        "po" / BitStruct(
+            "command" / Const(0x5, Nibble),
+            "status" / Struct(
+                "reserved" / Flag,
+                "alarm_reporting_pending" / Flag,
+                "Windload_connected" / Flag,
+                "NeWare_connected" / Flag)),
+        "not_used0" / Padding(1),
+        "validation" / Const(0x80, Int8ub),
+        "address" / Int8ub,
         "data" / Bytes(32),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))

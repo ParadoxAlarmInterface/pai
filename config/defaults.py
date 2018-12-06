@@ -26,14 +26,18 @@ IP_CONNECTION_EMAIL = None 		# Email registered in the site
 
 # Paradox
 KEEP_ALIVE_INTERVAL = 9     		# Interval between status updates
-ZONES = range(1, 17)			# Zones to monitor and control
-USERS = [1, 2, 3, 4]   			# Users to consider
-DOORS = range(1, 32)            # Doors to consider
-OUTPUTS = range(1, 17)  		# Outputs to monitor and control
-PARTITIONS = [1, 2]     		# Partitions to monitor and control
-BUSES = range(1, 17)			# Buses to monitor
-REPEATERS = range(1, 9)			# Repeaters to monitor
-KEYPADS = range(1, 9)			# Keypads to monitor
+
+LIMITS = { # By default all zones will be monitored
+    # 'zone': range(1, 17),     # Zones to monitor and control
+    # 'user': [1, 2, 3, 4],     # Users to consider
+    # 'door': range(1, 32),     # Doors to consider
+    # 'output': range(1, 17),   # Outputs to monitor and control
+    # 'partition': [1, 2],      # Partitions to monitor and control
+    # 'bus-module': range(1, 17),      # Buses to monitor
+    # 'repeater': range(1, 9),  # Repeaters to monitor
+    # 'keypad': range(1, 9)     # Keypads to monitor
+}
+
 LABEL_REFRESH_INTERVAL = 15 * 60        # Interval between refresh of labels
 OUTPUT_PULSE_DURATION = 1               # Duration of a PGM pulse in seconds
 PARTITIONS_CHANGE_NOTIFICATION_IGNORE = ['arm_full', 'exit_delay'] # Do not send notifications for these notificions
