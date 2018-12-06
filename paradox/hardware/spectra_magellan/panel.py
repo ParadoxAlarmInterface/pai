@@ -32,7 +32,7 @@ class Panel(PanelBase):
             "site": {"label_offset": 0, "addresses": [range(0x6c0, 0x6d0, 0x10)]},
             "siren": {"label_offset": 0, "addresses": [range(0x6d0, 0x700, 0x10)]}
         }
-        }
+    }
 
     def get_message(self, name):
         try:
