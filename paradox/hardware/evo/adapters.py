@@ -170,17 +170,17 @@ class PartitionStatus(Subconstruct):
 
 class PGMFlags(Subconstruct):
     parser = BitStruct(
-        'CHIME_ZONE_PARTITION' / StatusFlagArrayAdapter(Array(4, Flag)),
-        'POWER_SMOKE' / Flag,
-        'GROUND_START' / Flag,
-        'KISS_OFF' / Flag,
-        'LINE_RING' / Flag,
+        'chime_zone_partition' / StatusFlagArrayAdapter(Array(4, Flag)),
+        'power_smoke' / Flag,
+        'ground_start' / Flag,
+        'kiss_off' / Flag,
+        'line_ring' / Flag,
 
-        'Bell Partition' / StatusFlagArrayAdapter(Array(8, Flag)),
+        'bell_partition' / StatusFlagArrayAdapter(Array(8, Flag)),
 
-        'Fire Alarm' / StatusFlagArrayAdapter(Array(8, Flag)),
+        'fire_alarm' / StatusFlagArrayAdapter(Array(8, Flag)),
 
-        'Open/Close Kiss Off' / StatusFlagArrayAdapter(Array(8, Flag))
+        'open_close_kiss_off' / StatusFlagArrayAdapter(Array(8, Flag))
     )
 
     def __init__(self):

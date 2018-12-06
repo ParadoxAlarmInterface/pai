@@ -379,8 +379,11 @@ class Paradox:
             self.interface.event(raw=new_event)
 
     def update_properties(self, element_type, key, change, force_publish=False):
-
-        elements = self.data[element_type]
+        try:
+            elements = self.data[element_type]
+        except KeyError:
+            logger.debug('Error: "%s" key is missing from data' % element_type)
+            return
 
         if key not in elements:
             return

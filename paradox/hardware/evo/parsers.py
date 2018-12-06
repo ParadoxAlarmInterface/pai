@@ -55,53 +55,53 @@ RAMDataParserMap = {
     1: Struct(
         "weekday" / Int8ub,
         "pgm_flags" / PGMFlags(),
-        "key_switch" / StatusAdapter(Bytes(4)),
+        "_key-switch_triggered" / StatusAdapter(Bytes(4)), # TODO: Implement key-switch
         "door_open" / StatusAdapter(Bytes(4)),
         "troubles" / BitStruct(
-            "Trbl_System" / Flag,
-            "Trbl_Dialer" / Flag,
-            "Trbl_Mdl" / Flag,
-            "Trbl_BusCom" / Flag,
-            "Trbl_ZnTmpr" / Flag,
-            "Trbl_ZnLoBat" / Flag,
-            "Trbl_ZnFault" / Flag,
-            "Trbl_TimeLost" / Flag,
+            "system_trouble" / Flag,
+            "dialer_trouble" / Flag,
+            "module_trouble" / Flag,
+            "bus_com_trouble" / Flag, # BusCom
+            "zone_tamper_trouble" / Flag,
+            "zone_low_battery_trouble" / Flag,
+            "zone_fault_trouble" / Flag,
+            "time_lost_trouble" / Flag,
 
-            "AC_Trouble" / Flag,
-            "Battery_Fail" / Flag,
-            "Aux_Limit" / Flag,
-            "Bell_Limit" / Flag,
-            "Bell_Absent" / Flag,
-            "Rom_Error" / Flag,
-            "Future_Use_0" / Flag,
-            "Future_Use_1" / Flag,
+            "ac_trouble" / Flag,
+            "battery_fail_trouble" / Flag,
+            "aux_limit_trouble" / Flag,
+            "bell_limit_trouble" / Flag,
+            "bell_absent_trouble" / Flag,
+            "rom_error_trouble" / Flag,
+            "_future_use_0" / Flag,
+            "_future_use_1" / Flag,
 
-            "TLM_Trouble" / Flag,
-            "Fail_Tel_1" / Flag,
-            "Fail_Tel_2" / Flag,
-            "Fail_Tel_3" / Flag,
-            "Fail_Tel_4" / Flag,
-            "Fail_Com_PC" / Flag,
-            "Future_Use_2" / Flag,
-            "Future_Use_3" / Flag,
+            "tlm_trouble" / Flag,
+            "fail_tel_1_trouble" / Flag,
+            "fail_tel_2_trouble" / Flag,
+            "fail_tel_3_trouble" / Flag,
+            "fail_tel_4_trouble" / Flag,
+            "com_pc_trouble" / Flag,
+            "_future_use_2" / Flag,
+            "_future_use_3" / Flag,
 
-            "Mdl_Tamper" / Flag,
-            "Mdl_Rom_Error" / Flag,
-            "Mdl_TLM_TROUBLE" / Flag,
-            "Mdl_Fail_To_Com" / Flag,
-            "Mdl_Printer_Trbl" / Flag,
-            "Mdl_AC_Trouble" / Flag,
-            "Mdl_Battery_Fail" / Flag,
-            "Mdl_Aux_Trouble" / Flag,
+            "module_tamper_trouble" / Flag,
+            "module_rom_error_trouble" / Flag,
+            "module_tlm_trouble" / Flag,
+            "module_fail_to_com_trouble" / Flag,
+            "module_printer_trouble" / Flag,
+            "module_ac_trouble" / Flag,
+            "module_battery_fail" / Flag,
+            "module_aux_trouble" / Flag,
 
-            "Missing_Keypad" / Flag,
-            "Missing_Module" / Flag,
-            "Future_Use_4" / Flag,
-            "Future_Use_5" / Flag,
-            "Safety_Mismatch" / Flag,
-            "Bus_Global_Fail" / Flag,
-            "Bus_Overload" / Flag,
-            "Mdl_Com_Error" / Flag
+            "missing_keypad_trouble" / Flag,
+            "missing_module_trouble" / Flag,
+            "_future_use_4" / Flag,
+            "_future_use_5" / Flag,
+            "safety_mismatch_trouble" / Flag,
+            "bus_global_fail" / Flag,
+            "bus_overload_trouble" / Flag,
+            "mdl_com_error" / Flag
         ),
         "time" / DateAdapter(Bytes(7)),
         "vdc" / ExprAdapter(Byte, obj_ * (20.3 - 1.4) / 255.0 + 1.4, 0),
@@ -120,19 +120,19 @@ RAMDataParserMap = {
     ),
     4: Struct(
         "partition_status" / PartitionStatus(Bytes(16)),
-        "panel_status" / BitStruct(
+        "_panel_status" / BitStruct(
             "installer_lock_active" / Flag,
             "_free" / Padding(7)
         ),
         "event_pointer" / Int16ub,
         "event_pointer_bus" / Int16ub,
-        "recycle_system" / Array(8, Int8ub),
+        "_recycle_system" / Array(8, Int8ub),
         "arm_disarm_report_delay_timer" / Int8ub,
         "_free" / Padding(34)
     ),
     5: Struct(
         "_free" / Padding(1),
-        "module_trouble" / StatusAdapter(Bytes(63))
+        "bus-module_trouble" / StatusAdapter(Bytes(63))
     )
 }
 

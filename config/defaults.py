@@ -33,7 +33,7 @@ LIMITS = { # By default all zones will be monitored
     # 'door': range(1, 32),     # Doors to consider
     # 'output': range(1, 17),   # Outputs to monitor and control
     # 'partition': [1, 2],      # Partitions to monitor and control
-    # 'bus': range(1, 17),      # Buses to monitor
+    # 'bus-module': range(1, 17),      # Buses to monitor
     # 'repeater': range(1, 9),  # Repeaters to monitor
     # 'keypad': range(1, 9)     # Keypads to monitor
 }
