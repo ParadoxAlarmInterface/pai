@@ -89,10 +89,10 @@ class PartitionStatus(Subconstruct):
         'audible_alarm' / Flag,
         'silent_alarm' / Flag,
         'was_in_alarm' / Flag,  # is in alarm
-        'armed_no_entry' / Flag,
-        'armed_stay' / Flag,
-        'armed_away' / Flag,
-        'armed' / Flag,
+        'arm_no_entry' / Flag,
+        'arm_stay' / Flag,
+        'arm_away' / Flag,
+        'arm' / Flag,
 
         'lockout' / Flag,
         'programming' / Flag,
