@@ -94,22 +94,22 @@ RAMDataParserMap = {
         "zone_open" / StatusAdapter(Bytes(4)),
         "zone_tamper" / StatusAdapter(Bytes(4)),
         "pgm_tamper" / StatusAdapter(Bytes(2)),
-        "bus_tamper" / StatusAdapter(Bytes(2)),
+        "bus-module_tamper" / StatusAdapter(Bytes(2)),
         "zone_fire" / StatusAdapter(Bytes(4)),
         "not_used1" / Int8ub
     ),
     1: Struct(
         "zone_rf_supervision_trouble" / StatusAdapter(Bytes(4)),
         "pgm_supervision_trouble" / StatusAdapter(Bytes(2)),
-        "bus_supervision_trouble" / StatusAdapter(Bytes(2)),
-        "wireless-repeater_supervision_trouble" / StatusAdapter(Bytes(1)),
+        "bus-module_supervision_trouble" / StatusAdapter(Bytes(2)),
+        "repeater_supervision_trouble" / StatusAdapter(Bytes(1)),
         "zone_rf_low_battery_trouble" / StatusAdapter(Bytes(4)),
         "partition_status" / PartitionStatusAdapter(Bytes(8)),
-        "wireless-repeater_ac_loss_trouble" / StatusAdapter(Bytes(1)),
-        "wireless-repeater_battery_failure_trouble" / StatusAdapter(Bytes(1)),
-        "wireless-keypad_ac_loss_trouble" / StatusAdapter(Bytes(1)),
-        "wireless-keypad_battery_failure_trouble" / StatusAdapter(Bytes(1)),
-        "wireless-keypad_supervision_failure_trouble" / StatusAdapter(Bytes(1)),
+        "repeater_ac_loss_trouble" / StatusAdapter(Bytes(1)),
+        "repeater_battery_failure_trouble" / StatusAdapter(Bytes(1)),
+        "keypad_ac_loss_trouble" / StatusAdapter(Bytes(1)),
+        "keypad_battery_failure_trouble" / StatusAdapter(Bytes(1)),
+        "keypad_supervision_failure_trouble" / StatusAdapter(Bytes(1)),
         "not_used1" / Padding(6)
     ),
     2: Struct(
@@ -120,8 +120,8 @@ RAMDataParserMap = {
     ),
     4: Struct(
         "pgm_signal_strength" / SignalStrengthAdapter(Bytes(16)),
-        "wireless-repeater_signal_strength" / SignalStrengthAdapter(Bytes(2)),
-        "wireless-keypad_signal_strength" / SignalStrengthAdapter(Bytes(8)),
+        "repeater_signal_strength" / SignalStrengthAdapter(Bytes(2)),
+        "keypad_signal_strength" / SignalStrengthAdapter(Bytes(8)),
         "not_used1" / Padding(6)
     ),
     5: Struct(

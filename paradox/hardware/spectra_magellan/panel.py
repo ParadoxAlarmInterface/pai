@@ -15,32 +15,24 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 class Panel(PanelBase):
 
-    mem_map = dict(
-        status_base1=0x8000,
-        status_base2=0x1fe0,
-        elements=dict(
-            zone=dict(
-                label_offset=0, addresses=[range(0x010, 0x210, 0x10)]),
-            output=dict(
-                label_offset=0, addresses=[range(0x210, 0x310, 0x10)], template=dict(
-                    on=False,
-                    pulse=False)
-                ),
-            partition=dict(
-                label_offset=0, addresses=[range(0x310, 0x330, 0x10)]),
-            user=dict(
-                label_offset=0, addresses=[range(0x330, 0x530, 0x10)]),
-            bus=dict(
-                label_offset=0, addresses=[range(0x530, 0x620, 0x10)]),
-            repeater=dict(
-                label_offset=0, addresses=[range(0x620, 0x640, 0x10)]),
-            keypad=dict(
-                label_offset=0, addresses=[range(0x640, 0x6c0, 0x10)]),
-            site=dict(
-                label_offset=0, addresses=[range(0x6c0, 0x6d0, 0x10)]),
-            siren=dict(label_offset=0, addresses=[range(0x6d0, 0x700, 0x10)])
-        )
-    )
+    mem_map = {
+        "status_base1": 0x8000,
+        "status_base2": 0x1fe0,
+        "elements": {
+            "zone": {"label_offset": 0, "addresses": [range(0x010, 0x210, 0x10)]},
+            "pgm": {"label_offset": 0, "addresses": [range(0x210, 0x310, 0x10)], "template": {
+                "on": False,
+                "pulse": False}
+                    },
+            "partition": {"label_offset": 0, "addresses": [range(0x310, 0x330, 0x10)]},
+            "user": {"label_offset": 0, "addresses": [range(0x330, 0x530, 0x10)]},
+            "bus-module": {"label_offset": 0, "addresses": [range(0x530, 0x620, 0x10)]},
+            "repeater": {"label_offset": 0, "addresses": [range(0x620, 0x640, 0x10)]},
+            "keypad": {"label_offset": 0, "addresses": [range(0x640, 0x6c0, 0x10)]},
+            "site": {"label_offset": 0, "addresses": [range(0x6c0, 0x6d0, 0x10)]},
+            "siren": {"label_offset": 0, "addresses": [range(0x6d0, 0x700, 0x10)]}
+        }
+        }
 
     def get_message(self, name):
         try:

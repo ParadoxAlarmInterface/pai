@@ -34,13 +34,13 @@ class Paradox:
         self.retries = retries
         self.interface = interface
         self.reset()
-        self.data = dict()
+        self.data = dict(zone=dict(), partition=dict(), pgm=dict(), system=dict())
         self.labels = dict()
 
     def reset(self):
 
         # Keep track of alarm state
-        self.data = dict(
+        self.data = dict(zone=dict(), partition=dict(), pgm=dict(), 
             system=dict(power=dict(label='power'), rf=dict(label='rf'), troubles=dict(label='troubles'))
         )
 

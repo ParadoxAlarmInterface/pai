@@ -449,11 +449,11 @@ _outputLabel = {
     16: 'PGM Number 16'
 }
 
-_wirelessRepeater = {-1: 'Wireless',
+_wirelessRepeater = {-1: 'Repeater',
                      1: 'Wireless repeater 1',
                      2: 'Wireless repeater 2'}
 
-_wirelessKeypad = {-1: 'Wireless',
+_wirelessKeypad = {-1: 'Keypad',
                    1: 'Wireless keypad 1',
                    2: 'Wireless keypad 2',
                    3: 'Wireless keypad 3',
@@ -464,20 +464,20 @@ _wirelessKeypad = {-1: 'Wireless',
                    8: 'Wireless keypad 8'
                    }
 
-_wirelessSiren = {-1: 'Wireless',
+_wirelessSiren = {-1: 'Siren',
                   1: 'Wireless siren 1',
                   2: 'Wireless siren 2',
                   3: 'Wireless siren 3',
                   4: 'Wireless siren 4'}
 
-_busModuleEvent = {-1: 'Bus Module',
+_busModuleEvent = {-1: 'Bus-Module',
                    0: 'A bus module was added',
                    1: 'A bus module was removed',
                    2: '2-way RF Module Communication Failure',
                    3: '2-way RF Module Communication Restored'
                    }
 
-_moduleTrouble = {-1: 'Bus Module',
+_moduleTrouble = {-1: 'Bus-Module',
                   0: 'Bus / EBus / Wireless module communication fault',
                   1: 'Tamper trouble',
                   2: 'Power fail',
@@ -485,7 +485,7 @@ _moduleTrouble = {-1: 'Bus Module',
                   99: 'Any bus module new trouble event'
                   }
 
-_moduleTroubleRestore = {1: 'Bus Module',
+_moduleTroubleRestore = {1: 'Bus-Module',
                          0: 'Bus / EBus / Wireless module communication fault restore',
                          1: 'Tamper trouble restore',
                          2: 'Power fail restore',
