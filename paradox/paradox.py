@@ -394,13 +394,13 @@ class Paradox:
 
             # Virtual property "Trouble"
             # True if element has ANY type of alarm
-            if '_trouble' in property_name:
+            if 'trouble' in property_name:
                 if property_value:
                     self.update_properties(element_type, key, dict(trouble=True))
                 else:
                     r = False
                     for kk, vv in elements[key].items():
-                        if '_trouble' in kk:
+                        if 'trouble' in kk:
                             r = r or elements[key][kk]
 
                     self.update_properties(element_type, key, dict(trouble=r), force_publish=force_publish)
