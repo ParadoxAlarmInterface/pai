@@ -416,9 +416,14 @@ class Paradox:
 
                     # Trigger notifications for Partitions changes
                     # Ignore some changes as defined in the configuration
-                    if (element_type == "partition" and key in cfg.PARTITIONS and property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE) \
+                    try:
+                        if (element_type == "partition" and key in cfg.LIMITS['partition']  and property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE) \
                             or ('trouble' in property_name):
-                        self.interface.notify("Paradox", "{} {} {}".format(elements[key]['label'], property_name, property_value), logging.INFO)
+                            self.interface.notify("Paradox", "{} {} {}".format(elements[key]['label'], property_name, property_value), logging.INFO)
+                    except KeyError:
+                        logger.debug("Key 'partition' doesn't exist in cfg.LIMITS")
+                    except:
+                        logger.exception("Trigger notifications")
 
             else:
                 elements[key][property_name] = property_value  # Initial value
