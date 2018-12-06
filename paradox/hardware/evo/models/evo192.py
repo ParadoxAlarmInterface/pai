@@ -1,32 +1,35 @@
 from ..panel import Panel_EVOBase
 
 class Panel_EVO192(Panel_EVOBase):
-    mem_map = dict(
-        elements=dict(
-            zone=dict(
-                label_offset=0, addresses=[
+    mem_map = {
+        "elements": {
+            "zone": {
+                "label_offset": 0, "addresses": [
                     range(0x00430, 0x00730, 0x10),  # EVO48
                     range(0x00730, 0x00a30, 0x10),  # EVO96 = EVO48 + 48 zones
                     range(0x062f7, 0x068f7, 0x10)  # EVO192 = EVO96 + 96 zones
-                ]),
-            output=dict(
-                label_offset=0, addresses=[range(0x07082, 0x7482, 0x20)], template=dict(
-                    on=False,
-                    pulse=False)
-                ),
-            partition=dict(
-                label_offset=0, addresses=[
+                ]},
+            "pgm": {
+                "label_offset": 0, "addresses": [range(0x07082, 0x7482, 0x20)], "template": {
+                    "on": False,
+                    "pulse": False}
+            },
+            "partition": {
+                "label_offset": 0, "addresses": [
                     range(0x03a6b, 0x03c17, 0x6b),  # EVO48
                     range(0x03c17, 0x03dc3, 0x6b)  # EVO96 & EVO192 = EVO48 + 4 partitions
-                ]),
-            user=dict(
-                label_offset=0, addresses=[range(0x03e47, 0x04e47, 0x10)]),
-            bus=dict(  # modules
-                label_offset=0, addresses=[
+                ]},
+            "user": {
+                "label_offset": 0, "addresses": [range(0x03e47, 0x04e47, 0x10)]
+            },
+            "bus-module": {  # modules
+                "label_offset": 0, "addresses": [
                     range(0x04e47, 0x05637, 0x10),  # EVO48
                     range(0x05637, 0x05e27, 0x10)  # EVO96 & EVO192 = EVO48 + 127 modules
-                ]),
-            door=dict(
-                label_offset=0, addresses=[range(0x0345c, 0x365c, 0x10)]),
-        )
-    )
+                ]
+            },
+            "door": {
+                "label_offset": 0, "addresses": [range(0x0345c, 0x365c, 0x10)]
+            }
+        }
+    }

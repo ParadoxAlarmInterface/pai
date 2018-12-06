@@ -31,17 +31,16 @@ class Paradox:
 
         self.panel = None
         self.connection = connection
-        self.connection.timeout(0.5)
         self.retries = retries
         self.interface = interface
         self.reset()
-        self.data = dict()
+        self.data = dict(zone=dict(), partition=dict(), pgm=dict(), system=dict())
         self.labels = dict()
 
     def reset(self):
 
         # Keep track of alarm state
-        self.data = dict(
+        self.data = dict(zone=dict(), partition=dict(), pgm=dict(), 
             system=dict(power=dict(label='power'), rf=dict(label='rf'), troubles=dict(label='troubles'))
         )
 
@@ -57,6 +56,8 @@ class Paradox:
             logger.error('Failed to connect to interface')
             self.run = STATE_STOP
             return False
+
+        self.connection.timeout(0.5)
 
         logger.info("Connecting to panel")
 
@@ -324,15 +325,15 @@ class Paradox:
         outputs = []
         # if all or 0, select all
         if output == 'all' or output == '0':
-            outputs = list(range(1, len(self.data['output'])))
+            outputs = list(range(1, len(self.data['pgm'])))
         else:
             # if set by name, look for it
-            if output in self.labels['output']:
-                outputs = [self.labels['output'][output]]
+            if output in self.labels['pgm']:
+                outputs = [self.labels['pgm'][output]]
             # if set by number, look for it
             elif output.isdigit():
                 number = int(output)
-                if number > 0 and number < len(self.data['output']):
+                if number > 0 and number < len(self.data['pgm']):
                     outputs = [number]
 
         # Not Found
@@ -378,10 +379,11 @@ class Paradox:
             self.interface.event(raw=new_event)
 
     def update_properties(self, element_type, key, change, force_publish=False):
-        if element_type not in self.data:
+        try:
+            elements = self.data[element_type]
+        except KeyError:
+            logger.debug('Error: "%s" key is missing from data' % element_type)
             return
-
-        elements = self.data[element_type]
 
         if key not in elements:
             return
@@ -395,13 +397,13 @@ class Paradox:
 
             # Virtual property "Trouble"
             # True if element has ANY type of alarm
-            if '_trouble' in property_name:
+            if 'trouble' in property_name and property_name != 'trouble':
                 if property_value:
                     self.update_properties(element_type, key, dict(trouble=True))
                 else:
                     r = False
                     for kk, vv in elements[key].items():
-                        if '_trouble' in kk:
+                        if 'trouble' in kk:
                             r = r or elements[key][kk]
 
                     self.update_properties(element_type, key, dict(trouble=r), force_publish=force_publish)
@@ -417,10 +419,14 @@ class Paradox:
 
                     # Trigger notifications for Partitions changes
                     # Ignore some changes as defined in the configuration
-                    partition_limit = cfg.LIMITS.get('partition')
-                    if (element_type == "partition" and (partition_limit is None or key in partition_limit) and property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE) \
+                    try:
+                        if (element_type == "partition" and key in cfg.LIMITS['partition']  and property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE) \
                             or ('trouble' in property_name):
-                        self.interface.notify("Paradox", "{} {} {}".format(elements[key]['label'], property_name, property_value), logging.INFO)
+                            self.interface.notify("Paradox", "{} {} {}".format(elements[key]['label'], property_name, property_value), logging.INFO)
+                    except KeyError:
+                        logger.debug("Key 'partition' doesn't exist in cfg.LIMITS")
+                    except:
+                        logger.exception("Trigger notifications")
 
             else:
                 elements[key][property_name] = property_value  # Initial value

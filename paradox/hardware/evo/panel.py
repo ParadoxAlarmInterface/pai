@@ -160,33 +160,6 @@ class Panel_EVOBase(PanelBase):
 
         self.process_properties_bulk(properties, vars.address)
 
-    def process_properties_bulk(self, properties, address):
-        for key, value in iterate_properties(properties):
-            if not isinstance(value, (list, dict)):
-                continue
-
-            element_type = key.split('_')[0]
-
-            limit_list = cfg.LIMITS.get(element_type)
-
-            if key in self.core.status_cache and self.core.status_cache[address][key] == value:
-                continue
-
-            if address not in self.core.status_cache:
-                self.core.status_cache[address] = {}
-            self.core.status_cache[address][key] = value
-
-            prop_name = '_'.join(key.split('_')[1:])
-            if not prop_name:
-                continue
-
-            for i, status in iterate_properties(value):
-                if limit_list is None or i in limit_list:
-                    if prop_name == 'status':
-                        self.core.update_properties(element_type, i, status)
-                    else:
-                        self.core.update_properties(element_type, i, {prop_name: status})
-
     def process_event(self, event):
         major = event['major'][0]
         minor = event['minor'][0]
