@@ -144,6 +144,9 @@ class Panel:
             i += 1
 
     def process_properties_bulk(self, properties, address):
+        if cfg.LOGGING_DUMP_STATUS:
+            logger.debug("address: %s, properties: %s", address, properties)
+
         for key, value in iterate_properties(properties):
 
             if not isinstance(value, (list, dict)):

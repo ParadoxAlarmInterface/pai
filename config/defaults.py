@@ -10,6 +10,7 @@ LOGGING_LEVEL_FILE = logging.ERROR
 LOGGING_FILE = None             	# or set to file path LOGGING_FILE='/var/log/paradox.log'
 LOGGING_DUMP_PACKETS = False    	# Dump RAW Packets to log
 LOGGING_DUMP_MESSAGES = False   	# Dump Messages to log
+LOGGING_DUMP_STATUS = False         # Dump Status to log
 
 # Connection Type
 CONNECTION_TYPE = 'Serial'  		# Serial or IP
