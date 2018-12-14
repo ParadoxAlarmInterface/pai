@@ -144,7 +144,9 @@ class Panel_EVOBase(PanelBase):
         assert vars.control.eeprom_address_bits == 0x0
         assert vars.bus_address == 0x00 # panel
 
-        assert vars.address in RAMDataParserMap
+        if vars.address not in RAMDataParserMap:
+            logger.error("Parser for memory address (%d) is not implemented. Please review your STATUS_REQUESTS setting. Skipping." % vars.address)
+            return
         assert len(vars.data) == 64
 
         parser = RAMDataParserMap[vars.address]
