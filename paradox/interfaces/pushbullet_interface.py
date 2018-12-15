@@ -239,8 +239,8 @@ class PushBulletInterface(Thread):
         """ Enqueues a change """
         self.queue.put_nowait(SortableTuple((2, 'change', (element, label, property, value))))
         
-    def notify(self, source, message):
-        self.queue.put_nowait(SortableTuple((2, 'notify', (source, message))))
+    def notify(self, source, message, level):
+        self.queue.put_nowait(SortableTuple((2, 'notify', (source, message, level))))
 
     def stop(self):
         """ Stops the Pushbullet interface"""
@@ -255,8 +255,8 @@ class PushBulletInterface(Thread):
         self.pb_ws.change(element, label, property, value)
 
     def handle_notify(self, raw):
-        sender, message = raw
+        sender, message, level = raw
         if sender == 'pushbullet':
             return
-        self.pb_ws.notify(sender, message)
+        self.pb_ws.notify(sender, message, level)
 
