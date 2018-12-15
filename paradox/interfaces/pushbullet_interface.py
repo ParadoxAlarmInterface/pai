@@ -32,6 +32,10 @@ class PushBulletWSClient(WebSocketBaseClient):
         self.manager = WebSocketManager()
         self.alarm = None
 
+    def stop(self):
+        self.terminate()
+        self.manager.stop()
+
     def set_alarm(self, alarm):
         """ Sets the paradox alarm object """
         self.alarm = alarm
@@ -40,6 +44,7 @@ class PushBulletWSClient(WebSocketBaseClient):
         """ Callback trigger when connection succeeded"""
         logger.info("Handshake OK")
         self.manager.add(self)
+        self.manager.start()
         for chat in self.pb.chats:
             logger.debug("Associated contacts: {}".format(chat))
 
@@ -48,11 +53,10 @@ class PushBulletWSClient(WebSocketBaseClient):
        
         self.send_message("Active")
     
-   
-    def handle_message(self, message):
+    def received_message(self, message):
         """ Handle Pushbullet message. It should be a command """
-
         logger.debug("Received Message {}".format(message))
+
         try:
             message = json.loads(str(message))
         except:
@@ -61,11 +65,10 @@ class PushBulletWSClient(WebSocketBaseClient):
 
         if self.alarm == None:
             return
-
-        if message['type'] == 'tickle' and msg['subtype'] == 'push':
+        if message['type'] == 'tickle' and message['subtype'] == 'push':
             now = time.time()
-            pushes = self.pb.get_pushes(modified_after=int(now) - 10, limit=1, filter_inactive=True)
-
+            pushes = self.pb.get_pushes(modified_after=int(now) - 20, limit=1, filter_inactive=True)
+            logger.debug("got pushes {}".format(pushes))
             for p in pushes:
                 self.pb.dismiss_push(p.get("iden"))
                 self.pb.delete_push(p.get("iden"))
@@ -73,7 +76,7 @@ class PushBulletWSClient(WebSocketBaseClient):
                 if p.get('direction') == 'outgoing' or p.get('dismissed'):
                     continue
 
-                if p.get('sender_email_normalized') in PUSHBULLET_CONTACTS:
+                if p.get('sender_email_normalized') in cfg.PUSHBULLET_CONTACTS:
                     ret = self.send_command(p.get('body'))
 
                     if ret:
@@ -95,7 +98,7 @@ class PushBulletWSClient(WebSocketBaseClient):
 
     def send_message(self, msg, dstchat=None):    
         for chat in self.pb.chats:
-            if chat.email in PUSHBULLET_CONTACTS:
+            if chat.email in cfg.PUSHBULLET_CONTACTS:
                 try:
                     self.pb.push_note("paradox", msg, chat=chat)
                 except:
@@ -152,6 +155,7 @@ class PushBulletWSClient(WebSocketBaseClient):
         else:
             logger.error("Invalid control property {}".format(element))
 
+        return True
 
     def normalize_payload(self, message):
         message = message.strip().lower()
@@ -168,7 +172,6 @@ class PushBulletWSClient(WebSocketBaseClient):
     def notify(self, source, message, level):
         if level < logging.INFO:
             return
-
         try:
             self.send_message("{}".format(message))
         except:
@@ -184,7 +187,7 @@ class PushBulletWSClient(WebSocketBaseClient):
         #    element,
         #    label,
         #    property,
-        #    value))    
+        #    value))
         return
 
 class PushBulletInterface(Thread):
@@ -201,7 +204,7 @@ class PushBulletInterface(Thread):
     def run(self):
         logger.info("Starting Pushbullet Interface")
         try:
-            self.pb_ws = PushBulletWSClient('wss://stream.pushbullet.com/websocket/{}'.format(PUSHBULLET_KEY))
+            self.pb_ws = PushBulletWSClient('wss://stream.pushbullet.com/websocket/{}'.format(cfg.PUSHBULLET_KEY))
             self.pb_ws.init()
             self.pb_ws.connect()
 
@@ -242,8 +245,7 @@ class PushBulletInterface(Thread):
     def stop(self):
         """ Stops the Pushbullet interface"""
         self.queue.put_nowait(SortableTuple((2, 'command', 'stop')))
-
-        self.pb_ws.terminate()
+        self.pb_ws.stop()
     
     def handle_event(self, raw):
         self.pb_ws.event(raw)
