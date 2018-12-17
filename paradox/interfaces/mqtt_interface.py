@@ -123,7 +123,9 @@ class MQTTInterface(Thread):
             logger.warning("No alarm. Ignoring command")
             return
 
-        topics = message.topic.split("/")
+        topic = message.topic.split(cfg.MQTT_BASE_TOPIC)[1]
+
+        topics = topic.split("/")
 
         if len(topics) < 3:
             logger.error(

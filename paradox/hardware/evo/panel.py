@@ -1,21 +1,22 @@
 # -*- coding: utf-8 -*-
 
-import inspect
-import sys
-import logging
 import binascii
-import time
-import itertools
+import inspect
+import logging
+import sys
+from typing import Optional
 
-from .parsers import *
-from ..panel import Panel as PanelBase, iterate_properties
+from construct import Construct, Container, MappingError
 
-from config import user as cfg
+from .parsers import CloseConnection, ErrorMessage, InitializeCommunication, LoginConfirmationResponse, SetTimeDate, \
+    SetTimeDateResponse, PerformPartitionAction, PerformActionResponse, ReadEEPROMResponse, LiveEvent, ReadEEPROM, \
+    RAMDataParserMap
+from ..panel import Panel as PanelBase
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
 class Panel_EVOBase(PanelBase):
-    def get_message(self, name):
+    def get_message(self, name) -> Construct:
         try:
             return super(Panel_EVOBase, self).get_message(name)
         except ResourceWarning as e:
@@ -59,7 +60,7 @@ class Panel_EVOBase(PanelBase):
 
                 fh.write(data)
 
-    def parse_message(self, message):
+    def parse_message(self, message) -> Optional[Container]:
         try:
             if message is None or len(message) == 0:
                 return None
@@ -80,7 +81,7 @@ class Panel_EVOBase(PanelBase):
             elif message[0] >> 4 == 0x03:
                 return SetTimeDateResponse.parse(message)
             elif message[0] == 0x40:
-                return PerformAction.parse(message)
+                return PerformPartitionAction.parse(message)
             elif message[0] >> 4 == 4:
                 return PerformActionResponse.parse(message)
             # elif message[0] == 0x50 and message[2] == 0x80:
@@ -103,10 +104,10 @@ class Panel_EVOBase(PanelBase):
 
         return None
 
-    def encode_password(self, password):
+    def encode_password(self, password) -> bytes:
         return binascii.unhexlify(password)
 
-    def initialize_communication(self, reply, PASSWORD):
+    def initialize_communication(self, reply, PASSWORD) -> bool:
         password = self.encode_password(PASSWORD)
 
         raw_data = reply.fields.data + reply.checksum
@@ -127,7 +128,7 @@ class Panel_EVOBase(PanelBase):
             logger.error("Authentication Failed. Wrong Password?")
             return False
 
-    def request_status(self, i):
+    def request_status(self, i) -> Optional[Container]:
         args = dict(address=i, length=64, control=dict(ram_access=True))
         reply = self.core.send_wait(ReadEEPROM, args, reply_expected=0x05)
 
@@ -292,3 +293,20 @@ class Panel_EVOBase(PanelBase):
         else:
             # Remaining events trigger lower level notifications
             self.core.interface.notify("Paradox", "{}: {}".format(event['major'][1], event['minor'][1]), logging.INFO)
+
+    def control_partitions(self, partitions, command) -> bool:
+        """
+        Control Partitions
+        :param list partitions: a list of partitions
+        :param str command: textual command
+        :return: True if we have at least one success
+        """
+        args = dict(commands = dict((i, command) for i in partitions))
+
+        try:
+            reply = self.core.send_wait(PerformPartitionAction, args, reply_expected=0x04)
+        except MappingError:
+            logger.error('Partition command: "%s" is not supported' % command)
+            return False
+
+        return reply is not None
