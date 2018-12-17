@@ -1,19 +1,18 @@
 # -*- coding: utf-8 -*-
 
-from paradox.hardware import create_panel
+import binascii
+import datetime
 import logging
 import time
 from threading import Lock
-import datetime
-import binascii
+from typing import Optional
+
+from construct import Container
 
 from config import user as cfg
+from paradox.hardware import create_panel, Panel
 
 logger = logging.getLogger('PAI').getChild(__name__)
-
-PARTITION_ACTIONS = dict(arm=0x04, disarm=0x05, arm_stay=0x01, arm_sleep=0x03,  arm_stay_stayd=0x06, arm_sleep_stay=0x07, disarm_all=0x08)
-ZONE_ACTIONS = dict(bypass=0x10, clear_bypass=0x10)
-PGM_ACTIONS = dict(on_override=0x30, off_override=0x31, on=0x32, off=0x33, pulse=0)
 
 serial_lock = Lock()
 
@@ -29,7 +28,7 @@ class Paradox:
                  interface,
                  retries=3):
 
-        self.panel = None
+        self.panel = None  # type: Panel
         self.connection = connection
         self.retries = retries
         self.interface = interface
@@ -124,8 +123,6 @@ class Paradox:
         if reply is None:
             logger.warn("Could not set panel time")
 
-        return
-
     def loop(self):
         logger.debug("Loop start")
         args = {}
@@ -153,7 +150,7 @@ class Paradox:
             while time.time() - tstart < cfg.KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
                 self.send_wait(None, timeout=min(time.time() - tstart, 1))
 
-    def send_wait_simple(self, message=None, timeout=5, wait=True):
+    def send_wait_simple(self, message=None, timeout=5, wait=True) -> Optional[bytes]:
         if message is not None:
             if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug("PC -> A {}".format(binascii.hexlify(message)))
@@ -173,7 +170,7 @@ class Paradox:
 
         return data
 
-    def send_wait(self, message_type=None, args=None, message=None, retries=5, timeout=5, reply_expected=None):
+    def send_wait(self, message_type=None, args=None, message=None, retries=5, timeout=5, reply_expected=None) -> Optional[Container]:
 
         if message is None and message_type is not None:
             message = message_type.build(dict(fields=dict(value=args)))
@@ -239,11 +236,8 @@ class Paradox:
 
         return None
 
-    def control_zone(self, zone, command):
+    def control_zone(self, zone, command) -> bool:
         logger.debug("Control Zone: {} - {}".format(zone, command))
-
-        if command not in ZONE_ACTIONS:
-            return False
 
         zones_selected = []
         # if all or 0, select all
@@ -265,22 +259,18 @@ class Paradox:
 
         # Apply state changes
         accepted = False
-        for e in zones_selected:
-            args = dict(action=ZONE_ACTIONS[command], argument=(e - 1))
-            reply = self.send_wait(self.panel.get_message('PerformAction'), args, reply_expected=0x04)
-
-            if reply is not None:
-                accepted = True
+        try:
+            accepted = self.panel.control_zones(zones_selected, command)
+        except NotImplementedError:
+            logger.error('control_zones is not implemented for this alarm type')
 
         # Refresh status
         self.loop_wait = False
+
         return accepted
 
-    def control_partition(self, partition, command):
+    def control_partition(self, partition, command) -> bool:
         logger.debug("Control Partition: {} - {}".format(partition, command))
-
-        if command not in PARTITION_ACTIONS:
-            return False
 
         partitions_selected = []
 
@@ -303,24 +293,19 @@ class Paradox:
 
         # Apply state changes
         accepted = False
-
-        for e in partitions_selected:
-            args = dict(action=PARTITION_ACTIONS[command], argument=(e - 1))
-            reply = self.send_wait(self.panel.get_message('PerformAction'), args, reply_expected=0x04)
-
-            if reply is not None:
-                accepted = True
+        try:
+            accepted = self.panel.control_partitions(partitions_selected, command)
+        except NotImplementedError:
+            logger.error('control_partitions is not implemented for this alarm type')
+        # Apply state changes
 
         # Refresh status
         self.loop_wait = False
 
         return accepted
 
-    def control_output(self, output, command):
-        logger.debug("Control Partition: {} - {}".format(output, command))
-
-        if command not in PGM_ACTIONS:
-            return False
+    def control_output(self, output, command) -> bool:
+        logger.debug("Control Output: {} - {}".format(output, command))
 
         outputs = []
         # if all or 0, select all
@@ -333,32 +318,20 @@ class Paradox:
             # if set by number, look for it
             elif output.isdigit():
                 number = int(output)
-                if number > 0 and number < len(self.data['pgm']):
+                if 0 < number < len(self.data['pgm']):
                     outputs = [number]
 
         # Not Found
         if len(outputs) == 0:
             return False
 
+        # Apply state changes
         accepted = False
-
-        for e in outputs:
-            if command == 'pulse':
-                args = dict(action=PGM_COMMAND['on'], argument=(e - 1))
-                reply = self.send_wait(self.panel.get_message('PerformAction'), args, reply_expected=0x04)
-                if reply is not None:
-                    accepted = True
-
-                time.sleep(1)
-                args = dict(action=PGM_COMMAND['off'], argument=(e - 1))
-                reply = self.send_wait(self.panel.get_message('PerformAction'), args, reply_expected=0x04)
-                if reply is not None:
-                    accepted = True
-            else:
-                args = dict(action=PGM_COMMAND[command], argument=(e - 1))
-                reply = self.send_wait(self.panel.get_message('PerformAction'), args, reply_expected=0x04)
-                if reply is not None:
-                    accepted = True
+        try:
+            accepted = self.panel.control_outputs(outputs, command)
+        except NotImplementedError:
+            logger.error('control_outputs is not implemented for this alarm type')
+        # Apply state changes
 
         # Refresh status
         self.loop_wait = False
@@ -420,8 +393,9 @@ class Paradox:
                     # Trigger notifications for Partitions changes
                     # Ignore some changes as defined in the configuration
                     try:
-                        if (element_type == "partition" and key in cfg.LIMITS['partition']  and property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE) \
-                            or ('trouble' in property_name):
+                        if (element_type == "partition" and key in cfg.LIMITS['partition']
+                            and property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE) \
+                                or ('trouble' in property_name):
                             self.interface.notify("Paradox", "{} {} {}".format(elements[key]['label'], property_name, property_value), logging.INFO)
                     except KeyError:
                         logger.debug("Key 'partition' doesn't exist in cfg.LIMITS")
