@@ -1,9 +1,9 @@
-from .panel import Panel
 from . import evo
 from . import spectra_magellan
+from .panel import Panel
 
 
-def create_panel(core, product_id=None):
+def create_panel(core, product_id=None) -> Panel:
     if product_id is None:
         return Panel(core, product_id)
     elif product_id == 'DIGIPLEX_EVO_48':
