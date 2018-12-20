@@ -81,20 +81,22 @@ class IPConnection:
 
             stun_host = 'turn.paradoxmyhome.com'
 
+            logger.debug("STUN TCP Change Request")
             self.client = stun.StunClient(stun_host)
-
             self.client.send_tcp_change_request()
             stun_r = self.client.receive_response()
             if stun.is_error(stun_r):
                 logger.error(stun.get_error(stun_r))
                 return False
 
+            logger.debug("STUN TCP Binding Request")
             self.client.send_binding_request()
             stun_r = self.client.receive_response()
             if stun.is_error(stun_r):
                 logger.error(stun.get_error(stun_r))
                 return False
 
+            logger.debug("STUN Connect Request")
             self.client.send_connect_request(xoraddr=xoraddr)
             stun_r = self.client.receive_response()
             if stun.is_error(stun_r):
@@ -106,6 +108,7 @@ class IPConnection:
             connection_id = stun_r[0]['attr_body']
             raddr = self.client.sock.getpeername()
 
+            logger.debug("STUN Connection Bind Request")
             self.client1 = stun.StunClient(host=raddr[0], port=raddr[1])
             self.client1.send_connection_bind_request(binascii.unhexlify(connection_id))
             stun_r = self.client1.receive_response()

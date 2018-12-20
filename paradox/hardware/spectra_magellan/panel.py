@@ -115,6 +115,7 @@ class Panel(PanelBase):
         reply = self.core.send_wait(self.get_message('InitializeCommunication'), args=args)
 
         if reply is None:
+            logger.error("Initialization Failed")
             return False
 
         if reply.fields.value.po.command == 0x10:

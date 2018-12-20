@@ -119,6 +119,7 @@ class Panel_EVOBase(PanelBase):
         reply = self.core.send_wait(message=payload, reply_expected=0x1)
 
         if reply is None:
+            logger.error("Initialization Failed")
             return False
 
         if reply.fields.value.po.status.Windload_connected:
