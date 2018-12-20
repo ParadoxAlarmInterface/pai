@@ -121,7 +121,7 @@ class Panel(PanelBase):
         if reply.fields.value.po.command == 0x10:
             logger.info("Authentication Success")
             return True
-        elif reply.fields.value.po.command == 0x07 or reply.fields.value.po.command == 0x00:
+        elif reply.fields.value.po.command == 0x70 or reply.fields.value.po.command == 0x00:
             logger.error("Authentication Failed. Wrong Password?")
             return False
 

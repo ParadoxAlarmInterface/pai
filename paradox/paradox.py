@@ -10,7 +10,7 @@ from typing import Optional
 from construct import Container
 
 from config import user as cfg
-from paradox.hardware import create_panel, Panel
+from paradox.hardware import create_panel
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -39,9 +39,10 @@ class Paradox:
     def reset(self):
 
         # Keep track of alarm state
-        self.data = dict(zone=dict(), partition=dict(), pgm=dict(), 
-            system=dict(power=dict(label='power'), rf=dict(label='rf'), troubles=dict(label='troubles'))
-        )
+        self.data = dict(zone=dict(), partition=dict(), pgm=dict(),
+                         system=dict(power=dict(label='power'), rf=dict(label='rf'),
+                                     troubles=dict(label='troubles'))
+                        )
 
         self.last_power_update = 0
         self.run = STATE_STOP
@@ -82,13 +83,14 @@ class Paradox:
                 logger.warn("Unknown panel. Some features may not be supported")
 
             logger.info("Starting communication")
-            reply = self.send_wait(self.panel.get_message('StartCommunication'), args=dict(source_id=0x02), reply_expected=0x00)
-            
+            reply = self.send_wait(self.panel.get_message('StartCommunication'),
+                                   args=dict(source_id=0x02), reply_expected=0x00)
+
             if reply is None:
                 self.run = STATE_STOP
                 return False
 
-            self.panel = create_panel(self, reply.fields.value.product_id) # Now we know what panel it is. Let's
+            self.panel = create_panel(self, reply.fields.value.product_id)  # Now we know what panel it is. Let's
             # recreate panel object.
 
             result = self.panel.initialize_communication(reply, cfg.PASSWORD)
@@ -102,7 +104,7 @@ class Paradox:
                 self.send_wait()  # Read Clock loss restore event
 
             self.panel.update_labels()
-                    
+
             logger.info("Connection OK")
             self.loop_wait = False
 
@@ -117,7 +119,8 @@ class Paradox:
         logger.debug("Synchronizing panel time")
 
         now = datetime.datetime.now()
-        args = dict(century=int(now.year / 100), year=int(now.year % 100), month=now.month, day=now.day, hour=now.hour,minute=now.minute)
+        args = dict(century=int(now.year / 100), year=int(now.year % 100),
+                    month=now.month, day=now.day, hour=now.hour, minute=now.minute)
 
         reply = self.send_wait(self.panel.get_message('SetTimeDate'), args, reply_expected=0x03)
         if reply is None:
@@ -125,7 +128,6 @@ class Paradox:
 
     def loop(self):
         logger.debug("Loop start")
-        args = {}
 
         while self.run != STATE_STOP:
 
@@ -170,7 +172,13 @@ class Paradox:
 
         return data
 
-    def send_wait(self, message_type=None, args=None, message=None, retries=5, timeout=5, reply_expected=None) -> Optional[Container]:
+    def send_wait(self,
+                  message_type=None,
+                  args=None,
+                  message=None,
+                  retries=5,
+                  timeout=5,
+                  reply_expected=None) -> Optional[Container]:
 
         if message is None and message_type is not None:
             message = message_type.build(dict(fields=dict(value=args)))
@@ -211,7 +219,7 @@ class Paradox:
                 logger.debug(recv_message)
 
             # Events are async
-            if recv_message.fields.value.po.command == 0xe: # Events
+            if recv_message.fields.value.po.command == 0xe:  # Events
                 try:
                     self.handle_event(recv_message)
 
@@ -224,12 +232,13 @@ class Paradox:
 
                 retries += 1  # Ignore this try
 
-            elif recv_message.fields.value.po.command == 0x70: # Terminate connection
+            elif recv_message.fields.value.po.command == 0x70:  # Terminate connection
                 self.handle_error(recv_message)
                 return None
 
             elif reply_expected is not None and recv_message.fields.value.po.command != reply_expected:
-                logging.error("Got message {} but expected {}".format(recv_message.fields.value.po.command, reply_expected))
+                logging.error("Got message {} but expected {}".format(recv_message.fields.value.po.command,
+                                                                      reply_expected))
                 logging.error("Detail:\n{}".format(recv_message))
             else:
                 return recv_message
@@ -365,7 +374,7 @@ class Paradox:
         for property_name, property_value in change.items():
             old = None
 
-            if property_name.startswith('_'): # skip private properties
+            if property_name.startswith('_'):  # skip private properties
                 continue
 
             # Virtual property "Trouble"
@@ -385,7 +394,10 @@ class Paradox:
                 old = elements[key][property_name]
 
                 if old != change[property_name] or force_publish or cfg.PUSH_UPDATE_WITHOUT_CHANGE:
-                    logger.debug("Change {}/{}/{} from {} to {}".format(element_type, elements[key]['label'], property_name, old, property_value))
+                    logger.debug("Change {}/{}/{} from {} to {}".format(element_type,
+                                                                        elements[key]['label'],
+                                                                        property_name, old,
+                                                                        property_value))
                     elements[key][property_name] = property_value
                     self.interface.change(element_type, elements[key]['label'],
                                           property_name, property_value, initial=False)
@@ -393,13 +405,15 @@ class Paradox:
                     # Trigger notifications for Partitions changes
                     # Ignore some changes as defined in the configuration
                     try:
-                        if (element_type == "partition" and key in cfg.LIMITS['partition']
-                            and property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE) \
-                                or ('trouble' in property_name):
-                            self.interface.notify("Paradox", "{} {} {}".format(elements[key]['label'], property_name, property_value), logging.INFO)
+                        if (element_type == "partition" and key in cfg.LIMITS['partition'] and
+                            property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE) or\
+                                ('trouble' in property_name):
+                            self.interface.notify("Paradox", "{} {} {}".format(elements[key]['label'],
+                                                                               property_name,
+                                                                               property_value), logging.INFO)
                     except KeyError:
                         logger.debug("Key 'partition' doesn't exist in cfg.LIMITS")
-                    except:
+                    except Exception:
                         logger.exception("Trigger notifications")
 
             else:
@@ -419,17 +433,17 @@ class Paradox:
             logger.info("Disconnecting from the Alarm Panel")
             self.run = STATE_STOP
             self.loop_wait = False
-            reply = self.send_wait(self.panel.get_message('CloseConnection'), None, reply_expected=0x07)
+            self.send_wait(self.panel.get_message('CloseConnection'), None, reply_expected=0x07)
             self.connection.close()
-            
+
     def pause(self):
         if self.run == STATE_RUN:
             logger.info("Disconnecting from the Alarm Panel")
             self.run = STATE_PAUSE
             self.loop_wait = False
-            reply = self.send_wait(self.panel.get_message('CloseConnection'), None, reply_expected=0x07)
+            self.send_wait(self.panel.get_message('CloseConnection'), None, reply_expected=0x07)
             self.connection.close()
-            
+
     def resume(self):
         if self.run == STATE_PAUSE:
             self.connect()
