@@ -221,7 +221,8 @@ class PushBulletInterface(Interface):
         self.pb_ws.stop()
 
     def handle_event(self, raw):
-        self.pb_ws.event(raw)
+        #self.pb_ws.event(raw)
+        pass
 
     def handle_change(self, raw):
         element, label, property, value = raw
