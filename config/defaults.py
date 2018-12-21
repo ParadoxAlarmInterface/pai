@@ -86,6 +86,12 @@ MQTT_INTERFACE_TOPIC = 'interface'
 MQTT_TOGGLE_CODES = {}
 MQTT_USE_NUMERIC_STATES = False         # use 0 and 1 instead of True and False
 
+# Interfaces
+COMMAND_ALIAS = {						# alias for commands through text based interfaces
+    'arm': 'partition all arm',
+    'disarm': 'partition all disarm'
+}
+
 # Pushbullet
 PUSHBULLET_ENABLE = False
 PUSHBULLET_KEY = ''                     # Authentication key used for Pushbullet

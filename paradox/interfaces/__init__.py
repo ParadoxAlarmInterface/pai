@@ -120,6 +120,9 @@ class Interface(Thread):
     def send_command(self, message):
         """Handle message received from the MQTT broker"""
         """Format TYPE LABEL COMMAND """
+
+        cfg.COMMAND_ALIAS.get(message, message)
+
         tokens = message.split(" ")
 
         if len(tokens) != 3:
