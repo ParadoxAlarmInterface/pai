@@ -2,11 +2,11 @@
 
 # GSM interface.
 # Only exposes critical status changes and accepts commands
+from paradox.interfaces import Interface
+
 import time
 import logging
 import datetime
-
-from threading import Thread, Event
 import queue
 import serial
 
@@ -16,24 +16,16 @@ from config import user as cfg
 logger = logging.getLogger('PAI').getChild(__name__)
 
 
-class GSMInterface(Thread):
+class GSMInterface(Interface):
     """Interface Class using GSM"""
     name = 'gsm'
 
-    port = None
-    alarm = None
-    stop_running = Event()
-    thread = None
-    loop = None
-    notification_handler = None
-    modem_connected = False
-
     def __init__(self):
-        Thread.__init__(self)
+        super().__init__()
 
-        self.queue = queue.PriorityQueue()
         self.partitions = dict()
-        self.stop_running.clear()
+        self.port = None
+        self.modem_connected = False
 
     def stop(self):
         """ Stops the GSM Interface Thread"""
@@ -43,14 +35,6 @@ class GSMInterface(Thread):
         self.port.close()
 
         logger.debug("GSM Stopped")
-
-    def set_alarm(self, alarm):
-        """ Sets the alarm """
-        self.alarm = alarm
-
-    def set_notify(self, handler):
-        """ Set the notification handler"""
-        self.notification_handler = handler
 
     def event(self, raw):
         """ Enqueues an event"""
@@ -62,10 +46,6 @@ class GSMInterface(Thread):
                 (raw['major'][0] == 40 and raw['minor'][0] in [0, 1, 2, 3, 4, 5]):
 
             self.queue.put_nowait(SortableTuple((2, 'event', (raw))))
-
-    def change(self, element, label, property, value):
-        """ Enqueues a change """
-        return
 
     def notify(self, source, message, level):
         if source == self.name:
@@ -220,90 +200,16 @@ class GSMInterface(Thread):
             self.notification_handler.notify(
                 self.name, "REJECTED: {}: {}".format(source, message), logging.INFO)
 
-    def send_command(self, message):
-        """Handle message received from the MQTT broker"""
-        """Format TYPE LABEL COMMAND """
-        tokens = message.split(" ")
-
-        if len(tokens) != 3:
-            logger.warning("Message format is invalid")
-            return
-
-        if self.alarm is None:
-            logger.error("No alarm registered")
-            return
-
-        element_type = tokens[0].lower()
-        element = tokens[1]
-        command = self.normalize_payload(tokens[2])
-
-        # Process a Zone Command
-        if element_type == 'zone':
-            if command not in ['bypass', 'clear_bypass']:
-                logger.error("Invalid command for Zone {}".format(command))
-                return
-
-            if not self.alarm.control_zone(element, command):
-                logger.warning(
-                    "Zone command refused: {}={}".format(element, command))
-
-        # Process a Partition Command
-        elif element_type == 'partition':
-            if command not in ['arm', 'disarm', 'arm_stay', 'arm_sleep']:
-                logger.error(
-                    "Invalid command for Partition {}".format(command))
-                return
-
-            if not self.alarm.control_partition(element, command):
-                logger.warning(
-                    "Partition command refused: {}={}".format(element, command))
-
-        # Process an Output Command
-        elif element_type == 'output':
-            if command not in ['on', 'off', 'pulse']:
-                logger.error("Invalid command for Output {}".format(command))
-                return
-
-            if not self.alarm.control_output(element, command):
-                logger.warning(
-                    "Output command refused: {}={}".format(element, command))
-        else:
-            logger.error("Invalid control property {}".format(element))
-
-    def handle_notify(self, raw):
-        source, message, level = raw
-
-        try:
-            self.send_message(message)
-        except Exception:
-            logger.exception("handle_notify")
-
     def handle_event(self, raw):
         """Handle Live Event"""
 
+        major_code = raw['major'][0]
+        minor_code = raw['minor'][1]
+
         # Ignore some events
-
-#        for ev in cfg.GSM_IGNORE_EVENTS:
-#            if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
-#                return
-
-        # All events are extremelly critical. Make call to get user attention
+        for ev in cfg.GSM_IGNORE_EVENTS:
+            if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
+                return
 
         for contact in cfg.GSM_CONTACTS:
             self.write('ATD{}'.format(contact))
-
-    def handle_change(self, raw):
-        """Handle Property Change"""
-        return
-
-    def normalize_payload(self, message):
-        message = message.strip().lower()
-
-        if message in ['true', 'on', '1', 'enable']:
-            return 'on'
-        elif message in ['false', 'off', '0', 'disable']:
-            return 'off'
-        elif message in ['pulse', 'arm', 'disarm', 'arm_stay', 'arm_sleep', 'bypass', 'clear_bypass']:
-            return message
-
-        return None

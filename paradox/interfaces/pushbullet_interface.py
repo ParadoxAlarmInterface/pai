@@ -2,6 +2,7 @@
 
 # Pushbullet interface.
 # Only exposes critical status changes and accepts commands
+from paradox.interfaces import Interface
 
 from ws4py.client import WebSocketBaseClient
 from ws4py.manager import WebSocketManager
@@ -13,7 +14,6 @@ from pushbullet import Pushbullet
 
 import time
 import logging
-import datetime
 import json
 
 from paradox.lib.utils import SortableTuple
@@ -22,6 +22,7 @@ from config import user as cfg
 
 
 logger = logging.getLogger('PAI').getChild(__name__)
+
 
 class PushBulletWSClient(WebSocketBaseClient):
 
@@ -45,10 +46,10 @@ class PushBulletWSClient(WebSocketBaseClient):
 
         # Receiving pending messages
         self.received_message(json.dumps({"type": "tickle", "subtype": "push"}))
-       
+
         self.send_message("Active")
-    
-   
+
+
     def handle_message(self, message):
         """ Handle Pushbullet message. It should be a command """
 
@@ -59,7 +60,7 @@ class PushBulletWSClient(WebSocketBaseClient):
             logger.exception("Unable to parse message")
             return
 
-        if self.alarm == None:
+        if self.alarm is None:
             return
 
         if message['type'] == 'tickle' and msg['subtype'] == 'push':
@@ -69,11 +70,11 @@ class PushBulletWSClient(WebSocketBaseClient):
             for p in pushes:
                 self.pb.dismiss_push(p.get("iden"))
                 self.pb.delete_push(p.get("iden"))
-                
+
                 if p.get('direction') == 'outgoing' or p.get('dismissed'):
                     continue
 
-                if p.get('sender_email_normalized') in PUSHBULLET_CONTACTS:
+                if p.get('sender_email_normalized') in cfg.PUSHBULLET_CONTACTS:
                     ret = self.send_command(p.get('body'))
 
                     if ret:
@@ -88,17 +89,17 @@ class PushBulletWSClient(WebSocketBaseClient):
 
         try:
             self.terminate()
-        except:
+        except Exception:
             logger.exception("Closing Pushbullet WS")
-            
+
         self.close()
 
-    def send_message(self, msg, dstchat=None):    
+    def send_message(self, msg, dstchat=None):
         for chat in self.pb.chats:
-            if chat.email in PUSHBULLET_CONTACTS:
+            if chat.email in cfg.PUSHBULLET_CONTACTS:
                 try:
                     self.pb.push_note("paradox", msg, chat=chat)
-                except:
+                except Exception:
                     logger.exception("Sending message")
                     time.sleep(5)
 
@@ -111,14 +112,14 @@ class PushBulletWSClient(WebSocketBaseClient):
             logger.warning("Message format is invalid")
             return
 
-        if self.alarm == None:
+        if self.alarm is None:
             logger.error("No alarm registered")
             return
 
         element_type = tokens[0].lower()
         element = tokens[1]
         command = self.normalize_payload(tokens[2])
-        
+
         # Process a Zone Command
         if element_type == 'zone':
             if command not in ['bypass', 'clear_bypass']:
@@ -139,7 +140,7 @@ class PushBulletWSClient(WebSocketBaseClient):
             if not self.alarm.control_partition(element, command):
                 logger.warning(
                     "Partition command refused: {}={}".format(element, command))
-       
+
         # Process an Output Command
         elif element_type == 'output':
             if command not in ['on', 'off', 'pulse']:
@@ -152,56 +153,30 @@ class PushBulletWSClient(WebSocketBaseClient):
         else:
             logger.error("Invalid control property {}".format(element))
 
-
-    def normalize_payload(self, message):
-        message = message.strip().lower()
-
-        if message in ['true', 'on', '1', 'enable']:
-            return 'on'
-        elif message in ['false', 'off', '0', 'disable']:
-            return 'off'
-        elif message in ['pulse', 'arm', 'disarm', 'arm_stay', 'arm_sleep', 'bypass', 'clear_bypass']:
-            return message
-
-        return None
-
     def notify(self, source, message, level):
         if level < logging.INFO:
             return
 
         try:
             self.send_message("{}".format(message))
-        except:
+        except Exception:
             logging.exception("Pushbullet notify")
 
-    def event(self, raw):
-        """Handle Live Event"""
-        return 
 
-    def change(self, element, label, property, value):
-        """Handle Property Change"""
-        #logger.debug("Property Change: element={}, label={}, property={}, value={}".format(
-        #    element,
-        #    label,
-        #    property,
-        #    value))    
-        return
-
-class PushBulletInterface(Thread):
+class PushBulletInterface(Interface):
     """Interface Class using Pushbullet"""
     name = 'pushbullet'
 
-    def __init__(self):        
-        Thread.__init__(self)
+    def __init__(self):
+        super().__init__()
 
         self.pb = None
         self.pb_ws = None
-        self.queue = queue.PriorityQueue()
 
     def run(self):
         logger.info("Starting Pushbullet Interface")
         try:
-            self.pb_ws = PushBulletWSClient('wss://stream.pushbullet.com/websocket/{}'.format(PUSHBULLET_KEY))
+            self.pb_ws = PushBulletWSClient('wss://stream.pushbullet.com/websocket/{}'.format(cfg.PUSHBULLET_KEY))
             self.pb_ws.init()
             self.pb_ws.connect()
 
@@ -216,14 +191,13 @@ class PushBulletInterface(Thread):
                     self.handle_notify(item[2])
                 elif item[1] == 'command':
                     if item[2] == 'stop':
-                        break        
-        except:
+                        break
+        except Exception:
             logger.exception("PB")
-    
- 
+
     def set_alarm(self, alarm):
-        self.pb_ws.set_alarm(alarm)   
-    
+        self.pb_ws.set_alarm(alarm)
+
     def set_notify(self, handler):
         """ Set the notification handler"""
         self.notification_handler = handler
@@ -235,8 +209,8 @@ class PushBulletInterface(Thread):
     def change(self, element, label, property, value):
         """ Enqueues a change """
         self.queue.put_nowait(SortableTuple((2, 'change', (element, label, property, value))))
-        
-    def notify(self, source, message):
+
+    def notify(self, source, message, level):
         self.queue.put_nowait(SortableTuple((2, 'notify', (source, message))))
 
     def stop(self):
@@ -244,7 +218,7 @@ class PushBulletInterface(Thread):
         self.queue.put_nowait(SortableTuple((2, 'command', 'stop')))
 
         self.pb_ws.terminate()
-    
+
     def handle_event(self, raw):
         self.pb_ws.event(raw)
 
@@ -256,5 +230,6 @@ class PushBulletInterface(Thread):
         sender, message = raw
         if sender == 'pushbullet':
             return
-        self.pb_ws.notify(sender, message)
+
+        self.pb_ws.notify(sender, message, logging.INFO)
 
