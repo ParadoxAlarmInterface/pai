@@ -106,56 +106,6 @@ class PushBulletWSClient(WebSocketBaseClient):
                     logger.exception("Sending message")
                     time.sleep(5)
 
-    def send_command(self, message):
-        """Handle message received from the MQTT broker"""
-        """Format TYPE LABEL COMMAND """
-        tokens = message.split(" ")
-
-        if len(tokens) != 3:
-            logger.warning("Message format is invalid")
-            return
-
-        if self.alarm is None:
-            logger.error("No alarm registered")
-            return
-
-        element_type = tokens[0].lower()
-        element = tokens[1]
-        command = self.normalize_payload(tokens[2])
-
-        # Process a Zone Command
-        if element_type == 'zone':
-            if command not in ['bypass', 'clear_bypass']:
-                logger.error("Invalid command for Zone {}".format(command))
-                return
-
-            if not self.alarm.control_zone(element, command):
-                logger.warning(
-                    "Zone command refused: {}={}".format(element, command))
-
-        # Process a Partition Command
-        elif element_type == 'partition':
-            if command not in ['arm', 'disarm', 'arm_stay', 'arm_sleep']:
-                logger.error(
-                    "Invalid command for Partition {}".format(command))
-                return
-
-            if not self.alarm.control_partition(element, command):
-                logger.warning(
-                    "Partition command refused: {}={}".format(element, command))
-
-        # Process an Output Command
-        elif element_type == 'output':
-            if command not in ['on', 'off', 'pulse']:
-                logger.error("Invalid command for Output {}".format(command))
-                return
-
-            if not self.alarm.control_output(element, command):
-                logger.warning(
-                    "Output command refused: {}={}".format(element, command))
-        else:
-            logger.error("Invalid control property {}".format(element))
-
     def notify(self, source, message, level):
         if level < logging.INFO:
             return
