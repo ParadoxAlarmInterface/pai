@@ -33,6 +33,10 @@ class PushBulletWSClient(WebSocketBaseClient):
         self.manager = WebSocketManager()
         self.alarm = None
 
+    def stop(self):
+        self.terminate()
+        self.manager.stop()
+
     def set_alarm(self, alarm):
         """ Sets the paradox alarm object """
         self.alarm = alarm
@@ -41,6 +45,7 @@ class PushBulletWSClient(WebSocketBaseClient):
         """ Callback trigger when connection succeeded"""
         logger.info("Handshake OK")
         self.manager.add(self)
+        self.manager.start()
         for chat in self.pb.chats:
             logger.debug("Associated contacts: {}".format(chat))
 
@@ -49,11 +54,10 @@ class PushBulletWSClient(WebSocketBaseClient):
 
         self.send_message("Active")
 
-
-    def handle_message(self, message):
+    def received_message(self, message):
         """ Handle Pushbullet message. It should be a command """
-
         logger.debug("Received Message {}".format(message))
+
         try:
             message = json.loads(str(message))
         except:
@@ -62,11 +66,10 @@ class PushBulletWSClient(WebSocketBaseClient):
 
         if self.alarm is None:
             return
-
-        if message['type'] == 'tickle' and msg['subtype'] == 'push':
+        if message['type'] == 'tickle' and message['subtype'] == 'push':
             now = time.time()
-            pushes = self.pb.get_pushes(modified_after=int(now) - 10, limit=1, filter_inactive=True)
-
+            pushes = self.pb.get_pushes(modified_after=int(now) - 20, limit=1, filter_inactive=True)
+            logger.debug("got pushes {}".format(pushes))
             for p in pushes:
                 self.pb.dismiss_push(p.get("iden"))
                 self.pb.delete_push(p.get("iden"))
@@ -156,7 +159,6 @@ class PushBulletWSClient(WebSocketBaseClient):
     def notify(self, source, message, level):
         if level < logging.INFO:
             return
-
         try:
             self.send_message("{}".format(message))
         except Exception:
@@ -211,13 +213,12 @@ class PushBulletInterface(Interface):
         self.queue.put_nowait(SortableTuple((2, 'change', (element, label, property, value))))
 
     def notify(self, source, message, level):
-        self.queue.put_nowait(SortableTuple((2, 'notify', (source, message))))
+        self.queue.put_nowait(SortableTuple((2, 'notify', (source, message, level))))
 
     def stop(self):
         """ Stops the Pushbullet interface"""
         self.queue.put_nowait(SortableTuple((2, 'command', 'stop')))
-
-        self.pb_ws.terminate()
+        self.pb_ws.stop()
 
     def handle_event(self, raw):
         self.pb_ws.event(raw)
@@ -227,9 +228,9 @@ class PushBulletInterface(Interface):
         self.pb_ws.change(element, label, property, value)
 
     def handle_notify(self, raw):
-        sender, message = raw
+        sender, message, level = raw
         if sender == 'pushbullet':
             return
 
-        self.pb_ws.notify(sender, message, logging.INFO)
+        self.pb_ws.notify(sender, message, level)
 
