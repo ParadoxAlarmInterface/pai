@@ -104,9 +104,6 @@ class Panel_EVOBase(PanelBase):
 
         return None
 
-    def encode_password(self, password) -> bytes:
-        return binascii.unhexlify(password)
-
     def initialize_communication(self, reply, PASSWORD) -> bool:
         password = self.encode_password(PASSWORD)
 
