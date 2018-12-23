@@ -55,7 +55,7 @@ class Panel:
             raise ResourceWarning('{} parser not found'.format(name))
 
     def encode_password(self, password) -> bytes:
-        res = [0] * 5
+        res = [0] * 2
 
         if password is None:
             return b'\x00\x00'
@@ -64,22 +64,25 @@ class Panel:
             return password
 
         int_password = int(password)
-        i = len(password)
-        while i >= 0:
-            i2 = int(i / 2)
+        i = min(4, len(password))
+        i2 = i // 2 - 1
+
+        while i > 0:
             b = int(int_password % 10)
             if b == 0:
                 b = 0x0a
 
-            int_password /= 10
-            if (i + 1) % 2 == 0:
+            int_password = int_password // 10
+
+            if i % 2 == 0:
                 res[i2] = b
             else:
-                res[i2] = (((b << 4)) | res[i2]) & 0xff
+                res[i2] = ((b << 4) | res[i2]) & 0xff
+                i2 -= 1
 
             i -= 1
 
-        return bytes(res[:2])
+        return bytes(res)
 
     def update_labels(self):
         logger.info("Updating Labels from Panel")
