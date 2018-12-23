@@ -1,16 +1,22 @@
 # -*- coding: utf-8 -*-
 
 import inspect
-import sys
 import logging
+import sys
 import time
-from .parsers import *
-from ..panel import Panel as PanelBase, iterate_properties
+from typing import Optional
 
 from config import user as cfg
-
+from .parsers import Construct, CloseConnection, ErrorMessage, InitializeCommunication, InitializeCommunicationResponse, \
+    SetTimeDate, SetTimeDateResponse, PerformAction, PerformActionResponse, ReadStatusResponse, ReadEEPROM, \
+    ReadEEPROMResponse, LiveEvent, RAMDataParserMap, Container
+from ..panel import Panel as PanelBase
 
 logger = logging.getLogger('PAI').getChild(__name__)
+
+PARTITION_ACTIONS = dict(arm=0x04, disarm=0x05, arm_stay=0x01, arm_sleep=0x03,  arm_stay_stayd=0x06, arm_sleep_stay=0x07, disarm_all=0x08)
+ZONE_ACTIONS = dict(bypass=0x10, clear_bypass=0x10)
+PGM_ACTIONS = dict(on_override=0x30, off_override=0x31, on=0x32, off=0x33, pulse=0)
 
 
 class Panel(PanelBase):
@@ -34,7 +40,7 @@ class Panel(PanelBase):
         }
     }
 
-    def get_message(self, name):
+    def get_message(self, name) -> Construct:
         try:
             return super(Panel, self).get_message(name)
         except ResourceWarning as e:
@@ -51,7 +57,7 @@ class Panel(PanelBase):
 
         logger.debug("Labels updated")
 
-    def parse_message(self, message):
+    def parse_message(self, message) -> Optional[Container]:
         try:
             if message is None or len(message) == 0:
                 return None
@@ -109,12 +115,13 @@ class Panel(PanelBase):
         reply = self.core.send_wait(self.get_message('InitializeCommunication'), args=args)
 
         if reply is None:
+            logger.error("Initialization Failed")
             return False
 
         if reply.fields.value.po.command == 0x10:
             logger.info("Authentication Success")
             return True
-        elif reply.fields.value.po.command == 0x07 or reply.fields.value.po.command == 0x00:
+        elif reply.fields.value.po.command == 0x70 or reply.fields.value.po.command == 0x00:
             logger.error("Authentication Failed. Wrong Password?")
             return False
 
@@ -310,3 +317,77 @@ class Panel(PanelBase):
         else:
             # Remaining events trigger lower level notifications
             self.core.interface.notify("Paradox", "{}: {}".format(event['major'][1], event['minor'][1]), logging.INFO)
+
+    def control_zones(self, zones, command) -> bool:
+        """
+        Control zones
+        :param list zones: a list of zones
+        :param str command: textual command
+        :return: True if we have at least one success
+        """
+        if command not in ZONE_ACTIONS:
+            return False
+
+        accepted = False
+
+        for zone in zones:
+            args = dict(action=ZONE_ACTIONS[command], argument=(zone - 1))
+            reply = self.core.send_wait(PerformAction, args, reply_expected=0x04)
+
+            if reply is not None:
+                accepted = True
+
+        return accepted
+
+    def control_partitions(self, partitions, command) -> bool:
+        """
+        Control Partitions
+        :param list partitions: a list of partitions
+        :param str command: textual command
+        :return: True if we have at least one success
+        """
+        if command not in PARTITION_ACTIONS:
+            return False
+
+        accepted = False
+
+        for partition in partitions:
+            args = dict(action=PARTITION_ACTIONS[command], argument=(partition - 1))
+            reply = self.core.send_wait(PerformAction, args, reply_expected=0x04)
+
+            if reply is not None:
+                accepted = True
+
+        return accepted
+
+    def control_outputs(self, outputs, command) -> bool:
+        """
+        Control PGM
+        :param list outputs: a list of pgms
+        :param str command: textual command
+        :return: True if we have at least one success
+        """
+        if command not in PGM_ACTIONS:
+            return False
+
+        accepted = False
+
+        for output in outputs:
+            if command == 'pulse':
+                args = dict(action=PGM_ACTIONS['on'], argument=(output - 1))
+                reply = self.core.send_wait(PerformAction, args, reply_expected=0x04)
+                if reply is not None:
+                    accepted = True
+
+                time.sleep(1)
+                args = dict(action=PGM_ACTIONS['off'], argument=(output - 1))
+                reply = self.core.send_wait(PerformAction, args, reply_expected=0x04)
+                if reply is not None:
+                    accepted = True
+            else:
+                args = dict(action=PGM_ACTIONS[command], argument=(output - 1))
+                reply = self.core.send_wait(PerformAction, args, reply_expected=0x04)
+                if reply is not None:
+                    accepted = True
+
+        return accepted

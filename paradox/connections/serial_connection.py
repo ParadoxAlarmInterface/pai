@@ -16,11 +16,11 @@ class SerialCommunication:
     def connect(self, baud=9600, timeout=1):
         """Connects the serial port"""
 
-        try: # if reconnect
+        try:  # if reconnect
             if self.comm:
                 self.close()
         except Exception:
-            pass
+            logger.exception("Cannot close Serial Port")
 
         logger.debug("Opening Serial port: {}".format(self.serialport))
         self.comm = serial.Serial()

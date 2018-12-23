@@ -1,13 +1,18 @@
-import sys
 import inspect
 import logging
+import sys
 from itertools import chain
-from construct import *
+from typing import Optional
+
+from construct import Construct, Struct, BitStruct, Const, Nibble, Checksum, Padding, Bytes, this, RawCopy, Int8ub, \
+    Default, Enum, Flag, BitsInteger, Int16ub, Container
+
 from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
 from config import user as cfg
+
 
 def iterate_properties(data):
     if isinstance(data, list):
@@ -19,6 +24,7 @@ def iterate_properties(data):
                 continue
             yield (key, value)
 
+
 class Panel:
     mem_map = {}
 
@@ -26,7 +32,7 @@ class Panel:
         self.core = core
         self.product_id = product_id
 
-    def parse_message(self, message):
+    def parse_message(self, message) -> Optional[Container]:
         if message is None or len(message) == 0:
             return None
 
@@ -41,15 +47,15 @@ class Panel:
         else:
             return None
 
-    def get_message(self, name):
+    def get_message(self, name) -> Construct:
         clsmembers = dict(inspect.getmembers(sys.modules[__name__]))
         if name in clsmembers:
             return clsmembers[name]
         else:
             raise ResourceWarning('{} parser not found'.format(name))
 
-    def encode_password(self, password):
-        res = [0] * 5
+    def encode_password(self, password) -> bytes:
+        res = [0] * 2
 
         if password is None:
             return b'\x00\x00'
@@ -58,22 +64,25 @@ class Panel:
             return password
 
         int_password = int(password)
-        i = len(password)
-        while i >= 0:
-            i2 = int(i / 2)
+        i = min(4, len(password))
+        i2 = i // 2 - 1
+
+        while i > 0:
             b = int(int_password % 10)
             if b == 0:
                 b = 0x0a
 
-            int_password /= 10
-            if (i + 1) % 2 == 0:
+            int_password = int_password // 10
+
+            if i % 2 == 0:
                 res[i2] = b
             else:
-                res[i2] = (((b << 4)) | res[i2]) & 0xff
+                res[i2] = ((b << 4) | res[i2]) & 0xff
+                i2 -= 1
 
             i -= 1
 
-        return bytes(res[:2])
+        return bytes(res)
 
     def update_labels(self):
         logger.info("Updating Labels from Panel")
@@ -89,7 +98,7 @@ class Panel:
             addresses = list(chain.from_iterable(elem_def['addresses']))
             limits = cfg.LIMITS.get(elem_type)
             if limits is not None:
-                addresses = [a for i, a in enumerate(addresses) if i+1 in limits]
+                addresses = [a for i, a in enumerate(addresses) if i + 1 in limits]
 
             self.load_labels(self.core.data[elem_type],
                              self.core.labels[elem_type],
@@ -103,9 +112,11 @@ class Panel:
                     addresses,
                     field_length=16,
                     label_offset=0,
-                    template={}):
+                    template=None):
         """Load labels from panel"""
         i = 1
+        if template is None:
+            template = {}
 
         for address in list(addresses):
             args = dict(address=address, length=field_length)
@@ -131,7 +142,11 @@ class Panel:
                 break
 
             data = reply.fields.value.data
-            label = data[label_offset:label_offset + field_length].strip(b'\0 ').replace(b'\0', b'_').replace(b' ', b'_').decode('utf-8')
+            label = data[label_offset:label_offset + field_length] \
+                .strip(b'\0 ') \
+                .replace(b'\0', b'_') \
+                .replace(b' ', b'_') \
+                .decode('utf-8')
 
             if label not in labelDictName:
                 properties = template.copy()
@@ -144,31 +159,59 @@ class Panel:
             i += 1
 
     def process_properties_bulk(self, properties, address):
+        if cfg.LOGGING_DUMP_STATUS:
+            logger.debug("address: %s, properties: %s", address, properties)
+
         for key, value in iterate_properties(properties):
 
             if not isinstance(value, (list, dict)):
-                 continue
+                continue
 
             element_type = key.split('_')[0]
             limit_list = cfg.LIMITS.get(element_type)
 
             if key in self.core.status_cache and self.core.status_cache[address][key] == value:
-               continue
+                continue
             if address not in self.core.status_cache:
-               self.core.status_cache[address] = {}
+                self.core.status_cache[address] = {}
 
             self.core.status_cache[address][key] = value
             prop_name = '_'.join(key.split('_')[1:])
 
             if not prop_name:
-               continue
+                continue
 
             for i, status in iterate_properties(value):
-               if limit_list is None or i in limit_list:
-                   if prop_name == 'status':
-                       self.core.update_properties(element_type, i, status)
-                   else:
-                       self.core.update_properties(element_type, i, {prop_name: status})
+                if limit_list is None or i in limit_list:
+                    if prop_name == 'status':
+                        self.core.update_properties(element_type, i, status)
+                    else:
+                        self.core.update_properties(element_type, i, {prop_name: status})
+
+    def initialize_communication(self, reply, password):
+        raise NotImplementedError("override initialize_communication in a subclass")
+
+    def request_status(self, nr):
+        raise NotImplementedError("override request_status in a subclass")
+
+    def handle_status(self, reply):
+        raise NotImplementedError("override handle_status in a subclass")
+
+    def control_zones(self, zones, command) -> bool:
+        raise NotImplementedError("override control_zones in a subclass")
+
+    def control_partitions(self, partitions, command) -> bool:
+        raise NotImplementedError("override control_partitions in a subclass")
+
+    def control_outputs(self, outputs, command) -> bool:
+        raise NotImplementedError("override control_outputs in a subclass")
+
+    def process_event(self, event):
+        raise NotImplementedError("override process_event in a subclass")
+
+    def generate_event_notifications(self, event):
+        raise NotImplementedError("override generate_event_notifications in a subclass")
+
 
 InitiateCommunication = Struct("fields" / RawCopy(
     Struct("po" / BitStruct(

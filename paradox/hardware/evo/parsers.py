@@ -1,8 +1,12 @@
 import collections
 
-from construct import *
+from construct import Struct, RawCopy, BitStruct, Const, Nibble, Flag, Rebuild, Int8ub, BitsInteger, Int16ub, Checksum, \
+    Bytes, this, Default, Padding, Enum, Int24ub, ExprAdapter, Byte, obj_, Array, Computed, Subconstruct, \
+    ValidationError, ExprSymmetricAdapter
+
+from .adapters import PGMFlags, StatusAdapter, DateAdapter, ZoneFlags, PartitionStatus, EventAdapter, \
+    ModuleSerialAdapter
 from ..common import CommunicationSourceIDEnum, ProductIdEnum, calculate_checksum
-from .adapters import *
 
 LoginConfirmationResponse = Struct("fields" / RawCopy(
     Struct(
@@ -330,37 +334,34 @@ SetTimeDateResponse = Struct("fields" / RawCopy(
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
-PerformAction = Struct("fields" / RawCopy(Struct(
+_PartitionCommandEnum = Enum(Nibble,
+                             none  = 0,
+                             arm = 2,
+                             arm_stay = 3,
+                             arm_instant = 4,
+                             arm_force = 5,
+                             disarm = 6,
+                             beep_keypads = 8
+                             )
+
+class PartitionAdapter(Subconstruct):
+    def _build(self, obj, stream, context, path):
+        partitions = dict([(i, 0) for i in range(1, 9) ])
+        partitions.update(obj)
+
+        obj = {"partitions": list(partitions.values())}
+
+        return self.subcon._build(obj, stream, context, path)
+
+PerformPartitionAction = Struct("fields" / RawCopy(Struct(
         "po" / Struct(
             "command" / Const(0x40, Int8ub)),
-        "not_used0" / Padding(1),
-        "action" / Enum(Int8ub,
-                        Stay_Arm=0x01,
-                        Stay_Arm1=0x02,
-                        Sleep_Arm=0x03,
-                        Full_Arm=0x04,
-                        Disarm=0x05,
-                        Stay_Arm_StayD=0x06,
-                        Sleep_Arm_StayD=0x07,
-                        Disarm_Both_Disable_StayD=0x08,
-                        Bypass=0x10,
-                        Beep=0x10,
-                        PGM_On_Override=0x30,
-                        PGM_Off_Override=0x31,
-                        PGM_On=0x32,
-                        PGM_Off=0x33,
-                        Reload_RAM=0x80,
-                        Bus_Scan=0x85,
-                        Future_Use=0x90),
-        "argument" / Enum(Int8ub,
-                          One_Beep=0x04,
-                          Fail_Beep=0x08,
-                          Beep_Twice=0x0c,
-                          Accept_Beep=0x10),
-        "not_used1" / Padding(29),
-        "source_id" / Default(CommunicationSourceIDEnum, 1),
-        "user_high" / Default(Int8ub, 0),
-        "user_low" / Default(Int8ub, 0),
+        "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+        "_not_used0" / Padding(4),
+        "commands" / PartitionAdapter(BitStruct(
+            "partitions" / Array(8, _PartitionCommandEnum),
+        )),
+        "_not_used1" / Padding(4),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
@@ -373,26 +374,8 @@ PerformActionResponse = Struct("fields" / RawCopy(
                 "alarm_reporting_pending" / Flag,
                 "Windload_connected" / Flag,
                 "NeWare_connected" / Flag)),
-        "not_used0" / Padding(1),
-        "action" / Enum(Int8ub,
-                        Stay_Arm=0x01,
-                        Stay_Arm1=0x02,
-                        Sleep_Arm=0x03,
-                        Full_Arm=0x04,
-                        Disarm=0x05,
-                        Stay_Arm_StayD=0x06,
-                        Sleep_Arm_StayD=0x07,
-                        Disarm_Both_Disable_StayD=0x08,
-                        Bypass=0x10,
-                        Beep=0x10,
-                        PGM_On_Override=0x30,
-                        PGM_Off_Overrite=0x31,
-                        PGM_On=0x32,
-                        PGM_Of=0x33,
-                        Reload_RAM=0x80,
-                        Bus_Scan=0x85,
-                        Future_Use=0x90),
-        "not_used1" / Padding(33),
+        "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+        "_not_used0" / Padding(4),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 

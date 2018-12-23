@@ -10,6 +10,7 @@ LOGGING_LEVEL_FILE = logging.ERROR
 LOGGING_FILE = None             	# or set to file path LOGGING_FILE='/var/log/paradox.log'
 LOGGING_DUMP_PACKETS = False    	# Dump RAW Packets to log
 LOGGING_DUMP_MESSAGES = False   	# Dump Messages to log
+LOGGING_DUMP_STATUS = False         # Dump Status to log
 
 # Connection Type
 CONNECTION_TYPE = 'Serial'  		# Serial or IP
@@ -84,6 +85,12 @@ MQTT_PUBLISH_RAW_EVENTS = True
 MQTT_INTERFACE_TOPIC = 'interface'
 MQTT_TOGGLE_CODES = {}
 MQTT_USE_NUMERIC_STATES = False         # use 0 and 1 instead of True and False
+
+# Interfaces
+COMMAND_ALIAS = {						# alias for commands through text based interfaces
+    'arm': 'partition all arm',
+    'disarm': 'partition all disarm'
+}
 
 # Pushbullet
 PUSHBULLET_ENABLE = False
