@@ -121,7 +121,7 @@ class Interface(Thread):
         """Handle message received from the MQTT broker"""
         """Format TYPE LABEL COMMAND """
 
-        cfg.COMMAND_ALIAS.get(message, message)
+        message = cfg.COMMAND_ALIAS.get(message, message)
 
         tokens = message.split(" ")
 
