@@ -2,16 +2,12 @@ import paho.mqtt.client as mqtt
 import time
 import logging
 import json
-from threading import Thread
-import queue
 import os
 
 from config import user as cfg
 
 from paradox.lib.utils import SortableTuple
 from paradox.interfaces import Interface
-
-logger = logging.getLogger('PAI').getChild(__name__)
 
 PARTITION_HOMEBRIDGE_COMMANDS = dict(
     STAY_ARM='arm_stay', AWAY_ARM='arm', NIGHT_ARM='arm_sleep', DISARM='disarm')
@@ -37,6 +33,7 @@ class MQTTInterface(Interface):
     def __init__(self):
         super().__init__()
 
+        self.logger = logging.getLogger('PAI').getChild(__name__)
         self.mqtt = mqtt.Client("paradox_mqtt/{}".format(os.urandom(8).hex()))
         self.mqtt.on_message = self.handle_message
         self.mqtt.on_connect = self.handle_connect
@@ -80,7 +77,7 @@ class MQTTInterface(Interface):
     def stop(self):
         """ Stops the MQTT Interface Thread"""
         self.mqtt.disconnect()
-        logger.debug("Stopping MQTT Interface")
+        self.logger.debug("Stopping MQTT Interface")
         self.queue.put_nowait(SortableTuple((0, 'command', 'stop')))
         self.mqtt.loop_stop()
         self.join()
@@ -97,14 +94,14 @@ class MQTTInterface(Interface):
     # Handlers here
     def handle_message(self, client, userdata, message):
         """Handle message received from the MQTT broker"""
-        logger.info("message topic={}, payload={}".format(
+        self.logger.info("message topic={}, payload={}".format(
             message.topic, str(message.payload.decode("utf-8"))))
 
         if message.retain:
             return
 
         if self.alarm is None:
-            logger.warning("No alarm. Ignoring command")
+            self.logger.warning("No alarm. Ignoring command")
             return
 
         topic = message.topic.split(cfg.MQTT_BASE_TOPIC)[1]
@@ -112,7 +109,7 @@ class MQTTInterface(Interface):
         topics = topic.split("/")
 
         if len(topics) < 3:
-            logger.error(
+            self.logger.error(
                 "Invalid topic in mqtt message: {}".format(message.topic))
             return
 
@@ -122,7 +119,7 @@ class MQTTInterface(Interface):
             elif topics[2].upper() == "INFO":
                 level = logging.INFO
             else:
-                logger.error(
+                self.logger.error(
                     "Invalid notification level: {}".format(topics[2]))
                 return
 
@@ -131,7 +128,7 @@ class MQTTInterface(Interface):
             return
 
         if topics[1] != cfg.MQTT_CONTROL_TOPIC:
-            logger.error(
+            self.logger.error(
                 "Invalid subtopic in mqtt message: {}".format(message.topic))
             return
 
@@ -141,7 +138,7 @@ class MQTTInterface(Interface):
         # Process a Zone Command
         if topics[2] == cfg.MQTT_ZONE_TOPIC:
             if not self.alarm.control_zone(element, command):
-                logger.warning(
+                self.logger.warning(
                     "Zone command refused: {}={}".format(element, command))
 
         # Process a Partition Command
@@ -158,7 +155,7 @@ class MQTTInterface(Interface):
                     return
 
                 if tokens[1] not in cfg.MQTT_TOGGLE_CODES:
-                    logger.warning("Invalid toggle code {}".format(tokens[1]))
+                    self.logger.warning("Invalid toggle code {}".format(tokens[1]))
                     return
 
                 if element.lower() == 'all':
@@ -182,29 +179,29 @@ class MQTTInterface(Interface):
                     else:
                         command = 'arm'
                 else:
-                    logger.debug("Element {} not found".format(element))
+                    self.logger.debug("Element {} not found".format(element))
                     return
 
                 self.notification_handler.notify('mqtt', "Command by {}: {}".format(
                     cfg.MQTT_TOGGLE_CODES[tokens[1]], command), logging.INFO)
 
-            logger.debug("Partition command: {} = {}".format(element, command))
+            self.logger.debug("Partition command: {} = {}".format(element, command))
             if not self.alarm.control_partition(element, command):
-                logger.warning(
+                self.logger.warning(
                     "Partition command refused: {}={}".format(element, command))
 
         # Process an Output Command
         elif topics[2] == cfg.MQTT_OUTPUT_TOPIC:
-            logger.debug("Output command: {} = {}".format(element, command))
+            self.logger.debug("Output command: {} = {}".format(element, command))
 
             if not self.alarm.control_output(element, command):
-                logger.warning(
+                self.logger.warning(
                     "Output command refused: {}={}".format(element, command))
         else:
-            logger.error("Invalid control property {}".format(topics[2]))
+            self.logger.error("Invalid control property {}".format(topics[2]))
 
     def handle_disconnect(self, mqttc, userdata, rc):
-        logger.info("MQTT Broker Disconnected")
+        self.logger.info("MQTT Broker Disconnected")
         self.connected = False
 
         time.sleep(1)
@@ -219,10 +216,10 @@ class MQTTInterface(Interface):
                           bind_address=cfg.MQTT_BIND_ADDRESS)
 
     def handle_connect(self, mqttc, userdata, flags, result):
-        logger.info("MQTT Broker Connected")
+        self.logger.info("MQTT Broker Connected")
 
         self.connected = True
-        logger.debug(
+        self.logger.debug(
             "Subscribing to topics in {}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC))
         self.mqtt.subscribe(
             "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,

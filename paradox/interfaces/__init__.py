@@ -13,7 +13,7 @@ class Interface(Thread):
 
         self.alarm = None
         self.notification_handler = None
-        self.logger = None
+        self.logger = None  # assign logger in the subclass
         self.partitions = {}
 
         self.stop_running = Event()
