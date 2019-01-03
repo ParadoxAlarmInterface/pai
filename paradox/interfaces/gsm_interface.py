@@ -23,7 +23,6 @@ class GSMInterface(Interface):
     def __init__(self):
         super().__init__()
 
-        self.partitions = dict()
         self.port = None
         self.modem_connected = False
 

@@ -27,7 +27,6 @@ class SignalInterface(Interface):
         super().__init__()
 
         self.queue = queue.PriorityQueue()
-        self.partitions = dict()
         self.signal = None
         self.logger = logger
 

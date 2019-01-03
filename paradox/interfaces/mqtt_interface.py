@@ -9,6 +9,7 @@ import os
 from config import user as cfg
 
 from paradox.lib.utils import SortableTuple
+from paradox.interfaces import Interface
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -28,29 +29,23 @@ ELEMENT_TOPIC_MAP = dict(partition=cfg.MQTT_PARTITION_TOPIC, zone=cfg.MQTT_ZONE_
                          system=cfg.MQTT_SYSTEM_TOPIC, user=cfg.MQTT_USER_TOPIC)
 
 
-class MQTTInterface(Thread):
+class MQTTInterface(Interface):
     """Interface Class using MQTT"""
     name = 'mqtt'
     acceptsInitialState = True
 
     def __init__(self):
-        Thread.__init__(self)
+        super().__init__()
 
-        self.callback = None
         self.mqtt = mqtt.Client("paradox_mqtt/{}".format(os.urandom(8).hex()))
         self.mqtt.on_message = self.handle_message
         self.mqtt.on_connect = self.handle_connect
         self.mqtt.on_disconnect = self.handle_disconnect
         self.connected = False
-        self.alarm = None
-        self.partitions = {}
-        self.queue = queue.PriorityQueue()
 
-        self.notification_handler = None
         self.cache = dict()
 
         self.armed = dict()
-        self.alarm = None
 
     def run(self):
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
@@ -90,14 +85,6 @@ class MQTTInterface(Thread):
         self.mqtt.loop_stop()
         self.join()
 
-    def set_alarm(self, alarm):
-        """ Sets the alarm """
-        self.alarm = alarm
-
-    def set_notify(self, handler):
-        """ Set the notification handler"""
-        self.notification_handler = handler
-
     def event(self, raw):
         """ Enqueues an event"""
         self.queue.put_nowait(SortableTuple((2, 'event', raw)))
@@ -106,10 +93,6 @@ class MQTTInterface(Thread):
         """ Enqueues a change """
         self.queue.put_nowait(SortableTuple(
             (2, 'change', (element, label, property, value))))
-
-    # not supported
-    def notify(self, source, message, level):
-        pass
 
     # Handlers here
     def handle_message(self, client, userdata, message):

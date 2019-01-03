@@ -12,6 +12,7 @@ from threading import Thread, Event
 import binascii
 import os
 from paradox.lib.crypto import encrypt, decrypt
+from paradox.interfaces import Interface
 
 from config import user as cfg
 
@@ -40,20 +41,17 @@ ip_payload_connect_response = Aligned(16, Struct(
     'unknown' / Default(Int8ub, 0x00)), b'\xee')
 
 
-class IPInterface(Thread):
+class IPInterface(Interface):
     """Interface Class using a IP Interface"""
     name = 'IPI'
 
     def __init__(self):
-        Thread.__init__(self)
+        super().__init__()
 
         self.server_socket = None
         self.client_socket = None
         self.client_address = None
-        self.alarm = None
         self.stop_running = Event()
-        self.thread = None
-        self.loop = None
         self.key = cfg.IP_INTERFACE_PASSWORD
 
     def stop(self):
@@ -61,25 +59,6 @@ class IPInterface(Thread):
         logger.debug("Stopping IP Interface")
         self.stop_running.set()
         logger.debug("IP Stopped")
-
-    def set_alarm(self, alarm):
-        """ Sets the alarm """
-        self.alarm = alarm
-
-    def set_notify(self, handler):
-        """ Set the notification handler"""
-        self.notification_handler = handler
-
-    def event(self, raw):
-        """ Enqueues an event"""
-        return
-
-    def change(self, element, label, property, value):
-        """ Enqueues a change """
-        return
-
-    def notify(self, source, message, level):
-        return
 
     def run(self):
         logger.info("Starting IP Interface")
