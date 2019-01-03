@@ -136,7 +136,7 @@ class IPInterface(Interface):
 
                 m = ip_message.build(dict(header=dict(length=payload_len, unknown0=2, flags=flags, command=0), payload=payload))
                 logger.debug("IP -> AP: {}".format(binascii.hexlify(m)))
-                client.send(m)
+                self.client_socket.send(m)
 
             if tend - tstart < 0.1:
                 time.sleep(0.1)
