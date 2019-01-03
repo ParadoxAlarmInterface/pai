@@ -31,6 +31,7 @@ ELEMENT_TOPIC_MAP = dict(partition=cfg.MQTT_PARTITION_TOPIC, zone=cfg.MQTT_ZONE_
 class MQTTInterface(Thread):
     """Interface Class using MQTT"""
     name = 'mqtt'
+    acceptsInitialState = True
 
     def __init__(self):
         Thread.__init__(self)
