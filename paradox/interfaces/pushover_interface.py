@@ -7,6 +7,7 @@ from chump import Application
 
 from config import user as cfg
 from paradox.interfaces import Interface
+from paradox.lib.utils import SortableTuple
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -27,10 +28,29 @@ class PushoverInterface(Interface):
             self.app = Application(cfg.PUSHOVER_APPLICATION_KEY)
             if not self.app.is_authenticated:
                 raise Exception('Failed to authenticate with Pushover. Please check PUSHOVER_APPLICATION_KEY')
+
+            while True:
+                item = self.queue.get()
+                if item[1] == 'notify':
+                    self.handle_notify(item[2])
+                elif item[1] == 'command':
+                    if item[2] == 'stop':
+                        break
         except Exception:
             logger.exception("Pushover")
 
+    def stop(self):
+        """ Stops the Pushover interface"""
+        self.queue.put_nowait(SortableTuple((2, 'command', 'stop')))
+
     def notify(self, source, message, level):
+        self.queue.put_nowait(SortableTuple((2, 'notify', (source, message, level))))
+
+    def handle_notify(self, raw):
+        sender, message, level = raw
+        if level < logging.INFO:
+            return
+
         for user_key, devices_raw in cfg.PUSHOVER_BROADCAST_KEYS.items():
             user = self.users.get(user_key)
 
