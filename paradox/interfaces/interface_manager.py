@@ -49,6 +49,15 @@ class InterfaceManager():
             except Exception:
                 logger.exception("Unable to start Pushbullet Interface")
 
+        # Load Pushover service
+        if self.conf.PUSHOVER_ENABLE:
+            try:
+                logger.info("Using Pushover Interface")
+                from paradox.interfaces.pushover_interface import PushoverInterface
+                self.register(PushoverInterface())
+            except Exception:
+                logger.exception("Unable to start Pushover Interface")
+
         # Load IP Interface
         if self.conf.IP_INTERFACE_ENABLE:
             try:
