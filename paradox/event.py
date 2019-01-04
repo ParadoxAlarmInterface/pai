@@ -1,6 +1,7 @@
+
 from enum import Enum
 from copy import copy
-
+import typing
 
 class EventLevel(Enum):
     NOTSET = 0
@@ -14,15 +15,24 @@ class EventLevel(Enum):
 class Event:
 
     def __init__(self, eventMap, event=None, names=None):
-        self.level = EventLevel.NOTSET
         self.timestamp = 0
         self.eventMap = eventMap
-        self.data = {}
+
+        # default
+        self.level = EventLevel.NOTSET
+        self.tags = []
+        self.type = 'system'
+        self.message = ''
+        self.message_tpl = ''
+        self.change = {}
+        self.additional_data = {}
+
         if event is not None:
             self.parse(event, names)
 
     def __repr__(self):
-        return str(self.data)
+        return str(self.__class__) + '\n' + '\n'.join(
+            ('{} = {}'.format(item, self.__dict__[item]) for item in self.__dict__))
 
     def parse(self, event, names):
         if event.fields.value.po.command != 0x0e:
@@ -33,35 +43,41 @@ class Event:
         self.partition = self.raw.partition
         self.module = self.raw.module_serial
         self.label_type = self.raw.label_type
-        self.label = self.raw.label
+        self.label = self.raw.label.strip(b'\0 ').decode('utf-8')
 
         self.major = self.raw.event.major
         self.minor = self.raw.event.minor
 
-        if self.major in self.eventMap:
-            self.data = self.parseMap(self.major, self.minor, names)
+        self._parseMap(names)
 
-    def parseMap(self, major, minor, names):
-        event = self.eventMap[major]
-        event['message'] = event.get('message', '')
+    def _parseMap(self, names):
+        if self.major not in self.eventMap:
+            return
 
-        if names is not None and 'type' in event and event['type'] in names and \
-                minor in names[event['type']]:
-            event['label'] = names[event['type']][minor]
+        event_map = copy(self.eventMap[self.major])  # for inplace modifications
 
-        if '{}' in event['message']:
-            event['message'] = event['message'].format(event['label'])
+        if 'sub' in event_map and self.minor in event_map['sub']:
+            sub = event_map['sub'][self.minor]
 
-        if 'sub' in event and minor in event['sub']:
-            sub = event['sub'][minor]
             for k in sub:
                 if k == 'message':
-                    event[k] = '{} {}'.format(event[k], sub[k])
-                elif isinstance(sub[k], list):
-                    event[k] = event.get(k, []).extend(sub[k])
+                    event_map[k] = '{}: {}'.format(event_map[k], sub[k]) if event_map[k] else sub[k]
+                elif isinstance(sub[k], typing.List):  # for tags or other lists
+                    event_map[k] = event_map.get(k, []).extend(sub[k])
                 else:
-                    event[k] = sub[k]
-            del event['sub']
+                    event_map[k] = sub[k]
+            del event_map['sub']
 
-    def level(self):
-        return self.level
+        callables = (k for k in event_map if isinstance(event_map[k], typing.Callable))
+        for k in callables:
+            event_map[k] = event_map[k](self, names)
+
+        self.level = event_map.get('level', self.level)
+        self.type = event_map.get('type', self.type)
+        self.message_tpl = event_map.get('message', self.message_tpl)
+        self.change = event_map.get('change', self.change)
+        self.tags = event_map.get('tags', [])
+
+        self.additional_data = {k: v for k, v in event_map.items() if not hasattr(self, k)}
+
+        self.message = self.message_tpl.format(**self.__dict__)
