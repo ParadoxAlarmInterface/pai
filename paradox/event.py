@@ -35,8 +35,8 @@ class Event:
         self.label_type = self.raw.label_type
         self.label = self.raw.label
 
-        self.major = self.raw.event[0]
-        self.minor = self.raw.event[1]
+        self.major = self.raw.event.major
+        self.minor = self.raw.event.minor
 
         if self.major in self.eventMap:
             self.data = self.parseMap(self.major, self.minor, names)

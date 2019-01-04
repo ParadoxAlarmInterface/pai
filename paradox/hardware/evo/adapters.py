@@ -629,9 +629,8 @@ class EventAdapter(Adapter):
         partition = obj[1] & 0x0f
 
         return {
-            'major': (event_group, eventGroupMap[event_group]),
-            'minor': (event_1, subEventGroupMap[event_group][event_1]),
-            'minor2': (event_2, None),
-            'type': subEventGroupMap[event_group][-1],
+            'major': event_group,
+            'minor': event_1,
+            'minor2': event_2,
             'partition': partition
         }
