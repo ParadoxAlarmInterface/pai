@@ -13,9 +13,6 @@ import serial
 from paradox.lib.utils import SortableTuple
 from config import user as cfg
 
-logger = logging.getLogger('PAI').getChild(__name__)
-
-
 class GSMInterface(Interface):
     """Interface Class using GSM"""
     name = 'gsm'
@@ -23,18 +20,18 @@ class GSMInterface(Interface):
     def __init__(self):
         super().__init__()
 
-        self.partitions = dict()
+        self.logger = logging.getLogger('PAI').getChild(__name__)
         self.port = None
         self.modem_connected = False
 
     def stop(self):
         """ Stops the GSM Interface Thread"""
-        logger.debug("Stopping GSM Interface")
+        self.logger.debug("Stopping GSM Interface")
         self.stop_running.set()
 
         self.port.close()
 
-        logger.debug("GSM Stopped")
+        self.logger.debug("GSM Stopped")
 
     def event(self, raw):
         """ Enqueues an event"""
@@ -71,13 +68,13 @@ class GSMInterface(Interface):
 
             data = data.strip().decode('latin-1')
         except Exception:
-            logger.exception("Modem write")
+            self.logger.exception("Modem write")
             self.modem_connected = False
 
         return data
 
     def run(self):
-        logger.info("Starting GSM Interface")
+        self.logger.info("Starting GSM Interface")
 
         try:
             while not self.stop_running.isSet():
@@ -109,14 +106,14 @@ class GSMInterface(Interface):
 
                 except Exception:
                     self.modem_connected = False
-                    # logger.exception("")
+                    # self.logger.exception("")
 
         except (KeyboardInterrupt, SystemExit):
-            logger.debug("GSM loop stopping")
+            self.logger.debug("GSM loop stopping")
             return
 
         except Exception:
-            logger.exception("GSM loop")
+            self.logger.exception("GSM loop")
 
     def run_loop(self):
         try:
@@ -131,13 +128,13 @@ class GSMInterface(Interface):
         except queue.Empty as e:
             return True
         except Exception:
-            logger.exception("loop")
+            self.logger.exception("loop")
 
         return True
 
     def connected(self):
         if not self.modem_connected:
-            logger.info("Using {} at {} baud".format(
+            self.logger.info("Using {} at {} baud".format(
                 cfg.GSM_MODEM_PORT, cfg.GSM_MODEM_BAUDRATE))
             commands = [b'AT', b'ATE0', b'AT+CMGF=1',
                         b'AT+CNMI=1,2,0,0,0', b'AT+CUSD=1,"*111#"']
@@ -146,14 +143,14 @@ class GSMInterface(Interface):
                     cfg.GSM_MODEM_PORT, baudrate=cfg.GSM_MODEM_BAUDRATE, timeout=5)
                 for command in commands:
                     if self.port.write(command) == 0:
-                        logger.error("Unable to initialize modem")
+                        self.logger.error("Unable to initialize modem")
                         return False
             except Exception:
-                logger.exception("Modem connect error")
+                self.logger.exception("Modem connect error")
                 return False
 
             self.modem_connected = True
-            logger.info("Started GSM Interface")
+            self.logger.info("Started GSM Interface")
 
         return True
 
@@ -164,7 +161,7 @@ class GSMInterface(Interface):
 
     def send_message(self, message):
         if self.port is None:
-            logger.warning("GSM not available when sending message")
+            self.logger.warning("GSM not available when sending message")
             return
 
         for dst in cfg.GSM_CONTACTS:
@@ -173,7 +170,7 @@ class GSMInterface(Interface):
     def handle_message(self, timestamp, source, message):
         """ Handle GSM message. It should be a command """
 
-        logger.debug("Received Message {} {} {}".format(
+        self.logger.debug("Received Message {} {} {}".format(
             timestamp, source, message))
 
         if self.alarm is None:
@@ -186,17 +183,17 @@ class GSMInterface(Interface):
             ret = self.send_command(message)
 
             if ret:
-                logger.info("ACCEPTED: {}".format(message))
+                self.logger.info("ACCEPTED: {}".format(message))
                 self.send_sms(source, "ACCEPTED: {}".format(message))
                 self.notification_handler.notify(
                     self.name, "ACCEPTED: {}: {}".format(source, message), logging.INFO)
             else:
-                logger.warning("REJECTED: {}".format(message))
+                self.logger.warning("REJECTED: {}".format(message))
                 self.send_sms(source, "REJECTED: {}".format(message))
                 self.notification_handler.notify(
                     self.name, "REJECTED: {}: {}".format(source, message), logging.INFO)
         else:
-            logger.warning("REJECTED: {}".format(message))
+            self.logger.warning("REJECTED: {}".format(message))
             self.notification_handler.notify(
                 self.name, "REJECTED: {}: {}".format(source, message), logging.INFO)
 

@@ -9,17 +9,15 @@ from config import user as cfg
 class Interface(Thread):
 
     def __init__(self):
-        Thread.__init__(self)
+        super().__init__()
 
         self.alarm = None
         self.notification_handler = None
-        self.logger = None
+        self.logger = None  # assign logger in the subclass
+        self.partitions = {}
 
         self.stop_running = Event()
         self.stop_running.clear()
-
-        self.thread = None
-        self.loop = None
 
         self.queue = queue.PriorityQueue()
 
@@ -187,3 +185,6 @@ class Interface(Thread):
             return message
 
         return None
+
+    def send_message(self, message):
+        pass

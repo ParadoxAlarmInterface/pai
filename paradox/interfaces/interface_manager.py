@@ -69,7 +69,7 @@ class InterfaceManager():
 
     def register(self, interface):
         logger.debug("Registering Interface {}".format(interface.name))
-        interface.start()
+        interface.start()  # Starts interface thread
 
         self.interfaces.append(interface)
         try:

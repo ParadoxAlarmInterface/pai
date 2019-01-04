@@ -6,10 +6,7 @@ from paradox.interfaces import Interface
 
 from ws4py.client import WebSocketBaseClient
 from ws4py.manager import WebSocketManager
-from ws4py import format_addresses, configure_logger
 
-from threading import Thread
-import queue
 from pushbullet import Pushbullet
 
 import time
@@ -21,14 +18,12 @@ from paradox.lib.utils import SortableTuple
 from config import user as cfg
 
 
-logger = logging.getLogger('PAI').getChild(__name__)
-
-
 class PushBulletWSClient(WebSocketBaseClient):
 
     def init(self):
         """ Initializes the PB WS Client"""
 
+        self.logger = logging.getLogger('PAI').getChild(__name__)
         self.pb = Pushbullet(cfg.PUSHBULLET_KEY, cfg.PUSHBULLET_SECRET)
         self.manager = WebSocketManager()
         self.alarm = None
@@ -43,11 +38,11 @@ class PushBulletWSClient(WebSocketBaseClient):
 
     def handshake_ok(self):
         """ Callback trigger when connection succeeded"""
-        logger.info("Handshake OK")
+        self.logger.info("Handshake OK")
         self.manager.add(self)
         self.manager.start()
         for chat in self.pb.chats:
-            logger.debug("Associated contacts: {}".format(chat))
+            self.logger.debug("Associated contacts: {}".format(chat))
 
         # Receiving pending messages
         self.received_message(json.dumps({"type": "tickle", "subtype": "push"}))
@@ -56,12 +51,12 @@ class PushBulletWSClient(WebSocketBaseClient):
 
     def received_message(self, message):
         """ Handle Pushbullet message. It should be a command """
-        logger.debug("Received Message {}".format(message))
+        self.logger.debug("Received Message {}".format(message))
 
         try:
             message = json.loads(str(message))
         except:
-            logger.exception("Unable to parse message")
+            self.logger.exception("Unable to parse message")
             return
 
         if self.alarm is None:
@@ -69,7 +64,7 @@ class PushBulletWSClient(WebSocketBaseClient):
         if message['type'] == 'tickle' and message['subtype'] == 'push':
             now = time.time()
             pushes = self.pb.get_pushes(modified_after=int(now) - 20, limit=1, filter_inactive=True)
-            logger.debug("got pushes {}".format(pushes))
+            self.logger.debug("got pushes {}".format(pushes))
             for p in pushes:
                 self.pb.dismiss_push(p.get("iden"))
                 self.pb.delete_push(p.get("iden"))
@@ -81,19 +76,19 @@ class PushBulletWSClient(WebSocketBaseClient):
                     ret = self.send_command(p.get('body'))
 
                     if ret:
-                        logger.info("From {} ACCEPTED: {}".format(p.get('sender_email_normalized'), p.get('body')))
+                        self.logger.info("From {} ACCEPTED: {}".format(p.get('sender_email_normalized'), p.get('body')))
                     else:
-                        logger.warning("From {} UNKNOWN: {}".format(p.get('sender_email_normalized'), p.get('body')))
+                        self.logger.warning("From {} UNKNOWN: {}".format(p.get('sender_email_normalized'), p.get('body')))
                 else:
-                    logger.warning("Command from INVALID SENDER {}: {}".format(p.get('sender_email_normalized'), p.get('body')))
+                    self.logger.warning("Command from INVALID SENDER {}: {}".format(p.get('sender_email_normalized'), p.get('body')))
 
     def unhandled_error(self, error):
-        logger.error("{}".format(error))
+        self.logger.error("{}".format(error))
 
         try:
             self.terminate()
         except Exception:
-            logger.exception("Closing Pushbullet WS")
+            self.logger.exception("Closing Pushbullet WS")
 
         self.close()
 
@@ -103,7 +98,7 @@ class PushBulletWSClient(WebSocketBaseClient):
                 try:
                     self.pb.push_note("paradox", msg, chat=chat)
                 except Exception:
-                    logger.exception("Sending message")
+                    self.logger.exception("Sending message")
                     time.sleep(5)
 
     def notify(self, source, message, level):
@@ -126,7 +121,7 @@ class PushBulletInterface(Interface):
         self.pb_ws = None
 
     def run(self):
-        logger.info("Starting Pushbullet Interface")
+        self.logger.info("Starting Pushbullet Interface")
         try:
             self.pb_ws = PushBulletWSClient('wss://stream.pushbullet.com/websocket/{}'.format(cfg.PUSHBULLET_KEY))
             self.pb_ws.init()
@@ -145,7 +140,7 @@ class PushBulletInterface(Interface):
                     if item[2] == 'stop':
                         break
         except Exception:
-            logger.exception("PB")
+            self.logger.exception("PB")
 
     def set_alarm(self, alarm):
         self.pb_ws.set_alarm(alarm)

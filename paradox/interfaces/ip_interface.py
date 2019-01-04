@@ -4,7 +4,6 @@
 
 import time
 import logging
-import datetime
 import socket
 import select
 from construct import GreedyBytes, Struct, Aligned, Const, Int8ub, Bytes, this, Int16ub, Int16ul, BitStruct, Default, BitsInteger, Flag, Enum
@@ -12,10 +11,9 @@ from threading import Thread, Event
 import binascii
 import os
 from paradox.lib.crypto import encrypt, decrypt
+from paradox.interfaces import Interface
 
 from config import user as cfg
-
-logger = logging.getLogger('PAI').getChild(__name__)
 
 ip_message = Struct(
         "header" / Aligned(16,Struct(
@@ -40,67 +38,46 @@ ip_payload_connect_response = Aligned(16, Struct(
     'unknown' / Default(Int8ub, 0x00)), b'\xee')
 
 
-class IPInterface(Thread):
+class IPInterface(Interface):
     """Interface Class using a IP Interface"""
     name = 'IPI'
 
     def __init__(self):
-        Thread.__init__(self)
+        super().__init__()
 
+        self.logger = logging.getLogger('PAI').getChild(__name__)
         self.server_socket = None
         self.client_socket = None
         self.client_address = None
-        self.alarm = None
         self.stop_running = Event()
-        self.thread = None
-        self.loop = None
         self.key = cfg.IP_INTERFACE_PASSWORD
 
     def stop(self):
         """ Stops the IP Interface Thread"""
-        logger.debug("Stopping IP Interface")
+        self.logger.debug("Stopping IP Interface")
         self.stop_running.set()
-        logger.debug("IP Stopped")
-
-    def set_alarm(self, alarm):
-        """ Sets the alarm """
-        self.alarm = alarm
-
-    def set_notify(self, handler):
-        """ Set the notification handler"""
-        self.notification_handler = handler
-
-    def event(self, raw):
-        """ Enqueues an event"""
-        return
-
-    def change(self, element, label, property, value):
-        """ Enqueues a change """
-        return
-
-    def notify(self, source, message, level):
-        return
+        self.logger.debug("IP Stopped")
 
     def run(self):
-        logger.info("Starting IP Interface")
+        self.logger.info("Starting IP Interface")
 
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
         server_socket.bind((cfg.IP_INTERFACE_BIND_ADDRESS, cfg.IP_INTERFACE_BIND_PORT))
         server_socket.listen(1)
-        logger.info("IP Open")
+        self.logger.info("IP Open")
 
         s_list = [server_socket]
 
         self.client_socket = None
         self.stop_running.clear()
-        logger.debug("Waiting for the Alarm")
+        self.logger.debug("Waiting for the Alarm")
 
         # Wait for the alarm
         while not self.alarm and not self.stop_running.isSet():
             time.sleep(5)
-        logger.info("Ready")
+        self.logger.info("Ready")
         while True:
             rd, wt, ex = select.select(s_list, [], s_list, 5)
 
@@ -116,11 +93,11 @@ class IPInterface(Thread):
                         self.alarm.pause()
                         self.client_thread = Thread(target=self.connection_watch)
 
-                        logger.info("New client connected: {}".format(client_address))
+                        self.logger.info("New client connected: {}".format(client_address))
                     else:
                         self.client_socket, client_address = r.accept()
                         self.client_socket.close()
-                        logger.warn("Client connection denied")
+                        self.logger.warn("Client connection denied")
                         self.client_socket = None
 
                 else:
@@ -135,7 +112,7 @@ class IPInterface(Thread):
 
     def handle_disconnect(self):
         self.key = cfg.IP_INTERFACE_PASSWORD
-        logger.info("Client disconnected")
+        self.logger.info("Client disconnected")
         try:
             if self.client_socket is not None:
                 self.client_socket.close()
@@ -156,8 +133,8 @@ class IPInterface(Thread):
                 flags = 0x73
 
                 m = ip_message.build(dict(header=dict(length=payload_len, unknown0=2, flags=flags, command=0), payload=payload))
-                logger.debug("IP -> AP: {}".format(binascii.hexlify(m)))
-                client.send(m)
+                self.logger.debug("IP -> AP: {}".format(binascii.hexlify(m)))
+                self.client_socket.send(m)
 
             if tend - tstart < 0.1:
                 time.sleep(0.1)
@@ -165,7 +142,7 @@ class IPInterface(Thread):
     def process_client_message(self, client, data):
         message = ip_message.parse(data)
         message_payload = data[16:]
-        logger.debug("AP -> IP: {}".format(binascii.hexlify(data)))
+        self.logger.debug("AP -> IP: {}".format(binascii.hexlify(data)))
         if len(message_payload) >= 16  and message.header.flags & 0x01 != 0 and len(message_payload) % 16 == 0:
             message_payload = decrypt(message_payload, self.key)[:37]
 
@@ -175,7 +152,7 @@ class IPInterface(Thread):
             password = message_payload[:4]
 
             if password != cfg.IP_INTERFACE_PASSWORD:
-                logger.warn("Authentication Error")
+                self.logger.warn("Authentication Error")
                 return
 
             # Generate a new key
@@ -195,10 +172,10 @@ class IPInterface(Thread):
             try:
                 payload = self.alarm.send_wait_simple(message=message_payload[:37])
             except Exception:
-                logger.exception("Send to panel")
+                self.logger.exception("Send to panel")
                 return
         else:
-            logger.warn("UNKNOWN: {}".format(binascii.hexlify(data)))
+            self.logger.warn("UNKNOWN: {}".format(binascii.hexlify(data)))
             return
 
         if payload is not None:
@@ -214,5 +191,5 @@ class IPInterface(Thread):
                     flags = 0x39
 
             m = ip_message.build(dict(header=dict(length=payload_length, unknown0=response_code, flags=flags, command=message.header.command), payload=payload))
-            logger.debug("IP -> AP: {}".format(binascii.hexlify(m)))
+            self.logger.debug("IP -> AP: {}".format(binascii.hexlify(m)))
             client.send(m)

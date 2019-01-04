@@ -9,9 +9,6 @@ from config import user as cfg
 from paradox.interfaces import Interface
 from paradox.lib.utils import SortableTuple
 
-logger = logging.getLogger('PAI').getChild(__name__)
-
-
 class PushoverInterface(Interface):
     """Interface Class using Pushover"""
     name = 'pushover'
@@ -19,11 +16,12 @@ class PushoverInterface(Interface):
     def __init__(self):
         super().__init__()
 
+        self.logger = logging.getLogger('PAI').getChild(__name__)
         self.app = None
         self.users = {}
 
     def run(self):
-        logger.info("Starting Pushover Interface")
+        self.logger.info("Starting Pushover Interface")
         try:
             self.app = Application(cfg.PUSHOVER_APPLICATION_KEY)
             if not self.app.is_authenticated:
@@ -37,7 +35,7 @@ class PushoverInterface(Interface):
                     if item[2] == 'stop':
                         break
         except Exception:
-            logger.exception("Pushover")
+            self.logger.exception("Pushover")
 
     def stop(self):
         """ Stops the Pushover interface"""
@@ -67,7 +65,7 @@ class PushoverInterface(Interface):
                 devices = list(filter(bool, re.split('[\s]*,[\s]*', devices_raw)))
 
                 for elem in (elem for elem in devices if elem not in user.devices):
-                    logger.warning('%s is not in the Pushover device list for the user %s' % (elem, user_key))
+                    self.logger.warning('%s is not in the Pushover device list for the user %s' % (elem, user_key))
 
                 for device in devices:
                     user.send_message(message, title='Alarm', device=device)
