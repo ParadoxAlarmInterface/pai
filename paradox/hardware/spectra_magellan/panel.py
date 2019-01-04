@@ -12,6 +12,8 @@ from .parsers import Construct, CloseConnection, ErrorMessage, InitializeCommuni
     ReadEEPROMResponse, LiveEvent, RAMDataParserMap, Container
 from ..panel import Panel as PanelBase
 
+from .event import event_map
+
 logger = logging.getLogger('PAI').getChild(__name__)
 
 PARTITION_ACTIONS = dict(arm=0x04, disarm=0x05, arm_stay=0x01, arm_sleep=0x03,  arm_stay_stayd=0x06, arm_sleep_stay=0x07, disarm_all=0x08)
@@ -20,6 +22,8 @@ PGM_ACTIONS = dict(on_override=0x30, off_override=0x31, on=0x32, off=0x33, pulse
 
 
 class Panel(PanelBase):
+
+    event_map = event_map
 
     mem_map = {
         "status_base1": 0x8000,

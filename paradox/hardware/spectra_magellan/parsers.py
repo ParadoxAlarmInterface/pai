@@ -140,7 +140,7 @@ LiveEvent = Struct("fields" / RawCopy(
                 "Windload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "time" / DateAdapter(Bytes(6)),
-        "event" / EventAdapter(Bytes(2)),
+        "event" / Bytes(2),
         "partition" / ExprAdapter(Byte, obj_ + 1, obj_ - 1),
         "module_serial" / ModuleSerialAdapter(Bytes(4)),
         "label_type" / Bytes(1),

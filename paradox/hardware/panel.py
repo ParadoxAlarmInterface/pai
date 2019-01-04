@@ -27,6 +27,7 @@ def iterate_properties(data):
 
 class Panel:
     mem_map = {}
+    event_map = {}
 
     def __init__(self, core, product_id):
         self.core = core

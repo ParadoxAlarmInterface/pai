@@ -11,6 +11,7 @@ from construct import Container
 
 from config import user as cfg
 from paradox.hardware import create_panel
+from paradox import event
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -349,16 +350,13 @@ class Paradox:
 
     def handle_event(self, message):
         """Process cfg.Live Event Message and dispatch it to the interface module"""
-        event = message.fields.value.event
-        logger.debug("Handle Event: {}".format(event))
+        evt = event.Event(self.panel.event_map, message, self.labels)
 
-        new_event = self.panel.process_event(event)
-
-        self.panel.generate_event_notifications(new_event)
+        logger.debug("Handle Event: {}".format(evt))
 
         # Publish event
-        if self.interface is not None:
-            self.interface.event(raw=new_event)
+        #if self.interface is not None:
+        #    self.interface.event(evt)
 
     def update_properties(self, element_type, key, change, force_publish=False):
         try:
