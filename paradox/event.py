@@ -1,7 +1,13 @@
-
-from enum import Enum
-from copy import copy
+import string
 import typing
+from copy import copy
+from enum import Enum
+
+
+class Formatter(string.Formatter):
+    def get_value(self, key, args, kwargs):
+        return getattr(args[0], key)
+
 
 class EventLevel(Enum):
     NOTSET = 0
@@ -22,7 +28,6 @@ class Event:
         self.level = EventLevel.NOTSET
         self.tags = []
         self.type = 'system'
-        self.message = ''
         self.message_tpl = ''
         self.change = {}
         self.additional_data = {}
@@ -31,10 +36,14 @@ class Event:
             self.parse(event, names)
 
     def __repr__(self):
-        return str(self.__class__) + '\n' + '\n'.join(
-            ('{} = {}'.format(item, self.__dict__[item]) for item in self.__dict__))
+        vars = {}
+        vars.update(self.__dict__)
+        vars['message']=self.message
 
-    def parse(self, event, names):
+        return str(self.__class__) + '\n' + '\n'.join(
+            ('{} = {}'.format(item, vars[item]) for item in vars))
+
+    def parse(self, event, names=None):
         if event.fields.value.po.command != 0x0e:
             raise(Exception("Invalid Event"))
 
@@ -47,6 +56,7 @@ class Event:
 
         self.major = self.raw.event.major
         self.minor = self.raw.event.minor
+        self.names = names or {}
 
         self._parseMap(names)
 
@@ -78,6 +88,17 @@ class Event:
         self.change = event_map.get('change', self.change)
         self.tags = event_map.get('tags', [])
 
-        self.additional_data = {k: v for k, v in event_map.items() if not hasattr(self, k)}
+        self.additional_data = {k: v for k, v in event_map.items() if k not in ['message'] and not hasattr(self, k)}
 
-        self.message = self.message_tpl.format(**self.__dict__)
+    @property
+    def message(self):
+        return Formatter().format(self.message_tpl, self)
+
+    @property
+    def name(self):
+        key = self.partition if self.type == 'partition' else self.minor
+
+        if self.type in self.names and key in self.names[self.type]:
+            return self.names[self.type][key]
+
+        return '-'
