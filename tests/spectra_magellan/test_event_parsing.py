@@ -1,3 +1,8 @@
+import binascii
+from paradox.hardware.spectra_magellan.parsers import LiveEvent
+from paradox.hardware.spectra_magellan.event import event_map
+from paradox.event import Event
+
 events = [
 	b'e2141301040b08300200000000000000000000000000000000000000000000020000000055', # Software Log on
 	b'e2141301040b042d0600000000000000000000000000000000000000000000010000000051', # Clock loss restore
@@ -20,4 +25,12 @@ events = [
     b'e2141301040b09020900000000000258585858585858585858582020202020010000000098', # {'type': 'Partition', 'minor': (9, 'Squawk OFF (Partition 1)'), 'major': (2, 'Partition status')}
     b'e2141301040b0a020c0000000000025858585858585858585858202020202001000000009c', # {'type': 'Partition', 'minor': (12, 'Arm partition'), 'major': (2, 'Partition status')}
 	b'e2141301040b09020b0000000000025858585858585858585858202020202001000000009a', # {'type': 'Partition', 'minor': (11, 'Disarm partition'), 'major': (2, 'Partition status')}
-    ]
+]
+
+def test_disarm_partition():
+    hex = b'e2141301040b09020b0100000000025858585858585858585858202020202001000000009b' # {'type': 'Partition', 'minor': (11, 'Disarm partition'), 'major': (2, 'Partition status')}
+    payload = binascii.unhexlify(hex)
+
+    raw = LiveEvent.parse(payload)
+    event = Event(event_map, raw, {})
+    print(event)
