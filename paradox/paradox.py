@@ -354,6 +354,23 @@ class Paradox:
 
         logger.debug("Handle Event: {}".format(evt))
 
+        # Temporary to catch labesl/properties in wrong places
+        # TODO: REMOVE
+        if evt.type in self.labels:
+            if evt.label in self.labels[evt.type]:
+                eid = self.labels[evt.type][evt.label]
+                for k in evt.change:
+                    if k not in self.data[evt.type][eid]:
+                        logger.warn("Missing property {} in {}/{}".format(k, evt.type, evt.label))
+            else:
+                logger.warn("Missing label {} in type {}".format(evt.label, evt.label))
+        else:
+            logger.warn("Missing type {}".format(evt.type))
+        # Temporary end
+
+        if len(evt.change) > 0 and evt.type in self.labels and evt.label in self.labels[evt.type]:
+            self.update_properties(evt.type, self.labels[evt.type][evt.label], evt.change)
+
         # Publish event
         #if self.interface is not None:
         #    self.interface.event(evt)
