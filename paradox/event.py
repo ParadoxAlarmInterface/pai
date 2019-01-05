@@ -22,7 +22,7 @@ class Event:
 
     def __init__(self, event_map, event=None, names=None):
         self.timestamp = 0
-        self.event_map = event_map
+        self._event_map = event_map
 
         # default
         self.level = EventLevel.NOTSET
@@ -41,7 +41,7 @@ class Event:
         vars['message'] = self.message
 
         return str(self.__class__) + '\n' + '\n'.join(
-            ('{} = {}'.format(item, vars[item]) for item in vars))
+            ('{} = {}'.format(item, vars[item]) for item in vars if not item.startswith('_')))
 
     def parse(self, event, names=None):
         if event.fields.value.po.command != 0x0e:
@@ -56,15 +56,15 @@ class Event:
 
         self.major = self.raw.event.major
         self.minor = self.raw.event.minor
-        self.names = names or {}
+        self._names = names or {}
 
         self._parse_map(names)
 
     def _parse_map(self, names):
-        if self.major not in self.event_map:
+        if self.major not in self._event_map:
             raise(Exception("Unknown event major: {}".format(self.raw)))
 
-        event_map = copy(self.event_map[self.major])  # for inplace modifications
+        event_map = copy(self._event_map[self.major])  # for inplace modifications
 
         if 'sub' in event_map and self.minor in event_map['sub']:
             sub = event_map['sub'][self.minor]
@@ -98,7 +98,7 @@ class Event:
     def name(self):
         key = self.partition if self.type == 'partition' else self.minor
 
-        if self.type in self.names and key in self.names[self.type]:
-            return self.names[self.type][key]
+        if self.type in self._names and key in self._names[self.type]:
+            return self._names[self.type][key]
 
         return '-'
