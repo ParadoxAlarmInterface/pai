@@ -51,7 +51,7 @@ class Event:
         self.timestamp = self.raw.time
         self.partition = self.raw.partition
         self.module = self.raw.module_serial
-        self.label_type = self.raw.label_type
+        self.label_type = self.raw.get('label_type', None)
         self.label = self.raw.label.strip(b'\0 ').decode('utf-8')
 
         self.major = self.raw.event.major

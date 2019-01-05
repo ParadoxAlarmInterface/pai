@@ -146,9 +146,9 @@ LiveEvent = Struct("fields" / RawCopy(
         ),
         "partition" / ExprAdapter(Byte, obj_ + 1, obj_ - 1),
         "module_serial" / ModuleSerialAdapter(Bytes(4)),
-        "label_type" / Bytes(1),
+        "unknown0" / Bytes(1),
         "label" / Bytes(16),
-        "unknown" / Bytes(1),
+        "unknown1" / Bytes(1),
         "reserved2" / Bytes(4),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
