@@ -38,7 +38,7 @@ class Event:
     def __repr__(self):
         vars = {}
         vars.update(self.__dict__)
-        vars['message']=self.message
+        vars['message'] = self.message
 
         return str(self.__class__) + '\n' + '\n'.join(
             ('{} = {}'.format(item, vars[item]) for item in vars))
