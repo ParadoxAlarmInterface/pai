@@ -20,9 +20,9 @@ class EventLevel(Enum):
 
 class Event:
 
-    def __init__(self, eventMap, event=None, names=None):
+    def __init__(self, event_map, event=None, names=None):
         self.timestamp = 0
-        self.eventMap = eventMap
+        self.event_map = event_map
 
         # default
         self.level = EventLevel.NOTSET
@@ -58,20 +58,20 @@ class Event:
         self.minor = self.raw.event.minor
         self.names = names or {}
 
-        self._parseMap(names)
+        self._parse_map(names)
 
-    def _parseMap(self, names):
-        if self.major not in self.eventMap:
-            return
+    def _parse_map(self, names):
+        if self.major not in self.event_map:
+            raise(Exception("Unknown event major: {}".format(self.raw)))
 
-        event_map = copy(self.eventMap[self.major])  # for inplace modifications
+        event_map = copy(self.event_map[self.major])  # for inplace modifications
 
         if 'sub' in event_map and self.minor in event_map['sub']:
             sub = event_map['sub'][self.minor]
 
             for k in sub:
                 if k == 'message':
-                    event_map[k] = '{}: {}'.format(event_map[k], sub[k]) if event_map[k] else sub[k]
+                    event_map[k] = '{}: {}'.format(event_map[k], sub[k]) if k in event_map else sub[k]
                 elif isinstance(sub[k], typing.List):  # for tags or other lists
                     event_map[k] = event_map.get(k, []).extend(sub[k])
                 else:
