@@ -3,6 +3,7 @@ import time
 import logging
 import json
 import os
+import re
 
 from config import user as cfg
 
@@ -23,6 +24,12 @@ ELEMENT_TOPIC_MAP = dict(partition=cfg.MQTT_PARTITION_TOPIC, zone=cfg.MQTT_ZONE_
                          output=cfg.MQTT_OUTPUT_TOPIC, repeater=cfg.MQTT_REPEATER_TOPIC,
                          bus=cfg.MQTT_BUS_TOPIC, keypad=cfg.MQTT_KEYPAD_TOPIC,
                          system=cfg.MQTT_SYSTEM_TOPIC, user=cfg.MQTT_USER_TOPIC)
+
+re_topic_dirty = re.compile(r'[+#/]')
+
+
+def sanitize_topic_part(name):
+    return re_topic_dirty.sub('_', name)
 
 
 class MQTTInterface(Interface):
@@ -272,7 +279,7 @@ class MQTTInterface(Interface):
         self.publish('{}/{}/{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                              cfg.MQTT_STATES_TOPIC,
                                              element_topic,
-                                             label,
+                                             sanitize_topic_part(label),
                                              attribute),
                      "{}".format(publish_value), 0, cfg.MQTT_RETAIN)
 
@@ -333,7 +340,7 @@ class MQTTInterface(Interface):
         self.publish('{}/{}/{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                              cfg.MQTT_STATES_TOPIC,
                                              element_topic,
-                                             label,
+                                             sanitize_topic_part(label),
                                              summary_topic),
                      "{}".format(state), 0, cfg.MQTT_RETAIN)
 
