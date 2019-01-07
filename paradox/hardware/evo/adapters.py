@@ -628,9 +628,9 @@ class EventAdapter(Adapter):
         event_2 = obj[3] + (event_high_nibble << 8)
         partition = obj[1] & 0x0f
 
-        return {
+        return Container({
             'major': event_group,
             'minor': event_1,
             'minor2': event_2,
             'partition': partition
-        }
+        })
