@@ -68,6 +68,8 @@ class Event:
 
         if 'sub' in event_map and self.minor in event_map['sub']:
             sub = event_map['sub'][self.minor]
+            if isinstance(sub, str):
+                sub = dict(message=sub)
 
             for k in sub:
                 if k == 'message':

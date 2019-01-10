@@ -13,9 +13,14 @@ from .parsers import CloseConnection, ErrorMessage, InitializeCommunication, Log
     RAMDataParserMap
 from ..panel import Panel as PanelBase
 
+from .event import event_map
+
 logger = logging.getLogger('PAI').getChild(__name__)
 
 class Panel_EVOBase(PanelBase):
+
+    event_map = event_map
+
     def get_message(self, name) -> Construct:
         try:
             return super(Panel_EVOBase, self).get_message(name)
