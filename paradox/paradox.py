@@ -363,7 +363,7 @@ class Paradox:
                     if k not in self.data[evt.type][eid]:
                         logger.warn("Missing property {} in {}/{}".format(k, evt.type, evt.label))
             else:
-                logger.warn("Missing label {} in type {}".format(evt.label, evt.label))
+                logger.warn("Missing label {} in type {}".format(evt.label, evt.type))
         else:
             logger.warn("Missing type {}".format(evt.type))
         # Temporary end
