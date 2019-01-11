@@ -207,12 +207,6 @@ class Panel:
     def control_outputs(self, outputs, command) -> bool:
         raise NotImplementedError("override control_outputs in a subclass")
 
-    def process_event(self, event):
-        raise NotImplementedError("override process_event in a subclass")
-
-    def generate_event_notifications(self, event):
-        raise NotImplementedError("override generate_event_notifications in a subclass")
-
 
 InitiateCommunication = Struct("fields" / RawCopy(
     Struct("po" / BitStruct(
