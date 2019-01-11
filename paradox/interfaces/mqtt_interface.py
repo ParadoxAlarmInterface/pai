@@ -25,11 +25,12 @@ ELEMENT_TOPIC_MAP = dict(partition=cfg.MQTT_PARTITION_TOPIC, zone=cfg.MQTT_ZONE_
                          bus=cfg.MQTT_BUS_TOPIC, keypad=cfg.MQTT_KEYPAD_TOPIC,
                          system=cfg.MQTT_SYSTEM_TOPIC, user=cfg.MQTT_USER_TOPIC)
 
-re_topic_dirty = re.compile(r'[+#/]')
+#re_topic_dirty = re.compile(r'[+#/]')
+re_topic_dirty = re.compile(r'\W')
 
 
 def sanitize_topic_part(name):
-    return re_topic_dirty.sub('_', name)
+    return re_topic_dirty.sub('_', name).strip('_')
 
 
 class MQTTInterface(Interface):
