@@ -13,6 +13,7 @@ from .parsers import Construct, CloseConnection, ErrorMessage, InitializeCommuni
 from ..panel import Panel as PanelBase
 
 from .event import event_map
+from paradox.paradox import PublishPropertyChange
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -152,16 +153,18 @@ class Panel(PanelBase):
 
         if vars.address == 0:
             if time.time() - self.core.last_power_update >= cfg.POWER_UPDATE_INTERVAL:
+                force = PublishPropertyChange.YES if cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE else PublishPropertyChange.NO
+
                 self.core.last_power_update = time.time()
                 self.core.update_properties('system', 'power', dict(vdc=round(properties.vdc, 2)),
-                                            force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
+                                            publish=force)
                 self.core.update_properties('system', 'power', dict(battery=round(properties.battery, 2)),
-                                            force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
+                                            publish=force)
                 self.core.update_properties('system', 'power', dict(dc=round(properties.dc, 2)),
-                                            force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
+                                            publish=force)
                 self.core.update_properties('system', 'rf',
                                             dict(rf_noise_floor=round(properties.rf_noise_floor, 2)),
-                                            force_publish=cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE)
+                                            publish=force)
 
             for k in properties.troubles:
                 if "not_used" in k:
