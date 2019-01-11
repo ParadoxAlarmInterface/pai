@@ -12,6 +12,7 @@ from construct import Container
 from config import user as cfg
 from paradox.hardware import create_panel
 from paradox import event
+from enum import Enum
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -23,7 +24,20 @@ STATE_PAUSE = 2
 STATE_ERROR = 3
 
 
+class NotifyPropertyChange(Enum):
+    NO = 0
+    DEFAULT = 1
+    YES = 2
+
+
+class PublishPropertyChange(Enum):
+    NO = 0
+    DEFAULT = 1
+    YES = 2
+
+
 class Paradox:
+
     def __init__(self,
                  connection,
                  interface,
@@ -369,13 +383,15 @@ class Paradox:
         # Temporary end
 
         if len(evt.change) > 0 and evt.type in self.labels and evt.label in self.labels[evt.type]:
-            self.update_properties(evt.type, self.labels[evt.type][evt.label], evt.change)
+            self.update_properties(evt.type, self.labels[evt.type][evt.label],
+                                   evt.change, notify=NotifyPropertyChange.NO)
 
         # Publish event
-        #if self.interface is not None:
+        # if self.interface is not None:
         #    self.interface.event(evt)
 
-    def update_properties(self, element_type, key, change, force_publish=False):
+    def update_properties(self, element_type, key, change,
+                          notify=NotifyPropertyChange.DEFAULT, publish=PublishPropertyChange.DEFAULT):
         try:
             elements = self.data[element_type]
         except KeyError:
@@ -396,19 +412,19 @@ class Paradox:
             # True if element has ANY type of alarm
             if 'trouble' in property_name and property_name != 'trouble':
                 if property_value:
-                    self.update_properties(element_type, key, dict(trouble=True))
+                    self.update_properties(element_type, key, dict(trouble=True), notify=notify, publish=publish)
                 else:
                     r = False
                     for kk, vv in elements[key].items():
                         if 'trouble' in kk:
                             r = r or elements[key][kk]
 
-                    self.update_properties(element_type, key, dict(trouble=r), force_publish=force_publish)
+                    self.update_properties(element_type, key, dict(trouble=r), notify=notify, publish=publish)
 
             if property_name in elements[key]:
                 old = elements[key][property_name]
 
-                if old != change[property_name] or force_publish or cfg.PUSH_UPDATE_WITHOUT_CHANGE:
+                if old != change[property_name] or publish == PublishPropertyChange.YES or cfg.PUSH_UPDATE_WITHOUT_CHANGE:
                     logger.debug("Change {}/{}/{} from {} to {}".format(element_type,
                                                                         elements[key]['label'],
                                                                         property_name, old,
@@ -419,10 +435,12 @@ class Paradox:
 
                     # Trigger notifications for Partitions changes
                     # Ignore some changes as defined in the configuration
+                    # TODO: Move this to another place?
                     try:
-                        if (element_type == "partition" and key in cfg.LIMITS['partition'] and
-                            property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE) or\
-                                ('trouble' in property_name):
+                        if notify != NotifyPropertyChange.NO and \
+                           ((element_type == "partition" and key in cfg.LIMITS['partition'] and
+                             property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE) or
+                               ('trouble' in property_name)):
                             self.interface.notify("Paradox", "{} {} {}".format(elements[key]['label'],
                                                                                property_name,
                                                                                property_value), logging.INFO)
