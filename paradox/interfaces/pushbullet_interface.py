@@ -13,6 +13,7 @@ import time
 import logging
 import json
 
+from paradox.event import EventLevel
 from paradox.lib.utils import SortableTuple
 
 from config import user as cfg
@@ -102,10 +103,9 @@ class PushBulletWSClient(WebSocketBaseClient):
                     time.sleep(5)
 
     def notify(self, source, message, level):
-        if level < logging.INFO:
-            return
         try:
-            self.send_message("{}".format(message))
+            if level.value >= EventLevel.WARN.value:
+                self.send_message("{}".format(message))
         except Exception:
             logging.exception("Pushbullet notify")
 
@@ -166,8 +166,7 @@ class PushBulletInterface(Interface):
         self.pb_ws.stop()
 
     def handle_event(self, raw):
-        #self.pb_ws.event(raw)
-        pass
+        self.pb_ws.notify('panel', raw.message, raw.level)
 
     def handle_change(self, raw):
         element, label, property, value = raw

@@ -2,7 +2,7 @@ import string
 import typing
 from copy import copy
 from enum import Enum
-
+import datetime
 
 class Formatter(string.Formatter):
     def get_value(self, key, args, kwargs):
@@ -28,7 +28,7 @@ class Event:
         self.level = EventLevel.NOTSET
         self.tags = []
         self.type = 'system'
-        self.message_tpl = ''
+        self._message_tpl = ''
         self.change = {}
         self.additional_data = {}
         self.partition = None
@@ -93,7 +93,7 @@ class Event:
 
         self.level = event_map.get('level', self.level)
         self.type = event_map.get('type', self.type)
-        self.message_tpl = event_map.get('message', self.message_tpl)
+        self._message_tpl = event_map.get('message', self._message_tpl)
         self.change = event_map.get('change', self.change)
         self.tags = event_map.get('tags', [])
 
@@ -106,7 +106,7 @@ class Event:
 
     @property
     def message(self):
-        return Formatter().format(self.message_tpl, self)
+        return Formatter().format(self._message_tpl, self)
 
     @property
     def name(self):
@@ -116,3 +116,20 @@ class Event:
             return self._names[self.type][key]
 
         return '-'
+
+    @property
+    def props(self):
+        dp = {}
+        for key in dir(self):
+            if key in ['props', 'raw']:
+                continue
+
+            value = getattr(self, key)
+            if not key.startswith('_') and not isinstance(value, typing.Callable):
+                if isinstance(value, datetime.datetime):
+                    dp[key] = str(value.isoformat())
+                elif isinstance(value, Enum):
+                    dp[key] = value.name
+                else:
+                    dp[key] = value
+        return dp

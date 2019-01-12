@@ -10,6 +10,7 @@ import datetime
 import queue
 import serial
 
+from paradox.event import EventLevel
 from paradox.lib.utils import SortableTuple
 from config import user as cfg
 
@@ -38,17 +39,20 @@ class GSMInterface(Interface):
 
         # Fire Alarm and Strobe
         # Special Alarms
-        if raw['major'][0] == 37 or \
-                (raw['major'][0] == 2 and raw['minor'][0] == 6) or \
-                (raw['major'][0] == 40 and raw['minor'][0] in [0, 1, 2, 3, 4, 5]):
+        ignore = True
+        for tag in raw.tags:
+            if '_alarm' in tag:
+                ignore = False
+                break
 
+        if not ignore:
             self.queue.put_nowait(SortableTuple((2, 'event', (raw))))
 
     def notify(self, source, message, level):
         if source == self.name:
             return
 
-        if level < logging.CRITICAL:
+        if level.value < EventLevel.CRITICAL.value:
             return
 
         self.queue.put_nowait(SortableTuple(
@@ -200,13 +204,12 @@ class GSMInterface(Interface):
     def handle_event(self, raw):
         """Handle Live Event"""
 
-        major_code = raw['major'][0]
-        minor_code = raw['minor'][1]
-
         # Ignore some events
         for ev in cfg.GSM_IGNORE_EVENTS:
-            if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
+            if raw.major == ev[0] and (raw.minor == ev[1] or ev[1] == -1):
                 return
+
+        self.send_message(raw.message())
 
         for contact in cfg.GSM_CONTACTS:
             self.write('ATD{}'.format(contact))

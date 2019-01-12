@@ -254,7 +254,7 @@ class MQTTInterface(Interface):
             self.publish('{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                         cfg.MQTT_EVENTS_TOPIC,
                                         cfg.MQTT_RAW_TOPIC),
-                         json.dumps(raw), 0, cfg.MQTT_RETAIN)
+                         json.dumps(raw.props), 0, cfg.MQTT_RETAIN)
 
     def handle_change(self, raw):
         element, label, attribute, value = raw

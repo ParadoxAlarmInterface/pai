@@ -387,8 +387,8 @@ class Paradox:
                                    evt.change, notify=NotifyPropertyChange.NO)
 
         # Publish event
-        # if self.interface is not None:
-        #    self.interface.event(evt)
+        if self.interface is not None:
+            self.interface.event(evt)
 
     def update_properties(self, element_type, key, change,
                           notify=NotifyPropertyChange.DEFAULT, publish=PublishPropertyChange.DEFAULT):
@@ -424,7 +424,8 @@ class Paradox:
             if property_name in elements[key]:
                 old = elements[key][property_name]
 
-                if old != change[property_name] or publish == PublishPropertyChange.YES or cfg.PUSH_UPDATE_WITHOUT_CHANGE:
+                if old != change[property_name] or publish == PublishPropertyChange.YES \
+                        or cfg.PUSH_UPDATE_WITHOUT_CHANGE:
                     logger.debug("Change {}/{}/{} from {} to {}".format(element_type,
                                                                         elements[key]['label'],
                                                                         property_name, old,

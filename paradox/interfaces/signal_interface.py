@@ -12,6 +12,7 @@ from gi.repository import GObject
 import logging
 import queue
 
+from paradox.event import EventLevel
 from paradox.lib.utils import SortableTuple
 from config import user as cfg
 
@@ -34,6 +35,11 @@ class SignalInterface(Interface):
             self.loop.quit()
 
         self.logger.debug("Signal Stopped")
+
+    def event(self, event):
+        if event.level.value >= EventLevel.WARN.value:
+            self.queue.put_nowait(SortableTuple(
+                (2, 'event', event)))
 
     def notify(self, source, message, level):
         if source == self.name:
@@ -117,15 +123,15 @@ class SignalInterface(Interface):
             self.logger.warning("REJECTED: {}".format(message))
             self.send_message("REJECTED: {}".format(message))
 
-    def handle_event(self, raw):
+    def handle_event(self, event):
         """Handle Live Event"""
 
-        major_code = raw['major'][0]
-        minor_code = raw['minor'][1]
+        major_code = event.major
+        minor_code = event.minor
 
         # Ignore some events
         for ev in cfg.SIGNAL_IGNORE_EVENTS:
             if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
                 return
 
-        return super(SignalInterface, self).handle_event(raw)
+        self.send_message(event.message)

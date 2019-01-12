@@ -46,7 +46,9 @@ class Interface(Thread):
     def run(self):
         pass
 
-    def handle_change(self, raw):
+    def handle_change(self, event):
+        # TODO: Not consistent with handle_event
+
         element, label, property, value = raw
         """Handle Property Change"""
 
@@ -102,18 +104,9 @@ class Interface(Thread):
         except Exception:
             self.logger.exception("handle_notify")
 
-    def handle_event(self, raw):
+    def handle_event(self, event):
         """Handle Live Event"""
-
-        major_code = raw['major'][0]
-        minor_code = raw['minor'][1]
-
-        if major_code == 29:
-            self.send_message("Arming by user {}".format(minor_code))
-        elif major_code == 31:
-            self.send_message("Disarming by user {}".format(minor_code))
-        else:
-            self.send_message(str(raw))
+        pass
 
     def send_command(self, message):
         """Handle message received from the MQTT broker"""
