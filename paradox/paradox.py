@@ -379,7 +379,7 @@ class Paradox:
             else:
                 logger.warn("Missing label {} in type {}".format(evt.label, evt.type))
         else:
-            logger.warn("Missing type {}".format(evt.type))
+            logger.warn("Missing type {} for event: {}.{} {}".format(evt.type, evt.major, evt.minor, evt.message))
         # Temporary end
 
         if len(evt.change) > 0 and evt.type in self.labels and evt.label in self.labels[evt.type]:
