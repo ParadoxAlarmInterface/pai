@@ -43,7 +43,7 @@ event_map = {0: dict(level=EventLevel.DEBUG, change=dict(open=False), type='zone
                           8: dict(level=EventLevel.DEBUG, change=dict(squawk=True), id=1, message='Squawk ON'),
                           9: dict(level=EventLevel.DEBUG, change=dict(squawk=False), id=1, message='Squawk OFF'),
                           10: dict(message='Ground Start'),
-                          11: dict(change=dict(arm=False, arm_full=False, arm_sleep=False, arm_stay=False, alarm=False), message='Disarm partition {label}'),
+                          11: dict(change=dict(arm=False, arm_full=False, arm_sleep=False, arm_stay=False, alarm=False), message='Disarm partition'),
                           12: dict(change=dict(arm=True), message='Arm partition'),
                           13: dict(change=dict(entry_delay=False), message='Entry delay started'),
                           14: dict(change=dict(exit_delay=False), message='Exit delay started'),
