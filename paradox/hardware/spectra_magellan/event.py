@@ -45,8 +45,8 @@ event_map = {0: dict(level=EventLevel.DEBUG, change=dict(open=False), type='zone
                           10: dict(message='Ground Start'),
                           11: dict(change=dict(arm=False, arm_full=False, arm_sleep=False, arm_stay=False, alarm=False), message='Disarm partition'),
                           12: dict(change=dict(arm=True), message='Arm partition'),
-                          13: dict(change=dict(entry_delay=False), message='Entry delay started'),
-                          14: dict(change=dict(exit_delay=False), message='Exit delay started'),
+                          13: dict(change=dict(entry_delay=True), message='Entry delay started'),
+                          14: dict(change=dict(exit_delay=True), message='Exit delay started'),
                           15: dict(message='Pre-alarm delay'),
                           16: dict(message='Report confirmation'),
                           99: dict(message='Any partition status event')}
