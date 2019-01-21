@@ -62,6 +62,8 @@ class Type(MutableMapping):
         return len(self.store)
 
     def __keytransform__(self, key):
+        if isinstance(key, str) and key.isdigit():
+            return int(key)
         return key
 
 
@@ -78,7 +80,6 @@ class Paradox:
         self.interface = interface
 
         self.data = defaultdict(Type)  # dictionary of Type
-        self.labels = defaultdict(dict)  # each type is a dictionary, automatically create if missing
         self.reset()
 
     def reset(self):
@@ -306,9 +307,9 @@ class Paradox:
                 el = haystack.get(needle)
 
             if el:
-                if "index" not in el:
+                if "id" not in el:
                     raise Exception("Invalid dictionary of elements provided")
-                selected = [el["index"]]
+                selected = [el["id"]]
 
         return selected
 
@@ -377,28 +378,39 @@ class Paradox:
 
         return accepted
 
+    def get_label(self, type, id):
+        if type in self.data:
+            el = self.data[type].get(id)
+            if el:
+                return el.get("label")
+
     def handle_event(self, message):
         """Process cfg.Live Event Message and dispatch it to the interface module"""
-        evt = event.Event(self.panel.event_map, message, self.labels)
+        evt = event.Event(self.panel.event_map, message, label_provider=self.get_label)
 
         logger.debug("Handle Event: {}".format(evt))
 
-        # Temporary to catch labesl/properties in wrong places
+        # Temporary to catch labels/properties in wrong places
         # TODO: REMOVE
-        if evt.type in self.labels:
-            if evt.label in self.labels[evt.type]:
-                eid = self.labels[evt.type][evt.label]
-                for k in evt.change:
-                    if k not in self.data[evt.type][eid]:
-                        logger.warn("Missing property {} in {}/{}".format(k, evt.type, evt.label))
+        if evt.type in self.data:
+            if not evt.id:
+                logger.warn("Missing element ID in {}/{}".format(evt.type, evt.label))
             else:
-                logger.warn("Missing label {} in type {}".format(evt.label, evt.type))
+                el = self.data[evt.type].get(evt.id)
+                if not el:
+                    logger.warn("Missing element with ID {} in {}/{}".format(evt.id, evt.type, evt.label))
+                else:
+                    for k in evt.change:
+                        if k not in el:
+                            logger.warn("Missing property {} in {}/{}".format(k, evt.type, evt.label))
+                    if evt.label != el.get("label"):
+                        logger.warn("Labels differ {} != {} in {}/{}".format(el.get("label"), evt.label, evt.type, evt.label))
         else:
             logger.warn("Missing type {} for event: {}.{} {}".format(evt.type, evt.major, evt.minor, evt.message))
         # Temporary end
 
-        if len(evt.change) > 0 and evt.type in self.labels and evt.label in self.labels[evt.type]:
-            self.update_properties(evt.type, self.labels[evt.type][evt.label],
+        if len(evt.change) > 0 and evt.type in self.data and evt.id in self.data[evt.type]:
+            self.update_properties(evt.type, evt.id,
                                    evt.change, notify=NotifyPropertyChange.NO)
 
         # Publish event

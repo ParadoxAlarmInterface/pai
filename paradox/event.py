@@ -20,7 +20,7 @@ class EventLevel(Enum):
 
 class Event:
 
-    def __init__(self, event_map, event=None, names=None):
+    def __init__(self, event_map, event=None, label_provider=None):
         self.timestamp = 0
         self._event_map = event_map
 
@@ -28,13 +28,16 @@ class Event:
         self.level = EventLevel.NOTSET
         self.tags = []
         self.type = 'system'
+        self.id = None  # Element ID (if available in the event)
         self._message_tpl = ''
         self.change = {}
         self.additional_data = {}
         self.partition = None
+        assert isinstance(label_provider, typing.Callable)
+        self.label_provider = label_provider
 
         if event is not None:
-            self.parse(event, names)
+            self.parse(event)
 
     def __repr__(self):
         vars = {}
@@ -44,7 +47,7 @@ class Event:
         return str(self.__class__) + '\n' + '\n'.join(
             ('{} = {}'.format(item, vars[item]) for item in vars if not item.startswith('_')))
 
-    def parse(self, event, names=None):
+    def parse(self, event):
         if event.fields.value.po.command != 0x0e:
             raise(Exception("Invalid Event"))
 
@@ -54,15 +57,12 @@ class Event:
         self.module = self.raw.module_serial  # Event Module Serial
         self.label_type = self.raw.get('label_type', None)  # Type of element triggering the event
         self.label = self.raw.label.strip(b'\0 ').decode('utf-8')  # Event Element Label. May be overwride localy
-
         self.major = self.raw.event.major  # Event major code
         self.minor = self.raw.event.minor  # Event minor code
 
-        self._names = names or {}
-        self.id = None  # Element ID (if available in the event)
-        self._parse_map(names)
+        self._parse_map()
 
-    def _parse_map(self, names):
+    def _parse_map(self):
         if self.major not in self._event_map:
             raise(Exception("Unknown event major: {}".format(self.raw)))
 
@@ -89,7 +89,7 @@ class Event:
 
         callables = (k for k in event_map if isinstance(event_map[k], typing.Callable))
         for k in callables:
-            event_map[k] = event_map[k](self, names)
+            event_map[k] = event_map[k](self, self.label_provider)
 
         self.level = event_map.get('level', self.level)
         self.type = event_map.get('type', self.type)
@@ -100,8 +100,8 @@ class Event:
         self.additional_data = {k: v for k, v in event_map.items() if k not in ['message'] and not hasattr(self, k)}
 
         # Set partition label
-        if self.type == 'partition' and 'partition' in names:
-            self.label = names['partition'].get(self.partition, self.label)
+        if self.type == 'partition':
+            self.label = self.label_provider(self.type, self.partition)
             self.id = self.partition
 
     @property
@@ -112,8 +112,9 @@ class Event:
     def name(self):
         key = self.partition if self.type == 'partition' else self.minor
 
-        if self.type in self._names and key in self._names[self.type]:
-            return self._names[self.type][key]
+        name = self.label_provider(self.type, key)
+        if name:
+            return name
 
         return '-'
 

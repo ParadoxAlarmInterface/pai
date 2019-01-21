@@ -100,8 +100,7 @@ class Panel:
                              addresses,
                              label_offset=elem_def['label_offset'])
 
-            self.core.labels[elem_type].update({v["key"]: k for k, v in self.core.data[elem_type].items()}) # TODO: get rid of this labels in core
-            logger.info("{}: {}".format(elem_type.title(), ', '.join(self.core.labels[elem_type])))
+            logger.info("{}: {}".format(elem_type.title(), ', '.join([v["label"] for v in self.core.data[elem_type].values()])))
 
     def load_labels(self,
                     data_dict,
@@ -151,7 +150,7 @@ class Panel:
                 .decode('utf-8')
 
             properties = template.copy()
-            properties['index'] = index
+            properties['id'] = index
             properties['key'] = key
             properties['label'] = label
             if index not in data_dict:
