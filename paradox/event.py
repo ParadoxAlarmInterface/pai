@@ -1,12 +1,42 @@
 import string
+import re
 import typing
+import logging
 from copy import copy
 from enum import Enum
 import datetime
 
+logger = logging.getLogger('PAI').getChild(__name__)
+
+re_magick_placeholder = re.compile('@(?P<type>[a-z]+)(:?#(?P<source>[a-z0-9_]+))?')
+
 class Formatter(string.Formatter):
+    def _hasattr(self, event, key):
+        if key in event.additional_data:
+            return True
+        return hasattr(event, key)
+
+    def _getattr(self, event, key):
+        if key in event.additional_data:
+            return event.additional_data[key]
+        return getattr(event, key)
+
     def get_value(self, key, args, kwargs):
-        return getattr(args[0], key)
+        event = args[0]
+        if key.startswith('@'):  # pure magic is happening here
+            label_provider = event.label_provider
+            m = re_magick_placeholder.match(key)
+            if m:
+                type = m.group('type')
+                source = m.group('source') or (type if self._hasattr(event, type) else 'minor')
+                key = self._getattr(event, source)
+
+                return label_provider(type, key)
+            else:
+                logger.error('Magic placeholder "%s" has wrong format' % key)
+                return "{error}"
+
+        return self._getattr(event, key)
 
 
 class EventLevel(Enum):
