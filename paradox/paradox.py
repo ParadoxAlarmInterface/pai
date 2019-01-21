@@ -4,8 +4,9 @@ import binascii
 import datetime
 import logging
 import time
+from collections import defaultdict, MutableMapping
 from threading import Lock
-from typing import Optional
+from typing import Optional, Sequence
 
 from construct import Container
 
@@ -36,6 +37,34 @@ class PublishPropertyChange(Enum):
     YES = 2
 
 
+class Type(MutableMapping):
+    def __init__(self, *args, **kwargs):
+        self.store = dict()
+        self.update(dict(*args, **kwargs))  # use the free update to set keys
+
+    def __getitem__(self, key):
+        if isinstance(key, str):
+            for k, v in self.items():
+                if "key" in v and v["key"] == key:
+                    return v
+        return self.store[self.__keytransform__(key)]
+
+    def __setitem__(self, key, value):
+        self.store[self.__keytransform__(key)] = value
+
+    def __delitem__(self, key):
+        del self.store[self.__keytransform__(key)]
+
+    def __iter__(self):
+        return iter(self.store)
+
+    def __len__(self):
+        return len(self.store)
+
+    def __keytransform__(self, key):
+        return key
+
+
 class Paradox:
 
     def __init__(self,
@@ -47,22 +76,21 @@ class Paradox:
         self.connection = connection
         self.retries = retries
         self.interface = interface
+
+        self.data = defaultdict(Type)  # dictionary of Type
+        self.labels = defaultdict(dict)  # each type is a dictionary, automatically create if missing
         self.reset()
-        self.data = dict(zone=dict(), partition=dict(), pgm=dict(), system=dict())
-        self.labels = dict()
 
     def reset(self):
 
         # Keep track of alarm state
-        self.data = dict(zone=dict(), partition=dict(), pgm=dict(),
-                         system=dict(power=dict(label='power'), rf=dict(label='rf'),
-                                     troubles=dict(label='troubles'))
-                        )
+        self.data["power"].update(dict(label='power'))
+        self.data["rf"].update(dict(label='rf'))
+        self.data["troubles"].update(dict(label='troubles'))
 
         self.last_power_update = 0
         self.run = STATE_STOP
         self.loop_wait = True
-        self.labels = dict()
         self.status_cache = dict()
 
     def connect(self):
@@ -260,22 +288,34 @@ class Paradox:
 
         return None
 
+    def _select(self, haystack, needle) -> Sequence[int]:
+        """
+        Helper function to select objects from provided dictionary
+
+        :param haystack: dictionary
+        :param needle:
+        :return: Sequence[int] list of object indexes
+        """
+        selected = []  # type: Sequence[int]
+        if needle == 'all' or needle == '0':
+            zones_selected = list(haystack)
+        else:
+            if needle.isdigit() and 0 < int(needle) < len(haystack):
+                el = haystack.get(int(needle))
+            else:
+                el = haystack.get(needle)
+
+            if el:
+                if "index" not in el:
+                    raise Exception("Invalid dictionary of elements provided")
+                selected = [el["index"]]
+
+        return selected
+
     def control_zone(self, zone, command) -> bool:
         logger.debug("Control Zone: {} - {}".format(zone, command))
 
-        zones_selected = []
-        # if all or 0, select all
-        if zone == 'all' or zone == '0':
-            zones_selected = list(self.data['zone'])
-        else:
-            # if set by name, look for it
-            if zone in self.labels['zone']:
-                zones_selected = [self.labels['zone'][zone]]
-            # if set by number, look for it
-            elif zone.isdigit():
-                number = int(zone)
-                if number in self.data['zone']:
-                    zones_selected = [number]
+        zones_selected = self._select(self.data['zone'], zone)  # type: Sequence[int]
 
         # Not Found
         if len(zones_selected) == 0:
@@ -296,20 +336,7 @@ class Paradox:
     def control_partition(self, partition, command) -> bool:
         logger.debug("Control Partition: {} - {}".format(partition, command))
 
-        partitions_selected = []
-
-        # if all or 0, select all
-        if partition == 'all' or partition == '0':
-            partitions_selected = list(self.data['partition'])
-        else:
-            # if set by name, look for it
-            if partition in self.labels['partition']:
-                partitions_selected = [self.labels['partition'][partition]]
-            # if set by number, look for it
-            elif partition.isdigit():
-                number = int(partition)
-                if number in self.data['partition']:
-                    partitions_selected = [number]
+        partitions_selected = self._select(self.data['partition'], partition)  # type: Sequence[int]
 
         # Not Found
         if len(partitions_selected) == 0:
@@ -331,28 +358,16 @@ class Paradox:
     def control_output(self, output, command) -> bool:
         logger.debug("Control Output: {} - {}".format(output, command))
 
-        outputs = []
-        # if all or 0, select all
-        if output == 'all' or output == '0':
-            outputs = list(range(1, len(self.data['pgm'])))
-        else:
-            # if set by name, look for it
-            if output in self.labels['pgm']:
-                outputs = [self.labels['pgm'][output]]
-            # if set by number, look for it
-            elif output.isdigit():
-                number = int(output)
-                if 0 < number < len(self.data['pgm']):
-                    outputs = [number]
+        outputs_selected = self._select(self.data['pgm'], output)
 
         # Not Found
-        if len(outputs) == 0:
+        if len(outputs_selected) == 0:
             return False
 
         # Apply state changes
         accepted = False
         try:
-            accepted = self.panel.control_outputs(outputs, command)
+            accepted = self.panel.control_outputs(outputs_selected, command)
         except NotImplementedError:
             logger.error('control_outputs is not implemented for this alarm type')
         # Apply state changes
@@ -390,7 +405,7 @@ class Paradox:
         if self.interface is not None:
             self.interface.event(evt)
 
-    def update_properties(self, element_type, key, change,
+    def update_properties(self, element_type, type_key, change,
                           notify=NotifyPropertyChange.DEFAULT, publish=PublishPropertyChange.DEFAULT):
         try:
             elements = self.data[element_type]
@@ -398,7 +413,7 @@ class Paradox:
             logger.debug('Error: "%s" key is missing from data' % element_type)
             return
 
-        if key not in elements:
+        if type_key not in elements:
             return
 
         # Publish changes and update state
@@ -412,26 +427,27 @@ class Paradox:
             # True if element has ANY type of alarm
             if 'trouble' in property_name and property_name != 'trouble':
                 if property_value:
-                    self.update_properties(element_type, key, dict(trouble=True), notify=notify, publish=publish)
+                    self.update_properties(element_type, type_key, dict(trouble=True), notify=notify, publish=publish)
                 else:
                     r = False
-                    for kk, vv in elements[key].items():
+                    for kk, vv in elements[type_key].items():
                         if 'trouble' in kk:
-                            r = r or elements[key][kk]
+                            r = r or elements[type_key][kk]
 
-                    self.update_properties(element_type, key, dict(trouble=r), notify=notify, publish=publish)
+                    self.update_properties(element_type, type_key, dict(trouble=r), notify=notify, publish=publish)
 
-            if property_name in elements[key]:
-                old = elements[key][property_name]
+            if property_name in elements[type_key]:
+                old = elements[type_key][property_name]
 
                 if old != change[property_name] or publish == PublishPropertyChange.YES \
                         or cfg.PUSH_UPDATE_WITHOUT_CHANGE:
                     logger.debug("Change {}/{}/{} from {} to {}".format(element_type,
-                                                                        elements[key]['label'],
-                                                                        property_name, old,
+                                                                        elements[type_key]['key'],
+                                                                        property_name,
+                                                                        old,
                                                                         property_value))
-                    elements[key][property_name] = property_value
-                    self.interface.change(element_type, elements[key]['label'],
+                    elements[type_key][property_name] = property_value
+                    self.interface.change(element_type, elements[type_key]['key'],
                                           property_name, property_value, initial=False)
 
                     # Trigger notifications for Partitions changes
@@ -439,10 +455,10 @@ class Paradox:
                     # TODO: Move this to another place?
                     try:
                         if notify != NotifyPropertyChange.NO and \
-                           ((element_type == "partition" and key in cfg.LIMITS['partition'] and
+                           ((element_type == "partition" and type_key in cfg.LIMITS['partition'] and
                              property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE) or
                                ('trouble' in property_name)):
-                            self.interface.notify("Paradox", "{} {} {}".format(elements[key]['label'],
+                            self.interface.notify("Paradox", "{} {} {}".format(elements[type_key]['key'],
                                                                                property_name,
                                                                                property_value), logging.INFO)
                     except KeyError:
@@ -451,10 +467,10 @@ class Paradox:
                         logger.exception("Trigger notifications")
 
             else:
-                elements[key][property_name] = property_value  # Initial value
+                elements[type_key][property_name] = property_value  # Initial value
                 surpress = 'trouble' not in property_name
 
-                self.interface.change(element_type, elements[key]['label'],
+                self.interface.change(element_type, elements[type_key]['key'],
                                       property_name, property_value, initial=surpress)
 
     def handle_error(self, message):
