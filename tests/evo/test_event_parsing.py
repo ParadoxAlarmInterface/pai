@@ -21,6 +21,11 @@ def test_zone_ok():
 
     raw = LiveEvent.parse(payload)
 
+    def label_provider(type, id):
+        assert type == 'partition'
+        assert id == 1
+        return 'First floor'
+
     # monkey patch
     event_map[0]['message'] = 'Zone {label} OK in partition {@partition}'
 
@@ -38,6 +43,32 @@ def test_door_user():
 
     # monkey patch
     event_map[6]['message'] = 'User {@user} access on door {@door}'
+
+    event = Event(event_map, raw, label_provider=label_provider)
+
+    assert "User Test access on door Door 1" == event.message
+    print(event)
+
+def test_door_user2():
+    payload = b'\xe2\xff\xad\x06\x14\x13\x01\x04\x0e\x10\x06\x01\x05\x01\x00\x00\x00\x00\x02Living room     \x00\xd3'
+
+    raw = LiveEvent.parse(payload)
+
+    def label_provider(type, id):
+        if type == 'user':
+            assert id == 5
+            return 'Test'
+        elif type == 'partition':
+            assert id == 5
+            return 'First floor'
+        elif type == 'door':
+            assert id == 5
+            return 'Door 1'
+        else:
+            assert False
+
+    # monkey patch
+    event_map[6]['message'] = 'User {@user#minor} access on door {@door}'
 
     event = Event(event_map, raw, label_provider=label_provider)
 

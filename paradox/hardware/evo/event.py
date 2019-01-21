@@ -14,7 +14,7 @@ event_map = {
                 4: dict(level=EventLevel.INFO, type='partition', change=dict(away_arm=True, arm=True), message='Arm in Away mode'),
                 5: dict(level=EventLevel.INFO, type='partition', change=dict(stay_arm=True, arm=True), message='Full arm when in Stay mode'),
                 6: dict(type='system', message='Voice module access'),
-                7: dict(type='system', message='Remote control access', user=lambda x, *_ : x.raw.event.minor2),
+                7: dict(type='system', message='Remote control access by {@user}', user=lambda x, *_ : x.raw.event.minor2),
                 8: dict(type='system', message='PC fail to communicate'),
                 9: dict(type='system', message='Midnight'),
                 10: dict(type='system', message='Neware user login'),
