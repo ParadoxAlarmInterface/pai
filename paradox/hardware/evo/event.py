@@ -189,7 +189,7 @@ event_map = {
         1: 'Software reset (watchdog)',
         2: 'Test report',
         3: 'Listen-in request',
-        4: 'WinLoad in (connected))',
+        4: 'WinLoad in (connected)',
         5: 'WinLoad out (disconnected)',
         6: 'Installer in programming',
         7: 'Installer out of programming',

@@ -33,8 +33,11 @@ class Event:
         self.change = {}
         self.additional_data = {}
         self.partition = None
-        assert isinstance(label_provider, typing.Callable)
-        self.label_provider = label_provider
+        if isinstance(label_provider, typing.Callable):
+            self.label_provider = label_provider
+        else:
+            self.label_provider = lambda type, id: "[{}:{}]".format(type, id)
+
 
         if event is not None:
             self.parse(event)

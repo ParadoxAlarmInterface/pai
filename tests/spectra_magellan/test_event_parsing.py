@@ -32,7 +32,7 @@ def test_disarm_partition():
     payload = binascii.unhexlify(hex)
 
     raw = LiveEvent.parse(payload)
-    event = Event(event_map, raw, {})
+    event = Event(event_map, raw, None)
 
     assert event.message == "Partition status: Disarm partition XXXXXXXXXXX"
     print(event)
@@ -44,13 +44,14 @@ def test_disarm_partition():
     # monkey patch
     event_map[2]['sub'][11]['message']='Disarm partition {name}'
 
+    def label_provider(type, id):
+        assert type == 'partition'
+        assert id == 2
+        return 'Partition 2'
+
     raw = LiveEvent.parse(payload)
-    event = Event(event_map, raw, {
-        'partition': {
-            2: 'Partition 2'
-        }
-    })
+    event = Event(event_map, raw, label_provider)
 
     print(event)
 
-    assert event.message == "Partition status: Disarm partition Partition 2"
+    assert event.message == "Partition Partition 2: Disarm partition Partition 2"
