@@ -67,6 +67,15 @@ class InterfaceManager():
             except Exception:
                 logger.exception("Unable to start IP Interface")
 
+        # Load Dummy Interface
+        if self.conf.DUMMY_INTERFACE_ENABLE:
+            try:
+                logger.info("Using IP Interface")
+                from paradox.interfaces.dummy_interface import DummyInterface
+                self.register(DummyInterface())
+            except Exception:
+                logger.exception("Unable to start Dummy Interface")
+
     def register(self, interface):
         logger.debug("Registering Interface {}".format(interface.name))
         interface.start()  # Starts interface thread
