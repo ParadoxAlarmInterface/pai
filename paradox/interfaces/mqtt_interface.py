@@ -2,15 +2,13 @@ import paho.mqtt.client as mqtt
 import time
 import logging
 import json
-from threading import Thread
-import queue
 import os
+import re
 
 from config import user as cfg
 
 from paradox.lib.utils import SortableTuple
-
-logger = logging.getLogger('PAI').getChild(__name__)
+from paradox.interfaces import Interface
 
 PARTITION_HOMEBRIDGE_COMMANDS = dict(
     STAY_ARM='arm_stay', AWAY_ARM='arm', NIGHT_ARM='arm_sleep', DISARM='disarm')
@@ -27,29 +25,32 @@ ELEMENT_TOPIC_MAP = dict(partition=cfg.MQTT_PARTITION_TOPIC, zone=cfg.MQTT_ZONE_
                          bus=cfg.MQTT_BUS_TOPIC, keypad=cfg.MQTT_KEYPAD_TOPIC,
                          system=cfg.MQTT_SYSTEM_TOPIC, user=cfg.MQTT_USER_TOPIC)
 
+#re_topic_dirty = re.compile(r'[+#/]')
+re_topic_dirty = re.compile(r'\W')
 
-class MQTTInterface(Thread):
+
+def sanitize_topic_part(name):
+    return re_topic_dirty.sub('_', name).strip('_')
+
+
+class MQTTInterface(Interface):
     """Interface Class using MQTT"""
     name = 'mqtt'
+    acceptsInitialState = True
 
     def __init__(self):
-        Thread.__init__(self)
+        super().__init__()
 
-        self.callback = None
+        self.logger = logging.getLogger('PAI').getChild(__name__)
         self.mqtt = mqtt.Client("paradox_mqtt/{}".format(os.urandom(8).hex()))
         self.mqtt.on_message = self.handle_message
         self.mqtt.on_connect = self.handle_connect
         self.mqtt.on_disconnect = self.handle_disconnect
         self.connected = False
-        self.alarm = None
-        self.partitions = {}
-        self.queue = queue.PriorityQueue()
 
-        self.notification_handler = None
         self.cache = dict()
 
         self.armed = dict()
-        self.alarm = None
 
     def run(self):
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
@@ -84,18 +85,10 @@ class MQTTInterface(Thread):
     def stop(self):
         """ Stops the MQTT Interface Thread"""
         self.mqtt.disconnect()
-        logger.debug("Stopping MQTT Interface")
+        self.logger.debug("Stopping MQTT Interface")
         self.queue.put_nowait(SortableTuple((0, 'command', 'stop')))
         self.mqtt.loop_stop()
         self.join()
-
-    def set_alarm(self, alarm):
-        """ Sets the alarm """
-        self.alarm = alarm
-
-    def set_notify(self, handler):
-        """ Set the notification handler"""
-        self.notification_handler = handler
 
     def event(self, raw):
         """ Enqueues an event"""
@@ -106,21 +99,17 @@ class MQTTInterface(Thread):
         self.queue.put_nowait(SortableTuple(
             (2, 'change', (element, label, property, value))))
 
-    # not supported
-    def notify(self, source, message, level):
-        pass
-
     # Handlers here
     def handle_message(self, client, userdata, message):
         """Handle message received from the MQTT broker"""
-        logger.info("message topic={}, payload={}".format(
+        self.logger.info("message topic={}, payload={}".format(
             message.topic, str(message.payload.decode("utf-8"))))
 
         if message.retain:
             return
 
         if self.alarm is None:
-            logger.warning("No alarm. Ignoring command")
+            self.logger.warning("No alarm. Ignoring command")
             return
 
         topic = message.topic.split(cfg.MQTT_BASE_TOPIC)[1]
@@ -128,7 +117,7 @@ class MQTTInterface(Thread):
         topics = topic.split("/")
 
         if len(topics) < 3:
-            logger.error(
+            self.logger.error(
                 "Invalid topic in mqtt message: {}".format(message.topic))
             return
 
@@ -138,7 +127,7 @@ class MQTTInterface(Thread):
             elif topics[2].upper() == "INFO":
                 level = logging.INFO
             else:
-                logger.error(
+                self.logger.error(
                     "Invalid notification level: {}".format(topics[2]))
                 return
 
@@ -147,7 +136,7 @@ class MQTTInterface(Thread):
             return
 
         if topics[1] != cfg.MQTT_CONTROL_TOPIC:
-            logger.error(
+            self.logger.error(
                 "Invalid subtopic in mqtt message: {}".format(message.topic))
             return
 
@@ -157,7 +146,7 @@ class MQTTInterface(Thread):
         # Process a Zone Command
         if topics[2] == cfg.MQTT_ZONE_TOPIC:
             if not self.alarm.control_zone(element, command):
-                logger.warning(
+                self.logger.warning(
                     "Zone command refused: {}={}".format(element, command))
 
         # Process a Partition Command
@@ -174,7 +163,7 @@ class MQTTInterface(Thread):
                     return
 
                 if tokens[1] not in cfg.MQTT_TOGGLE_CODES:
-                    logger.warning("Invalid toggle code {}".format(tokens[1]))
+                    self.logger.warning("Invalid toggle code {}".format(tokens[1]))
                     return
 
                 if element.lower() == 'all':
@@ -198,29 +187,29 @@ class MQTTInterface(Thread):
                     else:
                         command = 'arm'
                 else:
-                    logger.debug("Element {} not found".format(element))
+                    self.logger.debug("Element {} not found".format(element))
                     return
 
                 self.notification_handler.notify('mqtt', "Command by {}: {}".format(
                     cfg.MQTT_TOGGLE_CODES[tokens[1]], command), logging.INFO)
 
-            logger.debug("Partition command: {} = {}".format(element, command))
+            self.logger.debug("Partition command: {} = {}".format(element, command))
             if not self.alarm.control_partition(element, command):
-                logger.warning(
+                self.logger.warning(
                     "Partition command refused: {}={}".format(element, command))
 
         # Process an Output Command
         elif topics[2] == cfg.MQTT_OUTPUT_TOPIC:
-            logger.debug("Output command: {} = {}".format(element, command))
+            self.logger.debug("Output command: {} = {}".format(element, command))
 
             if not self.alarm.control_output(element, command):
-                logger.warning(
+                self.logger.warning(
                     "Output command refused: {}={}".format(element, command))
         else:
-            logger.error("Invalid control property {}".format(topics[2]))
+            self.logger.error("Invalid control property {}".format(topics[2]))
 
     def handle_disconnect(self, mqttc, userdata, rc):
-        logger.info("MQTT Broker Disconnected")
+        self.logger.info("MQTT Broker Disconnected")
         self.connected = False
 
         time.sleep(1)
@@ -235,10 +224,10 @@ class MQTTInterface(Thread):
                           bind_address=cfg.MQTT_BIND_ADDRESS)
 
     def handle_connect(self, mqttc, userdata, flags, result):
-        logger.info("MQTT Broker Connected")
+        self.logger.info("MQTT Broker Connected")
 
         self.connected = True
-        logger.debug(
+        self.logger.debug(
             "Subscribing to topics in {}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC))
         self.mqtt.subscribe(
             "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
@@ -265,7 +254,7 @@ class MQTTInterface(Thread):
             self.publish('{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                         cfg.MQTT_EVENTS_TOPIC,
                                         cfg.MQTT_RAW_TOPIC),
-                         json.dumps(raw), 0, cfg.MQTT_RETAIN)
+                         json.dumps(raw.props), 0, cfg.MQTT_RETAIN)
 
     def handle_change(self, raw):
         element, label, attribute, value = raw
@@ -291,7 +280,7 @@ class MQTTInterface(Thread):
         self.publish('{}/{}/{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                              cfg.MQTT_STATES_TOPIC,
                                              element_topic,
-                                             label,
+                                             sanitize_topic_part(label),
                                              attribute),
                      "{}".format(publish_value), 0, cfg.MQTT_RETAIN)
 
@@ -352,7 +341,7 @@ class MQTTInterface(Thread):
         self.publish('{}/{}/{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                              cfg.MQTT_STATES_TOPIC,
                                              element_topic,
-                                             label,
+                                             sanitize_topic_part(label),
                                              summary_topic),
                      "{}".format(state), 0, cfg.MQTT_RETAIN)
 

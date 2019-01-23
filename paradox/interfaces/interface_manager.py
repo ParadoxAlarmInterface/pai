@@ -36,7 +36,7 @@ class InterfaceManager():
             try:
                 logger.info("Using MQTT Interface")
                 from paradox.interfaces.mqtt_interface import MQTTInterface
-                self.register(MQTTInterface(), initial=True)
+                self.register(MQTTInterface())
             except Exception:
                 logger.exception("Unable to start MQTT Interface")
 
@@ -49,6 +49,15 @@ class InterfaceManager():
             except Exception:
                 logger.exception("Unable to start Pushbullet Interface")
 
+        # Load Pushover service
+        if self.conf.PUSHOVER_ENABLE:
+            try:
+                logger.info("Using Pushover Interface")
+                from paradox.interfaces.pushover_interface import PushoverInterface
+                self.register(PushoverInterface())
+            except Exception:
+                logger.exception("Unable to start Pushover Interface")
+
         # Load IP Interface
         if self.conf.IP_INTERFACE_ENABLE:
             try:
@@ -58,11 +67,20 @@ class InterfaceManager():
             except Exception:
                 logger.exception("Unable to start IP Interface")
 
-    def register(self, interface, initial=False):
-        logger.debug("Registering Interface {}".format(interface.name))
-        interface.start()
+        # Load Dummy Interface
+        if self.conf.DUMMY_INTERFACE_ENABLE:
+            try:
+                logger.info("Using IP Interface")
+                from paradox.interfaces.dummy_interface import DummyInterface
+                self.register(DummyInterface())
+            except Exception:
+                logger.exception("Unable to start Dummy Interface")
 
-        self.interfaces.append(dict(name=interface.name, object=interface, initial=initial))
+    def register(self, interface):
+        logger.debug("Registering Interface {}".format(interface.name))
+        interface.start()  # Starts interface thread
+
+        self.interfaces.append(interface)
         try:
             interface.set_notify(self)
         except Exception:
@@ -71,47 +89,47 @@ class InterfaceManager():
     def event(self, raw):
         for interface in self.interfaces:
             try:
-                interface['object'].event(raw)
+                interface.event(raw)
             except Exception:
                 logger.exception(
-                    "Error dispatching event to interface {}".format(interface['name']))
+                    "Error dispatching event to interface {}".format(interface.name))
 
     def change(self, element, label, property, value, initial=False):
         for interface in self.interfaces:
 
-            if not interface['initial'] and initial:
+            if (not hasattr(interface, 'acceptsInitialState') or not interface.acceptsInitialState) and initial:
                 continue
 
             try:
-                interface['object'].change(element, label, property, value)
+                interface.change(element, label, property, value)
             except Exception:
                 logger.exception(
-                    "Error dispatching change to interface {}".format(interface['name']))
+                    "Error dispatching change to interface {}".format(interface.name))
 
     def notify(self, sender, message, level=logging.INFO):
         for interface in self.interfaces:
             try:
-                if sender != interface['name']:
-                    interface['object'].notify(sender, message, level)
+                if sender != interface.name:
+                    interface.notify(sender, message, level)
             except Exception:
                 logger.exception(
-                    "Error dispatching notification to interface {}".format(interface['name']))
+                    "Error dispatching notification to interface {}".format(interface.name))
 
     def stop(self):
         logger.debug("Stopping all interfaces")
         for interface in self.interfaces:
             try:
-                logger.debug("\t{}".format(interface['name']))
-                interface['object'].stop()
+                logger.debug("\t{}".format(interface.name))
+                interface.stop()
             except Exception:
                 logger.exception(
-                    "Error stoping interface {}".format(interface['name']))
+                    "Error stoping interface {}".format(interface.name))
         logger.debug("All Interfaces stopped")
 
     def set_alarm(self, alarm):
         for interface in self.interfaces:
             try:
-                interface['object'].set_alarm(alarm)
+                interface.set_alarm(alarm)
             except Exception:
                 logger.exception(
-                    "Error adding alarm to interface {}".format(interface['name']))
+                    "Error adding alarm to interface {}".format(interface.name))

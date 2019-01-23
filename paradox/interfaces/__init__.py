@@ -9,17 +9,15 @@ from config import user as cfg
 class Interface(Thread):
 
     def __init__(self):
-        Thread.__init__(self)
+        super().__init__()
 
         self.alarm = None
         self.notification_handler = None
-        self.logger = None
+        self.logger = None  # assign logger in the subclass
+        self.partitions = {}
 
         self.stop_running = Event()
         self.stop_running.clear()
-
-        self.thread = None
-        self.loop = None
 
         self.queue = queue.PriorityQueue()
 
@@ -48,7 +46,9 @@ class Interface(Thread):
     def run(self):
         pass
 
-    def handle_change(self, raw):
+    def handle_change(self, event):
+        # TODO: Not consistent with handle_event
+
         element, label, property, value = raw
         """Handle Property Change"""
 
@@ -104,24 +104,15 @@ class Interface(Thread):
         except Exception:
             self.logger.exception("handle_notify")
 
-    def handle_event(self, raw):
+    def handle_event(self, event):
         """Handle Live Event"""
-
-        major_code = raw['major'][0]
-        minor_code = raw['minor'][1]
-
-        if major_code == 29:
-            self.send_message("Arming by user {}".format(minor_code))
-        elif major_code == 31:
-            self.send_message("Disarming by user {}".format(minor_code))
-        else:
-            self.send_message(str(raw))
+        pass
 
     def send_command(self, message):
         """Handle message received from the MQTT broker"""
         """Format TYPE LABEL COMMAND """
 
-        cfg.COMMAND_ALIAS.get(message, message)
+        message = cfg.COMMAND_ALIAS.get(message, message)
 
         tokens = message.split(" ")
 
@@ -187,3 +178,6 @@ class Interface(Thread):
             return message
 
         return None
+
+    def send_message(self, message):
+        pass

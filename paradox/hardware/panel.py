@@ -27,6 +27,7 @@ def iterate_properties(data):
 
 class Panel:
     mem_map = {}
+    event_map = {}
 
     def __init__(self, core, product_id):
         self.core = core
@@ -89,11 +90,6 @@ class Panel:
 
         for elem_type in self.mem_map['elements']:
             elem_def = self.mem_map['elements'][elem_type]
-            if elem_type not in self.core.labels:
-                self.core.labels[elem_type] = dict()
-
-            if elem_type not in self.core.data:
-                self.core.data[elem_type] = dict()
 
             addresses = list(chain.from_iterable(elem_def['addresses']))
             limits = cfg.LIMITS.get(elem_type)
@@ -101,20 +97,19 @@ class Panel:
                 addresses = [a for i, a in enumerate(addresses) if i + 1 in limits]
 
             self.load_labels(self.core.data[elem_type],
-                             self.core.labels[elem_type],
                              addresses,
                              label_offset=elem_def['label_offset'])
-            logger.info("{}: {}".format(elem_type.title(), ', '.join(self.core.labels[elem_type])))
+
+            logger.info("{}: {}".format(elem_type.title(), ', '.join([v["label"] for v in self.core.data[elem_type].values()])))
 
     def load_labels(self,
-                    labelDictIndex,
-                    labelDictName,
+                    data_dict,
                     addresses,
                     field_length=16,
                     label_offset=0,
                     template=None):
         """Load labels from panel"""
-        i = 1
+        index = 1
         if template is None:
             template = {}
 
@@ -142,21 +137,27 @@ class Panel:
                 break
 
             data = reply.fields.value.data
-            label = data[label_offset:label_offset + field_length] \
-                .strip(b'\0 ') \
+            b_label = data[label_offset:label_offset + field_length].strip(b'\0 ')
+
+            key = b_label \
                 .replace(b'\0', b'_') \
+                .replace(b' ', b'_') \
                 .replace(b' ', b'_') \
                 .decode('utf-8')
 
-            if label not in labelDictName:
-                properties = template.copy()
-                properties['label'] = label
-                if i not in labelDictIndex:
-                    labelDictIndex[i] = {}
-                labelDictIndex[i].update(properties)
+            label = b_label \
+                .replace(b'\0', b' ') \
+                .decode('utf-8')
 
-                labelDictName[label] = i
-            i += 1
+            properties = template.copy()
+            properties['id'] = index
+            properties['key'] = key
+            properties['label'] = label
+            if index not in data_dict:
+                data_dict[index] = {}
+            data_dict[index].update(properties)
+
+            index += 1
 
     def process_properties_bulk(self, properties, address):
         if cfg.LOGGING_DUMP_STATUS:
@@ -205,12 +206,6 @@ class Panel:
 
     def control_outputs(self, outputs, command) -> bool:
         raise NotImplementedError("override control_outputs in a subclass")
-
-    def process_event(self, event):
-        raise NotImplementedError("override process_event in a subclass")
-
-    def generate_event_notifications(self, event):
-        raise NotImplementedError("override generate_event_notifications in a subclass")
 
 
 InitiateCommunication = Struct("fields" / RawCopy(

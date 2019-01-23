@@ -154,7 +154,7 @@ LiveEvent = Struct("fields" / RawCopy(
         "time" / DateAdapter(Bytes(6)),
         "event" / EventAdapter(Bytes(4)),
         "partition" / Computed(this.event.partition),
-        "module_serial" / ModuleSerialAdapter(Bytes(4)),
+        "module_serial" / Bytes(4),
         "label_type" / Bytes(1),
         "label" / Bytes(16),
         "not_used0" / Bytes(1),

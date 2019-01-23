@@ -98,6 +98,13 @@ PUSHBULLET_KEY = ''                     # Authentication key used for Pushbullet
 PUSHBULLET_SECRET = ''                  # Authentication secret used for Pushbullet
 PUSHBULLET_CONTACTS = []                # Pushbullet user identifiers for notifications and interaction
 
+# Pushover
+PUSHOVER_ENABLE = False
+PUSHOVER_KEY = ''                       # Application token for Pushover
+PUSHOVER_BROADCAST_KEYS = {             # Pushover user or group keys to broadcast notifications to
+#    '<user_key>': '*'                  # value can be '*' or comma separated list of device names
+}
+
 # Signal
 SIGNAL_ENABLE = False
 SIGNAL_CONTACTS = []                    # Contacts that are allowed to control the panel and receive notifications through Signal
@@ -116,3 +123,5 @@ IP_INTERFACE_BIND_ADDRESS = '0.0.0.0'
 IP_INTERFACE_BIND_PORT = 10000
 IP_INTERFACE_PASSWORD = b'0000'
 
+# Dummy Interface for testing
+DUMMY_INTERFACE_ENABLE = False

@@ -52,6 +52,7 @@ pip3 install -r requirements.txt
 If some requirement fail to install, this may not be critical.
 * ```gi```, ```pygobject``` and ```pydbus``` are only required when using Signal
 * ```Pushbullet.py``` and ```ws4py``` are only required when using Pushbullet
+* ```chump``` is only required when using Pushover
 * ```paho_mqtt``` is only required for MQTT support
 * ```pyserial``` is only required when connecting to the panel directly through the serial port or using a GSM modem.
 
