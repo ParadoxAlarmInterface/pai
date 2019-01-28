@@ -76,7 +76,6 @@ class IPConnection:
             logger.error("Unable to get site info")
             return False
         try:
-            logger.debug("Site Info: {}".format(json.dumps(self.site_info, indent=4)))
             xoraddr = binascii.unhexlify(self.site_info['site'][0]['module'][0]['xoraddr'])
 
             stun_host = 'turn.paradoxmyhome.com'
@@ -131,13 +130,13 @@ class IPConnection:
             payload = encrypt(self.key, self.key)
 
             msg = ip_message.build(dict(header=dict(length=len(self.key), unknown0=0x03, flags=0x09, command=0xf0, unknown1=0, encrypt=1), payload=payload))
-            if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
+            #if cfg.LOGGING_DUMP_PACKETS:
+            #    logger.debug("PC -> IP {}{}".format(binascii.hexlify(msg[:16]), 'xx' * 16))
 
             self.socket.send(msg)
             data = self.socket.recv(1024)
-            if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
+            #if cfg.LOGGING_DUMP_PACKETS:
+            #    logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
 
             message, message_payload = self.get_message_payload(data)
 
@@ -147,23 +146,22 @@ class IPConnection:
                 logger.error("Error connecting to IP Module. Wrong IP Module password?")
                 return False
 
-            logger.info("Authentication Success. Panel version {:02x}, firmware: {}.{}, serial: {}".format(response.hardware_version,
+            logger.info("Authentication Success. Panel version {:02x}, firmware: {}.{}".format(response.hardware_version,
                         response.ip_firmware_major,
-                        response.ip_firmware_minor,
-                        binascii.hexlify(response.ip_module_serial).decode('utf-8')))
+                        response.ip_firmware_minor))
 
             self.key = response.key
 
             # F2
             logging.debug("Sending F2")
             msg = ip_message.build(dict(header=dict(length=0, unknown0=0x03, flags=0x09, command=0xf2, unknown1=0, encrypt=1), payload=encrypt(b'', self.key)))
-            if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
+            #if cfg.LOGGING_DUMP_PACKETS:
+            #    logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
 
             self.socket.send(msg)
             data = self.socket.recv(1024)
-            if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
+            #if cfg.LOGGING_DUMP_PACKETS:
+            #    logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
 
             message, message_payload = self.get_message_payload(data)
             logger.debug("F2 answer: {}".format(binascii.hexlify(message_payload)))
@@ -171,17 +169,17 @@ class IPConnection:
             # F3
             logging.debug("Sending F3")
             msg = ip_message.build(dict(header=dict(length=0, unknown0=0x03, flags=0x09, command=0xf3, unknown1=0, encrypt=1), payload=encrypt(b'', self.key)))
-            if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
+            #if cfg.LOGGING_DUMP_PACKETS:
+            #    logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
 
             self.socket.send(msg)
             data = self.socket.recv(1024)
-            if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
+            #if cfg.LOGGING_DUMP_PACKETS:
+            #    logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
 
             message, message_payload = self.get_message_payload(data)
 
-            logger.debug("F3 answer: {}".format(binascii.hexlify(message_payload)))
+            #logger.debug("F3 answer: {}".format(binascii.hexlify(message_payload)))
 
             # F8
             logger.debug("Sending F8")
@@ -190,16 +188,16 @@ class IPConnection:
             payload = encrypt(payload, self.key)
             msg = ip_message.build(dict(header=dict(length=payload_len, unknown0=0x03, flags=0x09, command=0xf8, unknown1=0, encrypt=1), payload=payload))
 
-            if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
+            #if cfg.LOGGING_DUMP_PACKETS:
+            #    logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
 
             self.socket.send(msg)
             data = self.socket.recv(1024)
-            if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
+            #if cfg.LOGGING_DUMP_PACKETS:
+            #    logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
 
             message, message_payload = self.get_message_payload(data)
-            logger.debug("F8 answer: {}".format(binascii.hexlify(message_payload)))
+            #logger.debug("F8 answer: {}".format(binascii.hexlify(message_payload)))
 
 
             logger.info("Session Established with IP Module")
