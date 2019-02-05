@@ -13,12 +13,12 @@ from paradox.interfaces import Interface
 PARTITION_HOMEBRIDGE_COMMANDS = dict(
     STAY_ARM='arm_stay', AWAY_ARM='arm', NIGHT_ARM='arm_sleep', DISARM='disarm')
 PARTITION_HOMEASSISTANT_COMMANDS = dict(
-    ARM_AWAY='arm', NIGHT_ARM='arm_sleep', DISARM='disarm')
+    armed_home='arm_stay', armed_away='arm', armed_sleep='arm_sleep', disarmed='disarm')
 
 PARTITION_HOMEBRIDGE_STATES = dict(
     alarm='ALARM_TRIGGERED', stay_arm='STAY_ARM', arm='AWAY_ARM', sleep_arm='NIGHT_ARM', disarm='DISARMED')
 PARTITION_HOMEASSISTANT_STATES = dict(
-    alarm='triggered', stay_arm='armed_away', arm='armed_away', sleep_arm='armed_home', disarm='disarmed')
+    alarm='triggered', stay_arm='armed_home', arm='armed_away', sleep_arm='armed_sleep', disarm='disarmed')
 
 ELEMENT_TOPIC_MAP = dict(partition=cfg.MQTT_PARTITION_TOPIC, zone=cfg.MQTT_ZONE_TOPIC,
                          output=cfg.MQTT_OUTPUT_TOPIC, repeater=cfg.MQTT_REPEATER_TOPIC,
