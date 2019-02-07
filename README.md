@@ -10,7 +10,7 @@ Support for Magellan and Spectra panels is very stable. Support for EVO panels i
 
 Tested in the following environment:
 * Python > 3.5.2
-* Mosquitto MQTT Broker >v 1.4.8
+* Mosquitto MQTT Broker > v1.4.8
 * OrangePi 2G-IOT, NanoPi NEO, and Raspberry Pi 3 through their built in Serial Port (with a level shifter!), or a USB RS232 TTL adapter (CP2102, PL2303, CH340, etc..)
 * Ubuntu Server 16.04.3 LTS
 * Paradox MG5050, SP7000 and EVO panels
@@ -19,6 +19,8 @@ Tested in the following environment:
 * SIM900 module through a serial port
 
 For further information and detailed usage refer to the [Wiki](https://github.com/jpbarraca/pai/wiki).
+
+If you are having issues, or wish to discuss new features, join us at our [Gitter community](https://gitter.im/paradox-alarm-interface)
 
 ## How to use
 
