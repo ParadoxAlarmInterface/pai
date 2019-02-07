@@ -45,7 +45,7 @@ PanelStatus = Struct("fields" / RawCopy(
         "not_used0" / Default(Int8ub, 0x00),
         "validation" / Default(Int8ub, 0x00),
         "status_request" / Default(Int8ub, 0x00),
-        "not_used0" / Padding(29),
+        "not_used1" / Padding(29),
         "source_id" / Default(CommunicationSourceIDEnum, 1),
         "user_high" / Default(Int8ub, 0),
         "user_low" / Default(Int8ub, 0),
@@ -68,7 +68,7 @@ RAMDataParserMap = {
             "not_used0" / BitsInteger(5),
             "module_supervision_trouble" / Flag,
             "zone_supervision_trouble" / Flag,
-            "not_used0" / BitsInteger(1),
+            "not_used1" / BitsInteger(1),
             "wireless_repeater_battery_trouble" / Flag,
             "wireless_repeater_ac_loss_trouble" / Flag,
             "wireless_keypad_battery_trouble" / Flag,
@@ -76,10 +76,10 @@ RAMDataParserMap = {
             "auxiliary_output_overload_trouble" / Flag,
             "ac_failure_trouble" / Flag,
             "low_battery_trouble" / Flag,
-            "not_used1" / BitsInteger(6),
+            "not_used2" / BitsInteger(6),
             "bell_output_overload_trouble" / Flag,
             "bell_output_disconnected_trouble" / Flag,
-            "not_used2" / BitsInteger(2),
+            "not_used3" / BitsInteger(2),
             "computer_fail_to_communicate_trouble" / Flag,
             "voice_fail_to_communicate_trouble" / Flag,
             "pager_fail_to_communicate_trouble" / Flag,
@@ -96,7 +96,7 @@ RAMDataParserMap = {
         "pgm_tamper" / StatusAdapter(Bytes(2)),
         "bus-module_tamper" / StatusAdapter(Bytes(2)),
         "zone_fire" / StatusAdapter(Bytes(4)),
-        "not_used1" / Int8ub
+        "not_used0" / Int8ub
     ),
     1: Struct(
         "zone_rf_supervision_trouble" / StatusAdapter(Bytes(4)),
@@ -110,7 +110,7 @@ RAMDataParserMap = {
         "keypad_ac_loss_trouble" / StatusAdapter(Bytes(1)),
         "keypad_battery_failure_trouble" / StatusAdapter(Bytes(1)),
         "keypad_supervision_failure_trouble" / StatusAdapter(Bytes(1)),
-        "not_used1" / Padding(6)
+        "not_used0" / Padding(6)
     ),
     2: Struct(
         "zone_status" / ZoneStatusAdapter(Bytes(32))
@@ -126,7 +126,7 @@ RAMDataParserMap = {
     ),
     5: Struct(
         "zone_exit_delay" / StatusAdapter(Bytes(4)),
-        "not_used1" / Padding(28)
+        "not_used0" / Padding(28)
     ),
 }
 
@@ -149,7 +149,7 @@ LiveEvent = Struct("fields" / RawCopy(
         "unknown0" / Bytes(1),
         "label" / Bytes(16),
         "unknown1" / Bytes(1),
-        "reserved2" / Bytes(4),
+        "reserved0" / Bytes(4),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
@@ -207,7 +207,7 @@ ReadEEPROM = Struct("fields" / RawCopy(
         "po" / Struct("command" / Const(0x50, Int8ub)),
         "not_used0" / Padding(1),
         "address" / Default(Int16ub, 0),
-        "not_used0" / Padding(29),
+        "not_used1" / Padding(29),
         "source_id" / Default(CommunicationSourceIDEnum, 1),
         "user_high" / Default(Int8ub, 0),
         "user_low" / Default(Int8ub, 0),
