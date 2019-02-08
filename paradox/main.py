@@ -13,7 +13,8 @@ __status__ = "Beta"
 import logging
 import sys
 import time
-from config import user as cfg
+
+from paradox.config import config as cfg
 
 FORMAT = '%(asctime)s - %(levelname)-8s - %(name)s - %(message)s'
 

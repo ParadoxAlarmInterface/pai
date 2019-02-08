@@ -3,9 +3,10 @@
 import logging
 import re
 
-from config import user as cfg
 from paradox.interfaces import Interface
 from paradox.lib.utils import SortableTuple
+
+from paradox.config import config as cfg
 
 logger = logging.getLogger('PAI').getChild(__name__)
 

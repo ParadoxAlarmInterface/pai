@@ -10,10 +10,11 @@ from typing import Optional, Sequence
 
 from construct import Container
 
-from config import user as cfg
 from paradox.hardware import create_panel
 from paradox import event
 from enum import Enum
+
+from paradox.config import config as cfg
 
 logger = logging.getLogger('PAI').getChild(__name__)
 

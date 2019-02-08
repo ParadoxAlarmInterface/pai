@@ -27,7 +27,7 @@ For further information and detailed usage refer to the [Wiki](https://github.co
 If you have docker running, this will be the easy way:
 ```
 docker build -t pai .
-docker run -it -v <projectFolder>/config/user.py:/opt/paradox/config/user.py pai
+docker run -it -v <projectFolder>/pai.conf:/etc/pai/pai.conf pai
 ```
 
 ### Manually
@@ -37,10 +37,11 @@ docker run -it -v <projectFolder>/config/user.py:/opt/paradox/config/user.py pai
 git clone https://github.com/jpbarraca/pai.git
 ```
 
-2.  Copy user.py.sample to user.py and edit it to match your setup. You only need to define the variables that you wish to override from the ```defaults.py```.
+2.  Copy ```config/pai.conf.example``` to ```/etc/pai/pai.conf``` and edit it to match your setup. The file uses Python syntax.
 ```
 cd config
-cp user.py.sample user.py
+mkdir -p /etc/pai
+cp pai.conf.example /etc/pai/pai.conf
 cd ..
 ```
 

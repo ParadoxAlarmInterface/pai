@@ -6,7 +6,6 @@ import sys
 import time
 from typing import Optional
 
-from config import user as cfg
 from .parsers import Construct, CloseConnection, ErrorMessage, InitializeCommunication, InitializeCommunicationResponse, \
     SetTimeDate, SetTimeDateResponse, PerformAction, PerformActionResponse, ReadStatusResponse, ReadEEPROM, \
     ReadEEPROMResponse, LiveEvent, RAMDataParserMap, Container
@@ -14,6 +13,8 @@ from ..panel import Panel as PanelBase
 
 from .event import event_map
 from paradox.paradox import PublishPropertyChange
+
+from paradox.config import config as cfg
 
 logger = logging.getLogger('PAI').getChild(__name__)
 

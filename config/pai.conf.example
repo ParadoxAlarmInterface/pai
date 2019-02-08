@@ -1,8 +1,9 @@
-#!/usr/bin/env python
+# Should be at /etc/pai/pai.conf
+
 import logging
 
 # Default configuration.
-# Do not edit this.  Copy config_sample.py to config.py and edit that.
+# Edit as needed
 
 # Logging
 LOGGING_LEVEL_CONSOLE = logging.INFO # See documentation of Logging package

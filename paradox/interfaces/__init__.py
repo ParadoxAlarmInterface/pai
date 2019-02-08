@@ -3,8 +3,7 @@
 from threading import Thread, Event
 import queue
 
-from config import user as cfg
-
+from paradox.config import config as cfg
 
 class Interface(Thread):
 

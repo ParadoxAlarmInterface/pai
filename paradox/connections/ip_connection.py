@@ -10,7 +10,7 @@ import binascii
 import json
 import requests
 
-from config import user as cfg
+from paradox.config import config as cfg
 
 logger = logging.getLogger('PAI').getChild(__name__)
 

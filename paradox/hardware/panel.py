@@ -9,9 +9,9 @@ from construct import Construct, Struct, BitStruct, Const, Nibble, Checksum, Pad
 
 from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum
 
-logger = logging.getLogger('PAI').getChild(__name__)
+from paradox.config import config as cfg
 
-from config import user as cfg
+logger = logging.getLogger('PAI').getChild(__name__)
 
 
 def iterate_properties(data):

@@ -16,7 +16,7 @@ import json
 from paradox.event import EventLevel
 from paradox.lib.utils import SortableTuple
 
-from config import user as cfg
+from paradox.config import config as cfg
 
 
 class PushBulletWSClient(WebSocketBaseClient):

@@ -13,7 +13,7 @@ import os
 from paradox.lib.crypto import encrypt, decrypt
 from paradox.interfaces import Interface
 
-from config import user as cfg
+from paradox.config import config as cfg
 
 ip_message = Struct(
         "header" / Aligned(16,Struct(

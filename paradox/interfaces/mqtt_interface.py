@@ -5,10 +5,10 @@ import json
 import os
 import re
 
-from config import user as cfg
-
 from paradox.lib.utils import SortableTuple
 from paradox.interfaces import Interface
+
+from paradox.config import config as cfg
 
 PARTITION_HOMEBRIDGE_COMMANDS = dict(
     STAY_ARM='arm_stay', AWAY_ARM='arm', NIGHT_ARM='arm_sleep', DISARM='disarm')
