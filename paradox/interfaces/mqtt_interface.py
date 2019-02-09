@@ -306,7 +306,7 @@ class MQTTInterface(Interface):
 
         # Property changing to True: Alarm or arm
         if value:
-            if attribute == 'alarm':
+            if attribute in ['alarm', 'bell_activated', 'strobe_alarm', 'silent_alarm', 'audible_alarm'] and not self.armed[service][label][2]:
                 state = states_map['alarm']
                 self.armed[service][label][2] = True
 
@@ -328,7 +328,7 @@ class MQTTInterface(Interface):
         # Property changing to False: Disarm or alarm stop
         else:
             # Alarm stopped
-            if attribute == 'alarm' and self.armed[service][label][2]:
+            if attribute in ['alarm', 'strobe_alarm', 'audible_alarm', 'bell_activated', 'silent_alarm'] and self.armed[service][label][2]:
                 state = self.armed[service][label][1]
                 self.armed[service][label][2] = False
 
