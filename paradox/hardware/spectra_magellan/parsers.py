@@ -5,7 +5,7 @@ from .adapters import *
 InitializeCommunication = Struct("fields" / RawCopy(
     Struct(
         "po" / Struct("command" / Const(0x00, Int8ub)),
-        "not_used0" / Padding(3),
+        "_not_used0" / Padding(3),
         "product_id" / ProductIdEnum,
         "firmware" / Struct(
             "version" / Int8ub,
@@ -13,12 +13,12 @@ InitializeCommunication = Struct("fields" / RawCopy(
             "build" / Int8ub),
         "panel_id" / Int16ub,
         "pc_password" / Default(Bytes(2), b'0000'),
-        "not_used1" / Bytes(1),
+        "_not_used1" / Bytes(1),
         "source_method" / Default(Enum(Int8ub,
                                        Winload_Connection=0x00,
                                        NEware_Connection=0x55), 0x00),
         "user_code" / Default(Int32ub, 0x00000000),
-        "not_used2" / Padding(15),
+        "_not_used2" / Padding(15),
         "source_id" / Default(CommunicationSourceIDEnum, 1),
         "user_id" / Struct(
             "high" / Default(Int8ub, 0),
@@ -32,20 +32,20 @@ InitializeCommunicationResponse = Struct("fields" / RawCopy(
         "neware_connection" / Int16ub,
         "user_id_low" / Int8ub,
         "partition_rights" / BitStruct(
-            "not_used" / BitsInteger(6),
+            "_not_used" / BitsInteger(6),
             "partition_2" / Flag,
             "partition_1" / Flag),
-        "not_used0" / Padding(31),
+        "_not_used0" / Padding(31),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 PanelStatus = Struct("fields" / RawCopy(
     Struct(
         "po" / Struct("command" / Const(0x50, Int8ub)),
-        "not_used0" / Default(Int8ub, 0x00),
+        "_not_used0" / Default(Int8ub, 0x00),
         "validation" / Default(Int8ub, 0x00),
         "status_request" / Default(Int8ub, 0x00),
-        "not_used1" / Padding(29),
+        "_not_used1" / Padding(29),
         "source_id" / Default(CommunicationSourceIDEnum, 1),
         "user_high" / Default(Int8ub, 0),
         "user_low" / Default(Int8ub, 0),
@@ -65,10 +65,10 @@ RAMDataParserMap = {
             "power_trouble" / Flag,
             "rf_low_battery_trouble" / Flag,
             "rf_interference_trouble" / Flag,
-            "not_used0" / BitsInteger(5),
+            "_not_used0" / BitsInteger(5),
             "module_supervision_trouble" / Flag,
             "zone_supervision_trouble" / Flag,
-            "not_used1" / BitsInteger(1),
+            "_not_used1" / BitsInteger(1),
             "wireless_repeater_battery_trouble" / Flag,
             "wireless_repeater_ac_loss_trouble" / Flag,
             "wireless_keypad_battery_trouble" / Flag,
@@ -76,10 +76,10 @@ RAMDataParserMap = {
             "auxiliary_output_overload_trouble" / Flag,
             "ac_failure_trouble" / Flag,
             "low_battery_trouble" / Flag,
-            "not_used2" / BitsInteger(6),
+            "_not_used2" / BitsInteger(6),
             "bell_output_overload_trouble" / Flag,
             "bell_output_disconnected_trouble" / Flag,
-            "not_used3" / BitsInteger(2),
+            "_not_used3" / BitsInteger(2),
             "computer_fail_to_communicate_trouble" / Flag,
             "voice_fail_to_communicate_trouble" / Flag,
             "pager_fail_to_communicate_trouble" / Flag,
@@ -96,7 +96,7 @@ RAMDataParserMap = {
         "pgm_tamper" / StatusAdapter(Bytes(2)),
         "bus-module_tamper" / StatusAdapter(Bytes(2)),
         "zone_fire" / StatusAdapter(Bytes(4)),
-        "not_used0" / Int8ub
+        "_not_used0" / Int8ub
     ),
     1: Struct(
         "zone_rf_supervision_trouble" / StatusAdapter(Bytes(4)),
@@ -110,7 +110,7 @@ RAMDataParserMap = {
         "keypad_ac_loss_trouble" / StatusAdapter(Bytes(1)),
         "keypad_battery_failure_trouble" / StatusAdapter(Bytes(1)),
         "keypad_supervision_failure_trouble" / StatusAdapter(Bytes(1)),
-        "not_used0" / Padding(6)
+        "_not_used0" / Padding(6)
     ),
     2: Struct(
         "zone_status" / ZoneStatusAdapter(Bytes(32))
@@ -122,11 +122,11 @@ RAMDataParserMap = {
         "pgm_signal_strength" / SignalStrengthAdapter(Bytes(16)),
         "repeater_signal_strength" / SignalStrengthAdapter(Bytes(2)),
         "keypad_signal_strength" / SignalStrengthAdapter(Bytes(8)),
-        "not_used1" / Padding(6)
+        "_not_used1" / Padding(6)
     ),
     5: Struct(
         "zone_exit_delay" / StatusAdapter(Bytes(4)),
-        "not_used0" / Padding(28)
+        "_not_used0" / Padding(28)
     ),
 }
 
@@ -158,9 +158,9 @@ CloseConnection = Struct("fields" / RawCopy(
         "po" / Struct(
             "command" / Const(0x70, Int8ub)
         ),
-        "not_used0" / Const(0, Int8ub),
+        "_not_used0" / Const(0, Int8ub),
         "validation_byte" / Default(Int8ub, 0),
-        "not_used1" / Padding(29),
+        "_not_used1" / Padding(29),
         "message" / Default(Enum(Int8ub,
                                  authentication_failed=0x12,
                                  panel_will_disconnect=0x05), 0x05),
@@ -179,7 +179,7 @@ ErrorMessage = Struct("fields" / RawCopy(
                 "alarm_reporting_pending" / Flag,
                 "Windload_connected" / Flag,
                 "NeWare_connected" / Flag)),
-        "not_used0" / Default(Int8ub, 0),
+        "_not_used0" / Default(Int8ub, 0),
         "message" / Enum(Int8ub,
                          requested_command_failed=0x00,
                          invalid_user_code=0x01,
@@ -198,16 +198,16 @@ ErrorMessage = Struct("fields" / RawCopy(
                          incorrect_number_of_users=0x1b,
                          invalid_label_number=0x1c
                          ),
-        "not_used1" / Padding(33),
+        "_not_used1" / Padding(33),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 ReadEEPROM = Struct("fields" / RawCopy(
     Struct(
         "po" / Struct("command" / Const(0x50, Int8ub)),
-        "not_used0" / Padding(1),
+        "_not_used0" / Padding(1),
         "address" / Default(Int16ub, 0),
-        "not_used1" / Padding(29),
+        "_not_used1" / Padding(29),
         "source_id" / Default(CommunicationSourceIDEnum, 1),
         "user_high" / Default(Int8ub, 0),
         "user_low" / Default(Int8ub, 0),
@@ -223,7 +223,7 @@ ReadEEPROMResponse = Struct("fields" / RawCopy(
                 "alarm_reporting_pending" / Flag,
                 "Windload_connected" / Flag,
                 "NeWare_connected" / Flag)),
-        "not_used0" / Padding(1),
+        "_not_used0" / Padding(1),
         "address" / Int16ub,
         "data" / Bytes(32),
     )),
@@ -239,7 +239,7 @@ ReadStatusResponse = Struct("fields" / RawCopy(
                 "alarm_reporting_pending" / Flag,
                 "Windload_connected" / Flag,
                 "NeWare_connected" / Flag)),
-        "not_used0" / Padding(1),
+        "_not_used0" / Padding(1),
         "validation" / Const(0x80, Int8ub),
         "address" / Int8ub,
         "data" / Bytes(32),
@@ -250,14 +250,14 @@ SetTimeDate = Struct("fields" / RawCopy(
     Struct(
         "po" / Struct(
             "command" / Const(0x30, Int8ub)),
-        "not_used0" / Padding(3),
+        "_not_used0" / Padding(3),
         "century" / Int8ub,
         "year" / Int8ub,
         "month" / Int8ub,
         "day" / Int8ub,
         "hour" / Int8ub,
         "minute" / Int8ub,
-        "not_used1" / Padding(23),
+        "_not_used1" / Padding(23),
         "source_id" / Default(CommunicationSourceIDEnum, 1),
         "user_high" / Default(Int8ub, 0),
         "user_low" / Default(Int8ub, 0),
@@ -273,7 +273,7 @@ SetTimeDateResponse = Struct("fields" / RawCopy(
                 "alarm_reporting_pending" / Flag,
                 "Windload_connected" / Flag,
                 "NeWare_connected" / Flag)),
-        "not_used0" / Padding(35),
+        "_not_used0" / Padding(35),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
@@ -281,7 +281,7 @@ PerformAction = Struct("fields" / RawCopy(
     Struct(
         "po" / Struct(
             "command" / Const(0x40, Int8ub)),
-        "not_used0" / Padding(1),
+        "_not_used0" / Padding(1),
         "action" / Enum(Int8ub,
                         Stay_Arm=0x01,
                         Stay_Arm1=0x02,
@@ -305,7 +305,7 @@ PerformAction = Struct("fields" / RawCopy(
                           Fail_Beep=0x08,
                           Beep_Twice=0x0c,
                           Accept_Beep=0x10),
-        "not_used1" / Padding(29),
+        "_not_used1" / Padding(29),
         "source_id" / Default(CommunicationSourceIDEnum, 1),
         "user_high" / Default(Int8ub, 0),
         "user_low" / Default(Int8ub, 0),
@@ -321,7 +321,7 @@ PerformActionResponse = Struct("fields" / RawCopy(
                 "alarm_reporting_pending" / Flag,
                 "Windload_connected" / Flag,
                 "NeWare_connected" / Flag)),
-        "not_used0" / Padding(1),
+        "_not_used0" / Padding(1),
         "action" / Enum(Int8ub,
                         Stay_Arm=0x01,
                         Stay_Arm1=0x02,
@@ -340,6 +340,6 @@ PerformActionResponse = Struct("fields" / RawCopy(
                         Reload_RAM=0x80,
                         Bus_Scan=0x85,
                         Future_Use=0x90),
-        "not_used1" / Padding(33),
+        "_not_used1" / Padding(33),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))

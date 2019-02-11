@@ -159,7 +159,7 @@ class Panel_EVOBase(PanelBase):
 
         if vars.address == 1:
             for k in properties.troubles:
-                if "not_used" in k:
+                if k.startswith("_"):  # ignore private properties
                     continue
 
                 self.core.update_properties('system', 'trouble', {k: properties.troubles[k]})

@@ -259,7 +259,7 @@ StartCommunication = Struct("fields" / RawCopy(
     Struct(
         "po" / Struct("command" / Const(0x5F, Int8ub)),
         "validation" / Const(0x20, Int8ub),
-        "not_used0" / Padding(31),
+        "_not_used0" / Padding(31),
         "source_id" / Default(CommunicationSourceIDEnum, 1),
         "user_id" / Struct(
             "high" / Default(Int8ub, 0),
@@ -275,14 +275,14 @@ StartCommunicationResponse = Struct("fields" / RawCopy(
                              "Windload_connected" / Flag,
                              "NeWare_connected" / Flag)
                          ),
-        "not_used0" / Bytes(3),
+        "_not_used0" / Bytes(3),
         "product_id" / ProductIdEnum,
         "firmware" / Struct(
             "version" / Int8ub,
             "revision" / Int8ub,
             "build" / Int8ub),
         "panel_id" / Int16ub,
-        "not_used1" / Bytes(5),
+        "_not_used1" / Bytes(5),
         "transceiver" / Struct(
             "firmware_build" / Int8ub,
             "family" / Int8ub,
@@ -290,12 +290,12 @@ StartCommunicationResponse = Struct("fields" / RawCopy(
             "firmware_revision" / Int8ub,
             "noise_floor_level" / Int8ub,
             "status" / BitStruct(
-                "not_used" / BitsInteger(6),
+                "_not_used" / BitsInteger(6),
                 "noise_floor_high" / Flag,
                 "constant_carrier" / Flag,
             ),
             "hardware_revision" / Int8ub,
         ),
-        "not_used2" / Bytes(14),
+        "_not_used2" / Bytes(14),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))

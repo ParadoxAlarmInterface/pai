@@ -21,9 +21,9 @@ LoginConfirmationResponse = Struct("fields" / RawCopy(
         "length" / Rebuild(Int8ub, lambda
             this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
         "result" / BitStruct(
-            "not_used0" / BitsInteger(4),
+            "_not_used0" / BitsInteger(4),
             "partition_2" / Flag,
-            "not_used1" / BitsInteger(3)
+            "_not_used1" / BitsInteger(3)
         ),
         "callback" / Int16ub
     )),
@@ -33,7 +33,7 @@ InitializeCommunication = Struct("fields" / RawCopy(
     Struct(
         "po" / Struct("command" / Const(0x00, Int8ub)),
         "module_address" / Default(Int8ub, 0x00),
-        "not_used0" / Padding(2),
+        "_not_used0" / Padding(2),
         "product_id" / ProductIdEnum,
         "firmware" / Struct(
             "version" / Int8ub,
@@ -48,7 +48,7 @@ InitializeCommunication = Struct("fields" / RawCopy(
         "user_code" / Default(Int24ub, 0x000000),
         "serial_number" / Bytes(4),
         "evo_sections" / Bytes(9),  # EVO section data 3030-3038
-        "not_used1" / Padding(4),
+        "_not_used1" / Padding(4),
         "source_id" / Default(CommunicationSourceIDEnum, 1),
         "carrier_length" / Bytes(1)
     )),
@@ -157,7 +157,7 @@ LiveEvent = Struct("fields" / RawCopy(
         "module_serial" / Bytes(4),
         "label_type" / Bytes(1),
         "label" / Bytes(16),
-        "not_used0" / Bytes(1),
+        "_not_used0" / Bytes(1),
     )), "checksum" / Checksum(
     Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
@@ -166,7 +166,7 @@ Action = Struct("fields" / RawCopy(
         "po" / Struct(
             "command" / Const(0x40, Int8ub),
         ),
-        "not_used0" / Default(Int8ub, 0),
+        "_not_used0" / Default(Int8ub, 0),
         "action" / Enum(Int8ub,
                         Stay_Arm=0x1,
                         Stay_Arm1=0x2,
@@ -184,7 +184,7 @@ Action = Struct("fields" / RawCopy(
                         PGM_Off=0x33,
                         Reload_RAM=0x80),
         "argument" / ExprAdapter(Byte, obj_ + 1, obj_ - 1),
-        "not_used0" / Padding(29),
+        "_not_used0" / Padding(29),
         "source_id" / Default(CommunicationSourceIDEnum, 1),
         "user_high" / Default(Int8ub, 0),
         "user_low" / Default(Int8ub, 0),
@@ -273,7 +273,7 @@ ReadEEPROM = Struct("fields" / RawCopy(
             "alarm_reporting_pending" / Default(Flag, False),
             "Windload_connected" / Default(Flag, False),
             "NeWare_connected" / Default(Flag, False),
-            "not_used" / Default(BitsInteger(2), 0),
+            "_not_used" / Default(BitsInteger(2), 0),
             "eeprom_address_bits" / Default(BitsInteger(2), 0)
         ),
         "bus_address" / Default(Int8ub, 0x00),  # 00 - Panel, 01-FF - Modules
@@ -296,7 +296,7 @@ ReadEEPROMResponse = Struct("fields" / RawCopy(
             this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
         "control" / BitStruct(
             "ram_access" / Flag,
-            "not_used" / Padding(5),
+            "_not_used" / Padding(5),
             "eeprom_address_bits" / BitsInteger(2)
         ),
         "bus_address" / Int8ub,  # 00 - Panel, 01-FF - Modules
@@ -310,7 +310,7 @@ SetTimeDate = Struct("fields" / RawCopy(Struct(
             "command" / Const(0x30, Int8ub)),
         "packet_length" / Rebuild(Int8ub,
                                   lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
-        "not_used0" / Padding(4),
+        "_not_used0" / Padding(4),
         "century" / Int8ub,
         "year" / Int8ub,
         "month" / Int8ub,
@@ -330,7 +330,7 @@ SetTimeDateResponse = Struct("fields" / RawCopy(
                 "Windload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "length" / Int8ub,
-        "not_used0" / Padding(4),
+        "_not_used0" / Padding(4),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
