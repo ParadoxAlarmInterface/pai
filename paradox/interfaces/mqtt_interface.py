@@ -66,17 +66,20 @@ class MQTTInterface(Interface):
         last_republish = time.time()
 
         while True:
-            item = self.queue.get()
-            if item[1] == 'change':
-                self.handle_change(item[2])
-            elif item[1] == 'event':
-                self.handle_event(item[2])
-            elif item[1] == 'command':
-                if item[2] == 'stop':
-                    break
-            if time.time() - last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
-                self.republish()
-                last_republish = time.time()
+            try:
+                item = self.queue.get()
+                if item[1] == 'change':
+                    self.handle_change(item[2])
+                elif item[1] == 'event':
+                    self.handle_event(item[2])
+                elif item[1] == 'command':
+                    if item[2] == 'stop':
+                        break
+                if time.time() - last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
+                    self.republish()
+                    last_republish = time.time()
+            except Exception as e:
+                self.logger.exception("ERROR in MQTT Run loop")
 
         if self.connected:
             self.mqtt.disconnect()
@@ -302,16 +305,16 @@ class MQTTInterface(Interface):
             self.armed[service] = dict()
 
         if label not in self.armed[service]:
-            self.armed[service][label] = (None, None, False)
+            self.armed[service][label] = dict(attribute=None, state=None, alarm=False)
 
         # Property changing to True: Alarm or arm
         if value:
-            if attribute in ['alarm', 'bell_activated', 'strobe_alarm', 'silent_alarm', 'audible_alarm'] and not self.armed[service][label][2]:
+            if attribute in ['alarm', 'bell_activated', 'strobe_alarm', 'silent_alarm', 'audible_alarm'] and not self.armed[service][label]['alarm']:
                 state = states_map['alarm']
-                self.armed[service][label][2] = True
+                self.armed[service][label]['alarm'] = True
 
             # only process if not armed already
-            elif self.armed[service][label][0] is None:
+            elif self.armed[service][label]['attribute'] is None:
                 if attribute == 'stay_arm':
                     state = states_map['stay_arm']
                 elif attribute == 'arm':
@@ -321,20 +324,21 @@ class MQTTInterface(Interface):
                 else:
                     return
 
-                self.armed[service][label] = (attribute, state, self.armed[service][label][2])
+                self.armed[service][label]['attribute'] = attribute
+                self.armed[service][label]['state'] = state
             else:
                 return  # Do not publish a change
 
         # Property changing to False: Disarm or alarm stop
         else:
             # Alarm stopped
-            if attribute in ['alarm', 'strobe_alarm', 'audible_alarm', 'bell_activated', 'silent_alarm'] and self.armed[service][label][2]:
-                state = self.armed[service][label][1]
-                self.armed[service][label][2] = False
+            if attribute in ['alarm', 'strobe_alarm', 'audible_alarm', 'bell_activated', 'silent_alarm'] and self.armed[service][label]['alarm']:
+                state = self.armed[service][label]['state']  # Restore the ARM state
+                self.armed[service][label]['alarm'] = False  # Reset alarm state
 
-            elif attribute in ['stay_arm', 'arm', 'sleep_arm'] and self.armed[service][label][0] == attribute:
+            elif attribute in ['stay_arm', 'arm', 'sleep_arm'] and self.armed[service][label]['attribute'] == attribute:
                 state = states_map['disarm']
-                self.armed[service][label] = (None, None, self.armed[service][label][2])
+                self.armed[service][label] = dict(attribute=None, state=None, alarm=False)
             else:
                 return  # Do not publish a change
 
