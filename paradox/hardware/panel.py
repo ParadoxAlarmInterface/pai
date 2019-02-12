@@ -55,11 +55,54 @@ class Panel:
         else:
             raise ResourceWarning('{} parser not found'.format(name))
 
+    def get_error_message(self, error_code) -> str:
+
+        # This is from EVO and may not apply to all panels
+        if error_code == 0x00:
+            message = "Requested command did not work"
+        elif error_code == 0x01:
+            message = "User Code is invalid"
+        elif error_code == 0x02:
+            message = "Partition in code lockout (too many bad entries)"
+        elif error_code == 0x05:
+            message = "Panel will disconnect"
+        elif error_code == "0x10":
+            message = "Panel Not connected"
+        elif error_code == 0x11:
+            message = "Panel Already Connected"
+        elif error_code == 0x12:
+            message = "Invalid PC Password"
+        elif error_code == 0x13:
+            message = "Winload on phone line"
+        elif error_code == 0x14:
+            message = "Invalid Module address"
+        elif error_code == 0x15:
+            message = "Cannot write in RAM"
+        elif error_code == 0x16:
+            message = "Request to Upgrade Failed"
+        elif error_code == 0x17:
+            message = "Record number out of range"
+        elif error_code == 0x19:
+            message = "Invalid record type"
+        elif error_code == 0x1A:
+            message = "Multi-Bus not supported"
+        elif error_code == 0x1B:
+            message = "Incorrect number of users"
+        elif error_code == 0x1C:
+            message = "Invalid label number"
+        else:
+            message = error_code
+
+        return message
+
     def encode_password(self, password) -> bytes:
         res = [0] * 2
 
         if password is None:
             return b'\x00\x00'
+
+        if len(password) != 2:
+            raise(Exception("Password length must be equal to 2. Got {}".format(len(password))))
 
         if not password.isdigit():
             return password

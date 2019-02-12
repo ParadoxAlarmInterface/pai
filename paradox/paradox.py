@@ -488,7 +488,11 @@ class Paradox:
 
     def handle_error(self, message):
         """Handle ErrorMessage"""
-        logger.warn("Got ERROR Message: {}".format(message.fields.value.message))
+        error_code = message.fields.value.message[1]
+
+        message = self.panel.get_error_message(error_code)
+        logger.error("Got ERROR Message: {}".format(message))
+
         self.run = STATE_STOP
 
     def disconnect(self):
