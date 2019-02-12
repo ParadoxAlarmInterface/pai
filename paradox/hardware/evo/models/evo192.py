@@ -1,5 +1,6 @@
 from ..panel import Panel_EVOBase
 
+
 class Panel_EVO192(Panel_EVOBase):
     mem_map = {
         "elements": {

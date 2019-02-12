@@ -17,6 +17,7 @@ from .event import event_map
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
+
 class Panel_EVOBase(PanelBase):
 
     event_map = event_map
@@ -38,8 +39,12 @@ class Panel_EVOBase(PanelBase):
         packet_length = 64  # 64 is max
         with open(file, 'wb') as fh:
             for address in range_:
-                args = dict(address=address, length=packet_length, control=dict(ram_access=ram))
-                reply = self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=0x05)
+                args = dict(
+                    address=address,
+                    length=packet_length,
+                    control=dict(ram_access=ram))
+                reply = self.core.send_wait(
+                    self.get_message('ReadEEPROM'), args, reply_expected=0x05)
 
                 retry_count = 3
                 for retry in range(1, retry_count + 1):
@@ -50,14 +55,16 @@ class Panel_EVOBase(PanelBase):
 
                     if reply.fields.value.address != address:
                         logger.debug(
-                            "Fetched and receive %s addresses (received: %d, requested: %d) do not match. Retrying %d of %d" % (
-                                mem_type,
-                                reply.fields.value.address, address, retry, retry_count))
-                        reply = self.core.send_wait(None, None, reply_expected=0x05)
+                            "Fetched and receive %s addresses (received: %d, requested: %d) do not match. Retrying %d of %d"
+                            % (mem_type, reply.fields.value.address, address,
+                               retry, retry_count))
+                        reply = self.core.send_wait(
+                            None, None, reply_expected=0x05)
                         continue
 
                     if retry == retry_count:
-                        logger.error('Failed to fetch %s at address: %d' % (mem_type, address))
+                        logger.error('Failed to fetch %s at address: %d' %
+                                     (mem_type, address))
 
                     break
 
@@ -105,7 +112,8 @@ class Panel_EVOBase(PanelBase):
             elif message[0] >> 4 == 0x0e:
                 return LiveEvent.parse(message)
         except Exception:
-            logger.exception("Parsing message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
+            logger.exception("Parsing message: %s" % (" ".join(
+                "{:02x} ".format(c) for c in message)))
 
         return None
 
@@ -115,7 +123,8 @@ class Panel_EVOBase(PanelBase):
         raw_data = reply.fields.data + reply.checksum
         parsed = InitializeCommunication.parse(raw_data)
         parsed.fields.value.pc_password = password
-        payload = InitializeCommunication.build(dict(fields=dict(value=parsed.fields.value)))
+        payload = InitializeCommunication.build(
+            dict(fields=dict(value=parsed.fields.value)))
 
         logger.info("Initializing communication")
         reply = self.core.send_wait(message=payload, reply_expected=0x1)
@@ -146,10 +155,12 @@ class Panel_EVOBase(PanelBase):
         assert vars.po.command == 0x5
         assert vars.control.ram_access == True
         assert vars.control.eeprom_address_bits == 0x0
-        assert vars.bus_address == 0x00 # panel
+        assert vars.bus_address == 0x00  # panel
 
         if vars.address not in RAMDataParserMap:
-            logger.error("Parser for memory address (%d) is not implemented. Please review your STATUS_REQUESTS setting. Skipping." % vars.address)
+            logger.error(
+                "Parser for memory address (%d) is not implemented. Please review your STATUS_REQUESTS setting. Skipping."
+                % vars.address)
             return
         assert len(vars.data) == 64
 
@@ -162,7 +173,8 @@ class Panel_EVOBase(PanelBase):
                 if k.startswith("_"):  # ignore private properties
                     continue
 
-                self.core.update_properties('system', 'trouble', {k: properties.troubles[k]})
+                self.core.update_properties('system', 'trouble',
+                                            {k: properties.troubles[k]})
 
         self.process_properties_bulk(properties, vars.address)
 
@@ -173,10 +185,11 @@ class Panel_EVOBase(PanelBase):
         :param str command: textual command
         :return: True if we have at least one success
         """
-        args = dict(commands = dict((i, command) for i in partitions))
+        args = dict(commands=dict((i, command) for i in partitions))
 
         try:
-            reply = self.core.send_wait(PerformPartitionAction, args, reply_expected=0x04)
+            reply = self.core.send_wait(
+                PerformPartitionAction, args, reply_expected=0x04)
         except MappingError:
             logger.error('Partition command: "%s" is not supported' % command)
             return False
