@@ -21,9 +21,9 @@ class Panel_EVOBase(PanelBase):
 
     event_map = event_map
 
-    def get_message(self, name) -> Construct:
+    def get_message(self, name, direction) -> Construct:
         try:
-            return super(Panel_EVOBase, self).get_message(name)
+            return super(Panel_EVOBase, self).get_message(name, direction)
         except ResourceWarning as e:
             clsmembers = dict(inspect.getmembers(sys.modules[__name__]))
             if name in clsmembers:
