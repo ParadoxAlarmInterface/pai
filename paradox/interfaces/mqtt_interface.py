@@ -262,11 +262,15 @@ class MQTTInterface(Interface):
     def handle_change(self, raw):
         element, label, attribute, value = raw
         """Handle Property Change"""
-
+        
         # Keep track of ARM state
         if element == 'partition':
             if label not in self.partitions:
                 self.partitions[label] = dict()
+
+                # After we get 2 partitions, lets publish a dashboard
+                if cfg.MQTT_DASH_PUBLISH and len(self.partitions) == 2:
+                    self.publish_dash(cfg.MQTT_DASH_TEMPLATE, list(self.partitions.keys()))
 
             self.partitions[label][attribute] = value
 
@@ -357,3 +361,16 @@ class MQTTInterface(Interface):
         for k in list(self.cache.keys()):
             v = self.cache[k]
             self.mqtt.publish(k, v['value'], v['qos'], v['retain'])
+
+    def publish_dash(self, fname, partitions):
+        if len(partitions) < 2:
+            return
+
+        if os.path.exists(fname):
+            with open(fname, 'r') as f:
+                data = f.read()
+                data = data.replace('__PARTITION1__', partitions[0]).replace('__PARTITION2__', partitions[1])
+                self.mqtt.publish(cfg.MQTT_DASH_TOPIC, data, 2, True)
+                self.logger.info("MQTT Dash panel published to {}".format(cfg.MQTT_DASH_TOPIC))
+        else:
+            self.logger.warn("MQTT DASH Template not found: {}".format(fname))
