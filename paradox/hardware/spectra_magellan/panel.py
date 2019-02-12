@@ -113,7 +113,7 @@ class Panel(PanelBase):
                     panel_id=reply.fields.value.panel_id,
                     pc_password=password,
                     user_code=0x000000,
-                    not_used1=0x19,
+                    _not_used1=0x19,
                     source_id=0x02
                     )
 
@@ -168,7 +168,7 @@ class Panel(PanelBase):
                                             publish=force)
 
             for k in properties.troubles:
-                if "not_used" in k:
+                if k.startswith('_'):
                     continue
 
                 self.core.update_properties('system', 'trouble', {k: properties.troubles[k]})
