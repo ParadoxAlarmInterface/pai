@@ -7,18 +7,10 @@ It supports MG/SP/EVO panels connected through a serial port, which is present i
 
 Support for Magellan and Spectra panels is very stable. Support for EVO panels is being added, so YMMV. If you find a bug, please report it.
 
-
-Tested in the following environment:
-* Python > 3.5.2
-* Mosquitto MQTT Broker >v 1.4.8
-* OrangePi 2G-IOT, NanoPi NEO, and Raspberry Pi 3 through their built in Serial Port (with a level shifter!), or a USB RS232 TTL adapter (CP2102, PL2303, CH340, etc..)
-* Ubuntu Server 16.04.3 LTS
-* Paradox MG5050, SP7000 and EVO panels
-* [Signal Cli](https://github.com/AsamK/signal-cli) through a DBUS interface
-* Pushbullet.py
-* SIM900 module through a serial port
-
 For further information and detailed usage refer to the [Wiki](https://github.com/jpbarraca/pai/wiki).
+
+On Android, if you install [MQTT Dash](https://play.google.com/store/apps/details?id=net.routix.mqttdash), and [follow the instructions](https://github.com/jpbarraca/pai/wiki#mqtt-dash) you will automatically get a panel like this:
+![mqtt_dash](https://user-images.githubusercontent.com/497717/52603920-d4984d80-2e60-11e9-9772-578b10576b3c.jpg)
 
 ## How to use
 
@@ -65,6 +57,19 @@ python3 run.py
 
 If something goes wrong, you can edit the ```config/user.py``` to increase the debug level.
 Check ```config/defaults.py``` for all configuration options
+
+
+## Tested Environment
+
+Tested in the following environment:
+* Python > 3.5.2
+* Mosquitto MQTT Broker >v 1.4.8
+* OrangePi 2G-IOT, NanoPi NEO, and Raspberry Pi 3 through their built in Serial Port (with a level shifter!), or a USB RS232 TTL adapter (CP2102, PL2303, CH340, etc..)
+* Ubuntu Server 16.04.3 LTS
+* Paradox MG5050, SP7000 and EVO panels
+* [Signal Cli](https://github.com/AsamK/signal-cli) through a DBUS interface
+* Pushbullet.py
+* SIM900 module through a serial port
 
 ## Authors
 
