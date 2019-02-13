@@ -103,8 +103,8 @@ class Panel:
         if password is None:
             return b'\x00\x00'
 
-        if len(password) != 2:
-            raise(Exception("Password length must be equal to 2. Got {}".format(len(password))))
+        if len(password) != 4:
+            raise(Exception("Password length must be equal to 4. Got {}".format(len(password))))
 
         if not password.isdigit():
             return password
