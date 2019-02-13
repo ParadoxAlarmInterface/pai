@@ -33,20 +33,22 @@ class Panel:
         self.core = core
         self.product_id = product_id
 
-    def parse_message(self, message) -> Optional[Container]:
+    def parse_message(self, message, direction='topanel') -> Optional[Container]:
         if message is None or len(message) == 0:
             return None
-
-        if message[0] == 0x72 and message[1] == 0:
-            return InitiateCommunication.parse(message)
-        elif message[0] == 0x72 and message[1] == 0xFF:
-            return InitiateCommunicationResponse.parse(message)
-        elif message[0] == 0x5F:
-            return StartCommunication.parse(message)
-        elif message[0] == 0x00 and message[4] > 0:
-            return StartCommunicationResponse.parse(message)
+        
+        if direction == 'topanel':
+            if message[0] == 0x72 and message[1] == 0:
+                return InitiateCommunication.parse(message)
+            elif message[0] == 0x5F:
+                return StartCommunication.parse(message)
         else:
-            return None
+            if message[0] == 0x72 and message[1] == 0xFF:
+                return InitiateCommunicationResponse.parse(message)
+            elif message[0] == 0x00 and message[4] > 0:
+                return StartCommunicationResponse.parse(message)
+            else:
+                return None
 
     def get_message(self, name) -> Construct:
         clsmembers = dict(inspect.getmembers(sys.modules[__name__]))

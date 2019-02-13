@@ -251,7 +251,7 @@ class Paradox:
                 logger.debug("PC <- A {}".format(binascii.hexlify(data)))
 
             try:
-                recv_message = self.panel.parse_message(data)
+                recv_message = self.panel.parse_message(data, direction='frompanel')
                 # No message
                 if recv_message is None:
                     logger.debug("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in data)))
@@ -262,7 +262,7 @@ class Paradox:
 
             if cfg.LOGGING_DUMP_MESSAGES:
                 logger.debug(recv_message)
-
+            
             # Events are async
             if recv_message.fields.value.po.command == 0xe:  # Events
                 try:
@@ -277,7 +277,7 @@ class Paradox:
 
                 retries += 1  # Ignore this try
 
-            elif recv_message.fields.value.po.command == 0x70:  # Terminate connection
+            elif recv_message.fields.value.po.command == 0x7 and data[1] != 0xff:  # Error
                 self.handle_error(recv_message)
                 return None
 
