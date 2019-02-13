@@ -76,6 +76,9 @@ class Config:
         "MQTT_INTERFACE_TOPIC": 'interface',
         "MQTT_TOGGLE_CODES": {},
         "MQTT_USE_NUMERIC_STATES": False,         # use 0 and 1 instead of True and False
+        "MQTT_DASH_PUBLISH": True,
+        "MQTT_DASH_TOPIC": "metrics/exchange/pai",
+        "MQTT_DASH_TEMPLATE": "/etc/pai/mqtt_dash.txt",
 
         # Interfaces
         "COMMAND_ALIAS": {                       # alias for commands through text based interfaces
