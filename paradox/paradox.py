@@ -300,7 +300,7 @@ class Paradox:
         """
         selected = []  # type: Sequence[int]
         if needle == 'all' or needle == '0':
-            zones_selected = list(haystack)
+            selected = list(haystack)
         else:
             if needle.isdigit() and 0 < int(needle) < len(haystack):
                 el = haystack.get(int(needle))
