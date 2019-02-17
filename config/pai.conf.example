@@ -27,7 +27,7 @@ IP_CONNECTION_SITEID = None 		# SITE ID. IF defined, connection will be made thr
 IP_CONNECTION_EMAIL = None 		# Email registered in the site
 
 # Paradox
-KEEP_ALIVE_INTERVAL = 20   		# Interval between status updates
+KEEP_ALIVE_INTERVAL = 10   		# Interval between status updates
 
 LIMITS = { # By default all zones will be monitored
     # 'zone': range(1, 17),     # Zones to monitor and control

@@ -26,7 +26,7 @@ class Config:
         "IP_CONNECTION_EMAIL": None,          # Email registered in the site
 
         # Paradox
-        "KEEP_ALIVE_INTERVAL": 20,        # Interval between status updates
+        "KEEP_ALIVE_INTERVAL": 10,        # Interval between status updates
 
         "LIMITS": {},  # By default all zones will be monitored
 

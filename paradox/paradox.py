@@ -184,6 +184,7 @@ class Paradox:
             tstart = time.time()
             try:
                 for i in cfg.STATUS_REQUESTS:
+                    logger.debug("Requesting status: %d" % i)
                     reply = self.panel.request_status(i)
                     if reply is not None:
                         tstart = time.time()
@@ -488,9 +489,9 @@ class Paradox:
 
     def handle_error(self, message):
         """Handle ErrorMessage"""
-        error_code = message.fields.value.message[1]
+        error_enum = message.fields.value.message
 
-        message = self.panel.get_error_message(error_code)
+        message = self.panel.get_error_message(error_enum)
         logger.error("Got ERROR Message: {}".format(message))
 
         self.run = STATE_STOP
