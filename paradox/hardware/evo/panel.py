@@ -32,6 +32,14 @@ class Panel_EVOBase(PanelBase):
             else:
                 raise e
 
+    def dump_memory(self):
+        """
+        Dumps EEPROM and RAM memory to files
+        :return:
+        """
+        self.dump_memory_to_file('eeprom.bin', range(0, 0xffff, 64))
+        self.dump_memory_to_file('ram.bin', range(0, 59), True)
+
     def dump_memory_to_file(self, file, range_, ram=False):
         mem_type = "RAM" if ram else "EEPROM"
         logger.info("Dump " + mem_type)

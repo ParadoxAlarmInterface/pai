@@ -148,6 +148,14 @@ class Paradox:
                 self.sync_time()
                 self.send_wait()  # Read Clock loss restore event
 
+            if cfg.DEVELOPMENT_DUMP_MEMORY:
+                if hasattr(self.panel, 'dump_memory') and callable(self.panel.dump_memory):
+                    logger.warn("Requested memory dump. Dumping...")
+                    self.panel.dump_memory()
+                    logger.warn("Memory dump completed")
+                else:
+                    logger.warn("Requested memory dump, but current panel type does not support it yet.")
+
             self.panel.update_labels()
 
             logger.info("Connection OK")

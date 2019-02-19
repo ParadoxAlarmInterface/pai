@@ -12,6 +12,9 @@ class Config:
         "LOGGING_DUMP_MESSAGES": False,         # Dump Messages to log
         "LOGGING_DUMP_STATUS": False,           # Dump Status to log
 
+        # Development
+        "DEVELOPMENT_DUMP_MEMORY": False,
+
         # Connection Type
         "CONNECTION_TYPE": 'Serial',          # Serial or IP
 
