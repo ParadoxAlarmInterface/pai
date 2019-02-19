@@ -131,18 +131,22 @@ class Panel_EVOBase(PanelBase):
             dict(fields=dict(value=parsed.fields.value)))
 
         logger.info("Initializing communication")
-        reply = self.core.send_wait(message=payload, reply_expected=0x1)
+        reply = self.core.send_wait(message=payload, reply_expected=[0x1, 0x0])
 
         if reply is None:
             logger.error("Initialization Failed")
             return False
 
-        if reply.fields.value.po.status.Windload_connected:
-            logger.info("Authentication Success")
-            return True
-        else:
-            logger.error("Authentication Failed. Wrong Password?")
+        if reply.fields.value.po.command == 0x0:
+            logger.error("Authentication Failed. Wrong Password or User Type is not FullMaster?")
             return False
+        else:  # command == 0x1
+            if reply.fields.value.po.status.Windload_connected:
+                logger.info("Authentication Success")
+                return True
+            else:
+                logger.error("Authentication Failed")
+                return False
 
     def request_status(self, i) -> Optional[Container]:
         args = dict(address=i, length=64, control=dict(ram_access=True))

@@ -6,7 +6,7 @@ import logging
 import time
 from collections import defaultdict, MutableMapping
 from threading import Lock
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Iterable
 
 from construct import Container
 
@@ -282,10 +282,21 @@ class Paradox:
                 self.handle_error(recv_message)
                 return None
 
-            elif reply_expected is not None and recv_message.fields.value.po.command != reply_expected:
-                logging.error("Got message {} but expected {}".format(recv_message.fields.value.po.command,
-                                                                      reply_expected))
-                logging.error("Detail:\n{}".format(recv_message))
+            elif reply_expected is not None:
+                if isinstance(reply_expected, Iterable):
+                    if any(recv_message.fields.value.po.command == expected for expected in reply_expected):
+                        return recv_message
+                    else:
+                        logging.error("Got message {} but expected on of [{}]".format(recv_message.fields.value.po.command,
+                                                                              ", ".join(reply_expected)))
+                        logging.error("Detail:\n{}".format(recv_message))
+                else:
+                    if recv_message.fields.value.po.command == reply_expected:
+                        return recv_message
+                    else:
+                        logging.error("Got message {} but expected {}".format(recv_message.fields.value.po.command,
+                                                                              reply_expected))
+                        logging.error("Detail:\n{}".format(recv_message))
             else:
                 return recv_message
 
