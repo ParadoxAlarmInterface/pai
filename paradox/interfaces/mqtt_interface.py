@@ -5,7 +5,7 @@ import json
 import os
 import re
 
-from paradox.lib.utils import SortableTuple
+from paradox.lib.utils import SortableTuple, JSONByteEncoder
 from paradox.interfaces import Interface
 
 from paradox.config import config as cfg
@@ -251,13 +251,18 @@ class MQTTInterface(Interface):
                      'online', 0, cfg.MQTT_RETAIN)
 
     def handle_event(self, raw):
-        """Handle Live Event"""
+        """
+        Handle Live Event
+
+        :param raw: object with properties (can have byte properties)
+        :return:
+        """
 
         if cfg.MQTT_PUBLISH_RAW_EVENTS:
             self.publish('{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                         cfg.MQTT_EVENTS_TOPIC,
                                         cfg.MQTT_RAW_TOPIC),
-                         json.dumps(raw.props), 0, cfg.MQTT_RETAIN)
+                         json.dumps(raw.props, ensure_ascii=False, cls=JSONByteEncoder), 0, cfg.MQTT_RETAIN)
 
     def handle_change(self, raw):
         element, label, attribute, value = raw
