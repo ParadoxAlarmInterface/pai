@@ -152,7 +152,8 @@ class Paradox:
                 if hasattr(self.panel, 'dump_memory') and callable(self.panel.dump_memory):
                     logger.warn("Requested memory dump. Dumping...")
                     self.panel.dump_memory()
-                    logger.warn("Memory dump completed")
+                    logger.warn("Memory dump completed. Exiting pai.")
+                    raise SystemExit()
                 else:
                     logger.warn("Requested memory dump, but current panel type does not support it yet.")
 
