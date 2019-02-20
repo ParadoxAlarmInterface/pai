@@ -5,7 +5,7 @@ from itertools import chain
 from typing import Optional
 
 from construct import Construct, Struct, BitStruct, Const, Nibble, Checksum, Padding, Bytes, this, RawCopy, Int8ub, \
-    Default, Enum, Flag, BitsInteger, Int16ub, Container
+    Default, Enum, Flag, BitsInteger, Int16ub, Container, EnumIntegerString
 
 from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum
 
@@ -58,8 +58,12 @@ class Panel:
             raise ResourceWarning('{} parser not found'.format(name))
 
     def get_error_message(self, error_code) -> str:
-
         # This is from EVO and may not apply to all panels
+
+        error_str = str(error_code)
+        if isinstance(error_code, EnumIntegerString):
+            error_code = int(error_code)
+
         if error_code == 0x00:
             message = "Requested command did not work"
         elif error_code == 0x01:
@@ -68,7 +72,7 @@ class Panel:
             message = "Partition in code lockout (too many bad entries)"
         elif error_code == 0x05:
             message = "Panel will disconnect"
-        elif error_code == "0x10":
+        elif error_code == 0x10:
             message = "Panel Not connected"
         elif error_code == 0x11:
             message = "Panel Already Connected"
@@ -93,7 +97,7 @@ class Panel:
         elif error_code == 0x1C:
             message = "Invalid label number"
         else:
-            message = error_code
+            message = error_str
 
         return message
 

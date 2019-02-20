@@ -12,6 +12,9 @@ class Config:
         "LOGGING_DUMP_MESSAGES": False,         # Dump Messages to log
         "LOGGING_DUMP_STATUS": False,           # Dump Status to log
 
+        # Development
+        "DEVELOPMENT_DUMP_MEMORY": False,
+
         # Connection Type
         "CONNECTION_TYPE": 'Serial',          # Serial or IP
 
@@ -26,7 +29,7 @@ class Config:
         "IP_CONNECTION_EMAIL": None,          # Email registered in the site
 
         # Paradox
-        "KEEP_ALIVE_INTERVAL": 20,        # Interval between status updates
+        "KEEP_ALIVE_INTERVAL": 10,        # Interval between status updates
 
         "LIMITS": {},  # By default all zones will be monitored
 
@@ -76,7 +79,7 @@ class Config:
         "MQTT_INTERFACE_TOPIC": 'interface',
         "MQTT_TOGGLE_CODES": {},
         "MQTT_USE_NUMERIC_STATES": False,         # use 0 and 1 instead of True and False
-        "MQTT_DASH_PUBLISH": True,
+        "MQTT_DASH_PUBLISH": False,
         "MQTT_DASH_TOPIC": "metrics/exchange/pai",
         "MQTT_DASH_TEMPLATE": "/etc/pai/mqtt_dash.txt",
 

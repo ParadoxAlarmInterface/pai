@@ -5,7 +5,7 @@ import logging
 import time
 from collections import defaultdict, MutableMapping
 from threading import Lock
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Iterable
 
 from construct import Container
 
@@ -147,6 +147,15 @@ class Paradox:
                 self.sync_time()
                 self.send_wait()  # Read Clock loss restore event
 
+            if cfg.DEVELOPMENT_DUMP_MEMORY:
+                if hasattr(self.panel, 'dump_memory') and callable(self.panel.dump_memory):
+                    logger.warn("Requested memory dump. Dumping...")
+                    self.panel.dump_memory()
+                    logger.warn("Memory dump completed. Exiting pai.")
+                    raise SystemExit()
+                else:
+                    logger.warn("Requested memory dump, but current panel type does not support it yet.")
+
             self.panel.update_labels()
 
             logger.info("Connection OK")
@@ -183,6 +192,7 @@ class Paradox:
             tstart = time.time()
             try:
                 for i in cfg.STATUS_REQUESTS:
+                    logger.debug("Requesting status: %d" % i)
                     reply = self.panel.request_status(i)
                     if reply is not None:
                         tstart = time.time()
@@ -280,10 +290,21 @@ class Paradox:
                 self.handle_error(recv_message)
                 return None
 
-            elif reply_expected is not None and recv_message.fields.value.po.command != reply_expected:
-                logging.error("Got message {} but expected {}".format(recv_message.fields.value.po.command,
-                                                                      reply_expected))
-                logging.error("Detail:\n{}".format(recv_message))
+            elif reply_expected is not None:
+                if isinstance(reply_expected, Iterable):
+                    if any(recv_message.fields.value.po.command == expected for expected in reply_expected):
+                        return recv_message
+                    else:
+                        logging.error("Got message {} but expected on of [{}]".format(recv_message.fields.value.po.command,
+                                                                              ", ".join(reply_expected)))
+                        logging.error("Detail:\n{}".format(recv_message))
+                else:
+                    if recv_message.fields.value.po.command == reply_expected:
+                        return recv_message
+                    else:
+                        logging.error("Got message {} but expected {}".format(recv_message.fields.value.po.command,
+                                                                              reply_expected))
+                        logging.error("Detail:\n{}".format(recv_message))
             else:
                 return recv_message
 
@@ -487,9 +508,9 @@ class Paradox:
 
     def handle_error(self, message):
         """Handle ErrorMessage"""
-        error_code = message.fields.value.message[1]
+        error_enum = message.fields.value.message
 
-        message = self.panel.get_error_message(error_code)
+        message = self.panel.get_error_message(error_enum)
         logger.error("Got ERROR Message: {}".format(message))
 
         self.run = STATE_STOP
