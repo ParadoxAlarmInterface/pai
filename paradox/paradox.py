@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import binascii
-import datetime
 import logging
 import time
 from collections import defaultdict, MutableMapping
@@ -163,9 +162,9 @@ class Paradox:
     def sync_time(self):
         logger.debug("Synchronizing panel time")
 
-        now = datetime.datetime.now()
-        args = dict(century=int(now.year / 100), year=int(now.year % 100),
-                    month=now.month, day=now.day, hour=now.hour, minute=now.minute)
+        now = time.localtime()
+        args = dict(century=int(now.tm_year / 100), year=int(now.tm_year % 100),
+                    month=now.tm_mon, day=now.tm_mday, hour=now.tm_hour, minute=now.tm_min)
 
         reply = self.send_wait(self.panel.get_message('SetTimeDate'), args, reply_expected=0x03)
         if reply is None:
