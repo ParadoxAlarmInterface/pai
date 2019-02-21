@@ -123,7 +123,7 @@ class IPInterface(Interface):
         self.alarm.resume()
 
     def connection_watch(self):
-        while self.client_socket != None:
+        while self.client_socket is None:
             tstart = time.time()
             payload = self.alarm.send_wait()
             tend = time.time()

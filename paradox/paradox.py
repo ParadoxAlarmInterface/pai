@@ -101,14 +101,14 @@ class Paradox:
             self.run = STATE_STOP
             return False
 
+        self.run = STATE_STOP
+
         self.connection.timeout(0.5)
 
         logger.info("Connecting to panel")
 
         # Reset all states
         self.reset()
-
-        self.run = STATE_RUN
 
         if not self.panel:
             self.panel = create_panel(self)
@@ -131,7 +131,6 @@ class Paradox:
                                    args=dict(source_id=0x02), reply_expected=0x00)
 
             if reply is None:
-                self.run = STATE_STOP
                 return False
 
             self.panel = create_panel(self, reply.fields.value.product_id)  # Now we know what panel it is. Let's
@@ -139,7 +138,6 @@ class Paradox:
 
             result = self.panel.initialize_communication(reply, cfg.PASSWORD)
             if not result:
-                self.run = STATE_STOP
                 return False
             self.send_wait()  # Read WinLoad in (connected) event
 
@@ -157,6 +155,8 @@ class Paradox:
                     logger.warn("Requested memory dump, but current panel type does not support it yet.")
 
             self.panel.update_labels()
+
+            self.run = STATE_RUN
 
             logger.info("Connection OK")
             self.loop_wait = False
@@ -187,6 +187,10 @@ class Paradox:
             while self.run == STATE_PAUSE:
                 time.sleep(5)
 
+            # May happend when out of sleep
+            if self.run == STATE_STOP:
+                break
+
             self.loop_wait = True
 
             tstart = time.time()
@@ -207,6 +211,10 @@ class Paradox:
                 self.send_wait(None, timeout=min(time.time() - tstart, 1))
 
     def send_wait_simple(self, message=None, timeout=5, wait=True) -> Optional[bytes]:
+        # Connection closed
+        if self.connection is None:
+            return
+
         if message is not None:
             if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug("PC -> A {}".format(binascii.hexlify(message)))
@@ -233,6 +241,10 @@ class Paradox:
                   retries=5,
                   timeout=5,
                   reply_expected=None) -> Optional[Container]:
+
+        # Connection closed
+        if self.connection is None:
+            return
 
         if message is None and message_type is not None:
             message = message_type.build(dict(fields=dict(value=args)))
@@ -529,7 +541,6 @@ class Paradox:
             self.run = STATE_PAUSE
             self.loop_wait = False
             self.send_wait(self.panel.get_message('CloseConnection'), None, reply_expected=0x07)
-            self.connection.close()
 
     def resume(self):
         if self.run == STATE_PAUSE:
