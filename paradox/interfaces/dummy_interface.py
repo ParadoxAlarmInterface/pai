@@ -11,8 +11,8 @@ from paradox.config import config as cfg
 logger = logging.getLogger('PAI').getChild(__name__)
 
 class DummyInterface(Interface):
-    """Interface Class using Pushover"""
-    name = 'pushover'
+    """Interface Class using Dummy"""
+    name = 'dummy'
 
     def __init__(self):
         super().__init__()
@@ -35,7 +35,7 @@ class DummyInterface(Interface):
             self.logger.exception("Dummy")
 
     def stop(self):
-        """ Stops the Pushover interface"""
+        """ Stops the Dummy interface"""
         self.queue.put_nowait(SortableTuple((2, 'command', 'stop')))
 
     def notify(self, source, message, level):
