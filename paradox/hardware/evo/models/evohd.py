@@ -11,7 +11,7 @@ class Panel_EVOHD(Panel_EVOBase):
                     range(0x062f7, 0x068f7, 0x10)  # EVO192 = EVO96 + 96 zones
                 ]},
             "pgm": {
-                "label_offset": 0, "addresses": [range(0x07082, 0x7482, 0x20)], "template": {
+                "label_offset": 0, "addresses": [range(0x070a6, 0x7486, 0x20)], "template": {  # A bit off from EVO 192
                     "on": False,
                     "pulse": False}
             },
