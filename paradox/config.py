@@ -27,7 +27,7 @@ class Config:
         "IP_CONNECTION_PASSWORD": b'0000',    # IP Module password
         "IP_CONNECTION_SITEID": None,         # SITE ID. IF defined, connection will be made through this method.
         "IP_CONNECTION_EMAIL": None,          # Email registered in the site
-
+        "IP_CONNECTION_PANEL_SERIAL": None,   # Serial number to be used in multi-panel sites. None for first
         # Paradox
         "KEEP_ALIVE_INTERVAL": 10,        # Interval between status updates
 
