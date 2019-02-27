@@ -64,8 +64,6 @@ MQTT_PASSWORD = None    		# MQTT Password
 MQTT_RETAIN = True      		# Publish messages with Retain
 MQTT_BIND_ADDRESS = '127.0.0.1'
 MQTT_REPUBLISH_INTERVAL = 60 * 60 * 12  # Interval for republishing all data
-MQTT_HOMEBRIDGE_ENABLE = False
-MQTT_HOMEASSISTANT_ENABLE = False
 
 # MQTT Topics
 MQTT_BASE_TOPIC = 'paradox'             # Root of all topics
@@ -81,14 +79,61 @@ MQTT_OUTPUT_TOPIC = 'outputs'
 MQTT_KEYPAD_TOPIC = 'keypads'
 MQTT_STATES_TOPIC = 'states'
 MQTT_RAW_TOPIC = 'raw'
-MQTT_HOMEBRIDGE_SUMMARY_TOPIC = 'current'
-MQTT_HOMEASSISTANT_SUMMARY_TOPIC = 'current_hass'
 
 MQTT_NOTIFICATIONS_TOPIC = 'notifications'
 MQTT_PUBLISH_RAW_EVENTS = True
 MQTT_INTERFACE_TOPIC = 'interface'
 MQTT_TOGGLE_CODES = {}
 MQTT_USE_NUMERIC_STATES = False         # use 0 and 1 instead of True and False
+
+# MQTT Homebridge
+MQTT_HOMEBRIDGE_ENABLE = False
+
+# Topic to use
+# Defaults to paradox/states/partitions/PARTITION/current
+MQTT_HOMEBRIDGE_SUMMARY_TOPIC = 'current'
+
+# Homeassistant states map
+# Key = Paradox State
+# Value = State propagated to Homebridge
+MQTT_PARTITION_HOMEBRIDGE_COMMANDS = dict(
+    STAY_ARM='arm_stay',
+    AWAY_ARM='arm',
+    NIGHT_ARM='arm_sleep',
+    DISARM='disarm')
+
+# Homeassistant control map
+# Key = Command from HASS
+# Value = Command sent to Panel
+MQTT_PARTITION_HOMEBRIDGE_STATES = dict(
+    alarm='ALARM_TRIGGERED',
+    stay_arm='STAY_ARM',
+    arm='AWAY_ARM',
+    sleep_arm='NIGHT_ARM',
+    disarm='DISARMED')
+
+# MQTT HASS
+MQTT_HOMEASSISTANT_ENABLE = False
+
+# Topic to use
+# Defaults to paradox/states/partitions/PARTITION/current_hass
+MQTT_HOMEASSISTANT_SUMMARY_TOPIC = 'current_hass'
+
+# Homeassistant states map
+# Key = Paradox State
+# Value = State propagated to HASS
+MQTT_PARTITION_HOMEASSISTANT_STATES = dict(alarm='triggered', 
+                             stay_arm='armed_home',
+                             arm='armed_away',
+                             sleep_arm='armed_sleep',
+                             disarm='disarmed')
+# Homeassistant control map
+# Key = Command from HASS
+# Value = Command sent to Panel
+MQTT_PARTITION_HOMEASSISTANT_COMMANDS = dict(armed_home='arm_stay', 
+                                armed_away='arm',
+                                armed_sleep='arm_sleep',
+                                disarmed='disarm')
 
 # Interfaces
 COMMAND_ALIAS = {						# alias for commands through text based interfaces
