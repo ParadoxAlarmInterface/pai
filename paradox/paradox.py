@@ -85,9 +85,9 @@ class Paradox:
     def reset(self):
 
         # Keep track of alarm state
-        self.data["power"].update(dict(label='power'))
-        self.data["rf"].update(dict(label='rf'))
-        self.data["troubles"].update(dict(label='troubles'))
+        self.data['system'] = dict(power=dict(label='power', key='power', id=0), 
+                                   rf=dict(label='rf', key='rf', id=1), 
+                                   troubles=dict(label='troubles', key='troubles', id=2) )
 
         self.last_power_update = 0
         self.run = STATE_STOP
