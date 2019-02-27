@@ -176,7 +176,7 @@ class Panel(PanelBase):
                 if k.startswith('_'):
                     continue
 
-                self.core.update_properties('system', 'trouble', {k: properties.troubles[k]})
+                self.core.update_properties('system', 'troubles', {k: properties.troubles[k]})
 
             self.process_properties_bulk(properties, vars.address)
 
