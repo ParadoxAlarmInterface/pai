@@ -189,7 +189,7 @@ class Panel_EVOBase(PanelBase):
                 if k.startswith("_"):  # ignore private properties
                     continue
 
-                self.core.update_properties('system', 'trouble',
+                self.core.update_properties('system', 'troubles',
                                             {k: properties.troubles[k]})
 
         self.process_properties_bulk(properties, vars.address)
