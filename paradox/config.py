@@ -8,6 +8,8 @@ class Config:
         "LOGGING_LEVEL_CONSOLE": logging.INFO,  # See documentation of Logging package
         "LOGGING_LEVEL_FILE": logging.ERROR,
         "LOGGING_FILE": '/var/log/paradox.log',  # or set to file path LOGGING_FILE:'/var/log/paradox.log'
+        "LOGGING_FILE_MAX_SIZE": 10,             # Max log file size in MB
+        "LOGGING_FILE_MAX_FILES": 2,            # Max old log files to keep
         "LOGGING_DUMP_PACKETS": False,          # Dump RAW Packets to log
         "LOGGING_DUMP_MESSAGES": False,         # Dump Messages to log
         "LOGGING_DUMP_STATUS": False,           # Dump Status to log

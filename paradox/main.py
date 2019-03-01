@@ -11,6 +11,7 @@ __email__ = "jpbarraca@gmail.com"
 __status__ = "Beta"
 
 import logging
+from logging.handlers import RotatingFileHandler
 import sys
 import time
 
@@ -22,7 +23,11 @@ logger = logging.getLogger('PAI')
 logger.setLevel(cfg.LOGGING_LEVEL_CONSOLE)
 
 if cfg.LOGGING_FILE is not None:
-    logfile_handler = logging.FileHandler(cfg.LOGGING_FILE)
+    logfile_handler = RotatingFileHandler(cfg.LOGGING_FILE, mode='a',
+                        maxBytes=cfg.LOGGING_FILE_MAX_SIZE*1024*1024, 
+                        backupCount=cfg.LOGGING_FILE_MAX_FILES,
+                        encoding=None, delay=0)
+
     logfile_handler.setLevel(cfg.LOGGING_LEVEL_FILE)
     logfile_handler.setFormatter(logging.Formatter(FORMAT))
     logger.addHandler(logfile_handler)
