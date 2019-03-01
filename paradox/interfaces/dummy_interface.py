@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import logging
-import re
 
 from paradox.interfaces import Interface
 from paradox.lib.utils import SortableTuple

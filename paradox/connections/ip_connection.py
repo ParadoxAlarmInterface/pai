@@ -79,11 +79,11 @@ class IPConnection:
             
             logger.debug("Site Info: {}".format(json.dumps(self.site_info, indent=4)))
             
-            if self.IP_CONNECTION_PANEL_SERIAL is not None:
+            if cfg.IP_CONNECTION_PANEL_SERIAL is not None:
                 for site in self.site_info['site']:
                     for module in site:
                         logger.debug("Found module with panel serial: {}".format(module['panelSerial']))
-                        if module['panelSerial'] == self.IP_CONNECTION_PANEL_SERIAL:
+                        if module['panelSerial'] == cfg.IP_CONNECTION_PANEL_SERIAL:
                             self.module = module
                             break
 
@@ -247,7 +247,7 @@ class IPConnection:
                 return True
             else:
                 return False
-        except Exception as e:
+        except Exception:
             logger.exception("Error writing to socket.")
             raise ConnectionError()
 

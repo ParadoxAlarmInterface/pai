@@ -246,6 +246,7 @@ ReadStatusResponse = Struct("fields" / RawCopy(
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
+# noinspection PyUnresolvedReferences
 SetTimeDate = Struct("fields" / RawCopy(
     Struct(
         "po" / Struct(

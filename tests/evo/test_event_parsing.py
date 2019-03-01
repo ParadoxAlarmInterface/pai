@@ -1,4 +1,3 @@
-import binascii
 from paradox.hardware.evo.parsers import LiveEvent
 from paradox.hardware.evo.event import event_map
 from paradox.event import Event

@@ -256,6 +256,8 @@ class Panel:
     def control_outputs(self, outputs, command) -> bool:
         raise NotImplementedError("override control_outputs in a subclass")
 
+    def dump_memory(self):
+        raise NotImplementedError("override dump_memory in a subclass")
 
 InitiateCommunication = Struct("fields" / RawCopy(
     Struct("po" / BitStruct(

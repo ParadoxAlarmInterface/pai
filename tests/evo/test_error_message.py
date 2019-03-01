@@ -1,4 +1,4 @@
-from binascii import hexlify, unhexlify
+from binascii import unhexlify
 from paradox.hardware.evo.parsers import ErrorMessage
 
 def test_panel_not_connected():

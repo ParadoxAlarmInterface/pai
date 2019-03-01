@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import binascii
 import inspect
 import logging
 import sys

@@ -21,13 +21,14 @@ from paradox.config import config as cfg
 
 class PushBulletWSClient(WebSocketBaseClient):
 
-    def init(self):
+    def init(self, interface):
         """ Initializes the PB WS Client"""
 
         self.logger = logging.getLogger('PAI').getChild(__name__)
         self.pb = Pushbullet(cfg.PUSHBULLET_KEY, cfg.PUSHBULLET_SECRET)
         self.manager = WebSocketManager()
         self.alarm = None
+        self.interface = interface
 
     def stop(self):
         self.terminate()
@@ -74,7 +75,7 @@ class PushBulletWSClient(WebSocketBaseClient):
                     continue
 
                 if p.get('sender_email_normalized') in cfg.PUSHBULLET_CONTACTS:
-                    ret = self.send_command(p.get('body'))
+                    ret = self.interface.send_command(p.get('body'))
 
                     if ret:
                         self.logger.info("From {} ACCEPTED: {}".format(p.get('sender_email_normalized'), p.get('body')))
@@ -124,7 +125,7 @@ class PushBulletInterface(Interface):
         self.logger.info("Starting Pushbullet Interface")
         try:
             self.pb_ws = PushBulletWSClient('wss://stream.pushbullet.com/websocket/{}'.format(cfg.PUSHBULLET_KEY))
-            self.pb_ws.init()
+            self.pb_ws.init(self)
             self.pb_ws.connect()
 
             while True:
