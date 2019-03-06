@@ -3,8 +3,7 @@
 from threading import Thread, Event
 import queue
 
-from config import user as cfg
-
+from paradox.config import config as cfg
 
 class Interface(Thread):
 
@@ -46,7 +45,7 @@ class Interface(Thread):
     def run(self):
         pass
 
-    def handle_change(self, event):
+    def handle_change(self, raw):
         # TODO: Not consistent with handle_event
 
         element, label, property, value = raw

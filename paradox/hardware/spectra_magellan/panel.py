@@ -6,7 +6,6 @@ import sys
 import time
 from typing import Optional
 
-from config import user as cfg
 from .parsers import Construct, CloseConnection, ErrorMessage, InitializeCommunication, InitializeCommunicationResponse, \
     SetTimeDate, SetTimeDateResponse, PerformAction, PerformActionResponse, ReadStatusResponse, ReadEEPROM, \
     ReadEEPROMResponse, LiveEvent, RAMDataParserMap, Container
@@ -14,6 +13,8 @@ from ..panel import Panel as PanelBase
 
 from .event import event_map
 from paradox.paradox import PublishPropertyChange
+
+from paradox.config import config as cfg
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -62,43 +63,48 @@ class Panel(PanelBase):
 
         logger.debug("Labels updated")
 
-    def parse_message(self, message) -> Optional[Container]:
+    def parse_message(self, message, direction='topanel') -> Optional[Container]:
         try:
             if message is None or len(message) == 0:
                 return None
 
-            parent_parsed = super(Panel, self).parse_message(message)
+            parent_parsed = super(Panel, self).parse_message(message, direction)
             if parent_parsed:
                 return parent_parsed
-            elif message[0] == 0x70:
-                return CloseConnection.parse(message)
-            elif message[0] >> 4 == 0x7:
-                return ErrorMessage.parse(message)
-            elif message[0] == 0x00:
-                return InitializeCommunication.parse(message)
-            elif message[0] == 0x10:
-                return InitializeCommunicationResponse.parse(message)
-            elif message[0] == 0x30:
-                return SetTimeDate.parse(message)
-            elif message[0] >> 4 == 0x03:
-                return SetTimeDateResponse.parse(message)
-            elif message[0] == 0x40:
-                return PerformAction.parse(message)
-            elif message[0] >> 4 == 0x04:
-                return PerformActionResponse.parse(message)
-            elif message[0] >> 4 == 0x05 and message[2] == 0x80:
-                return ReadStatusResponse.parse(message)
-            elif message[0] == 0x50 and message[2] < 0x80:
-                return ReadEEPROM.parse(message)
-            elif message[0] >> 4 == 0x05 and message[2] < 0x80:
-                return ReadEEPROMResponse.parse(message)
+
+            if direction == 'topanel':
+                if message[0] == 0x70 and message[-5] != 0:
+                    return CloseConnection.parse(message)
+                elif message[0] == 0x00:
+                    return InitializeCommunication.parse(message)
+                elif message[0] == 0x30:
+                    return SetTimeDate.parse(message)
+                elif message[0] == 0x40:
+                    return PerformAction.parse(message)
+                elif message[0] == 0x50 and message[2] < 0x80:
+                    return ReadEEPROM.parse(message)
+            
+            else:
+                if message[0] == 0x10:
+                    return InitializeCommunicationResponse.parse(message)
+                elif message[0] >> 4 == 0x7 and message[-5] == 0:
+                    return ErrorMessage.parse(message)
+                elif message[0] >> 4 == 0x03:
+                    return SetTimeDateResponse.parse(message)
+                elif message[0] >> 4 == 0x04:
+                    return PerformActionResponse.parse(message)
+                elif message[0] >> 4 == 0x05 and message[2] == 0x80:
+                    return ReadStatusResponse.parse(message)
+                elif message[0] >> 4 == 0x05 and message[2] < 0x80:
+                    return ReadEEPROMResponse.parse(message)
 
             #        elif message[0] == 0x60 and message[2] < 0x80:
             #            return WriteEEPROM.parse(message)
             #        elif message[0] >> 4 == 0x06 and message[2] < 0x80:
             #            return WriteEEPROMResponse.parse(message)
-            elif message[0] >> 4 == 0x0e:
-                return LiveEvent.parse(message)
+                elif message[0] >> 4 == 0x0e:
+                    return LiveEvent.parse(message)
+
         except Exception:
             logger.exception("Parsing message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
 
@@ -112,7 +118,7 @@ class Panel(PanelBase):
                     panel_id=reply.fields.value.panel_id,
                     pc_password=password,
                     user_code=0x000000,
-                    not_used1=0x19,
+                    _not_used1=0x19,
                     source_id=0x02
                     )
 
@@ -167,10 +173,10 @@ class Panel(PanelBase):
                                             publish=force)
 
             for k in properties.troubles:
-                if "not_used" in k:
+                if k.startswith('_'):
                     continue
 
-                self.core.update_properties('system', 'trouble', {k: properties.troubles[k]})
+                self.core.update_properties('system', 'troubles', {k: properties.troubles[k]})
 
             self.process_properties_bulk(properties, vars.address)
 

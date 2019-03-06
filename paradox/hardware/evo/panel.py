@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import binascii
 import inspect
 import logging
 import sys
@@ -17,6 +16,7 @@ from .event import event_map
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
+
 class Panel_EVOBase(PanelBase):
 
     event_map = event_map
@@ -31,6 +31,14 @@ class Panel_EVOBase(PanelBase):
             else:
                 raise e
 
+    def dump_memory(self):
+        """
+        Dumps EEPROM and RAM memory to files
+        :return:
+        """
+        self.dump_memory_to_file('eeprom.bin', range(0, 0xffff, 64))
+        self.dump_memory_to_file('ram.bin', range(0, 59), True)
+
     def dump_memory_to_file(self, file, range_, ram=False):
         mem_type = "RAM" if ram else "EEPROM"
         logger.info("Dump " + mem_type)
@@ -38,8 +46,12 @@ class Panel_EVOBase(PanelBase):
         packet_length = 64  # 64 is max
         with open(file, 'wb') as fh:
             for address in range_:
-                args = dict(address=address, length=packet_length, control=dict(ram_access=ram))
-                reply = self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=0x05)
+                args = dict(
+                    address=address,
+                    length=packet_length,
+                    control=dict(ram_access=ram))
+                reply = self.core.send_wait(
+                    self.get_message('ReadEEPROM'), args, reply_expected=0x05)
 
                 retry_count = 3
                 for retry in range(1, retry_count + 1):
@@ -50,14 +62,16 @@ class Panel_EVOBase(PanelBase):
 
                     if reply.fields.value.address != address:
                         logger.debug(
-                            "Fetched and receive %s addresses (received: %d, requested: %d) do not match. Retrying %d of %d" % (
-                                mem_type,
-                                reply.fields.value.address, address, retry, retry_count))
-                        reply = self.core.send_wait(None, None, reply_expected=0x05)
+                            "Fetched and receive %s addresses (received: %d, requested: %d) do not match. Retrying %d of %d"
+                            % (mem_type, reply.fields.value.address, address,
+                               retry, retry_count))
+                        reply = self.core.send_wait(
+                            None, None, reply_expected=0x05)
                         continue
 
                     if retry == retry_count:
-                        logger.error('Failed to fetch %s at address: %d' % (mem_type, address))
+                        logger.error('Failed to fetch %s at address: %d' %
+                                     (mem_type, address))
 
                     break
 
@@ -65,47 +79,52 @@ class Panel_EVOBase(PanelBase):
 
                 fh.write(data)
 
-    def parse_message(self, message) -> Optional[Container]:
+    def parse_message(self, message, direction='topanel') -> Optional[Container]:
         try:
             if message is None or len(message) == 0:
                 return None
 
-            parent_parsed = super(Panel_EVOBase, self).parse_message(message)
+            parent_parsed = super(Panel_EVOBase, self).parse_message(message, direction)
             if parent_parsed:
                 return parent_parsed
-            elif message[0] == 0x70:
-                return CloseConnection.parse(message)
-            elif message[0] >> 4 == 0x7:
-                return ErrorMessage.parse(message)
-            elif message[0] == 0x00:
-                return InitializeCommunication.parse(message)
-            elif message[0] >> 4 == 0x1:
-                return LoginConfirmationResponse.parse(message)
-            elif message[0] == 0x30:
-                return SetTimeDate.parse(message)
-            elif message[0] >> 4 == 0x03:
-                return SetTimeDateResponse.parse(message)
-            elif message[0] == 0x40:
-                return PerformPartitionAction.parse(message)
-            elif message[0] >> 4 == 4:
-                return PerformActionResponse.parse(message)
-            # elif message[0] == 0x50 and message[2] == 0x80:
-            #     return PanelStatus.parse(message)
-            # elif message[0] == 0x50 and message[2] < 0x80:
-            #     return ReadEEPROM.parse(message)
-            # elif message[0] >> 4 == 0x05 and message[2] == 0x80:
-            #     return PanelStatusResponse[message[3]].parse(message)
-            # elif message[0] >> 4 == 0x05 and message[2] < 0x80:
-            elif message[0] >> 4 == 0x05:
-                return ReadEEPROMResponse.parse(message)
-            # elif message[0] == 0x60 and message[2] < 0x80:
-            #     return WriteEEPROM.parse(message)
-            # elif message[0] >> 4 == 0x06 and message[2] < 0x80:
-            #     return WriteEEPROMResponse.parse(message)
-            elif message[0] >> 4 == 0x0e:
-                return LiveEvent.parse(message)
+
+            if direction == 'topanel':
+                if message[0] == 0x70:
+                    return CloseConnection.parse(message)
+                elif message[0] == 0x00:
+                    return InitializeCommunication.parse(message)
+                elif message[0] == 0x30:
+                    return SetTimeDate.parse(message)
+                elif message[0] == 0x40:
+                    return PerformPartitionAction.parse(message)
+            else:
+                if message[0] >> 4 == 0x7:
+                    return ErrorMessage.parse(message)
+                elif message[0] >> 4 == 0x1:
+                    return LoginConfirmationResponse.parse(message)
+                elif message[0] >> 4 == 0x03:
+                    return SetTimeDateResponse.parse(message)
+                elif message[0] >> 4 == 4:
+                    return PerformActionResponse.parse(message)
+                # elif message[0] == 0x50 and message[2] == 0x80:
+                #     return PanelStatus.parse(message)
+                # elif message[0] == 0x50 and message[2] < 0x80:
+                #     return ReadEEPROM.parse(message)
+                # elif message[0] >> 4 == 0x05 and message[2] == 0x80:
+                #     return PanelStatusResponse[message[3]].parse(message)
+                # elif message[0] >> 4 == 0x05 and message[2] < 0x80:
+                elif message[0] >> 4 == 0x05:
+                    return ReadEEPROMResponse.parse(message)
+                # elif message[0] == 0x60 and message[2] < 0x80:
+                #     return WriteEEPROM.parse(message)
+                # elif message[0] >> 4 == 0x06 and message[2] < 0x80:
+                #     return WriteEEPROMResponse.parse(message)
+                elif message[0] >> 4 == 0x0e:
+                    return LiveEvent.parse(message)
+
         except Exception:
-            logger.exception("Parsing message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
+            logger.exception("Parsing message: %s" % (" ".join(
+                "{:02x} ".format(c) for c in message)))
 
         return None
 
@@ -115,21 +134,26 @@ class Panel_EVOBase(PanelBase):
         raw_data = reply.fields.data + reply.checksum
         parsed = InitializeCommunication.parse(raw_data)
         parsed.fields.value.pc_password = password
-        payload = InitializeCommunication.build(dict(fields=dict(value=parsed.fields.value)))
+        payload = InitializeCommunication.build(
+            dict(fields=dict(value=parsed.fields.value)))
 
         logger.info("Initializing communication")
-        reply = self.core.send_wait(message=payload, reply_expected=0x1)
+        reply = self.core.send_wait(message=payload, reply_expected=[0x1, 0x0])
 
         if reply is None:
             logger.error("Initialization Failed")
             return False
 
-        if reply.fields.value.po.status.Windload_connected:
-            logger.info("Authentication Success")
-            return True
-        else:
-            logger.error("Authentication Failed. Wrong Password?")
+        if reply.fields.value.po.command == 0x0:
+            logger.error("Authentication Failed. Wrong Password or User Type is not FullMaster?")
             return False
+        else:  # command == 0x1
+            if reply.fields.value.po.status.Windload_connected:
+                logger.info("Authentication Success")
+                return True
+            else:
+                logger.error("Authentication Failed")
+                return False
 
     def request_status(self, i) -> Optional[Container]:
         args = dict(address=i, length=64, control=dict(ram_access=True))
@@ -146,10 +170,12 @@ class Panel_EVOBase(PanelBase):
         assert vars.po.command == 0x5
         assert vars.control.ram_access == True
         assert vars.control.eeprom_address_bits == 0x0
-        assert vars.bus_address == 0x00 # panel
+        assert vars.bus_address == 0x00  # panel
 
         if vars.address not in RAMDataParserMap:
-            logger.error("Parser for memory address (%d) is not implemented. Please review your STATUS_REQUESTS setting. Skipping." % vars.address)
+            logger.error(
+                "Parser for memory address (%d) is not implemented. Please review your STATUS_REQUESTS setting. Skipping."
+                % vars.address)
             return
         assert len(vars.data) == 64
 
@@ -159,10 +185,11 @@ class Panel_EVOBase(PanelBase):
 
         if vars.address == 1:
             for k in properties.troubles:
-                if "not_used" in k:
+                if k.startswith("_"):  # ignore private properties
                     continue
 
-                self.core.update_properties('system', 'trouble', {k: properties.troubles[k]})
+                self.core.update_properties('system', 'troubles',
+                                            {k: properties.troubles[k]})
 
         self.process_properties_bulk(properties, vars.address)
 
@@ -173,10 +200,11 @@ class Panel_EVOBase(PanelBase):
         :param str command: textual command
         :return: True if we have at least one success
         """
-        args = dict(commands = dict((i, command) for i in partitions))
+        args = dict(commands=dict((i, command) for i in partitions))
 
         try:
-            reply = self.core.send_wait(PerformPartitionAction, args, reply_expected=0x04)
+            reply = self.core.send_wait(
+                PerformPartitionAction, args, reply_expected=0x04)
         except MappingError:
             logger.error('Partition command: "%s" is not supported' % command)
             return False

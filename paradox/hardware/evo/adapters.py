@@ -35,6 +35,7 @@ class PartitionStateAdapter(Adapter):
         return 0
 
 
+# noinspection PyUnresolvedReferences,PyUnresolvedReferences
 class ZoneFlags(Subconstruct):
     flag_parser = BitStruct(
         "supervision_trouble" / Flag,
@@ -83,6 +84,7 @@ class StatusAdapter(Adapter):
         return r
 
 
+# noinspection PyUnresolvedReferences,PyUnresolvedReferences,PyUnresolvedReferences
 class PartitionStatus(Subconstruct):
     first2 = BitStruct(
         'fire_alarm' / Flag,
