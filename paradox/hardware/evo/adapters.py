@@ -64,6 +64,7 @@ class ZoneFlags(Subconstruct):
     def _encode(self, obj, context, path):
         return b"".join([self.flag_parser.build(i) for i in obj])
 
+
 class StatusFlagArrayAdapter(Adapter):
     def _decode(self, obj, context, path):
         r = dict()
@@ -72,6 +73,7 @@ class StatusFlagArrayAdapter(Adapter):
             r[i + 1] = status
 
         return r
+
 
 class StatusAdapter(Adapter):
     def _decode(self, obj, context, path):
@@ -169,6 +171,7 @@ class PartitionStatus(Subconstruct):
             raise Exception('Not supported size. Only 32 or 16')
 
         return obj
+
 
 class PGMFlags(Subconstruct):
     parser = BitStruct(

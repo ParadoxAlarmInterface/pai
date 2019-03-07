@@ -5,6 +5,7 @@ import queue
 
 from paradox.config import config as cfg
 
+
 class Interface(Thread):
 
     def __init__(self):
@@ -32,7 +33,7 @@ class Interface(Thread):
         """ Enqueues an event"""
         pass
 
-    def change(self, element, label, property, value):
+    def change(self, element, label, panel_property, value):
         """ Enqueues a change """
         pass
 
@@ -48,32 +49,32 @@ class Interface(Thread):
     def handle_change(self, raw):
         # TODO: Not consistent with handle_event
 
-        element, label, property, value = raw
+        element, label, panel_property, value = raw
         """Handle Property Change"""
 
-        message = "{} {} {} {}".format(element, label, property, value)
+        message = "{} {} {} {}".format(element, label, panel_property, value)
         if element == 'partition':
             if element not in self.partitions:
                 self.partitions[label] = dict()
 
-            self.partitions[label][property] = value
+            self.partitions[label][panel_property] = value
 
-            if property == 'arm_sleep':
+            if panel_property == 'arm_sleep':
                 return
 
-            elif property == 'exit_delay':
+            elif panel_property == 'exit_delay':
                 if not value:
                     return
                 else:
                     message = "Partition {} in Exit Delay".format(label)
                     if 'arm_sleep' in self.partitions[label] and self.partitions[label]['arm_sleep']:
                         message = ''.join([message, ' (Sleep)'])
-            elif property == 'entry_delay':
+            elif panel_property == 'entry_delay':
                 if not value:
                     return
                 else:
                     message = "Partition {} in Entry Delay".format(label)
-            elif property == 'arm':
+            elif panel_property == 'arm':
                 try:
                     if value:
                         message = "Partition {} is Armed".format(label)
@@ -84,10 +85,10 @@ class Interface(Thread):
                 except Exception:
                     self.logger.exception("ARM")
 
-            elif property == 'arm_full':
+            elif panel_property == 'arm_full':
                 return
         elif element == 'zone':
-            if property == 'alarm':
+            if panel_property == 'alarm':
                 if value:
                     message = "Zone {} is in Alarm".format(label)
                 else:
@@ -166,7 +167,8 @@ class Interface(Thread):
 
         return True
 
-    def normalize_payload(self, message):
+    @staticmethod
+    def normalize_payload(message):
         message = message.strip().lower()
 
         if message in ['true', 'on', '1', 'enable']:

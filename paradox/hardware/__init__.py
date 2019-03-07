@@ -21,5 +21,5 @@ def create_panel(core, product_id=None) -> Panel:
         return spectra_magellan.Panel(core, product_id)
     else:
         raise NotImplementedError(
-            "We are not sure what panel you have (product_id: %s). Please create an issue. Maybe we can help you." % str(product_id))
+            "We are not sure what panel you have (product_id: {}). Please create an issue. Maybe we can help you.".format(str(product_id)))
 

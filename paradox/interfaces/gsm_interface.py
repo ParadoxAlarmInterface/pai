@@ -48,7 +48,7 @@ class GSMInterface(Interface):
                 break
 
         if not ignore:
-            self.queue.put_nowait(SortableTuple((2, 'event', (raw))))
+            self.queue.put_nowait(SortableTuple((2, 'event', raw)))
 
     def notify(self, source, message, level):
         if source == self.name:

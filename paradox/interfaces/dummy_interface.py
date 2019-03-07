@@ -5,9 +5,8 @@ import logging
 from paradox.interfaces import Interface
 from paradox.lib.utils import SortableTuple
 
-from paradox.config import config as cfg
-
 logger = logging.getLogger('PAI').getChild(__name__)
+
 
 class DummyInterface(Interface):
     """Interface Class using Dummy"""

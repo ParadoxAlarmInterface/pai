@@ -87,7 +87,7 @@ class SignalInterface(Interface):
             elif item[1] == 'notify':
                 self.send_message("{}: {}".format(item[2][0], item[2][1]))
 
-        except queue.Empty as e:
+        except queue.Empty:
             return True
         except Exception:
             self.logger.exception("loop")

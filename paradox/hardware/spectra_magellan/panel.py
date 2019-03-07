@@ -144,20 +144,20 @@ class Panel(PanelBase):
 
     def handle_status(self, message):
         """Handle MessageStatus"""
-        vars = message.fields.value
+        mvars = message.fields.value
 
-        if vars.address not in RAMDataParserMap:
-            logger.warn("Unknown memory address {}".format(vars.address))
+        if mvars.address not in RAMDataParserMap:
+            logger.warn("Unknown memory address {}".format(mvars.address))
             return
 
-        parser = RAMDataParserMap[vars.address]
+        parser = RAMDataParserMap[mvars.address]
         try:
-            properties = parser.parse(vars.data)
+            properties = parser.parse(mvars.data)
         except Exception:
             logger.exception("Unable to parse RAM Status Block")
             return
 
-        if vars.address == 0:
+        if mvars.address == 0:
             if time.time() - self.core.last_power_update >= cfg.POWER_UPDATE_INTERVAL:
                 force = PublishPropertyChange.YES if cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE else PublishPropertyChange.NO
 
@@ -178,10 +178,10 @@ class Panel(PanelBase):
 
                 self.core.update_properties('system', 'troubles', {k: properties.troubles[k]})
 
-            self.process_properties_bulk(properties, vars.address)
+            self.process_properties_bulk(properties, mvars.address)
 
-        elif vars.address >= 1 and vars.address <= 5:
-            self.process_properties_bulk(properties, vars.address)
+        elif 1 <= mvars.address <= 5:
+            self.process_properties_bulk(properties, mvars.address)
 
     def control_zones(self, zones, command) -> bool:
         """

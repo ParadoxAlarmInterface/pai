@@ -148,7 +148,7 @@ class Panel_EVOBase(PanelBase):
             logger.error("Authentication Failed. Wrong Password or User Type is not FullMaster?")
             return False
         else:  # command == 0x1
-            if reply.fields.value.po.status.Windload_connected:
+            if reply.fields.value.po.status.Winload_connected:
                 logger.info("Authentication Success")
                 return True
             else:
@@ -164,26 +164,25 @@ class Panel_EVOBase(PanelBase):
     def handle_status(self, message):
         """Handle MessageStatus"""
 
-        vars = message.fields.value
+        mvars = message.fields.value
         # Check message
 
-        assert vars.po.command == 0x5
-        assert vars.control.ram_access == True
-        assert vars.control.eeprom_address_bits == 0x0
-        assert vars.bus_address == 0x00  # panel
+        assert mvars.po.command == 0x5
+        assert mvars.control.ram_access is True
+        assert mvars.control.eeprom_address_bits == 0x0
+        assert mvars.bus_address == 0x00  # panel
 
-        if vars.address not in RAMDataParserMap:
+        if mvars.address not in RAMDataParserMap:
             logger.error(
-                "Parser for memory address (%d) is not implemented. Please review your STATUS_REQUESTS setting. Skipping."
-                % vars.address)
+                "Parser for memory address ({}) is not implemented. Please review your STATUS_REQUESTS setting. Skipping.".format(mvars.address))
             return
-        assert len(vars.data) == 64
+        assert len(mvars.data) == 64
 
-        parser = RAMDataParserMap[vars.address]
+        parser = RAMDataParserMap[mvars.address]
 
-        properties = parser.parse(vars.data)
+        properties = parser.parse(mvars.data)
 
-        if vars.address == 1:
+        if mvars.address == 1:
             for k in properties.troubles:
                 if k.startswith("_"):  # ignore private properties
                     continue
@@ -191,7 +190,7 @@ class Panel_EVOBase(PanelBase):
                 self.core.update_properties('system', 'troubles',
                                             {k: properties.troubles[k]})
 
-        self.process_properties_bulk(properties, vars.address)
+        self.process_properties_bulk(properties, mvars.address)
 
     def control_partitions(self, partitions, command) -> bool:
         """

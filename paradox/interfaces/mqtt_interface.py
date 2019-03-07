@@ -68,7 +68,7 @@ class MQTTInterface(Interface):
                 if time.time() - last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
                     self.republish()
                     last_republish = time.time()
-            except Exception as e:
+            except Exception:
                 self.logger.exception("ERROR in MQTT Run loop")
 
         if self.connected:
@@ -87,10 +87,10 @@ class MQTTInterface(Interface):
         """ Enqueues an event"""
         self.queue.put_nowait(SortableTuple((2, 'event', raw)))
 
-    def change(self, element, label, property, value):
+    def change(self, element, label, panel_property, value):
         """ Enqueues a change """
         self.queue.put_nowait(SortableTuple(
-            (2, 'change', (element, label, property, value))))
+            (2, 'change', (element, label, panel_property, value))))
 
     # Handlers here
     def handle_message(self, client, userdata, message):
