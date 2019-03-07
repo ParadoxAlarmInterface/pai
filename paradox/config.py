@@ -155,7 +155,9 @@ class Config:
             return
         self.load()
 
-    def load(self, alt_locations=None):
+
+    @staticmethod
+    def load(alt_locations=None):
         Config.CONFIG_LOADED = False
 
         if alt_locations is not None:
