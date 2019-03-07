@@ -182,14 +182,16 @@ class Config:
 
         # Reset defaults
         for k, v in Config.DEFAULTS.items():
+            if isinstance(v, tuple):
+                v = v[0]
+
             setattr(Config, k, v)
 
         # Set values
         for k, v in entries.items():
-            print(k)
             if k[0].isupper() and k in Config.DEFAULTS:
-                default = getattr(Config, k)
-
+                default = Config.DEFAULTS.get(k)
+                
                 if isinstance(default, tuple) and 2 <= len(default) <= 3:
                     default_type = default[1]
 
