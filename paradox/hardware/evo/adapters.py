@@ -35,6 +35,7 @@ class PartitionStateAdapter(Adapter):
         return 0
 
 
+# noinspection PyUnresolvedReferences,PyUnresolvedReferences
 class ZoneFlags(Subconstruct):
     flag_parser = BitStruct(
         "supervision_trouble" / Flag,
@@ -63,6 +64,7 @@ class ZoneFlags(Subconstruct):
     def _encode(self, obj, context, path):
         return b"".join([self.flag_parser.build(i) for i in obj])
 
+
 class StatusFlagArrayAdapter(Adapter):
     def _decode(self, obj, context, path):
         r = dict()
@@ -71,6 +73,7 @@ class StatusFlagArrayAdapter(Adapter):
             r[i + 1] = status
 
         return r
+
 
 class StatusAdapter(Adapter):
     def _decode(self, obj, context, path):
@@ -83,6 +86,7 @@ class StatusAdapter(Adapter):
         return r
 
 
+# noinspection PyUnresolvedReferences,PyUnresolvedReferences,PyUnresolvedReferences
 class PartitionStatus(Subconstruct):
     first2 = BitStruct(
         'fire_alarm' / Flag,
@@ -167,6 +171,7 @@ class PartitionStatus(Subconstruct):
             raise Exception('Not supported size. Only 32 or 16')
 
         return obj
+
 
 class PGMFlags(Subconstruct):
     parser = BitStruct(

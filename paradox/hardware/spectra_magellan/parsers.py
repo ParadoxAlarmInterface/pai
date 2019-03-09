@@ -137,7 +137,7 @@ LiveEvent = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "time" / DateAdapter(Bytes(6)),
         "event" / Struct(
@@ -177,7 +177,7 @@ ErrorMessage = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "_not_used0" / Default(Int8ub, 0),
         "message" / Enum(Int8ub,
@@ -221,7 +221,7 @@ ReadEEPROMResponse = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "_not_used0" / Padding(1),
         "address" / Int16ub,
@@ -237,7 +237,7 @@ ReadStatusResponse = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "_not_used0" / Padding(1),
         "validation" / Const(0x80, Int8ub),
@@ -246,6 +246,7 @@ ReadStatusResponse = Struct("fields" / RawCopy(
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
+# noinspection PyUnresolvedReferences
 SetTimeDate = Struct("fields" / RawCopy(
     Struct(
         "po" / Struct(
@@ -271,7 +272,7 @@ SetTimeDateResponse = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "_not_used0" / Padding(35),
     )),
@@ -319,7 +320,7 @@ PerformActionResponse = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "_not_used0" / Padding(1),
         "action" / Enum(Int8ub,

@@ -32,7 +32,7 @@ class SerialCommunication:
             self.comm.open()
             logger.debug("Serial port open!")
             return True
-        except Exception as e:
+        except Exception:
             logger.exception("Unable to open serial port: {}".format(self.serialport))
             return False
 
@@ -107,7 +107,8 @@ class SerialCommunication:
 
         return None
 
-    def checksum(self, data):
+    @staticmethod
+    def checksum(data):
         """Calculates the 8bit checksum of Paradox messages"""
         c = 0
 

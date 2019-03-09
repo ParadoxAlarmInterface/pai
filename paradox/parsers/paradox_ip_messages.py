@@ -1,4 +1,4 @@
-from construct import Struct, Aligned, Const, Int8ub, Bytes, this, Int16ub, Int16ul, BitStruct, Default, BitsInteger, Flag, Enum, GreedyBytes
+from construct import Struct, Aligned, Const, Int8ub, Bytes, Int16ub, Int16ul, Default, Enum, GreedyBytes
 
 ip_message = Struct(
         "header" / Aligned(16, Struct(

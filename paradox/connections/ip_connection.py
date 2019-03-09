@@ -25,6 +25,7 @@ class IPConnection:
         self.host = host
         self.port = port
         self.site_info = None
+        self.module = None
         self.connection_timestamp = 0
 
     def connect(self):
@@ -72,12 +73,31 @@ class IPConnection:
         if self.site_info is None:
             self.site_info = self.get_site_info(siteid=cfg.IP_CONNECTION_SITEID, email=cfg.IP_CONNECTION_EMAIL)
 
-        if self.site_info is None:
-            logger.error("Unable to get site info")
-            return False
-        try:
+            if self.site_info is None:
+                logger.error("Unable to get site info")
+                return False
+            
             logger.debug("Site Info: {}".format(json.dumps(self.site_info, indent=4)))
-            xoraddr = binascii.unhexlify(self.site_info['site'][0]['module'][0]['xoraddr'])
+            
+            if cfg.IP_CONNECTION_PANEL_SERIAL is not None:
+                for site in self.site_info['site']:
+                    for module in site:
+                        logger.debug("Found module with panel serial: {}".format(module['panelSerial']))
+                        if module['panelSerial'] == cfg.IP_CONNECTION_PANEL_SERIAL:
+                            self.module = module
+                            break
+
+                    if self.module is not None:
+                        break
+            else:
+                self.module = self.site_info[0]['module']
+
+            if self.module is None:
+                self.site_info = None  # Reset state
+                logger.error("Unable to find module with desired panel serial")
+                return False
+        try:
+            xoraddr = binascii.unhexlify(self.module['xoraddr'])
 
             stun_host = 'turn.paradoxmyhome.com'
 
@@ -155,7 +175,7 @@ class IPConnection:
             self.key = response.key
 
             # F2
-            logging.debug("Sending F2")
+            logger.debug("Sending F2")
             msg = ip_message.build(dict(header=dict(length=0, unknown0=0x03, flags=0x09, command=0xf2, unknown1=0, encrypt=1), payload=encrypt(b'', self.key)))
             if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
@@ -169,7 +189,7 @@ class IPConnection:
             logger.debug("F2 answer: {}".format(binascii.hexlify(message_payload)))
 
             # F3
-            logging.debug("Sending F3")
+            logger.debug("Sending F3")
             msg = ip_message.build(dict(header=dict(length=0, unknown0=0x03, flags=0x09, command=0xf3, unknown1=0, encrypt=1), payload=encrypt(b'', self.key)))
             if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug("PC -> IP {}".format(binascii.hexlify(msg)))
@@ -227,7 +247,7 @@ class IPConnection:
                 return True
             else:
                 return False
-        except Exception as e:
+        except Exception:
             logger.exception("Error writing to socket.")
             raise ConnectionError()
 
@@ -266,12 +286,12 @@ class IPConnection:
 
             if len(data) % 16 != 0:
                 continue
+
             if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug("IP -> PC {}".format(binascii.hexlify(data)))
+
             message, payload = self.get_message_payload(data)
             return payload
-
-        return None
 
     def timeout(self, timeout=5):
         self.socket_timeout = timeout
@@ -306,15 +326,23 @@ class IPConnection:
 
         return message, message_payload
 
-    def get_site_info(self, email, siteid):
+    @staticmethod
+    def get_site_info(email, siteid):
 
         logger.debug("Getting site info")
         URL = "https://api.insightgoldatpmh.com/v1/site"
 
         headers={'User-Agent': 'Mozilla/3.0 (compatible; Indy Library)', 'Accept-Encoding': 'identity', 'Accept': 'text/html, */*'}
-        req = requests.get(URL, headers=headers, params={'email': email, 'name': siteid})
-        if req.status_code == 200:
-            return req.json()
+
+        tries = 5
+        while tries > 0:
+            req = requests.get(URL, headers=headers, params={'email': email, 'name': siteid})
+            if req.status_code == 200:
+                return req.json()
+
+            logger.warn("Unable to get site info. Retrying...")
+            tries -= 1
+            time.sleep(5)
 
         return None
 

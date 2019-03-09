@@ -57,7 +57,8 @@ class Panel:
         else:
             raise ResourceWarning('{} parser not found'.format(name))
 
-    def get_error_message(self, error_code) -> str:
+    @staticmethod
+    def get_error_message(error_code) -> str:
         # This is from EVO and may not apply to all panels
 
         error_str = str(error_code)
@@ -101,7 +102,8 @@ class Panel:
 
         return message
 
-    def encode_password(self, password) -> bytes:
+    @staticmethod
+    def encode_password(password) -> bytes:
         res = [0] * 2
 
         if password is None:
@@ -256,6 +258,8 @@ class Panel:
     def control_outputs(self, outputs, command) -> bool:
         raise NotImplementedError("override control_outputs in a subclass")
 
+    def dump_memory(self):
+        raise NotImplementedError("override dump_memory in a subclass")
 
 InitiateCommunication = Struct("fields" / RawCopy(
     Struct("po" / BitStruct(
@@ -321,7 +325,7 @@ StartCommunicationResponse = Struct("fields" / RawCopy(
                          "status" / Struct(
                              "reserved" / Flag,
                              "alarm_reporting_pending" / Flag,
-                             "Windload_connected" / Flag,
+                             "Winload_connected" / Flag,
                              "NeWare_connected" / Flag)
                          ),
         "_not_used0" / Bytes(3),

@@ -61,7 +61,8 @@ class Type(MutableMapping):
     def __len__(self):
         return len(self.store)
 
-    def __keytransform__(self, key):
+    @staticmethod
+    def __keytransform__(key):
         if isinstance(key, str) and key.isdigit():
             return int(key)
         return key
@@ -85,9 +86,9 @@ class Paradox:
     def reset(self):
 
         # Keep track of alarm state
-        self.data["power"].update(dict(label='power'))
-        self.data["rf"].update(dict(label='rf'))
-        self.data["troubles"].update(dict(label='troubles'))
+        self.data['system'] = dict(power=dict(label='power', key='power', id=0),
+                                   rf=dict(label='rf', key='rf', id=1),
+                                   troubles=dict(label='troubles', key='troubles', id=2))
 
         self.last_power_update = 0
         self.run = STATE_STOP
@@ -187,7 +188,7 @@ class Paradox:
             while self.run == STATE_PAUSE:
                 time.sleep(5)
 
-            # May happend when out of sleep
+            # May happen when out of sleep
             if self.run == STATE_STOP:
                 break
 
@@ -239,7 +240,7 @@ class Paradox:
                   args=None,
                   message=None,
                   retries=5,
-                  timeout=5,
+                  timeout=5.0,
                   reply_expected=None) -> Optional[Container]:
 
         # Connection closed
@@ -253,7 +254,7 @@ class Paradox:
             retries -= 1
 
             if message is not None and cfg.LOGGING_DUMP_PACKETS:
-                    logger.debug("PC -> A {}".format(binascii.hexlify(message)))
+                logger.debug("PC -> A {}".format(binascii.hexlify(message)))
 
             with serial_lock:
                 if message is not None:
@@ -283,7 +284,7 @@ class Paradox:
 
             if cfg.LOGGING_DUMP_MESSAGES:
                 logger.debug(recv_message)
-            
+
             # Events are async
             if recv_message.fields.value.po.command == 0xe:  # Events
                 try:
@@ -307,8 +308,9 @@ class Paradox:
                     if any(recv_message.fields.value.po.command == expected for expected in reply_expected):
                         return recv_message
                     else:
-                        logging.error("Got message {} but expected on of [{}]".format(recv_message.fields.value.po.command,
-                                                                              ", ".join(reply_expected)))
+                        logging.error(
+                            "Got message {} but expected on of [{}]".format(recv_message.fields.value.po.command,
+                                                                            ', '.join(reply_expected)))
                         logging.error("Detail:\n{}".format(recv_message))
                 else:
                     if recv_message.fields.value.po.command == reply_expected:
@@ -322,7 +324,8 @@ class Paradox:
 
         return None
 
-    def _select(self, haystack, needle) -> Sequence[int]:
+    @staticmethod
+    def _select(haystack, needle) -> Sequence[int]:
         """
         Helper function to select objects from provided dictionary
 
@@ -411,9 +414,9 @@ class Paradox:
 
         return accepted
 
-    def get_label(self, type, id):
-        if type in self.data:
-            el = self.data[type].get(id)
+    def get_label(self, label_type, label_id):
+        if label_type in self.data:
+            el = self.data[label_type].get(label_id)
             if el:
                 return el.get("label")
 
@@ -437,7 +440,8 @@ class Paradox:
                         if k not in el:
                             logger.warn("Missing property {} in {}/{}".format(k, evt.type, evt.label))
                     if evt.label != el.get("label"):
-                        logger.warn("Labels differ {} != {} in {}/{}".format(el.get("label"), evt.label, evt.type, evt.label))
+                        logger.warn(
+                            "Labels differ {} != {} in {}/{}".format(el.get("label"), evt.label, evt.type, evt.label))
         else:
             logger.warn("Missing type {} for event: {}.{} {}".format(evt.type, evt.major, evt.minor, evt.message))
         # Temporary end
@@ -463,7 +467,6 @@ class Paradox:
 
         # Publish changes and update state
         for property_name, property_value in change.items():
-            old = None
 
             if property_name.startswith('_'):  # skip private properties
                 continue
@@ -500,9 +503,9 @@ class Paradox:
                     # TODO: Move this to another place?
                     try:
                         if notify != NotifyPropertyChange.NO and \
-                           ((element_type == "partition" and type_key in cfg.LIMITS['partition'] and
-                             property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE) or
-                               ('trouble' in property_name)):
+                                ((element_type == "partition" and type_key in cfg.LIMITS['partition'] and
+                                  property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE) or
+                                 ('trouble' in property_name)):
                             self.interface.notify("Paradox", "{} {} {}".format(elements[type_key]['key'],
                                                                                property_name,
                                                                                property_value), logging.INFO)
@@ -513,10 +516,10 @@ class Paradox:
 
             else:
                 elements[type_key][property_name] = property_value  # Initial value
-                surpress = 'trouble' not in property_name
+                suppress = 'trouble' not in property_name
 
                 self.interface.change(element_type, elements[type_key]['key'],
-                                      property_name, property_value, initial=surpress)
+                                      property_name, property_value, initial=suppress)
 
     def handle_error(self, message):
         """Handle ErrorMessage"""

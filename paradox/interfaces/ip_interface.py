@@ -6,7 +6,7 @@ import time
 import logging
 import socket
 import select
-from construct import GreedyBytes, Struct, Aligned, Const, Int8ub, Bytes, this, Int16ub, Int16ul, BitStruct, Default, BitsInteger, Flag, Enum
+from construct import GreedyBytes, Struct, Aligned, Const, Int8ub, Bytes, Int16ul, Default
 from threading import Thread, Event
 import binascii
 import os

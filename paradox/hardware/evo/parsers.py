@@ -4,8 +4,7 @@ from construct import Struct, RawCopy, BitStruct, Const, Nibble, Flag, Rebuild, 
     Bytes, this, Default, Padding, Enum, Int24ub, ExprAdapter, Byte, obj_, Array, Computed, Subconstruct, \
     ValidationError, ExprSymmetricAdapter
 
-from .adapters import PGMFlags, StatusAdapter, DateAdapter, ZoneFlags, PartitionStatus, EventAdapter, \
-    ModuleSerialAdapter
+from .adapters import PGMFlags, StatusAdapter, DateAdapter, ZoneFlags, PartitionStatus, EventAdapter
 from ..common import CommunicationSourceIDEnum, ProductIdEnum, calculate_checksum
 
 LoginConfirmationResponse = Struct("fields" / RawCopy(
@@ -15,7 +14,7 @@ LoginConfirmationResponse = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)
         ),
         "length" / Rebuild(Int8ub, lambda
@@ -147,7 +146,7 @@ LiveEvent = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "event_source" / Const(0xFF, Int8ub),
         "event_nr" / Int16ub,
@@ -198,7 +197,7 @@ ActionResponse = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "length" / Rebuild(Int8ub, lambda
             this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
@@ -271,7 +270,7 @@ ReadEEPROM = Struct("fields" / RawCopy(
         "control" / BitStruct(
             "ram_access" / Default(Flag, False),
             "alarm_reporting_pending" / Default(Flag, False),
-            "Windload_connected" / Default(Flag, False),
+            "Winload_connected" / Default(Flag, False),
             "NeWare_connected" / Default(Flag, False),
             "_not_used" / Default(BitsInteger(2), 0),
             "eeprom_address_bits" / Default(BitsInteger(2), 0)
@@ -289,7 +288,7 @@ ReadEEPROMResponse = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)
         ),
         "packet_length" / Rebuild(Int8ub, lambda
@@ -327,7 +326,7 @@ SetTimeDateResponse = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "length" / Int8ub,
         "_not_used0" / Padding(4),
@@ -372,7 +371,7 @@ PerformActionResponse = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
         "_not_used0" / Padding(4),
@@ -386,7 +385,7 @@ ErrorMessage = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "length" / Rebuild(Int8ub, lambda
             this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),

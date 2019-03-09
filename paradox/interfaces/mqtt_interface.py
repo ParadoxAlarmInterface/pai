@@ -10,16 +10,6 @@ from paradox.interfaces import Interface
 
 from paradox.config import config as cfg
 
-PARTITION_HOMEBRIDGE_COMMANDS = dict(
-    STAY_ARM='arm_stay', AWAY_ARM='arm', NIGHT_ARM='arm_sleep', DISARM='disarm')
-PARTITION_HOMEASSISTANT_COMMANDS = dict(
-    armed_home='arm_stay', armed_away='arm', armed_sleep='arm_sleep', disarmed='disarm')
-
-PARTITION_HOMEBRIDGE_STATES = dict(
-    alarm='ALARM_TRIGGERED', stay_arm='STAY_ARM', arm='AWAY_ARM', sleep_arm='NIGHT_ARM', disarm='DISARMED')
-PARTITION_HOMEASSISTANT_STATES = dict(
-    alarm='triggered', stay_arm='armed_home', arm='armed_away', sleep_arm='armed_sleep', disarm='disarmed')
-
 ELEMENT_TOPIC_MAP = dict(partition=cfg.MQTT_PARTITION_TOPIC, zone=cfg.MQTT_ZONE_TOPIC,
                          output=cfg.MQTT_OUTPUT_TOPIC, repeater=cfg.MQTT_REPEATER_TOPIC,
                          bus=cfg.MQTT_BUS_TOPIC, keypad=cfg.MQTT_KEYPAD_TOPIC,
@@ -78,7 +68,7 @@ class MQTTInterface(Interface):
                 if time.time() - last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
                     self.republish()
                     last_republish = time.time()
-            except Exception as e:
+            except Exception:
                 self.logger.exception("ERROR in MQTT Run loop")
 
         if self.connected:
@@ -97,10 +87,10 @@ class MQTTInterface(Interface):
         """ Enqueues an event"""
         self.queue.put_nowait(SortableTuple((2, 'event', raw)))
 
-    def change(self, element, label, property, value):
+    def change(self, element, label, panel_property, value):
         """ Enqueues a change """
         self.queue.put_nowait(SortableTuple(
-            (2, 'change', (element, label, property, value))))
+            (2, 'change', (element, label, panel_property, value))))
 
     # Handlers here
     def handle_message(self, client, userdata, message):
@@ -155,10 +145,10 @@ class MQTTInterface(Interface):
         # Process a Partition Command
         elif topics[2] == cfg.MQTT_PARTITION_TOPIC:
 
-            if command in PARTITION_HOMEBRIDGE_COMMANDS and cfg.MQTT_HOMEBRIDGE_ENABLE:
-                command = PARTITION_HOMEBRIDGE_COMMANDS[command]
-            elif command in PARTITION_HOMEASSISTANT_COMMANDS and cfg.MQTT_HOMEASSISTANT_ENABLE:
-                command = PARTITION_HOMEASSISTANT_COMMANDS[command]
+            if command in cfg.MQTT_PARTITION_HOMEBRIDGE_COMMANDS and cfg.MQTT_HOMEBRIDGE_ENABLE:
+                command = cfg.MQTT_PARTITION_HOMEBRIDGE_COMMANDS[command]
+            elif command in cfg.MQTT_PARTITION_HOMEASSISTANT_COMMANDS and cfg.MQTT_HOMEASSISTANT_ENABLE:
+                command = cfg.MQTT_PARTITION_HOMEASSISTANT_COMMANDS[command]
 
             if command.startswith('code_toggle-'):
                 tokens = command.split('-')
@@ -299,11 +289,11 @@ class MQTTInterface(Interface):
         if element == 'partition':
             if cfg.MQTT_HOMEBRIDGE_ENABLE:
                 self.handle_change_external(element, label, attribute, value, element_topic,
-                                            PARTITION_HOMEBRIDGE_STATES, cfg.MQTT_HOMEBRIDGE_SUMMARY_TOPIC, 'hb')
+                                            cfg.MQTT_PARTITION_HOMEBRIDGE_STATES, cfg.MQTT_HOMEBRIDGE_SUMMARY_TOPIC, 'hb')
 
             if cfg.MQTT_HOMEASSISTANT_ENABLE:
                 self.handle_change_external(element, label, attribute, value, element_topic,
-                                            PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC,
+                                            cfg.MQTT_PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC,
                                             'hass')
 
     def handle_change_external(self, element, label, attribute,
