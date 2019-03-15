@@ -46,6 +46,11 @@ class MQTTInterface(Interface):
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
             self.mqtt.username_pw_set(
                 username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
+        
+        self.mqtt.will_set('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+                                             cfg.MQTT_INTERFACE_TOPIC,
+                                             self.__class__.__name__),
+                           'offline', 0, cfg.MQTT_RETAIN)
 
         self.mqtt.connect(host=cfg.MQTT_HOST,
                           port=cfg.MQTT_PORT,
@@ -210,6 +215,11 @@ class MQTTInterface(Interface):
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
             self.mqtt.username_pw_set(
                 username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
+        
+        self.mqtt.will_set('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+                                             cfg.MQTT_INTERFACE_TOPIC,
+                                             self.__class__.__name__),
+                           'offline', 0, cfg.MQTT_RETAIN)
 
         self.mqtt.connect(host=cfg.MQTT_HOST,
                           port=cfg.MQTT_PORT,
@@ -229,11 +239,6 @@ class MQTTInterface(Interface):
         self.mqtt.subscribe(
             "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
                               cfg.MQTT_NOTIFICATIONS_TOPIC, "#"))
-
-        self.mqtt.will_set('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                             cfg.MQTT_INTERFACE_TOPIC,
-                                             self.__class__.__name__),
-                           'offline', 0, cfg.MQTT_RETAIN)
 
         self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                        cfg.MQTT_INTERFACE_TOPIC,
