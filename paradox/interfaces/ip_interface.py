@@ -23,19 +23,23 @@ ip_message = Struct(
             "flags" / Int8ub,
             "command" / Int8ub,
             "sub_command" / Default(Int8ub, 0x00),
-            'unknown1' / Default(Int8ub, 0x0a),
-            'encrypt' / Default(Int8ub, 0x00),
+            'unknown1' / Default(Int8ub, 0x00),
+            'encrypt' / Default(Int8ub, 0x03),
         ), b'\xee'),
         "payload" / Aligned(16, GreedyBytes, b'\xee'))
 
-ip_payload_connect_response = Aligned(16, Struct(
+ip_payload_connect_response = Struct(
     'command' / Const(0x00, Int8ub),
     'key' / Bytes(16),
     'major' / Int8ub,
     'minor' / Int8ub,
     'ip_major' / Default(Int8ub, 5),
     'ip_minor' / Default(Int8ub, 2),
-    'unknown' / Default(Int8ub, 0x00)), b'\xee')
+    'unknown' / Default(Int8ub, 0x00),
+    'unknown2' / Default(Int8ub, 0x00),
+    'unknown3' / Default(Int8ub, 0x00),
+    'unknown4' / Default(Int8ub, 0xee)
+)
 
 
 class IPInterface(Interface):
@@ -140,16 +144,22 @@ class IPInterface(Interface):
                 time.sleep(0.1)
 
     def process_client_message(self, client, data):
+        encrypt_key = self.key
         message = ip_message.parse(data)
-        message_payload = data[16:]
+        in_payload = message.payload
         self.logger.debug("AP -> IP: {}".format(binascii.hexlify(data)))
-        if len(message_payload) >= 16  and message.header.flags & 0x01 != 0 and len(message_payload) % 16 == 0:
-            message_payload = decrypt(message_payload, self.key)[:37]
+        if len(in_payload) >= 16  and message.header.flags & 0x01 != 0 and len(in_payload) % 16 == 0:
+            in_payload = decrypt(in_payload, encrypt_key)[:message.header.length]
+
+        in_payload = in_payload[:message.header.length]
+        assert len(in_payload) == message.header.length, 'Message payload length does not match with length in header'
+        # self.logger.debug("AP -> IP unencrypted payload: {}".format(binascii.hexlify(in_payload)))
+
 
         force_plain_text = False
         response_code = 0x01
         if message.header.command == 0xf0:
-            password = message_payload[:4]
+            password = in_payload
 
             if password != cfg.IP_INTERFACE_PASSWORD:
                 self.logger.warn("Authentication Error")
@@ -158,19 +168,23 @@ class IPInterface(Interface):
             # Generate a new key
             self.key = binascii.hexlify(os.urandom(8)).upper()
 
-            payload = ip_payload_connect_response.build(dict(key=self.key, major=0x0, minor=32, ip_major=4, ip_minor=48))
-            force_plain_text = True
+            out_payload = ip_payload_connect_response.build(dict(key=self.key, major=0, minor=32, ip_major=1, ip_minor=50, unknown=113, unknown2=6, unknown3=0x15, unknown4=44))
+            flags = 0x39
 
         elif message.header.command == 0xf2:
-            payload = b'\x00'
+            out_payload = b'\x00'
+            flags = 0x39
         elif message.header.command == 0xf3:
-            payload = binascii.unhexlify('0100000000000000000000000000000000')
+            out_payload = binascii.unhexlify('0100000000000000000000000000000000')
+            flags = 0x3b
         elif message.header.command == 0xf8:
-            payload = b'\x01'
+            out_payload = b'\x01'
+            flags = 0x7b
         elif message.header.command == 0x00:
             response_code = 0x02
+            flags = 0x73
             try:
-                payload = self.alarm.send_wait_simple(message=message_payload[:37])
+                out_payload = self.alarm.send_wait_simple(message=in_payload)  # this probably needs to run multiple times, as we may have multiple replies pending from the panel
             except Exception:
                 self.logger.exception("Send to panel")
                 return
@@ -178,18 +192,20 @@ class IPInterface(Interface):
             self.logger.warn("UNKNOWN: {}".format(binascii.hexlify(data)))
             return
 
-        if payload is not None:
-            flags = 0x38
-            payload_length = len(payload)
+        if out_payload is not None:
+            payload_length = len(out_payload)
+
+            if message.header.flags & 0x08 != 0:
+                out_payload = out_payload.ljust((payload_length // 16) * 16, bytes([0xee]))
+
+            # self.logger.debug("IP -> AP unencrypted payload: {}".format(binascii.hexlify(out_payload)))
 
             if message.header.flags & 0x01 != 0 and not force_plain_text:
-                payload = encrypt(payload, self.key)
+                out_payload = encrypt(out_payload, encrypt_key)
 
-                if message.header.command == 0x00:
-                    flags = 0x73
-                else:
-                    flags = 0x39
-
-            m = ip_message.build(dict(header=dict(length=payload_length, unknown0=response_code, flags=flags, command=message.header.command), payload=payload))
+            m = ip_message.build(dict(header=dict(length=payload_length, unknown0=response_code, flags=flags, command=message.header.command), payload=out_payload))
             self.logger.debug("IP -> AP: {}".format(binascii.hexlify(m)))
             client.send(m)
+
+    # def event(self, raw):
+    #     print("ip interface event", raw)

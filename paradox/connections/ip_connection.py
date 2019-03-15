@@ -322,7 +322,7 @@ class IPConnection:
         if len(message.payload) >= 16 and len(message.payload) % 16 == 0 and message.header.flags & 0x01 != 0:
             message_payload = decrypt(data[16:], self.key)[:message.header.length]
         else:
-            message_payload = message.payload
+            message_payload = message.payload[:message.header.length]
 
         return message, message_payload
 
