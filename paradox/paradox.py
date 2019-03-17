@@ -537,16 +537,17 @@ class Paradox:
         self.run = STATE_STOP
 
     def disconnect(self):
-        task = self.work_loop.create_task(self.disconnect_async())
-        self.work_loop.run_until_complete(task)
+        logger.info("Disconnecting from the Alarm Panel")
+        self.run = STATE_STOP
+        self.loop_wait = False
 
-    async def disconnect_async(self):
-        if self.run == STATE_RUN:
-            logger.info("Disconnecting from the Alarm Panel")
-            self.run = STATE_STOP
-            self.loop_wait = False
-            await self.send_wait(self.panel.get_message('CloseConnection'), None, reply_expected=0x07)
+        # Write directly as this can be called from other contexts
+        if self.connection and self.panel:
+            self.connection.write(self.panel.get_message('CloseConnection').build(dict()))
             self.connection.close()
+
+        logger.info("Disconnected")
+
 
     def pause(self):
         task = self.work_loop.create_task(self.pause_async())
