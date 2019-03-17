@@ -50,7 +50,7 @@ interface_manager = None
 def exit_handler(signal, frame):
     global alarm, interface_manager
 
-    print("Exit")
+    print("Exit Start")
     if alarm:
         alarm.disconnect()
         alarm = None
@@ -60,6 +60,8 @@ def exit_handler(signal, frame):
         interface_manager = None
 
     time.sleep(1)
+    
+    logger.info("Good bye!")
     sys.exit(0)
 
 
@@ -88,6 +90,8 @@ def main():
         logger.error("Invalid connection type: {}".format(cfg.CONNECTION_TYPE))
         sys.exit(-1)
 
+    signal.signal(signal.SIGINT, exit_handler)
+
     # Start interacting with the alarm
     alarm = Paradox(connection=connection, interface=interface_manager)
     retry = 1
@@ -111,9 +115,6 @@ def main():
             time.sleep(retry_time_wait)
 
         except (KeyboardInterrupt, SystemExit):
-            logger.info("Exit start")
-            if alarm:
-                alarm.disconnect()
             break  # break exits the retry loop
 
         except Exception:
@@ -121,7 +122,6 @@ def main():
             time.sleep(retry_time_wait)
 
         retry += 1
-    if interface_manager:
-        interface_manager.stop()
     
-    logger.info("Good bye!")
+    exit_handler()
+    
