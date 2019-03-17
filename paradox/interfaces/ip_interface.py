@@ -153,7 +153,7 @@ class IPInterface(Interface):
 
         in_payload = in_payload[:message.header.length]
         assert len(in_payload) == message.header.length, 'Message payload length does not match with length in header'
-        # self.logger.debug("AP -> IP unencrypted payload: {}".format(binascii.hexlify(in_payload)))
+        self.logger.debug("AP -> IP unencrypted payload: {}".format(binascii.hexlify(in_payload)))
 
 
         force_plain_text = False
@@ -198,7 +198,7 @@ class IPInterface(Interface):
             if message.header.flags & 0x08 != 0:
                 out_payload = out_payload.ljust((payload_length // 16) * 16, bytes([0xee]))
 
-            # self.logger.debug("IP -> AP unencrypted payload: {}".format(binascii.hexlify(out_payload)))
+            self.logger.debug("IP -> AP unencrypted payload: {}".format(binascii.hexlify(out_payload)))
 
             if message.header.flags & 0x01 != 0 and not force_plain_text:
                 out_payload = encrypt(out_payload, encrypt_key)
