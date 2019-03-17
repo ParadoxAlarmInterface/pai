@@ -14,6 +14,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import sys
 import time
+import signal
 
 from paradox.config import config as cfg
 
@@ -43,8 +44,27 @@ logger.setLevel(logger_level)
 from paradox.paradox import Paradox
 from paradox.interfaces.interface_manager import InterfaceManager
 
+alarm = None
+interface_manager = None
+
+def exit_handler(signal, frame):
+    global alarm, interface_manager
+
+    print("Exit")
+    if alarm:
+        alarm.disconnect()
+        alarm = None
+
+    if interface_manager:
+        interface_manager.stop()
+        interface_manager = None
+
+    time.sleep(1)
+    sys.exit(0)
+
 
 def main():
+    global alarm, interface_manager
     logger.info("Starting Paradox Alarm Interface")
     logger.info("Console Log level set to {}".format(cfg.LOGGING_LEVEL_CONSOLE))
 
@@ -101,6 +121,7 @@ def main():
             time.sleep(retry_time_wait)
 
         retry += 1
-
-    interface_manager.stop()
+    if interface_manager:
+        interface_manager.stop()
+    
     logger.info("Good bye!")
