@@ -47,10 +47,9 @@ from paradox.interfaces.interface_manager import InterfaceManager
 alarm = None
 interface_manager = None
 
-def exit_handler(signal, frame):
+def exit_handler(signal=None, frame=None):
     global alarm, interface_manager
-
-    print("Exit Start")
+    
     if alarm:
         alarm.disconnect()
         alarm = None
