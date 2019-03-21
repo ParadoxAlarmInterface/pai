@@ -76,6 +76,8 @@ class IPConnection:
             if self.site_info is None:
                 logger.error("Unable to get site info")
                 return False
+
+            self.module = None
             
             logger.debug("Site Info: {}".format(json.dumps(self.site_info, indent=4)))
             
@@ -90,7 +92,7 @@ class IPConnection:
                     if self.module is not None:
                         break
             else:
-                self.module = self.site_info[0]['module']
+                self.module = self.site_info['site'][0]['module'][0] # Use first
 
             if self.module is None:
                 self.site_info = None  # Reset state
