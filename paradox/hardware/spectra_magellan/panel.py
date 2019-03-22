@@ -110,7 +110,7 @@ class Panel(PanelBase):
 
         return None
 
-    def initialize_communication(self, reply, PASSWORD):
+    async def initialize_communication(self, reply, PASSWORD):
         password = self.encode_password(PASSWORD)
 
         args = dict(product_id=reply.fields.value.product_id,
@@ -123,7 +123,7 @@ class Panel(PanelBase):
                     )
 
         logger.info("Initializing communication")
-        reply = self.core.send_wait(self.get_message('InitializeCommunication'), args=args)
+        reply = await self.core.send_wait(self.get_message('InitializeCommunication'), args=args)
 
         if reply is None:
             logger.error("Initialization Failed")
@@ -136,9 +136,9 @@ class Panel(PanelBase):
             logger.error("Authentication Failed. Wrong Password?")
             return False
 
-    def request_status(self, i):
+    async def request_status(self, i):
         args = dict(address=self.mem_map['status_base1'] + i)
-        reply = self.core.send_wait(ReadEEPROM, args, reply_expected=0x05)
+        reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=0x05)
 
         return reply
 
@@ -183,7 +183,7 @@ class Panel(PanelBase):
         elif 1 <= mvars.address <= 5:
             self.process_properties_bulk(properties, mvars.address)
 
-    def control_zones(self, zones, command) -> bool:
+    async def control_zones(self, zones, command) -> bool:
         """
         Control zones
         :param list zones: a list of zones
@@ -197,14 +197,14 @@ class Panel(PanelBase):
 
         for zone in zones:
             args = dict(action=ZONE_ACTIONS[command], argument=(zone - 1))
-            reply = self.core.send_wait(PerformAction, args, reply_expected=0x04)
+            reply = await self.core.send_wait(PerformAction, args, reply_expected=0x04)
 
             if reply is not None:
                 accepted = True
 
         return accepted
 
-    def control_partitions(self, partitions, command) -> bool:
+    async def control_partitions(self, partitions, command) -> bool:
         """
         Control Partitions
         :param list partitions: a list of partitions
@@ -218,14 +218,14 @@ class Panel(PanelBase):
 
         for partition in partitions:
             args = dict(action=PARTITION_ACTIONS[command], argument=(partition - 1))
-            reply = self.core.send_wait(PerformAction, args, reply_expected=0x04)
+            reply = await self.core.send_wait(PerformAction, args, reply_expected=0x04)
 
             if reply is not None:
                 accepted = True
 
         return accepted
 
-    def control_outputs(self, outputs, command) -> bool:
+    async def control_outputs(self, outputs, command) -> bool:
         """
         Control PGM
         :param list outputs: a list of pgms
@@ -240,18 +240,18 @@ class Panel(PanelBase):
         for output in outputs:
             if command == 'pulse':
                 args = dict(action=PGM_ACTIONS['on'], argument=(output - 1))
-                reply = self.core.send_wait(PerformAction, args, reply_expected=0x04)
+                reply = await self.core.send_wait(PerformAction, args, reply_expected=0x04)
                 if reply is not None:
                     accepted = True
 
                 time.sleep(1)
                 args = dict(action=PGM_ACTIONS['off'], argument=(output - 1))
-                reply = self.core.send_wait(PerformAction, args, reply_expected=0x04)
+                reply = await self.core.send_wait(PerformAction, args, reply_expected=0x04)
                 if reply is not None:
                     accepted = True
             else:
                 args = dict(action=PGM_ACTIONS[command], argument=(output - 1))
-                reply = self.core.send_wait(PerformAction, args, reply_expected=0x04)
+                reply = await self.core.send_wait(PerformAction, args, reply_expected=0x04)
                 if reply is not None:
                     accepted = True
 

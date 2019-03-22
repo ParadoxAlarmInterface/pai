@@ -31,15 +31,15 @@ class Panel_EVOBase(PanelBase):
             else:
                 raise e
 
-    def dump_memory(self):
+    async def dump_memory(self):
         """
         Dumps EEPROM and RAM memory to files
         :return:
         """
-        self.dump_memory_to_file('eeprom.bin', range(0, 0xffff, 64))
-        self.dump_memory_to_file('ram.bin', range(0, 59), True)
+        await self.dump_memory_to_file('eeprom.bin', range(0, 0xffff, 64))
+        await self.dump_memory_to_file('ram.bin', range(0, 59), True)
 
-    def dump_memory_to_file(self, file, range_, ram=False):
+    async def dump_memory_to_file(self, file, range_, ram=False):
         mem_type = "RAM" if ram else "EEPROM"
         logger.info("Dump " + mem_type)
 
@@ -50,30 +50,13 @@ class Panel_EVOBase(PanelBase):
                     address=address,
                     length=packet_length,
                     control=dict(ram_access=ram))
-                reply = self.core.send_wait(
-                    self.get_message('ReadEEPROM'), args, reply_expected=0x05)
+                logger.info("Dumping %s: address %d" % (mem_type, address))
+                reply = await self.core.send_wait(
+                    self.get_message('ReadEEPROM'), args, reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address)
 
-                retry_count = 3
-                for retry in range(1, retry_count + 1):
-                    # Avoid errors due to collision with events. It should not come here as we use reply_expected=0x05
-                    if reply is None:
-                        logger.error("Could not fully read " + mem_type)
-                        return
-
-                    if reply.fields.value.address != address:
-                        logger.debug(
-                            "Fetched and receive %s addresses (received: %d, requested: %d) do not match. Retrying %d of %d"
-                            % (mem_type, reply.fields.value.address, address,
-                               retry, retry_count))
-                        reply = self.core.send_wait(
-                            None, None, reply_expected=0x05)
-                        continue
-
-                    if retry == retry_count:
-                        logger.error('Failed to fetch %s at address: %d' %
-                                     (mem_type, address))
-
-                    break
+                if reply is None:
+                    logger.error("Could not read %s: address %d" % (mem_type, address))
+                    return
 
                 data = reply.fields.value.data
 
@@ -128,7 +111,7 @@ class Panel_EVOBase(PanelBase):
 
         return None
 
-    def initialize_communication(self, reply, PASSWORD) -> bool:
+    async def initialize_communication(self, reply, PASSWORD) -> bool:
         password = self.encode_password(PASSWORD)
 
         raw_data = reply.fields.data + reply.checksum
@@ -138,7 +121,7 @@ class Panel_EVOBase(PanelBase):
             dict(fields=dict(value=parsed.fields.value)))
 
         logger.info("Initializing communication")
-        reply = self.core.send_wait(message=payload, reply_expected=[0x1, 0x0])
+        reply = await self.core.send_wait(message=payload, reply_expected=[0x1, 0x0])
 
         if reply is None:
             logger.error("Initialization Failed")
@@ -155,9 +138,9 @@ class Panel_EVOBase(PanelBase):
                 logger.error("Authentication Failed")
                 return False
 
-    def request_status(self, i) -> Optional[Container]:
+    async def request_status(self, i) -> Optional[Container]:
         args = dict(address=i, length=64, control=dict(ram_access=True))
-        reply = self.core.send_wait(ReadEEPROM, args, reply_expected=0x05)
+        reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=0x05)
 
         return reply
 
@@ -192,7 +175,7 @@ class Panel_EVOBase(PanelBase):
 
         self.process_properties_bulk(properties, mvars.address)
 
-    def control_partitions(self, partitions, command) -> bool:
+    async def control_partitions(self, partitions, command) -> bool:
         """
         Control Partitions
         :param list partitions: a list of partitions
@@ -202,7 +185,7 @@ class Panel_EVOBase(PanelBase):
         args = dict(commands=dict((i, command) for i in partitions))
 
         try:
-            reply = self.core.send_wait(
+            reply = await self.core.send_wait(
                 PerformPartitionAction, args, reply_expected=0x04)
         except MappingError:
             logger.error('Partition command: "%s" is not supported' % command)

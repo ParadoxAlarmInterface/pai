@@ -3,9 +3,10 @@
 import binascii
 import logging
 import time
+import asyncio
 from collections import defaultdict, MutableMapping
 from threading import Lock
-from typing import Optional, Sequence, Iterable
+from typing import Optional, Sequence, Iterable, Callable
 
 from construct import Container
 
@@ -14,6 +15,7 @@ from paradox import event
 from enum import Enum
 
 from paradox.config import config as cfg
+from paradox.lib.async import AsyncMessageManager, EventMessageHandler, ErrorMessageHandler
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -79,6 +81,11 @@ class Paradox:
         self.connection = connection
         self.retries = retries
         self.interface = interface
+        self.message_manager = AsyncMessageManager()
+        self.work_loop = asyncio.get_event_loop()
+
+        self.message_manager.register_handler(EventMessageHandler(self.handle_event))
+        self.message_manager.register_handler(ErrorMessageHandler(self.handle_error))
 
         self.data = defaultdict(Type)  # dictionary of Type
         self.reset()
@@ -95,7 +102,12 @@ class Paradox:
         self.loop_wait = True
         self.status_cache = dict()
 
-    def connect(self):
+    def connect(self) -> bool:
+        task = self.work_loop.create_task(self.connect_async())
+        self.work_loop.run_until_complete(task)
+        return task.result()
+
+    async def connect_async(self):
         logger.info("Connecting to interface")
         if not self.connection.connect():
             logger.error('Failed to connect to interface')
@@ -116,7 +128,8 @@ class Paradox:
 
         try:
             logger.info("Initiating communication")
-            reply = self.send_wait(self.panel.get_message('InitiateCommunication'), None, reply_expected=0x07)
+
+            reply = await self.send_wait(self.panel.get_message('InitiateCommunication'), None, reply_expected=0x07)
 
             if reply:
                 logger.info("Found Panel {} version {}.{} build {}".format(
@@ -128,7 +141,7 @@ class Paradox:
                 logger.warn("Unknown panel. Some features may not be supported")
 
             logger.info("Starting communication")
-            reply = self.send_wait(self.panel.get_message('StartCommunication'),
+            reply = await self.send_wait(self.panel.get_message('StartCommunication'),
                                    args=dict(source_id=0x02), reply_expected=0x00)
 
             if reply is None:
@@ -137,25 +150,28 @@ class Paradox:
             self.panel = create_panel(self, reply.fields.value.product_id)  # Now we know what panel it is. Let's
             # recreate panel object.
 
-            result = self.panel.initialize_communication(reply, cfg.PASSWORD)
+            result = await self.panel.initialize_communication(reply, cfg.PASSWORD)
             if not result:
                 return False
-            self.send_wait()  # Read WinLoad in (connected) event
+
+            # TODO: Now we need to start message reading loop
+            self.work_loop.create_task(self.send_wait())
 
             if cfg.SYNC_TIME:
-                self.sync_time()
-                self.send_wait()  # Read Clock loss restore event
+                await self.sync_time()
 
             if cfg.DEVELOPMENT_DUMP_MEMORY:
                 if hasattr(self.panel, 'dump_memory') and callable(self.panel.dump_memory):
                     logger.warn("Requested memory dump. Dumping...")
-                    self.panel.dump_memory()
+
+                    await self.panel.dump_memory()
                     logger.warn("Memory dump completed. Exiting pai.")
                     raise SystemExit()
                 else:
                     logger.warn("Requested memory dump, but current panel type does not support it yet.")
 
-            self.panel.update_labels()
+
+            await self.panel.update_labels()
 
             self.run = STATE_RUN
 
@@ -169,18 +185,24 @@ class Paradox:
         self.run = STATE_STOP
         return False
 
-    def sync_time(self):
+    async def sync_time(self):
         logger.debug("Synchronizing panel time")
 
         now = time.localtime()
         args = dict(century=int(now.tm_year / 100), year=int(now.tm_year % 100),
                     month=now.tm_mon, day=now.tm_mday, hour=now.tm_hour, minute=now.tm_min)
 
-        reply = self.send_wait(self.panel.get_message('SetTimeDate'), args, reply_expected=0x03)
+        reply = await self.send_wait(self.panel.get_message('SetTimeDate'), args, reply_expected=0x03, timeout=10)
         if reply is None:
             logger.warn("Could not set panel time")
+        else:
+            logger.info("Panel time synchronized")
 
     def loop(self):
+        task = self.work_loop.create_task(self.async_loop())
+        self.work_loop.run_until_complete(task)
+
+    async def async_loop(self):
         logger.debug("Loop start")
 
         while self.run != STATE_STOP:
@@ -198,7 +220,7 @@ class Paradox:
             try:
                 for i in cfg.STATUS_REQUESTS:
                     logger.debug("Requesting status: %d" % i)
-                    reply = self.panel.request_status(i)
+                    reply = await self.panel.request_status(i)
                     if reply is not None:
                         tstart = time.time()
                         self.panel.handle_status(reply)
@@ -209,7 +231,7 @@ class Paradox:
 
             # cfg.Listen for events
             while time.time() - tstart < cfg.KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
-                self.send_wait(None, timeout=min(time.time() - tstart, 1))
+                await self.send_wait(None, timeout=min(time.time() - tstart, 1))
 
     def send_wait_simple(self, message=None, timeout=5, wait=True) -> Optional[bytes]:
         # Connection closed
@@ -235,7 +257,7 @@ class Paradox:
 
         return data
 
-    def send_wait(self,
+    async def send_wait(self,
                   message_type=None,
                   args=None,
                   message=None,
@@ -274,53 +296,29 @@ class Paradox:
 
             try:
                 recv_message = self.panel.parse_message(data, direction='frompanel')
+
+                if cfg.LOGGING_DUMP_MESSAGES:
+                    logger.debug(recv_message)
+
                 # No message
                 if recv_message is None:
                     logger.debug("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in data)))
                     continue
+
             except Exception:
                 logging.exception("Error parsing message")
                 continue
 
-            if cfg.LOGGING_DUMP_MESSAGES:
-                logger.debug(recv_message)
+            self.message_manager.schedule_message_handling(recv_message)  # schedule handling in the loop
 
-            # Events are async
-            if recv_message.fields.value.po.command == 0xe:  # Events
-                try:
-                    self.handle_event(recv_message)
-
-                except Exception:
-                    logger.exception("Handle event")
-
-                # Prevent events from blocking further messages
-                if message is None:
-                    return None
-
-                retries += 1  # Ignore this try
-
-            elif recv_message.fields.value.po.command == 0x7 and data[1] != 0xff:  # Error
-                self.handle_error(recv_message)
-                return None
-
-            elif reply_expected is not None:
-                if isinstance(reply_expected, Iterable):
-                    if any(recv_message.fields.value.po.command == expected for expected in reply_expected):
-                        return recv_message
-                    else:
-                        logging.error(
-                            "Got message {} but expected on of [{}]".format(recv_message.fields.value.po.command,
-                                                                            ', '.join(reply_expected)))
-                        logging.error("Detail:\n{}".format(recv_message))
+            if reply_expected is not None:
+                if isinstance(reply_expected, Callable):
+                    return await self.message_manager.wait_for(reply_expected, timeout=timeout)
+                elif isinstance(reply_expected, Iterable):
+                    return await self.message_manager.wait_for(
+                        lambda m: any(recv_message.fields.value.po.command == expected for expected in reply_expected), timeout=timeout)
                 else:
-                    if recv_message.fields.value.po.command == reply_expected:
-                        return recv_message
-                    else:
-                        logging.error("Got message {} but expected {}".format(recv_message.fields.value.po.command,
-                                                                              reply_expected))
-                        logging.error("Detail:\n{}".format(recv_message))
-            else:
-                return recv_message
+                    return await self.message_manager.wait_for(lambda m: m.fields.value.po.command == reply_expected, timeout=timeout)
 
         return None
 
@@ -361,7 +359,9 @@ class Paradox:
         # Apply state changes
         accepted = False
         try:
-            accepted = self.panel.control_zones(zones_selected, command)
+            task = self.work_loop.create_task(self.panel.control_zones(zones_selected, command))
+            self.work_loop.run_until_complete(task)
+            accepted = task.result()
         except NotImplementedError:
             logger.error('control_zones is not implemented for this alarm type')
 
@@ -382,7 +382,9 @@ class Paradox:
         # Apply state changes
         accepted = False
         try:
-            accepted = self.panel.control_partitions(partitions_selected, command)
+            task = self.work_loop.create_task(self.panel.control_partitions(partitions_selected, command))
+            self.work_loop.run_until_complete(task)
+            accepted = task.result()
         except NotImplementedError:
             logger.error('control_partitions is not implemented for this alarm type')
         # Apply state changes
@@ -404,7 +406,9 @@ class Paradox:
         # Apply state changes
         accepted = False
         try:
-            accepted = self.panel.control_outputs(outputs_selected, command)
+            task = self.work_loop.create_task(self.panel.control_outputs(outputs_selected, command))
+            self.work_loop.run_until_complete(task)
+            accepted = task.result()
         except NotImplementedError:
             logger.error('control_outputs is not implemented for this alarm type')
         # Apply state changes
@@ -422,37 +426,40 @@ class Paradox:
 
     def handle_event(self, message):
         """Process cfg.Live Event Message and dispatch it to the interface module"""
-        evt = event.Event(self.panel.event_map, message, label_provider=self.get_label)
+        try:
+            evt = event.Event(self.panel.event_map, message, label_provider=self.get_label)
 
-        logger.debug("Handle Event: {}".format(evt))
+            logger.debug("Handle Event: {}".format(evt))
 
-        # Temporary to catch labels/properties in wrong places
-        # TODO: REMOVE
-        if evt.type in self.data:
-            if not evt.id:
-                logger.warn("Missing element ID in {}/{}".format(evt.type, evt.label))
-            else:
-                el = self.data[evt.type].get(evt.id)
-                if not el:
-                    logger.warn("Missing element with ID {} in {}/{}".format(evt.id, evt.type, evt.label))
+            # Temporary to catch labels/properties in wrong places
+            # TODO: REMOVE
+            if evt.type in self.data:
+                if not evt.id:
+                    logger.warn("Missing element ID in {}/{}".format(evt.type, evt.label))
                 else:
-                    for k in evt.change:
-                        if k not in el:
-                            logger.warn("Missing property {} in {}/{}".format(k, evt.type, evt.label))
-                    if evt.label != el.get("label"):
-                        logger.warn(
-                            "Labels differ {} != {} in {}/{}".format(el.get("label"), evt.label, evt.type, evt.label))
-        else:
-            logger.warn("Missing type {} for event: {}.{} {}".format(evt.type, evt.major, evt.minor, evt.message))
-        # Temporary end
+                    el = self.data[evt.type].get(evt.id)
+                    if not el:
+                        logger.warn("Missing element with ID {} in {}/{}".format(evt.id, evt.type, evt.label))
+                    else:
+                        for k in evt.change:
+                            if k not in el:
+                                logger.warn("Missing property {} in {}/{}".format(k, evt.type, evt.label))
+                        if evt.label != el.get("label"):
+                            logger.warn(
+                                "Labels differ {} != {} in {}/{}".format(el.get("label"), evt.label, evt.type, evt.label))
+            else:
+                logger.warn("Missing type {} for event: {}.{} {}".format(evt.type, evt.major, evt.minor, evt.message))
+            # Temporary end
 
-        if len(evt.change) > 0 and evt.type in self.data and evt.id in self.data[evt.type]:
-            self.update_properties(evt.type, evt.id,
-                                   evt.change, notify=NotifyPropertyChange.NO)
+            if len(evt.change) > 0 and evt.type in self.data and evt.id in self.data[evt.type]:
+                self.update_properties(evt.type, evt.id,
+                                       evt.change, notify=NotifyPropertyChange.NO)
 
-        # Publish event
-        if self.interface is not None:
-            self.interface.event(evt)
+            # Publish event
+            if self.interface is not None:
+                self.interface.event(evt)
+        except Exception as e:
+            logger.exception("Handle event")
 
     def update_properties(self, element_type, type_key, change,
                           notify=NotifyPropertyChange.DEFAULT, publish=PublishPropertyChange.DEFAULT):
@@ -531,20 +538,32 @@ class Paradox:
         self.run = STATE_STOP
 
     def disconnect(self):
+        task = self.work_loop.create_task(self.disconnect_async())
+        self.work_loop.run_until_complete(task)
+
+    async def disconnect_async(self):
         if self.run == STATE_RUN:
             logger.info("Disconnecting from the Alarm Panel")
             self.run = STATE_STOP
             self.loop_wait = False
-            self.send_wait(self.panel.get_message('CloseConnection'), None, reply_expected=0x07)
+            await self.send_wait(self.panel.get_message('CloseConnection'), None, reply_expected=0x07)
             self.connection.close()
 
     def pause(self):
+        task = self.work_loop.create_task(self.pause_async())
+        self.work_loop.run_until_complete(task)
+
+    async def pause_async(self):
         if self.run == STATE_RUN:
             logger.info("Disconnecting from the Alarm Panel")
             self.run = STATE_PAUSE
             self.loop_wait = False
-            self.send_wait(self.panel.get_message('CloseConnection'), None, reply_expected=0x07)
+            await self.send_wait(self.panel.get_message('CloseConnection'), None, reply_expected=0x07)
 
     def resume(self):
+        task = self.work_loop.create_task(self.resume_async())
+        self.work_loop.run_until_complete(task)
+
+    async def resume_async(self):
         if self.run == STATE_PAUSE:
-            self.connect()
+            await self.connect()
