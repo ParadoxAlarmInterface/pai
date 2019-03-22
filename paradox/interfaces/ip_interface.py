@@ -128,10 +128,10 @@ class IPInterface(Interface):
         self.client_socket = None
         self.alarm.resume()
 
-    def connection_watch(self):
+    async def connection_watch(self):
         while self.client_socket is None:
             tstart = time.time()
-            payload = self.alarm.send_wait()
+            payload = await self.alarm.send_wait()
             tend = time.time()
             payload_len = len(payload)
             if payload is not None:

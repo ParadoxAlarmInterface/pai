@@ -136,7 +136,7 @@ class Panel:
 
         return bytes(res)
 
-    def update_labels(self):
+    async def update_labels(self):
         logger.info("Updating Labels from Panel")
 
         for elem_type in self.mem_map['elements']:
@@ -147,13 +147,13 @@ class Panel:
             if limits is not None:
                 addresses = [a for i, a in enumerate(addresses) if i + 1 in limits]
 
-            self.load_labels(self.core.data[elem_type],
+            await self.load_labels(self.core.data[elem_type],
                              addresses,
                              label_offset=elem_def['label_offset'])
 
             logger.info("{}: {}".format(elem_type.title(), ', '.join([v["label"] for v in self.core.data[elem_type].values()])))
 
-    def load_labels(self,
+    async def load_labels(self,
                     data_dict,
                     addresses,
                     field_length=16,
@@ -166,26 +166,11 @@ class Panel:
 
         for address in list(addresses):
             args = dict(address=address, length=field_length)
-            reply = self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=0x05)
+            reply = await self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address)
 
-            retry_count = 3
-            for retry in range(1, retry_count + 1):
-                # Avoid errors due to collision with events. It should not come here as we use reply_expected=0x05
-                if reply is None:
-                    logger.error("Could not fully load labels")
-                    return
-
-                if reply.fields.value.address != address:
-                    logger.debug(
-                        "EEPROM label addresses do not match (received: %d, requested: %d). Retrying %d of %d" % (
-                            reply.fields.value.address, address, retry, retry_count))
-                    reply = self.core.send_wait(None, None, reply_expected=0x05)
-                    continue
-
-                if retry == retry_count:
-                    logger.error('Failed to fetch label at address: %d' % address)
-
-                break
+            if reply is None:
+                logger.error("Could not fully load labels")
+                return
 
             data = reply.fields.value.data
             b_label = data[label_offset:label_offset + field_length].strip(b'\0 ')
