@@ -67,6 +67,7 @@ class IPInterface(Interface):
 
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
 
         server_socket.bind((cfg.IP_INTERFACE_BIND_ADDRESS, cfg.IP_INTERFACE_BIND_PORT))
         server_socket.listen(1)
@@ -92,6 +93,8 @@ class IPInterface(Interface):
                 if r == server_socket:
                     if self.client_socket is None:
                         self.client_socket, client_address = r.accept()
+                        self.client_socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
+
                         s_list = [server_socket, self.client_socket]
 
                         self.alarm.pause()
@@ -99,10 +102,9 @@ class IPInterface(Interface):
 
                         self.logger.info("New client connected: {}".format(client_address))
                     else:
-                        self.client_socket, client_address = r.accept()
-                        self.client_socket.close()
+                        client_socket, client_address = r.accept()
+                        client_socket.close()
                         self.logger.warn("Client connection denied")
-                        self.client_socket = None
 
                 else:
                     logging.info("Receiving data")
