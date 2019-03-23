@@ -170,7 +170,6 @@ class Paradox:
                 else:
                     logger.warn("Requested memory dump, but current panel type does not support it yet.")
 
-
             await self.panel.update_labels()
 
             self.run = STATE_RUN
@@ -566,4 +565,4 @@ class Paradox:
 
     async def resume_async(self):
         if self.run == STATE_PAUSE:
-            await self.connect()
+            await self.connect_async()
