@@ -4,6 +4,7 @@ import inspect
 import logging
 import sys
 import time
+import asyncio
 from typing import Optional
 
 from .parsers import Construct, CloseConnection, ErrorMessage, InitializeCommunication, InitializeCommunicationResponse, \
@@ -244,7 +245,7 @@ class Panel(PanelBase):
                 if reply is not None:
                     accepted = True
 
-                time.sleep(1)
+                await asyncio.sleep(1)
                 args = dict(action=PGM_ACTIONS['off'], argument=(output - 1))
                 reply = await self.core.send_wait(PerformAction, args, reply_expected=0x04)
                 if reply is not None:

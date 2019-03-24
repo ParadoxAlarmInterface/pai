@@ -138,9 +138,20 @@ class Panel_EVOBase(PanelBase):
                 logger.error("Authentication Failed")
                 return False
 
+    def _request_status_reply_check(self, message, address):
+        mvars = message.fields.value
+
+        assert mvars.po.command == 0x5
+        assert mvars.control.ram_access is True
+        assert mvars.control.eeprom_address_bits == 0x0
+        assert mvars.bus_address == 0x00  # panel
+        assert mvars.address == address
+
+        return True
+
     async def request_status(self, i) -> Optional[Container]:
         args = dict(address=i, length=64, control=dict(ram_access=True))
-        reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=0x05)
+        reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, i))
 
         return reply
 
@@ -149,11 +160,6 @@ class Panel_EVOBase(PanelBase):
 
         mvars = message.fields.value
         # Check message
-
-        assert mvars.po.command == 0x5
-        assert mvars.control.ram_access is True
-        assert mvars.control.eeprom_address_bits == 0x0
-        assert mvars.bus_address == 0x00  # panel
 
         if mvars.address not in RAMDataParserMap:
             logger.error(

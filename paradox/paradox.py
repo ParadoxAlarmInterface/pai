@@ -207,7 +207,7 @@ class Paradox:
         while self.run != STATE_STOP:
 
             while self.run == STATE_PAUSE:
-                time.sleep(5)
+                await asyncio.sleep(5)
 
             # May happen when out of sleep
             if self.run == STATE_STOP:
