@@ -57,13 +57,6 @@ class Panel(PanelBase):
             else:
                 raise e
 
-    def update_labels(self):
-        logger.info("Updating Labels from Panel")
-
-        super(Panel, self).update_labels()
-
-        logger.debug("Labels updated")
-
     def parse_message(self, message, direction='topanel') -> Optional[Container]:
         try:
             if message is None or len(message) == 0:
@@ -124,7 +117,7 @@ class Panel(PanelBase):
                     )
 
         logger.info("Initializing communication")
-        reply = await self.core.send_wait(self.get_message('InitializeCommunication'), args=args)
+        reply = await self.core.send_wait(self.get_message('InitializeCommunication'), args=args, reply_expected=0x10)
 
         if reply is None:
             logger.error("Initialization Failed")
