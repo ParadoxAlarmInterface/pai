@@ -9,6 +9,7 @@ from paradox.lib import stun
 import binascii
 import json
 import requests
+import asyncio
 
 from paradox.config import config as cfg
 
@@ -253,7 +254,7 @@ class IPConnection:
             logger.exception("Error writing to socket.")
             raise ConnectionError()
 
-    def read(self, sz=37, timeout=5):
+    async def read(self, sz=37, timeout=5):
         """Read data from the IP Port, if available, until the timeout is exceeded"""
 
         if not self.refresh_stun():
@@ -264,7 +265,8 @@ class IPConnection:
 
         while True:
             try:
-                recv_data = self.socket.recv(1024)
+                loop = asyncio.get_event_loop()
+                recv_data = await loop.sock_recv(self.socket, 1024)
                 if recv_data == b'': # Socket was closed. Restart the connection.
                     logger.info('Connection to IP module lost.')
                     raise ConnectionResetError()

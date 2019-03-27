@@ -6,7 +6,7 @@ import time
 import asyncio
 from collections import defaultdict, MutableMapping
 from threading import Lock
-from typing import Optional, Sequence, Iterable, Callable
+from typing import Optional, Sequence, Iterable, Callable, Awaitable
 
 from construct import Container
 
@@ -82,7 +82,7 @@ class Paradox:
         self.retries = retries
         self.interface = interface
         self.message_manager = AsyncMessageManager()
-        self.work_loop = asyncio.get_event_loop()
+        self.work_loop = asyncio.get_event_loop() # type: asyncio.AbstractEventLoop
         self.receive_worker_task = None
 
         self.message_manager.register_handler(EventMessageHandler(self.handle_event))
@@ -233,16 +233,23 @@ class Paradox:
                 await asyncio.sleep(min(time.time() - tstart, 1))
 
     async def receive_worker(self):
+        # async_supported = asyncio.iscoroutinefunction(self.connection.read)
+        # For some reason asyncio.get_event_loop().asyncio.sock_recv still locks execution.
+        # So asyncio.sleep is required.
+        async_supported = False
         try:
             while True:
                 await self.receive(0.1)
-                await asyncio.sleep(0.1)  # we need this until we use fully async receive. This lets other loop events to continue their work
+                if not async_supported:
+                    await asyncio.sleep(0.1)  # we need this until we use fully async receive. This lets other loop events to continue their work
         except asyncio.CancelledError:
             pass
 
     async def receive(self, timeout=5.0):
         with serial_lock:
             data = self.connection.read(timeout=timeout)
+            if isinstance(data, Awaitable):
+                data = await data
 
         # Retry if no data was available
         if data is None or len(data) == 0:
@@ -284,7 +291,11 @@ class Paradox:
             if not wait:
                 return None
 
-            data = self.connection.read()
+            data = self.connection.read(timeout=timeout)
+            if isinstance(data, Awaitable):
+                task = self.work_loop.create_task(data)
+                self.work_loop.run_until_complete(task)
+                data = task.result()
 
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("PC <- A {}".format(binascii.hexlify(data)))
@@ -553,7 +564,10 @@ class Paradox:
 
         # Write directly as this can be called from other contexts
         if self.connection and self.panel:
-            self.connection.write(self.panel.get_message('CloseConnection').build(dict()))
+            try:
+                self.connection.write(self.panel.get_message('CloseConnection').build(dict()))
+            except ResourceWarning:
+                logger.debug('CloseConnection parser not found. Probably we have not detected what panel it is yet.')
             self.connection.close()
 
         logger.info("Disconnected")
