@@ -83,6 +83,7 @@ class Paradox:
         self.interface = interface
         self.message_manager = AsyncMessageManager()
         self.work_loop = asyncio.get_event_loop()
+        self.receive_worker_task = None
 
         self.message_manager.register_handler(EventMessageHandler(self.handle_event))
         self.message_manager.register_handler(ErrorMessageHandler(self.handle_error))
@@ -91,7 +92,6 @@ class Paradox:
         self.reset()
 
     def reset(self):
-
         # Keep track of alarm state
         self.data['system'] = dict(power=dict(label='power', key='power', id=0),
                                    rf=dict(label='rf', key='rf', id=1),
@@ -154,8 +154,8 @@ class Paradox:
             if not result:
                 return False
 
-            # TODO: Now we need to start message reading loop
-            self.work_loop.create_task(self.send_wait())
+            # Now we need to start async message reading worker
+            self.receive_worker_task = self.work_loop.create_task(self.receive_worker())
 
             if cfg.SYNC_TIME:
                 await self.sync_time()
@@ -230,7 +230,42 @@ class Paradox:
 
             # cfg.Listen for events
             while time.time() - tstart < cfg.KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
-                await self.send_wait(None, timeout=min(time.time() - tstart, 1))
+                await asyncio.sleep(min(time.time() - tstart, 1))
+
+    async def receive_worker(self):
+        try:
+            while True:
+                await self.receive(0.1)
+                await asyncio.sleep(0.1)  # we need this until we use fully async receive. This lets other loop events to continue their work
+        except asyncio.CancelledError:
+            pass
+
+    async def receive(self, timeout=5.0):
+        with serial_lock:
+            data = self.connection.read(timeout=timeout)
+
+        # Retry if no data was available
+        if data is None or len(data) == 0:
+            return None
+
+        if cfg.LOGGING_DUMP_PACKETS:
+            logger.debug("PC <- A {}".format(binascii.hexlify(data)))
+
+        try:
+            recv_message = self.panel.parse_message(data, direction='frompanel')
+
+            if cfg.LOGGING_DUMP_MESSAGES:
+                logger.debug(recv_message)
+
+            # No message
+            if recv_message is None:
+                logger.debug("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in data)))
+                return None
+
+            self.message_manager.schedule_message_handling(recv_message)  # schedule handling in the loop
+        except Exception:
+            logging.exception("Error parsing message")
+            return None
 
     def send_wait_simple(self, message=None, timeout=5, wait=True) -> Optional[bytes]:
         # Connection closed
@@ -282,42 +317,15 @@ class Paradox:
                     self.connection.timeout(timeout)
                     self.connection.write(message)
 
-                data = self.connection.read()
-
-            # Retry if no data was available
-            if data is None or len(data) == 0:
-                if message is None:
-                    return None
-                continue
-
-            if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("PC <- A {}".format(binascii.hexlify(data)))
-
-            try:
-                recv_message = self.panel.parse_message(data, direction='frompanel')
-
-                if cfg.LOGGING_DUMP_MESSAGES:
-                    logger.debug(recv_message)
-
-                # No message
-                if recv_message is None:
-                    logger.debug("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in data)))
-                    continue
-
-            except Exception:
-                logging.exception("Error parsing message")
-                continue
-
-            self.message_manager.schedule_message_handling(recv_message)  # schedule handling in the loop
-
             if reply_expected is not None:
+                self.work_loop.create_task(self.receive(timeout))
                 if isinstance(reply_expected, Callable):
-                    return await self.message_manager.wait_for(reply_expected, timeout=timeout)
+                    return await self.message_manager.wait_for(reply_expected, timeout=timeout*2)
                 elif isinstance(reply_expected, Iterable):
                     return await self.message_manager.wait_for(
-                        lambda m: any(recv_message.fields.value.po.command == expected for expected in reply_expected), timeout=timeout)
+                        lambda m: any(m.fields.value.po.command == expected for expected in reply_expected), timeout=timeout*2)
                 else:
-                    return await self.message_manager.wait_for(lambda m: m.fields.value.po.command == reply_expected, timeout=timeout)
+                    return await self.message_manager.wait_for(lambda m: m.fields.value.po.command == reply_expected, timeout=timeout*2)
 
         return None
 
@@ -540,6 +548,8 @@ class Paradox:
         logger.info("Disconnecting from the Alarm Panel")
         self.run = STATE_STOP
         self.loop_wait = False
+        if self.receive_worker_task:
+            self.receive_worker_task.cancel()
 
         # Write directly as this can be called from other contexts
         if self.connection and self.panel:
