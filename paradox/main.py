@@ -79,7 +79,7 @@ def main():
         logger.info("Using Serial Connection")
         from paradox.connections.serial_connection import SerialCommunication
 
-        connection = SerialCommunication(port=cfg.SERIAL_PORT)
+        connection = SerialCommunication(port=cfg.SERIAL_PORT, baud=cfg.SERIAL_BAUD)
     elif cfg.CONNECTION_TYPE == 'IP':
         logger.info("Using IP Connection")
         from paradox.connections.ip_connection import IPConnection

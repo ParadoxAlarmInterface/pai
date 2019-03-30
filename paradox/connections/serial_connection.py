@@ -9,11 +9,12 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 class SerialCommunication:
 
-    def __init__(self, port):
+    def __init__(self, port, baud=9600):
         self.serialport = port
+        self.baud = baud
         self.comm = None
 
-    def connect(self, baud=9600, timeout=1):
+    def connect(self, timeout=1):
         """Connects the serial port"""
 
         try:  # if reconnect
@@ -24,7 +25,7 @@ class SerialCommunication:
 
         logger.debug("Opening Serial port: {}".format(self.serialport))
         self.comm = serial.Serial()
-        self.comm.baudrate = baud
+        self.comm.baudrate = self.baud
         self.comm.port = self.serialport
         self.comm.timeout = timeout
 

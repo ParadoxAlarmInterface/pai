@@ -79,6 +79,11 @@ PARTITIONS_CHANGE_NOTIFICATION_IGNORE = [
 ]
 ```
 
+If you use Serial connection you need to set *SERIAL_BAUD*:
+``` python
+SERIAL_BAUD = 38400 # or 57600 if you have changed default setting in Babyware
+```
+
 ## Running
 ```
 python3 run.py
