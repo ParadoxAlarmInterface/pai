@@ -23,13 +23,13 @@ class Panel_EVOBase(PanelBase):
 
     def get_message(self, name) -> Construct:
         try:
-            return super(Panel_EVOBase, self).get_message(name)
-        except ResourceWarning as e:
             clsmembers = dict(inspect.getmembers(sys.modules[__name__]))
             if name in clsmembers:
                 return clsmembers[name]
-            else:
-                raise e
+        except ResourceWarning:
+            pass
+
+        return super(Panel_EVOBase, self).get_message(name)
 
     async def dump_memory(self):
         """

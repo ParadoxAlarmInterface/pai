@@ -47,10 +47,9 @@ from paradox.interfaces.interface_manager import InterfaceManager
 alarm = None
 interface_manager = None
 
-def exit_handler(signal, frame):
+def exit_handler(signal=None, frame=None):
     global alarm, interface_manager
-
-    print("Exit Start")
+    
     if alarm:
         alarm.disconnect()
         alarm = None
@@ -60,7 +59,7 @@ def exit_handler(signal, frame):
         interface_manager = None
 
     time.sleep(1)
-
+    
     logger.info("Good bye!")
     sys.exit(0)
 
@@ -80,7 +79,7 @@ def main():
         logger.info("Using Serial Connection")
         from paradox.connections.serial_connection import SerialCommunication
 
-        connection = SerialCommunication(port=cfg.SERIAL_PORT)
+        connection = SerialCommunication(port=cfg.SERIAL_PORT, baud=cfg.SERIAL_BAUD)
     elif cfg.CONNECTION_TYPE == 'IP':
         logger.info("Using IP Connection")
         from paradox.connections.ip_connection import IPConnection
@@ -101,7 +100,6 @@ def main():
         retry_time_wait = 30 if retry_time_wait > 30 else retry_time_wait
 
         try:
-            alarm.disconnect()
             if alarm.connect():
                 retry = 1
                 interface_manager.set_alarm(alarm)
@@ -122,7 +120,6 @@ def main():
             time.sleep(retry_time_wait)
 
         retry += 1
-    if interface_manager:
-        interface_manager.stop()
+    
+    exit_handler()
 
-    logger.info("Good bye!")

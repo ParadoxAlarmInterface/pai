@@ -5,7 +5,7 @@ from itertools import chain
 from typing import Optional
 
 from construct import Construct, Struct, BitStruct, Const, Nibble, Checksum, Padding, Bytes, this, RawCopy, Int8ub, \
-    Default, Enum, Flag, BitsInteger, Int16ub, Container, EnumIntegerString
+    Default, Enum, Flag, BitsInteger, Int16ub, Container, EnumIntegerString, Rebuild
 
 from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum
 
@@ -337,3 +337,15 @@ StartCommunicationResponse = Struct("fields" / RawCopy(
         "_not_used2" / Bytes(14),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
+CloseConnection = Struct("fields" / RawCopy(
+    Struct(
+        "po" / Struct(
+            "command" / Const(0x70, Int8ub)
+        ),
+        "length" / Rebuild(Int8ub, lambda
+            this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+        "_not_used0" / Padding(34),
+    )),
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+

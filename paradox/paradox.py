@@ -108,6 +108,8 @@ class Paradox:
         return task.result()
 
     async def connect_async(self):
+        self.clean_session()
+
         logger.info("Connecting to interface")
         if not self.connection.connect():
             logger.error('Failed to connect to interface')
@@ -562,16 +564,11 @@ class Paradox:
         if self.receive_worker_task:
             self.receive_worker_task.cancel()
 
-        # Write directly as this can be called from other contexts
-        if self.connection and self.panel:
-            try:
-                self.connection.write(self.panel.get_message('CloseConnection').build(dict()))
-            except ResourceWarning:
-                logger.debug('CloseConnection parser not found. Probably we have not detected what panel it is yet.')
+        self.clean_session()
+        if self.connection.connected:
             self.connection.close()
 
         logger.info("Disconnected")
-
 
     def pause(self):
         task = self.work_loop.create_task(self.pause_async())
@@ -591,3 +588,17 @@ class Paradox:
     async def resume_async(self):
         if self.run == STATE_PAUSE:
             await self.connect_async()
+
+    def clean_session(self):
+        if self.connection.connected:
+            if not self.panel:
+                panel = create_panel(self)
+            else:
+                panel = self.panel
+
+            logger.info("Cleaning previous session")
+            # Write directly as this can be called from other contexts
+
+            self.connection.write(panel.get_message('CloseConnection').build(dict()))
+
+

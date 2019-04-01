@@ -1,19 +1,25 @@
 # -*- coding: utf-8 -*-
 
-import serial
+import binascii
 import logging
 import time
+
+import serial
+
+from paradox.config import config as cfg
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
 
 class SerialCommunication:
 
-    def __init__(self, port):
+    def __init__(self, port, baud=9600):
         self.serialport = port
+        self.baud = baud
         self.comm = None
+        self.connected = False
 
-    def connect(self, baud=9600, timeout=1):
+    def connect(self, timeout=1):
         """Connects the serial port"""
 
         try:  # if reconnect
@@ -24,12 +30,13 @@ class SerialCommunication:
 
         logger.debug("Opening Serial port: {}".format(self.serialport))
         self.comm = serial.Serial()
-        self.comm.baudrate = baud
+        self.comm.baudrate = self.baud
         self.comm.port = self.serialport
         self.comm.timeout = timeout
 
         try:
             self.comm.open()
+            self.connected = True
             logger.debug("Serial port open!")
             return True
         except Exception:
@@ -40,6 +47,8 @@ class SerialCommunication:
         """Write data to serial port"""
 
         try:
+            if cfg.LOGGING_DUMP_PACKETS:
+                logger.debug("PC -> Serial {}".format(binascii.hexlify(data)))
             self.comm.write(data)
             return True
         except Exception:
@@ -84,6 +93,8 @@ class SerialCommunication:
 
                 continue
 
+            if cfg.LOGGING_DUMP_PACKETS:
+                logger.debug("Serial -> PC {}".format(binascii.hexlify(data)))
             return data
 
         return None
@@ -95,6 +106,7 @@ class SerialCommunication:
         """Closes the serial port"""
         self.comm.close()
         self.comm = None
+        self.connected = False
 
     def flush(self):
         """Write any pending data"""
