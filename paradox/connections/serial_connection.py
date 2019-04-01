@@ -17,6 +17,7 @@ class SerialCommunication:
         self.serialport = port
         self.baud = baud
         self.comm = None
+        self.connected = False
 
     def connect(self, timeout=1):
         """Connects the serial port"""
@@ -35,6 +36,7 @@ class SerialCommunication:
 
         try:
             self.comm.open()
+            self.connected = True
             logger.debug("Serial port open!")
             return True
         except Exception:
@@ -104,6 +106,7 @@ class SerialCommunication:
         """Closes the serial port"""
         self.comm.close()
         self.comm = None
+        self.connected = False
 
     def flush(self):
         """Write any pending data"""
