@@ -55,7 +55,7 @@ class SerialCommunication:
             logger.exception("Error writing to serial port")
             return False
 
-    def read(self, sz=37, timeout=5):
+    def read(self, sz=37, timeout=5.0):
         """Read data from the serial port, if available, until the timeout is exceeded"""
         self.comm.timeout = timeout / 5.0
 

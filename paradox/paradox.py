@@ -111,7 +111,7 @@ class Paradox:
         self.clean_session()
 
         logger.info("Connecting to interface")
-        if not self.connection.connect():
+        if not await self.connection.connect():
             logger.error('Failed to connect to interface')
             self.run = STATE_STOP
             return False
@@ -235,23 +235,26 @@ class Paradox:
                 await asyncio.sleep(min(time.time() - tstart, 1))
 
     async def receive_worker(self):
-        # async_supported = asyncio.iscoroutinefunction(self.connection.read)
-        # For some reason asyncio.get_event_loop().asyncio.sock_recv still locks execution.
-        # So asyncio.sleep is required.
-        async_supported = False
+        async_supported = asyncio.iscoroutinefunction(self.connection.read)
         try:
             while True:
-                await self.receive(0.1)
-                if not async_supported:
+                if async_supported:
+                    await self.receive()
+                else:
+                    await self.receive()
                     await asyncio.sleep(0.1)  # we need this until we use fully async receive. This lets other loop events to continue their work
         except asyncio.CancelledError:
             pass
 
     async def receive(self, timeout=5.0):
-        with serial_lock:
-            data = self.connection.read(timeout=timeout)
-            if isinstance(data, Awaitable):
+        # TODO: Get rid of receive worker
+        # with serial_lock:
+        data = self.connection.read(timeout=timeout)
+        if isinstance(data, Awaitable):
+            try:
                 data = await data
+            except asyncio.TimeoutError:
+                return None
 
         # Retry if no data was available
         if data is None or len(data) == 0:
@@ -276,7 +279,7 @@ class Paradox:
             logging.exception("Error parsing message")
             return None
 
-    def send_wait_simple(self, message=None, timeout=5, wait=True) -> Optional[bytes]:
+    def send_wait_simple(self, message=None, timeout=5.0, wait=True) -> Optional[bytes]:
         # Connection closed
         if self.connection is None:
             return
