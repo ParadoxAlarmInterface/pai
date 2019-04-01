@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 
-import serial
+import binascii
 import logging
 import time
+
+import serial
+
+from paradox.config import config as cfg
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -41,6 +45,8 @@ class SerialCommunication:
         """Write data to serial port"""
 
         try:
+            if cfg.LOGGING_DUMP_PACKETS:
+                logger.debug("PC -> Serial {}".format(binascii.hexlify(data)))
             self.comm.write(data)
             return True
         except Exception:
@@ -85,6 +91,8 @@ class SerialCommunication:
 
                 continue
 
+            if cfg.LOGGING_DUMP_PACKETS:
+                logger.debug("Serial -> PC {}".format(binascii.hexlify(data)))
             return data
 
         return None
