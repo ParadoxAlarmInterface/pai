@@ -101,6 +101,7 @@ class Paradox:
             logger.error('Failed to connect to interface')
             self.run = STATE_STOP
             return False
+        
 
         self.run = STATE_STOP
 
@@ -113,6 +114,8 @@ class Paradox:
 
         if not self.panel:
             self.panel = create_panel(self)
+        
+        self.clean_session()
 
         try:
             logger.info("Initiating communication")
@@ -541,8 +544,7 @@ class Paradox:
             self.connection.close()
 
         logger.info("Disconnected")
-
-
+    
     def pause(self):
         if self.run == STATE_RUN:
             logger.info("Disconnecting from the Alarm Panel")
@@ -553,3 +555,14 @@ class Paradox:
     def resume(self):
         if self.run == STATE_PAUSE:
             self.connect()
+    
+    def clean_session(self):
+        logger.info("Cleaning previous session")
+        if self.connection:
+            if not self.panel:
+                panel = create_panel(self)
+            else:
+                panel = self.panel
+
+            self.connection.write(panel.get_message('GenericCloseConnection').build(dict()))
+

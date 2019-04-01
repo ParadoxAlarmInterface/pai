@@ -100,7 +100,6 @@ def main():
         retry_time_wait = 30 if retry_time_wait > 30 else retry_time_wait
 
         try:
-            alarm.disconnect()
             if alarm.connect():
                 retry = 1
                 interface_manager.set_alarm(alarm)
