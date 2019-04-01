@@ -353,7 +353,7 @@ StartCommunicationResponse = Struct("fields" / RawCopy(
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
-GenericCloseConnection = Struct("fields" / RawCopy(
+CloseConnection = Struct("fields" / RawCopy(
     Struct(
         "po" / Struct(
             "command" / Const(0x70, Int8ub)

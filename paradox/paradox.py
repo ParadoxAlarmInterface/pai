@@ -96,12 +96,13 @@ class Paradox:
         self.status_cache = dict()
 
     def connect(self):
+        self.clean_session()
+
         logger.info("Connecting to interface")
         if not self.connection.connect():
             logger.error('Failed to connect to interface')
             self.run = STATE_STOP
             return False
-        
 
         self.run = STATE_STOP
 
@@ -114,8 +115,6 @@ class Paradox:
 
         if not self.panel:
             self.panel = create_panel(self)
-        
-        self.clean_session()
 
         try:
             logger.info("Initiating communication")
@@ -538,9 +537,8 @@ class Paradox:
         self.run = STATE_STOP
         self.loop_wait = False
 
-        # Write directly as this can be called from other contexts
-        if self.connection and self.panel:
-            self.connection.write(self.panel.get_message('CloseConnection').build(dict()))
+        self.clean_session()
+        if self.connection.connected:
             self.connection.close()
 
         logger.info("Disconnected")
@@ -557,12 +555,15 @@ class Paradox:
             self.connect()
     
     def clean_session(self):
-        logger.info("Cleaning previous session")
-        if self.connection:
+        if self.connection.connected:
             if not self.panel:
                 panel = create_panel(self)
             else:
                 panel = self.panel
 
-            self.connection.write(panel.get_message('GenericCloseConnection').build(dict()))
+            logger.info("Cleaning previous session")
+            # Write directly as this can be called from other contexts
+
+            self.connection.write(panel.get_message('CloseConnection').build(dict()))
+
 

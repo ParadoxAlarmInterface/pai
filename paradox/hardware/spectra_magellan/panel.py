@@ -48,13 +48,13 @@ class Panel(PanelBase):
 
     def get_message(self, name) -> Construct:
         try:
-            return super(Panel, self).get_message(name)
-        except ResourceWarning as e:
             clsmembers = dict(inspect.getmembers(sys.modules[__name__]))
             if name in clsmembers:
                 return clsmembers[name]
-            else:
-                raise e
+        except ResourceWarning:
+            pass
+
+        return super(Panel, self).get_message(name)
 
     def update_labels(self):
         logger.info("Updating Labels from Panel")
