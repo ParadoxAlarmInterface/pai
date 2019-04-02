@@ -4,131 +4,130 @@ import binascii
 import logging
 import time
 
-import serial
+import asyncio
+import serial_asyncio
 
 from paradox.config import config as cfg
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
 
-class SerialCommunication:
+def checksum(data):
+    """Calculates the 8bit checksum of Paradox messages"""
+    c = 0
 
-    def __init__(self, port, baud=9600):
-        self.serialport = port
+    if data is None or len(data) < 37:
+        return False
+
+    for i in data[:36]:
+        c += i
+
+    r = (c % 256) == data[36]
+    return r
+
+class SerialConnectionProtocol(asyncio.Protocol):
+    def __init__(self, on_port_open, on_port_closed):
+        self.buffer = b''
+        self.transport = None
+        self.read_queue = asyncio.Queue()
+        self.on_port_open = on_port_open
+        self.on_port_closed = on_port_closed
+
+    def connection_made(self, transport):
+        logger.info("Serial port Open")
+        self.transport = transport
+        self.on_port_open()
+ 
+    def send_message(self, message):
+        if cfg.LOGGING_DUMP_PACKETS:
+            logger.debug("PC -> Serial {}".format(binascii.hexlify(message)))
+        self.transport.write(message)
+
+    async def read_message(self, timeout=5):
+        return await asyncio.wait_for(self.read_queue.get(), timeout=timeout)
+
+    def data_received(self, recv_data):
+        self.buffer += recv_data
+        while len(self.buffer) >= 37:
+            if checksum(self.buffer):
+                if cfg.LOGGING_DUMP_PACKETS:
+                    logger.debug("Serial -> PC {}".format(binascii.hexlify(self.buffer)))
+
+                    self.read_queue.put_nowait(self.buffer)
+                    self.buffer = b''
+            else:
+                self.buffer = self.buffer[1:]
+        
+    def connection_lost(self, exc):
+        logger.error('The serial port was closed')
+        self.read_queue = asyncio.Queue()
+        #self.on_port_closed()
+
+class SerialCommunication   :
+    def __init__(self, port, baud=9600, timeout=5):
+        self.connection = None
+        self.transport = None
+        self.default_timeout = timeout
+        self.connection_timestamp = 0
+        self.port_path = port
         self.baud = baud
-        self.comm = None
-        self.connected = False
+        self.connected = None
 
-    def connect(self, timeout=1):
-        """Connects the serial port"""
+    def on_port_closed(self):
+        logger.error('Connection to panel was lost')
+        self.connected.set_result(False)
+        self.connection_timestamp = 0
 
-        try:  # if reconnect
-            if self.comm:
-                self.close()
-        except Exception:
-            logger.exception("Cannot close Serial Port")
+    def on_port_open(self):
+        logger.info('Serial port open')
+        self.connected.set_result(True)
+        self.connection_timestamp = 0
 
-        logger.debug("Opening Serial port: {}".format(self.serialport))
-        self.comm = serial.Serial()
-        self.comm.baudrate = self.baud
-        self.comm.port = self.serialport
-        self.comm.timeout = timeout
+    def open_timeout(self):
+        if self.connected.done():
+            return
 
-        try:
-            self.comm.open()
-            self.connected = True
-            logger.debug("Serial port open!")
-            return True
-        except Exception:
-            logger.exception("Unable to open serial port: {}".format(self.serialport))
-            return False
+        logger.error("Serial Port Timeout")
+        self.connected.set_result(False)
+
+    def make_protocol(self):
+        return SerialConnectionProtocol(self.on_port_open, self.on_port_closed)
+
+    async def connect(self):
+        logger.info("Connecting to serial port {}".format(self.port_path))
+        loop = asyncio.get_event_loop()
+        self.transport, self.connection = await serial_asyncio.create_serial_connection(loop,
+                                        self.make_protocol, 
+                                        self.port_path, 
+                                        self.baud)
+        
+        self.connected = loop.create_future()
+        loop.call_later(5, self.open_timeout)
+
+        return await self.connected
 
     def write(self, data):
         """Write data to serial port"""
 
-        try:
-            if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("PC -> Serial {}".format(binascii.hexlify(data)))
-            self.comm.write(data)
-            return True
-        except Exception:
-            logger.exception("Error writing to serial port")
-            return False
+        if self.connected:
+            self.connection.send_message(data)
+        
+    async def read(self, timeout=None):
+        """Read data from the IP Port, if available, until the timeout is exceeded"""
 
-    def read(self, sz=37, timeout=5.0):
-        """Read data from the serial port, if available, until the timeout is exceeded"""
-        self.comm.timeout = timeout / 5.0
+        if not timeout:
+            timeout = self.default_timeout
 
-        data = b""
-        tstart = time.time()
-        read_sz = sz
+        if self.connected:
+            result = await self.connection.read_message(timeout=timeout)
+        
+        return result
 
-        while time.time() < (tstart + timeout):
-            recv_data = self.comm.read(read_sz)
-
-            if recv_data is None:
-                continue
-
-            data += recv_data
-
-            if len(data) < sz:
-                continue
-
-            while not self.checksum(data) and len(data) >= 37:
-                data = data[1:]
-
-            i = 0
-            while i < 37 and data[i] == 0:
-                i = i + 1
-
-            if i == 37:
-                data = data[37:]
-                continue
-
-            if not self.checksum(data):
-                if self.comm.in_waiting > 0:
-                    read_sz = self.comm.in_waiting
-                else:
-                    read_sz = 1
-
-                continue
-
-            if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("Serial -> PC {}".format(binascii.hexlify(data)))
-            return data
-
-        return None
-
-    def timeout(self, timeout=5):
-        self.comm.timeout = timeout
+    def timeout(self, timeout=5.0):
+        self.default_timeout = timeout
 
     def close(self):
         """Closes the serial port"""
-        self.comm.close()
-        self.comm = None
-        self.connected = False
 
-    def flush(self):
-        """Write any pending data"""
-        self.comm.flush()
+        self.connection.stop()
 
-    def getfd(self):
-        """Gets the FD associated with the serial port"""
-        if self.comm.is_open:
-            return self.comm.fileno()
-
-        return None
-
-    @staticmethod
-    def checksum(data):
-        """Calculates the 8bit checksum of Paradox messages"""
-        c = 0
-
-        if data is None or len(data) < 37:
-            return False
-
-        for i in data[:36]:
-            c += i
-
-        r = (c % 256) == data[36]
-        return r
