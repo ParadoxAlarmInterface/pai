@@ -57,6 +57,8 @@ class IPConnectionProtocol(asyncio.Protocol):
         self.buffer += recv_data
 
         if self.buffer[0] != 0xaa:
+            if len(self.buffer) > 0:
+                logger.warn('Dangling data in the receive buffer: %s' % binascii.hexlify(self.buffer))
             self.buffer = b''
             return
 
