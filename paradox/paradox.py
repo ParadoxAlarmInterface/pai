@@ -388,11 +388,14 @@ class Paradox:
         # Apply state changes
         accepted = False
         try:
-            task = self.work_loop.create_task(self.panel.control_zones(zones_selected, command))
-            self.work_loop.run_until_complete(task)
-            accepted = task.result()
+            coro = self.panel.control_zones(zones_selected, command)
+            future = asyncio.run_coroutine_threadsafe(coro, self.work_loop)
+            accepted = future.result(10)
         except NotImplementedError:
             logger.error('control_zones is not implemented for this alarm type')
+        except asyncio.TimeoutError:
+            logger.error('control_zones timeout')
+            future.cancel()
 
         # Refresh status
         self.loop_wait = False
@@ -411,11 +414,15 @@ class Paradox:
         # Apply state changes
         accepted = False
         try:
-            task = self.work_loop.create_task(self.panel.control_partitions(partitions_selected, command))
-            self.work_loop.run_until_complete(task)
-            accepted = task.result()
+            coro = self.panel.control_partitions(partitions_selected, command)
+            future = asyncio.run_coroutine_threadsafe(coro, self.work_loop)
+            accepted = future.result(10)
         except NotImplementedError:
             logger.error('control_partitions is not implemented for this alarm type')
+        except asyncio.TimeoutError:
+            logger.error('control_partitions timeout')
+            future.cancel()
+
         # Apply state changes
 
         # Refresh status
@@ -435,11 +442,14 @@ class Paradox:
         # Apply state changes
         accepted = False
         try:
-            task = self.work_loop.create_task(self.panel.control_outputs(outputs_selected, command))
-            self.work_loop.run_until_complete(task)
-            accepted = task.result()
+            coro = self.panel.control_outputs(outputs_selected, command)
+            future = asyncio.run_coroutine_threadsafe(coro, self.work_loop)
+            accepted = future.result(10)
         except NotImplementedError:
             logger.error('control_outputs is not implemented for this alarm type')
+        except asyncio.TimeoutError:
+            logger.error('control_outputs timeout')
+            future.cancel()
         # Apply state changes
 
         # Refresh status
