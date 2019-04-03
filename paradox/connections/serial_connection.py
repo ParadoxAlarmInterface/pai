@@ -33,12 +33,16 @@ class SerialConnectionProtocol(asyncio.Protocol):
         self.on_port_open = on_port_open
         self.on_port_closed = on_port_closed
         self.last_message_time = 0
+        self.loop = asyncio.get_event_loop()
 
     def connection_made(self, transport):
         logger.info("Serial port Open")
         self.transport = transport
         self.on_port_open()
  
+    async def _send_message(self, message):
+        await self.transport.write(message)
+
     def send_message(self, message):
         
         if cfg.LOGGING_DUMP_PACKETS:
@@ -51,11 +55,9 @@ class SerialConnectionProtocol(asyncio.Protocol):
         now = time.time()
         enlapsed = now - self.last_message_time
         if enlapsed < 0.1:
-            time.sleep(0.1 - enlapsed)
-    
-        self.last_message_time = time.time()
-
-        self.transport.write(message)
+            syncio.sleep(0.1 - enlapsed)
+   
+        asyncio.run_coroutine_threadsafe(self._send_message(message), self.loop)
 
     async def read_message(self, timeout=5):
         return await asyncio.wait_for(self.read_queue.get(), timeout=timeout)
