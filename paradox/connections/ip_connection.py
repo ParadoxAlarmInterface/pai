@@ -27,6 +27,10 @@ class IPConnectionProtocol(asyncio.Protocol):
     def connection_made(self, transport):
         self.transport = transport
 
+    def close(self):
+        self.transport.close()
+        self.transport = None
+
     def send_raw(self, raw):
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("PC -> IP {}".format(binascii.hexlify(raw)))
@@ -85,6 +89,7 @@ class IPConnectionProtocol(asyncio.Protocol):
 class IPConnection:
     def __init__(self, host='127.0.0.1', port=10000, password=None, timeout=5.0):
         self.connection = None
+        self.transport = None
         self.default_timeout = timeout
         self.password = password
         self.key = password
@@ -320,7 +325,8 @@ class IPConnection:
 
     def close(self):
         """Closes the serial port"""
-
+        if self.connection:
+            self.connection.close()
         self.connected = False
 
     @staticmethod

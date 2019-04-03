@@ -108,7 +108,7 @@ class Paradox:
         return task.result()
 
     async def connect_async(self):
-        self.clean_session()
+        self.disconnect()  # socket needs to be also closed
 
         logger.info("Connecting to interface")
         if not await self.connection.connect():
@@ -230,7 +230,7 @@ class Paradox:
                         tstart = time.time()
                         self.panel.handle_status(reply)
                     else:
-                        logger.error("No reply to status request")
+                        logger.error("No reply to status request: %d" % i)
             except ConnectionError:
                 raise
             except Exception:
