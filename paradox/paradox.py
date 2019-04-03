@@ -140,21 +140,23 @@ class Paradox:
                     reply.fields.value.application.revision,
                     reply.fields.value.application.build))
             else:
-                logger.warn("Unknown panel. Some features may not be supported")
+                raise ConnectionError("Panel did not replied to InitiateCommunication")
+
 
             logger.info("Starting communication")
             reply = await self.send_wait(self.panel.get_message('StartCommunication'),
                                    args=dict(source_id=0x02), reply_expected=0x00)
 
             if reply is None:
-                return False
+                raise ConnectionError("Panel did not replied to StartCommunication")
 
-            self.panel = create_panel(self, reply.fields.value.product_id)  # Now we know what panel it is. Let's
+            if reply.fields.value.product_id is not None:
+                self.panel = create_panel(self, reply.fields.value.product_id)  # Now we know what panel it is. Let's
             # recreate panel object.
 
             result = await self.panel.initialize_communication(reply, cfg.PASSWORD)
             if not result:
-                return False
+                raise ConnectionError("Failed to initialize communication")
 
             # Now we need to start async message reading worker
             self.receive_worker_task = self.work_loop.create_task(self.receive_worker())
@@ -180,6 +182,8 @@ class Paradox:
             self.loop_wait = False
 
             return True
+        except ConnectionError as e:
+            logger.error("Failed to connect: %s" % str(e))
         except Exception:
             logger.exception("Connect error")
 
@@ -225,6 +229,8 @@ class Paradox:
                     if reply is not None:
                         tstart = time.time()
                         self.panel.handle_status(reply)
+                    else:
+                        logger.error("No reply to status request")
             except ConnectionError:
                 raise
             except Exception:
@@ -281,8 +287,8 @@ class Paradox:
 
     def send_wait_simple(self, message=None, timeout=5.0, wait=True) -> Optional[bytes]:
         # Connection closed
-        if self.connection is None:
-            return
+        if not self.connection.connected:
+            raise ConnectionError('Not connected')
 
         if message is not None:
             if cfg.LOGGING_DUMP_PACKETS:
@@ -316,8 +322,8 @@ class Paradox:
                   reply_expected=None) -> Optional[Container]:
 
         # Connection closed
-        if self.connection is None:
-            return
+        if not self.connection.connected:
+            raise ConnectionError('Not connected')
 
         if message is None and message_type is not None:
             message = message_type.build(dict(fields=dict(value=args)))
@@ -458,7 +464,7 @@ class Paradox:
             # TODO: REMOVE
             if evt.type in self.data:
                 if not evt.id:
-                    logger.warn("Missing element ID in {}/{}".format(evt.type, evt.label))
+                    logger.warn("Missing element ID in {}/{}, m/m: {}/{}, message: {}".format(evt.type, evt.label or '?', evt.major, evt.minor, evt.message))
                 else:
                     el = self.data[evt.type].get(evt.id)
                     if not el:
@@ -555,10 +561,11 @@ class Paradox:
         """Handle ErrorMessage"""
         error_enum = message.fields.value.message
 
-        message = self.panel.get_error_message(error_enum)
-        logger.error("Got ERROR Message: {}".format(message))
-
-        self.run = STATE_STOP
+        if error_enum == 'panel_not_connected':
+            self.disconnect()
+        else:
+            message = self.panel.get_error_message(error_enum)
+            logger.error("Got ERROR Message: {}".format(message))
 
     def disconnect(self):
         logger.info("Disconnecting from the Alarm Panel")
@@ -603,5 +610,3 @@ class Paradox:
             # Write directly as this can be called from other contexts
 
             self.connection.write(panel.get_message('CloseConnection').build(dict()))
-
-

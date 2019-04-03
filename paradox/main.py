@@ -108,7 +108,11 @@ def main():
                 logger.error("Unable to connect to alarm")
 
             time.sleep(retry_time_wait)
-        except (ConnectionError, OSError):  # Connection to IP Module or MQTT lost
+        except ConnectionError as e:  # Connection to IP Module or MQTT lost
+            logger.error("Connection to panel lost: %s. Restarting" % str(e))
+            time.sleep(retry_time_wait)
+
+        except OSError:  # Connection to IP Module or MQTT lost
             logger.exception("Restarting")
             time.sleep(retry_time_wait)
 

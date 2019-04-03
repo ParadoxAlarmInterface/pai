@@ -1,21 +1,20 @@
 # -*- coding: utf-8 -*-
 
+import asyncio
+import binascii
 import inspect
 import logging
 import sys
 import time
-import asyncio
 from typing import Optional
 
+from paradox.config import config as cfg
+from paradox.paradox import PublishPropertyChange
+from .event import event_map
 from .parsers import Construct, CloseConnection, ErrorMessage, InitializeCommunication, InitializeCommunicationResponse, \
     SetTimeDate, SetTimeDateResponse, PerformAction, PerformActionResponse, ReadStatusResponse, ReadEEPROM, \
-    ReadEEPROMResponse, LiveEvent, RAMDataParserMap, Container
+    ReadEEPROMResponse, LiveEvent, RAMDataParserMap, Container, ChecksumError
 from ..panel import Panel as PanelBase
-
-from .event import event_map
-from paradox.paradox import PublishPropertyChange
-
-from paradox.config import config as cfg
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -99,9 +98,10 @@ class Panel(PanelBase):
                 elif message[0] >> 4 == 0x0e:
                     return LiveEvent.parse(message)
 
+        except ChecksumError as e:
+            logger.error("ChecksumError %s, message: %s" % (str(e), binascii.hexlify(message)))
         except Exception:
-            logger.exception("Parsing message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
-
+            logger.exception("Exception parsing message: %s" % (binascii.hexlify(message)))
         return None
 
     async def initialize_communication(self, reply, PASSWORD):

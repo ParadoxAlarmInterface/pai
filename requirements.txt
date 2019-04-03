@@ -8,6 +8,7 @@ construct>=2.9.43
 #
 # Direct connection and GSM
 pyserial>=3.4
+pyserial-asyncio>=0.4
 #
 # MQTT Support
 paho_mqtt>=1.3.1
