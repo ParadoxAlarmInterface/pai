@@ -568,7 +568,6 @@ class Paradox:
             logger.error("Got ERROR Message: {}".format(message))
 
     def disconnect(self):
-        logger.info("Disconnecting from the Alarm Panel")
         self.run = STATE_STOP
         self.loop_wait = False
         if self.receive_worker_task:
@@ -577,8 +576,7 @@ class Paradox:
         self.clean_session()
         if self.connection.connected:
             self.connection.close()
-
-        logger.info("Disconnected")
+            logger.info("Disconnected from the Alarm Panel")
 
     def pause(self):
         task = self.work_loop.create_task(self.pause_async())
@@ -606,7 +604,7 @@ class Paradox:
             else:
                 panel = self.panel
 
-            logger.info("Cleaning previous session")
+            logger.info("Cleaning previous session. Closing connection")
             # Write directly as this can be called from other contexts
 
             self.connection.write(panel.get_message('CloseConnection').build(dict()))
