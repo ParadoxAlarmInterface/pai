@@ -304,11 +304,13 @@ class Paradox:
 
             data = self.connection.read(timeout=timeout)
             if isinstance(data, Awaitable):
-                task = self.work_loop.create_task(data)
-                self.work_loop.run_until_complete(task)
-                data = task.result()
+                future = asyncio.run_coroutine_threadsafe(data, self.work_loop)
+                try:
+                    data = future.result(5)
+                except asyncio.TimeoutError:
+                    data = None
 
-        if cfg.LOGGING_DUMP_PACKETS:
+        if data is not None and cfg.LOGGING_DUMP_PACKETS:
             logger.debug("PC <- A {}".format(binascii.hexlify(data)))
 
         return data
@@ -589,8 +591,7 @@ class Paradox:
             logger.info("Disconnected from the Alarm Panel")
 
     def pause(self):
-        task = self.work_loop.create_task(self.pause_async())
-        self.work_loop.run_until_complete(task)
+        asyncio.run_coroutine_threadsafe(self.pause_async(), self.work_loop)
 
     async def pause_async(self):
         if self.run == STATE_RUN:
@@ -600,8 +601,7 @@ class Paradox:
             await self.send_wait(self.panel.get_message('CloseConnection'), None, reply_expected=0x07)
 
     def resume(self):
-        task = self.work_loop.create_task(self.resume_async())
-        self.work_loop.run_until_complete(task)
+        asyncio.run_coroutine_threadsafe(self.resume_async(), self.work_loop)
 
     async def resume_async(self):
         if self.run == STATE_PAUSE:
