@@ -324,7 +324,7 @@ class IPConnection:
         self.default_timeout = timeout
 
     def close(self):
-        """Closes the serial port"""
+        """Closes the socket"""
         if self.connection:
             self.connection.close()
         self.connected = False
