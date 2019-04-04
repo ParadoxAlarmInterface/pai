@@ -1,5 +1,8 @@
 # PAI - Paradox Alarm Interface
 
+[![Join the chat at https://gitter.im/paradox-alarm-interface/community](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/paradox-alarm-interface/community)
+
+
 Middleware that aims to connect to a Paradox Alarm panel, exposing the interface for monitoring and control via several technologies.
 With this interface it is possible to integrate Paradox panels with HomeAssistant, OpenHAB, Homebridge or other domotics system that supports MQTT, as well as several IM methods.
 
@@ -16,11 +19,20 @@ On Android, if you install [MQTT Dash](https://play.google.com/store/apps/detail
 
 ### Docker
 
-If you have docker running, this will be the easy way:
+If you have docker running, this will be the easiest way:
+
 ```
-docker build -t pai .
-docker run -it -v <projectFolder>/pai.conf:/etc/pai/pai.conf pai
+mkdir /opt/pai/etc
+mkdir /opt/pai/log
+
+wget https://raw.githubusercontent.com/jpbarraca/pai/master/config/pai.conf.example -O /opt/pai/etc
+edit /opt/pai/etc/pai.conf as needed 
+
+docker run -it -v /opt/pai/etc:/etc/pai -v /opt/pai/log:/opt/log --device=/dev/tty.YOUR_SERIAL_PORT jpbarraca/pai
 ```
+You also try ```jpbarraca/pai:latest```
+
+The docker images do not have support for Signal.
 
 ### Manually
 
@@ -31,15 +43,15 @@ git clone https://github.com/jpbarraca/pai.git
 
 2.  Copy ```config/pai.conf.example``` to ```/etc/pai/pai.conf``` and edit it to match your setup. The file uses Python syntax.
 ```
-cd config
 mkdir -p /etc/pai
-cp pai.conf.example /etc/pai/pai.conf
-cd ..
+cp config/pai.conf.example /etc/pai/pai.conf
+edit /etc/pai/pai.conf as needed
+python3 run.py
 ```
 
 Alternatively see [#Configuration](#configuration) section for supported file locations.
 
-3.  Install the python requirements.
+3.  Install the python 3.6 and its requirements.
 ```
 pip3 install -r requirements.txt
 ```
