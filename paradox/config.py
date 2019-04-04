@@ -227,6 +227,17 @@ class Config:
                         logging.error("Invalid value for config argument {}. Allowed are: {}".format(type(v), k, expected_value))
                         raise(Exception("Error parsing configuration value"))
 
+        for args in os.environ:
+            if not args.startswith('PAI_') and len(args) > 4:
+                continue
+            opt = args[4:]
+            if opt in Config.DEFAULTS:
+                v = os.environ[args]
+                if v.isdigit():
+                    v = int(v)
+
+                setattr(Config, opt, v)
+
         Config.CONFIG_LOADED = True
 
 
