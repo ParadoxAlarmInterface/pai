@@ -11,7 +11,7 @@ from paradox.config import config as cfg
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
-
+last = 0
 def checksum(data):
     """Calculates the 8bit checksum of Paradox messages"""
     c = 0
@@ -32,21 +32,38 @@ class SerialConnectionProtocol(asyncio.Protocol):
         self.read_queue = asyncio.Queue()
         self.on_port_open = on_port_open
         self.on_port_closed = on_port_closed
+        self.last_message_time = 0
+        self.loop = asyncio.get_event_loop()
 
     def connection_made(self, transport):
         logger.info("Serial port Open")
         self.transport = transport
         self.on_port_open()
  
+    async def _send_message(self, message):
+        await self.transport.write(message)
+
     def send_message(self, message):
+        
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("PC -> Serial {}".format(binascii.hexlify(message)))
-        self.transport.write(message)
+        
+        # Panels seem to throttle messages
+        # Impose 100ms between commands. 
+        # Value needs to be tweaked, or removed
+        # TODO: Investigate this
+        now = time.time()
+        enlapsed = now - self.last_message_time
+        if enlapsed < 0.1:
+            syncio.sleep(0.1 - enlapsed)
+   
+        asyncio.run_coroutine_threadsafe(self._send_message(message), self.loop)
 
     async def read_message(self, timeout=5):
         return await asyncio.wait_for(self.read_queue.get(), timeout=timeout)
 
     def data_received(self, recv_data):
+        self.last_message_time = 0 # Got a message reset timer
         self.buffer += recv_data
         while len(self.buffer) >= 37:
             if checksum(self.buffer):
@@ -108,7 +125,6 @@ class SerialCommunication   :
 
     def write(self, data):
         """Write data to serial port"""
-
         if self.connected:
             self.connection.send_message(data)
         
@@ -128,6 +144,6 @@ class SerialCommunication   :
 
     def close(self):
         """Closes the serial port"""
-
-        self.connection.stop()
+        if self.transport:
+            self.transport.close()
 

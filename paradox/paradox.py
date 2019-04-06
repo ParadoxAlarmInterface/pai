@@ -108,7 +108,7 @@ class Paradox:
         return task.result()
 
     async def connect_async(self):
-        self.clean_session()
+        self.disconnect()  # socket needs to be also closed
 
         logger.info("Connecting to interface")
         if not await self.connection.connect():
@@ -140,21 +140,23 @@ class Paradox:
                     reply.fields.value.application.revision,
                     reply.fields.value.application.build))
             else:
-                logger.warn("Unknown panel. Some features may not be supported")
+                raise ConnectionError("Panel did not replied to InitiateCommunication")
+
 
             logger.info("Starting communication")
             reply = await self.send_wait(self.panel.get_message('StartCommunication'),
                                    args=dict(source_id=0x02), reply_expected=0x00)
 
             if reply is None:
-                return False
+                raise ConnectionError("Panel did not replied to StartCommunication")
 
-            self.panel = create_panel(self, reply.fields.value.product_id)  # Now we know what panel it is. Let's
+            if reply.fields.value.product_id is not None:
+                self.panel = create_panel(self, reply.fields.value.product_id)  # Now we know what panel it is. Let's
             # recreate panel object.
 
             result = await self.panel.initialize_communication(reply, cfg.PASSWORD)
             if not result:
-                return False
+                raise ConnectionError("Failed to initialize communication")
 
             # Now we need to start async message reading worker
             self.receive_worker_task = self.work_loop.create_task(self.receive_worker())
@@ -180,6 +182,8 @@ class Paradox:
             self.loop_wait = False
 
             return True
+        except ConnectionError as e:
+            logger.error("Failed to connect: %s" % str(e))
         except Exception:
             logger.exception("Connect error")
 
@@ -225,6 +229,8 @@ class Paradox:
                     if reply is not None:
                         tstart = time.time()
                         self.panel.handle_status(reply)
+                    else:
+                        logger.error("No reply to status request: %d" % i)
             except ConnectionError:
                 raise
             except Exception:
@@ -281,8 +287,8 @@ class Paradox:
 
     def send_wait_simple(self, message=None, timeout=5.0, wait=True) -> Optional[bytes]:
         # Connection closed
-        if self.connection is None:
-            return
+        if not self.connection.connected:
+            raise ConnectionError('Not connected')
 
         if message is not None:
             if cfg.LOGGING_DUMP_PACKETS:
@@ -298,11 +304,13 @@ class Paradox:
 
             data = self.connection.read(timeout=timeout)
             if isinstance(data, Awaitable):
-                task = self.work_loop.create_task(data)
-                self.work_loop.run_until_complete(task)
-                data = task.result()
+                future = asyncio.run_coroutine_threadsafe(data, self.work_loop)
+                try:
+                    data = future.result(5)
+                except asyncio.TimeoutError:
+                    data = None
 
-        if cfg.LOGGING_DUMP_PACKETS:
+        if data is not None and cfg.LOGGING_DUMP_PACKETS:
             logger.debug("PC <- A {}".format(binascii.hexlify(data)))
 
         return data
@@ -316,8 +324,8 @@ class Paradox:
                   reply_expected=None) -> Optional[Container]:
 
         # Connection closed
-        if self.connection is None:
-            return
+        if not self.connection.connected:
+            raise ConnectionError('Not connected')
 
         if message is None and message_type is not None:
             message = message_type.build(dict(fields=dict(value=args)))
@@ -382,11 +390,14 @@ class Paradox:
         # Apply state changes
         accepted = False
         try:
-            task = self.work_loop.create_task(self.panel.control_zones(zones_selected, command))
-            self.work_loop.run_until_complete(task)
-            accepted = task.result()
+            coro = self.panel.control_zones(zones_selected, command)
+            future = asyncio.run_coroutine_threadsafe(coro, self.work_loop)
+            accepted = future.result(10)
         except NotImplementedError:
             logger.error('control_zones is not implemented for this alarm type')
+        except asyncio.TimeoutError:
+            logger.error('control_zones timeout')
+            future.cancel()
 
         # Refresh status
         self.loop_wait = False
@@ -405,11 +416,15 @@ class Paradox:
         # Apply state changes
         accepted = False
         try:
-            task = self.work_loop.create_task(self.panel.control_partitions(partitions_selected, command))
-            self.work_loop.run_until_complete(task)
-            accepted = task.result()
+            coro = self.panel.control_partitions(partitions_selected, command)
+            future = asyncio.run_coroutine_threadsafe(coro, self.work_loop)
+            accepted = future.result(10)
         except NotImplementedError:
             logger.error('control_partitions is not implemented for this alarm type')
+        except asyncio.TimeoutError:
+            logger.error('control_partitions timeout')
+            future.cancel()
+
         # Apply state changes
 
         # Refresh status
@@ -429,11 +444,14 @@ class Paradox:
         # Apply state changes
         accepted = False
         try:
-            task = self.work_loop.create_task(self.panel.control_outputs(outputs_selected, command))
-            self.work_loop.run_until_complete(task)
-            accepted = task.result()
+            coro = self.panel.control_outputs(outputs_selected, command)
+            future = asyncio.run_coroutine_threadsafe(coro, self.work_loop)
+            accepted = future.result(10)
         except NotImplementedError:
             logger.error('control_outputs is not implemented for this alarm type')
+        except asyncio.TimeoutError:
+            logger.error('control_outputs timeout')
+            future.cancel()
         # Apply state changes
 
         # Refresh status
@@ -458,7 +476,7 @@ class Paradox:
             # TODO: REMOVE
             if evt.type in self.data:
                 if not evt.id:
-                    logger.warn("Missing element ID in {}/{}".format(evt.type, evt.label))
+                    logger.warn("Missing element ID in {}/{}, m/m: {}/{}, message: {}".format(evt.type, evt.label or '?', evt.major, evt.minor, evt.message))
                 else:
                     el = self.data[evt.type].get(evt.id)
                     if not el:
@@ -555,13 +573,13 @@ class Paradox:
         """Handle ErrorMessage"""
         error_enum = message.fields.value.message
 
-        message = self.panel.get_error_message(error_enum)
-        logger.error("Got ERROR Message: {}".format(message))
-
-        self.run = STATE_STOP
+        if error_enum == 'panel_not_connected':
+            self.disconnect()
+        else:
+            message = self.panel.get_error_message(error_enum)
+            logger.error("Got ERROR Message: {}".format(message))
 
     def disconnect(self):
-        logger.info("Disconnecting from the Alarm Panel")
         self.run = STATE_STOP
         self.loop_wait = False
         if self.receive_worker_task:
@@ -570,12 +588,10 @@ class Paradox:
         self.clean_session()
         if self.connection.connected:
             self.connection.close()
-
-        logger.info("Disconnected")
+            logger.info("Disconnected from the Alarm Panel")
 
     def pause(self):
-        task = self.work_loop.create_task(self.pause_async())
-        self.work_loop.run_until_complete(task)
+        asyncio.run_coroutine_threadsafe(self.pause_async(), self.work_loop)
 
     async def pause_async(self):
         if self.run == STATE_RUN:
@@ -585,8 +601,7 @@ class Paradox:
             await self.send_wait(self.panel.get_message('CloseConnection'), None, reply_expected=0x07)
 
     def resume(self):
-        task = self.work_loop.create_task(self.resume_async())
-        self.work_loop.run_until_complete(task)
+        asyncio.run_coroutine_threadsafe(self.resume_async(), self.work_loop)
 
     async def resume_async(self):
         if self.run == STATE_PAUSE:
@@ -599,9 +614,7 @@ class Paradox:
             else:
                 panel = self.panel
 
-            logger.info("Cleaning previous session")
+            logger.info("Cleaning previous session. Closing connection")
             # Write directly as this can be called from other contexts
 
             self.connection.write(panel.get_message('CloseConnection').build(dict()))
-
-

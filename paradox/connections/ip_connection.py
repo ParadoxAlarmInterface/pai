@@ -27,6 +27,10 @@ class IPConnectionProtocol(asyncio.Protocol):
     def connection_made(self, transport):
         self.transport = transport
 
+    def close(self):
+        self.transport.close()
+        self.transport = None
+
     def send_raw(self, raw):
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("PC -> IP {}".format(binascii.hexlify(raw)))
@@ -57,6 +61,8 @@ class IPConnectionProtocol(asyncio.Protocol):
         self.buffer += recv_data
 
         if self.buffer[0] != 0xaa:
+            if len(self.buffer) > 0:
+                logger.warn('Dangling data in the receive buffer: %s' % binascii.hexlify(self.buffer))
             self.buffer = b''
             return
 
@@ -83,6 +89,7 @@ class IPConnectionProtocol(asyncio.Protocol):
 class IPConnection:
     def __init__(self, host='127.0.0.1', port=10000, password=None, timeout=5.0):
         self.connection = None
+        self.transport = None
         self.default_timeout = timeout
         self.password = password
         self.key = password
@@ -124,8 +131,10 @@ class IPConnection:
 
                     if await self.connect_to_panel():
                         return True
+                except OSError as e:
+                    logger.error('Connect to IP Module failed (try %d/%d): %s' % (tries, max_tries, str(e)))
                 except Exception:
-                    logger.exception("Try %d/%d. Unable to connect to IP Module" % (tries, max_tries))
+                    logger.exception("Unable to connect to IP Module (try %d/%d)" % (tries, max_tries))
 
             tries += 1
 
@@ -277,7 +286,7 @@ class IPConnection:
             self.connected = True
         except asyncio.TimeoutError:
             self.connected = False
-            logger.error("Unable to establish session with IP Module. Timeout")
+            logger.error("Unable to establish session with IP Module. Timeout. Only one connection at a time is allowed.")
         except Exception:
             self.connected = False
             logger.exception("Unable to establish session with IP Module")
@@ -288,17 +297,13 @@ class IPConnection:
         """Write data to socket"""
 
         if not self.refresh_stun():
-            return False
+            raise ConnectionError('Failed to refresh STUN')
 
-        try:
-            if self.connected:
-                self.connection.send_message(data)
-                return True
-            else:
-                return False
-        except Exception:
-            logger.exception("Error writing to socket.")
-            raise ConnectionError()
+        if self.connected:
+            self.connection.send_message(data)
+            return True
+        else:
+            raise ConnectionError('Failed to send message to IP module')
 
     async def read(self, sz=37, timeout=None):
         """Read data from the IP Port, if available, until the timeout is exceeded"""
@@ -319,8 +324,9 @@ class IPConnection:
         self.default_timeout = timeout
 
     def close(self):
-        """Closes the serial port"""
-
+        """Closes the socket"""
+        if self.connection:
+            self.connection.close()
         self.connected = False
 
     @staticmethod

@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
 
+import binascii
 import inspect
 import logging
 import sys
 from typing import Optional
 
-from construct import Construct, Container, MappingError
+from construct import Construct, Container, MappingError, ChecksumError
 
+from .event import event_map
 from .parsers import CloseConnection, ErrorMessage, InitializeCommunication, LoginConfirmationResponse, SetTimeDate, \
     SetTimeDateResponse, PerformPartitionAction, PerformActionResponse, ReadEEPROMResponse, LiveEvent, ReadEEPROM, \
     RAMDataParserMap
 from ..panel import Panel as PanelBase
-
-from .event import event_map
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -105,9 +105,10 @@ class Panel_EVOBase(PanelBase):
                 elif message[0] >> 4 == 0x0e:
                     return LiveEvent.parse(message)
 
+        except ChecksumError as e:
+            logger.error("ChecksumError %s, message: %s" % (str(e), binascii.hexlify(message)))
         except Exception:
-            logger.exception("Parsing message: %s" % (" ".join(
-                "{:02x} ".format(c) for c in message)))
+            logger.exception("Exception parsing message: %s" % (binascii.hexlify(message)))
 
         return None
 
