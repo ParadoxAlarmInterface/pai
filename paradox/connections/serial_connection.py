@@ -76,8 +76,10 @@ class SerialConnectionProtocol(asyncio.Protocol):
 
                     self.read_queue.put_nowait(self.buffer)
                     self.buffer = b''
-            else:
+            elif len(self.buffer) >= 37:
                 self.buffer = self.buffer[1:]
+            else:
+                break
         
     def connection_lost(self, exc):
         logger.error('The serial port was closed')
