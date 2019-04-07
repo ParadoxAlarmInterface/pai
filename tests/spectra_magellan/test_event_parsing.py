@@ -34,7 +34,7 @@ def test_disarm_partition0():
     raw = LiveEvent.parse(payload)
     event = Event(event_map, raw, None)
 
-    assert event.message == "Partition status: Disarm partition XXXXXXXXXXX"
+    assert event.message == "Partition [partition:2]: Disarm partition"
     print(event)
 
 def test_disarm_partition1():

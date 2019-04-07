@@ -1,3 +1,4 @@
+import pytest
 import asyncio
 import binascii
 import mock
@@ -144,4 +145,5 @@ def test_handler_timeout(mocker):
     assert 1 == len(mh.handlers)
 
     result = task_get_eeprom.result()
+
     assert result is None
