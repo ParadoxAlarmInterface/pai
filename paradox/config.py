@@ -23,6 +23,7 @@ class Config:
         # Serial Connection Details
         "SERIAL_PORT": '/dev/ttyS1',                                  # Pathname of the Serial Port
         "SERIAL_BAUD": 9600,                                          # Baud rate of the Serial Port. Use 38400(default setting) or 57600 for EVO
+        "SERIAL_WRITE_THROTTLE": 100,                                 # Throttle writes to serial in milliseconds
 
         # IP Connection Details
         "IP_CONNECTION_HOST": '127.0.0.1',                            # IP Module address when using direct IP Connection
