@@ -55,7 +55,7 @@ class SerialConnectionProtocol(asyncio.Protocol):
         now = time.time()
         enlapsed = now - self.last_message_time
         if enlapsed < 0.1:
-            syncio.sleep(0.1 - enlapsed)
+            asyncio.sleep(0.1 - enlapsed)
    
         asyncio.run_coroutine_threadsafe(self._send_message(message), self.loop)
 
