@@ -11,18 +11,20 @@ from paradox.config import config as cfg
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
+MIN_MESSAGE_LEN = 6
+
 last = 0
 def checksum(data):
     """Calculates the 8bit checksum of Paradox messages"""
     c = 0
 
-    if data is None or len(data) < 37:
+    if data is None or len(data) < MIN_MESSAGE_LEN:
         return False
 
-    for i in data[:36]:
+    for i in data[:-1]:
         c += i
 
-    r = (c % 256) == data[36]
+    r = (c % 256) == data[-1]
     return r
 
 class SerialConnectionProtocol(asyncio.Protocol):
@@ -67,7 +69,7 @@ class SerialConnectionProtocol(asyncio.Protocol):
     def data_received(self, recv_data):
         self.last_sent_message_time = 0 # Got a message reset timer
         self.buffer += recv_data
-        while len(self.buffer) >= 6:
+        while len(self.buffer) >= MIN_MESSAGE_LEN:
             if checksum(self.buffer):
                 if cfg.LOGGING_DUMP_PACKETS:
                     logger.debug("Serial -> PC {}".format(binascii.hexlify(self.buffer)))
