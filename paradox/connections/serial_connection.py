@@ -67,7 +67,7 @@ class SerialConnectionProtocol(asyncio.Protocol):
     def data_received(self, recv_data):
         self.last_sent_message_time = 0 # Got a message reset timer
         self.buffer += recv_data
-        while len(self.buffer) >= 37:
+        while len(self.buffer) >= 6:
             if checksum(self.buffer):
                 if cfg.LOGGING_DUMP_PACKETS:
                     logger.debug("Serial -> PC {}".format(binascii.hexlify(self.buffer)))
