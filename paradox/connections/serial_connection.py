@@ -73,6 +73,13 @@ class SerialConnectionProtocol(asyncio.Protocol):
             if checksum(self.buffer):
                 if cfg.LOGGING_DUMP_PACKETS:
                     logger.debug("Serial -> PC {}".format(binascii.hexlify(self.buffer)))
+               
+                # Observed that in MG/SP, spurious zeros may be introduced before messages 
+                # If first bytes are all 0, checksum will pass, but message will have abnormal size and structure. 
+                # Will not be parsed correctly
+                if len(self.buffer) > 37:
+                    self.buffer = self.buffer[len(self.buffer) - 37:]
+                    logger.warn("MG/SP Workaround: skipping bytes")
 
                 self.read_queue.put_nowait(self.buffer)
                 self.buffer = b''
