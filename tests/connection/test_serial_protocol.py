@@ -1,4 +1,3 @@
-import mock
 import binascii
 from pytest_mock import mocker
 
