@@ -50,7 +50,7 @@ class MQTTInterface(Interface):
         self.mqtt.will_set('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                              cfg.MQTT_INTERFACE_TOPIC,
                                              self.__class__.__name__),
-                           'offline', 0, cfg.MQTT_RETAIN)
+                           'offline', 0, retain=True)
 
         self.mqtt.connect(host=cfg.MQTT_HOST,
                           port=cfg.MQTT_PORT,
@@ -219,7 +219,7 @@ class MQTTInterface(Interface):
         self.mqtt.will_set('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                              cfg.MQTT_INTERFACE_TOPIC,
                                              self.__class__.__name__),
-                           'offline', 0, cfg.MQTT_RETAIN)
+                           'offline', 0, retain=True)
 
         self.mqtt.connect(host=cfg.MQTT_HOST,
                           port=cfg.MQTT_PORT,
@@ -243,7 +243,7 @@ class MQTTInterface(Interface):
         self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                        cfg.MQTT_INTERFACE_TOPIC,
                                        self.__class__.__name__),
-                     'online', 0, cfg.MQTT_RETAIN)
+                     'online', 0, retain=True)
 
     def handle_event(self, raw):
         """
