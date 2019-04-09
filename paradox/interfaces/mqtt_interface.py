@@ -37,9 +37,7 @@ class MQTTInterface(Interface):
         self.mqtt.on_connect = self.handle_connect
         self.mqtt.on_disconnect = self.handle_disconnect
         self.connected = False
-
         self.cache = dict()
-
         self.armed = dict()
 
     def run(self):
@@ -78,14 +76,19 @@ class MQTTInterface(Interface):
 
         if self.connected:
             self.mqtt.disconnect()
-            time.sleep(0.5)
+
+        # Need to set as disconnect will delete the last will
+        self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+                                       cfg.MQTT_INTERFACE_TOPIC,
+                                       self.__class__.__name__),
+                     'offline', 0, retain=True)
+
+        self.mqtt.loop_stop()
 
     def stop(self):
         """ Stops the MQTT Interface Thread"""
-        self.mqtt.disconnect()
         self.logger.debug("Stopping MQTT Interface")
         self.queue.put_nowait(SortableTuple((0, 'command', 'stop')))
-        self.mqtt.loop_stop()
         self.join()
 
     def event(self, raw):
@@ -209,22 +212,6 @@ class MQTTInterface(Interface):
     def handle_disconnect(self, mqttc, userdata, rc):
         self.logger.info("MQTT Broker Disconnected")
         self.connected = False
-
-        time.sleep(1)
-
-        if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
-            self.mqtt.username_pw_set(
-                username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
-        
-        self.mqtt.will_set('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                             cfg.MQTT_INTERFACE_TOPIC,
-                                             self.__class__.__name__),
-                           'offline', 0, retain=True)
-
-        self.mqtt.connect(host=cfg.MQTT_HOST,
-                          port=cfg.MQTT_PORT,
-                          keepalive=cfg.MQTT_KEEPALIVE,
-                          bind_address=cfg.MQTT_BIND_ADDRESS)
 
     def handle_connect(self, mqttc, userdata, flags, result):
         self.logger.info("MQTT Broker Connected")
