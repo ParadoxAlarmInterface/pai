@@ -74,8 +74,8 @@ class SerialConnectionProtocol(asyncio.Protocol):
                 if cfg.LOGGING_DUMP_PACKETS:
                     logger.debug("Serial -> PC {}".format(binascii.hexlify(self.buffer)))
 
-                    self.read_queue.put_nowait(self.buffer)
-                    self.buffer = b''
+                self.read_queue.put_nowait(self.buffer)
+                self.buffer = b''
             elif len(self.buffer) >= 37:
                 self.buffer = self.buffer[1:]
             else:
