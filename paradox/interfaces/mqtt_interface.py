@@ -74,14 +74,15 @@ class MQTTInterface(Interface):
             except Exception:
                 self.logger.exception("ERROR in MQTT Run loop")
 
-        if self.connected:
-            self.mqtt.disconnect()
 
-        # Need to set as disconnect will delete the last will
-        self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+        if self.connected:
+            # Need to set as disconnect will delete the last will
+            self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                        cfg.MQTT_INTERFACE_TOPIC,
                                        self.__class__.__name__),
                      'offline', 0, retain=True)
+        
+            self.mqtt.disconnect()
 
         self.mqtt.loop_stop()
 
