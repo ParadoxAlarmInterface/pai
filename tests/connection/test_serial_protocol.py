@@ -100,3 +100,35 @@ def test_sequential_6byte_and_37byte_with_junk_in_front_and_between(mocker):
             )
         ],
     )
+
+def test_error_message(mocker):
+    cp = SerialConnectionProtocol(None, None)
+
+    payload = b'\x70\x04\x10\x84'
+    mocker.patch.object(cp, 'read_queue')
+
+    cp.data_received(payload)
+
+    cp.read_queue.put_nowait.assert_called_with(payload)
+
+def test_evo_eeprom_reading(mocker):
+    cp = SerialConnectionProtocol(None, None)
+
+    payload = binascii.unhexlify('524700009f0041133e001e0e0400000000060a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000121510010705004e85')
+
+    mocker.patch.object(cp, 'read_queue')
+
+    cp.data_received(payload)
+
+    cp.read_queue.put_nowait.assert_called_with(payload)
+
+def test_evo_ram_reading(mocker):
+    cp = SerialConnectionProtocol(None, None)
+
+    payload = binascii.unhexlify('524780000010040200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002fd2')
+
+    mocker.patch.object(cp, 'read_queue')
+
+    cp.data_received(payload)
+
+    cp.read_queue.put_nowait.assert_called_with(payload)
