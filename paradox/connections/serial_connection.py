@@ -60,6 +60,7 @@ class SerialConnectionProtocol(asyncio.Protocol):
         while len(self.buffer) >= MIN_MESSAGE_LEN:
             logger.debug(len(self.buffer))
             if self.buffer[0] >> 4 == 1 and checksum(self.buffer[:MIN_MESSAGE_LEN]):
+                # We have received EVO192 Successful connection response: 120600000018 (6 bytes)
                 frame = self.buffer[:MIN_MESSAGE_LEN]
             elif len(self.buffer) >= 37:
                 if checksum(self.buffer[:37]):
