@@ -320,7 +320,7 @@ class Paradox:
                   args=None,
                   message=None,
                   retries=5,
-                  timeout=5.0,
+                  timeout=0.5,
                   reply_expected=None) -> Optional[Container]:
 
         # Connection closed
@@ -344,12 +344,17 @@ class Paradox:
             if reply_expected is not None:
                 self.work_loop.create_task(self.receive(timeout))
                 if isinstance(reply_expected, Callable):
-                    return await self.message_manager.wait_for(reply_expected, timeout=timeout*2)
+                    reply = await self.message_manager.wait_for(reply_expected, timeout=timeout*2)
                 elif isinstance(reply_expected, Iterable):
-                    return await self.message_manager.wait_for(
+                    reply = await self.message_manager.wait_for(
                         lambda m: any(m.fields.value.po.command == expected for expected in reply_expected), timeout=timeout*2)
                 else:
-                    return await self.message_manager.wait_for(lambda m: m.fields.value.po.command == reply_expected, timeout=timeout*2)
+                    reply = await self.message_manager.wait_for(lambda m: m.fields.value.po.command == reply_expected, timeout=timeout*2)
+
+                if reply is None:
+                    continue
+
+            return reply
 
         return None
 

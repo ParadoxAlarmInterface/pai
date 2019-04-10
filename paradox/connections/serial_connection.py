@@ -34,11 +34,9 @@ class SerialConnectionProtocol(asyncio.Protocol):
         self.read_queue = asyncio.Queue()
         self.on_port_open = on_port_open
         self.on_port_closed = on_port_closed
-        self.last_sent_message_time = 0
         self.loop = asyncio.get_event_loop()
 
     def connection_made(self, transport):
-        logger.info("Serial port Open")
         self.transport = transport
         self.on_port_open()
  
@@ -51,42 +49,34 @@ class SerialConnectionProtocol(asyncio.Protocol):
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("PC -> Serial {}".format(binascii.hexlify(message)))
         
-        # Panels seem to throttle messages
-        # Impose 100ms between commands. 
-        # Value needs to be tweaked, or removed
-        # TODO: Investigate this
-        now = time.time()
-        elapsed = now - self.last_sent_message_time
-        throttle = cfg.SERIAL_WRITE_THROTTLE / 1000
-        if throttle and elapsed < throttle:
-            asyncio.sleep(throttle - elapsed)
-   
         asyncio.run_coroutine_threadsafe(self._send_message(message), self.loop)
 
     async def read_message(self, timeout=5):
         return await asyncio.wait_for(self.read_queue.get(), timeout=timeout)
 
     def data_received(self, recv_data):
-        self.last_sent_message_time = 0 # Got a message reset timer
         self.buffer += recv_data
+    
         while len(self.buffer) >= MIN_MESSAGE_LEN:
-            if checksum(self.buffer):
-                if cfg.LOGGING_DUMP_PACKETS:
-                    logger.debug("Serial -> PC {}".format(binascii.hexlify(self.buffer)))
-               
-                # Observed that in MG/SP, spurious zeros may be introduced before messages 
-                # If first bytes are all 0, checksum will pass, but message will have abnormal size and structure. 
-                # Will not be parsed correctly
-                if len(self.buffer) > 37:
-                    self.buffer = self.buffer[len(self.buffer) - 37:]
-                    logger.warn("MG/SP Workaround: skipping bytes")
-
-                self.read_queue.put_nowait(self.buffer)
-                self.buffer = b''
+            logger.debug(len(self.buffer))
+            if self.buffer[0] >> 4 == 1 and checksum(self.buffer[:MIN_MESSAGE_LEN]):
+                frame = self.buffer[:MIN_MESSAGE_LEN]
             elif len(self.buffer) >= 37:
-                self.buffer = self.buffer[1:]
+                if checksum(self.buffer[:37]):
+                    frame = self.buffer[:37]
+                else:
+                    self.buffer = self.buffer[1:]
+                    continue
             else:
                 break
+
+            self.buffer = self.buffer[len(frame):] # Remove message
+
+            if cfg.LOGGING_DUMP_PACKETS:
+                logger.debug("Serial -> PC {}".format(binascii.hexlify(frame)))
+               
+            self.read_queue.put_nowait(frame)
+
         
     def connection_lost(self, exc):
         logger.error('The serial port was closed')
