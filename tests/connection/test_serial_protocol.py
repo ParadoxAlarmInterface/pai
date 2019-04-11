@@ -114,7 +114,7 @@ def test_error_message(mocker):
 def test_evo_eeprom_reading(mocker):
     cp = SerialConnectionProtocol(None, None)
 
-    payload = binascii.unhexlify('524700009f0041133e001e0e0400000000060a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000121510010705004e85')
+    payload = binascii.unhexlify('524700009f0041133e001e0e0400000000060a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000121510010705004e')
 
     mocker.patch.object(cp, 'read_queue')
 
@@ -122,10 +122,25 @@ def test_evo_eeprom_reading(mocker):
 
     cp.read_queue.put_nowait.assert_called_with(payload)
 
+def test_evo_eeprom_reading_in_chunks(mocker):
+    cp = SerialConnectionProtocol(None, None)
+
+    payload = binascii.unhexlify('524700009f0041133e001e0e0400000000060a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000121510010705004e')
+
+    mocker.patch.object(cp, 'read_queue')
+
+    chunk_length = 9
+    payloads = [payload[y - chunk_length:y] for y in range(chunk_length, len(payload) + chunk_length, chunk_length)]
+    for p in payloads:
+        # print(binascii.hexlify(p))
+        cp.data_received(p)
+
+    cp.read_queue.put_nowait.assert_called_with(payload)
+
 def test_evo_ram_reading(mocker):
     cp = SerialConnectionProtocol(None, None)
 
-    payload = binascii.unhexlify('524780000010040200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002fd2')
+    payload = binascii.unhexlify('524780000010040200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002f')
 
     mocker.patch.object(cp, 'read_queue')
 

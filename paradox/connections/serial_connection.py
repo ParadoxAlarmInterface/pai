@@ -12,9 +12,11 @@ from .connection import Connection, ConnectionProtocol
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
-MIN_MESSAGE_LEN = 6
+MIN_MESSAGE_LEN = 4
 
 last = 0
+
+
 def checksum(data):
     """Calculates the 8bit checksum of Paradox messages"""
     c = 0
@@ -27,6 +29,7 @@ def checksum(data):
 
     r = (c % 256) == data[-1]
     return r
+
 
 class SerialConnectionProtocol(ConnectionProtocol):
     def __init__(self, on_port_open, on_port_closed):
@@ -54,33 +57,44 @@ class SerialConnectionProtocol(ConnectionProtocol):
     async def read_message(self, timeout=5):
         return await asyncio.wait_for(self.read_queue.get(), timeout=timeout)
 
+    def on_frame(self, frame):
+        if cfg.LOGGING_DUMP_PACKETS:
+            logger.debug("Serial -> PC {}".format(binascii.hexlify(frame)))
+
+        self.read_queue.put_nowait(frame)
+
     def data_received(self, recv_data):
         self.buffer += recv_data
     
         while len(self.buffer) >= MIN_MESSAGE_LEN:
             logger.debug(len(self.buffer))
-            if self.buffer[0] >> 4 == 1 and checksum(self.buffer[:MIN_MESSAGE_LEN]):
-                # We have received EVO192 Successful connection response: 120600000018 (6 bytes)
-                frame = self.buffer[:MIN_MESSAGE_LEN]
-            elif len(self.buffer) >= 37:
-                if checksum(self.buffer[:37]):
-                    frame = self.buffer[:37]
+
+            potential_packet_length = self.buffer[1]
+            if len(self.buffer) >= potential_packet_length >= MIN_MESSAGE_LEN:
+                frame = self.buffer[:potential_packet_length]
+                if checksum(frame):
+                    self.buffer = self.buffer[len(frame):]  # Remove message
+                    self.on_frame(frame)
+                    continue  # In case buffer contains more than one frame
+
+            if len(self.buffer) >= 37:
+                frame = self.buffer[:37]
+                if checksum(frame):
+                    self.buffer = self.buffer[len(frame):]  # Remove message
+                    self.on_frame(frame)
+                    continue  # In case buffer contains more than one frame
+                elif 37 <= potential_packet_length <= 71:
+                    # EVO also has 524 byte message length. Starts from Cx
+                    break
                 else:
                     self.buffer = self.buffer[1:]
-                    continue
             else:
                 break
-
-            self.buffer = self.buffer[len(frame):] # Remove message
-
-            if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("Serial -> PC {}".format(binascii.hexlify(frame)))
-               
-            self.read_queue.put_nowait(frame)
 
     def connection_lost(self, exc):
         logger.error('The serial port was closed')
         super(SerialConnectionProtocol, self).connection_lost(exc)
+
 
 class SerialCommunication(Connection):
     def __init__(self, port, baud=9600, timeout=5):
