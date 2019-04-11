@@ -8,6 +8,7 @@ import asyncio
 import serial_asyncio
 
 from paradox.config import config as cfg
+from .connection import Connection, ConnectionProtocol
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -27,17 +28,16 @@ def checksum(data):
     r = (c % 256) == data[-1]
     return r
 
-class SerialConnectionProtocol(asyncio.Protocol):
+class SerialConnectionProtocol(ConnectionProtocol):
     def __init__(self, on_port_open, on_port_closed):
+        super(SerialConnectionProtocol, self).__init__()
         self.buffer = b''
-        self.transport = None
-        self.read_queue = asyncio.Queue()
         self.on_port_open = on_port_open
         self.on_port_closed = on_port_closed
         self.loop = asyncio.get_event_loop()
 
     def connection_made(self, transport):
-        self.transport = transport
+        super(SerialConnectionProtocol, self).connection_made(transport)
         self.on_port_open()
  
     async def _send_message(self, message):
@@ -78,34 +78,26 @@ class SerialConnectionProtocol(asyncio.Protocol):
                
             self.read_queue.put_nowait(frame)
 
-        
     def connection_lost(self, exc):
         logger.error('The serial port was closed')
-        self.read_queue = asyncio.Queue()
-        #self.on_port_closed()
+        super(SerialConnectionProtocol, self).connection_lost(exc)
 
-class SerialCommunication   :
+class SerialCommunication(Connection):
     def __init__(self, port, baud=9600, timeout=5):
-        self.connection = None
-        self.transport = None
-        self.default_timeout = timeout
-        self.connection_timestamp = 0
+        super(SerialCommunication, self).__init__(timeout=timeout)
         self.port_path = port
         self.baud = baud
-        self.connected = False
         self.connected_future = None
 
     def on_port_closed(self):
         logger.error('Connection to panel was lost')
         self.connected_future.set_result(False)
         self.connected = False
-        self.connection_timestamp = 0
 
     def on_port_open(self):
         logger.info('Serial port open')
         self.connected_future.set_result(True)
         self.connected = True
-        self.connection_timestamp = 0
 
     def open_timeout(self):
         if self.connected_future.done():
@@ -125,39 +117,9 @@ class SerialCommunication   :
         self.connected_future = loop.create_future()
         loop.call_later(5, self.open_timeout)
 
-        self.transport, self.connection = await serial_asyncio.create_serial_connection(loop,
+        _, self.connection = await serial_asyncio.create_serial_connection(loop,
                                         self.make_protocol, 
                                         self.port_path, 
                                         self.baud)
 
         return await self.connected_future
-
-    def write(self, data):
-        """Write data to serial port"""
-        if self.connected:
-            self.connection.send_message(data)
-        else:
-            raise ConnectionError("Not connected to serial port")
-        
-    async def read(self, timeout=None):
-        """Read data from the IP Port, if available, until the timeout is exceeded"""
-
-        if not timeout:
-            timeout = self.default_timeout
-
-        if self.connected:
-            result = await self.connection.read_message(timeout=timeout)
-        else:
-            raise ConnectionError("Not connected to serial port")
-        
-        return result
-
-    def timeout(self, timeout=5.0):
-        self.default_timeout = timeout
-
-    def close(self):
-        """Closes the serial port"""
-        if self.transport:
-            self.transport.close()
-            self.connected = False
-

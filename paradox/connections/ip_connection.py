@@ -13,23 +13,17 @@ from paradox.lib import stun
 from paradox.lib.crypto import encrypt, decrypt
 from paradox.parsers.paradox_ip_messages import *
 
+from .connection import Connection, ConnectionProtocol
+
 logger = logging.getLogger('PAI').getChild(__name__)
 
 
-class IPConnectionProtocol(asyncio.Protocol):
+class IPConnectionProtocol(ConnectionProtocol):
     def __init__(self, on_con_lost, key):
+        super(IPConnectionProtocol, self).__init__()
         self.buffer = b''
         self.key = key
-        self.transport = None
-        self.read_queue = asyncio.Queue()
         self.on_con_lost = on_con_lost
-
-    def connection_made(self, transport):
-        self.transport = transport
-
-    def close(self):
-        self.transport.close()
-        self.transport = None
 
     def send_raw(self, raw):
         if cfg.LOGGING_DUMP_PACKETS:
@@ -81,19 +75,15 @@ class IPConnectionProtocol(asyncio.Protocol):
         logger.debug("IP Connection inbound packet queue size: %d", self.read_queue.qsize())
 
     def connection_lost(self, exc):
-        logger.error('The server has closed the connection')
-        self.read_queue = asyncio.Queue()
+        super(IPConnectionProtocol, self).connection_lost(exc)
         self.on_con_lost()
 
 
-class IPConnection:
+class IPConnection(Connection):
     def __init__(self, host='127.0.0.1', port=10000, password=None, timeout=5.0):
-        self.connection = None
-        self.transport = None
-        self.default_timeout = timeout
+        super(IPConnection, self).__init__(timeout=timeout)
         self.password = password
         self.key = password
-        self.connected = False
         self.host = host
         self.port = port
         self.site_info = None
@@ -104,6 +94,9 @@ class IPConnection:
         logger.error('Connection to panel was lost')
         self.connected = False
         self.connection_timestamp = 0
+
+    def make_protocol(self):
+        return IPConnectionProtocol(self.on_connection_lost, self.key)
 
     async def connect(self):
         loop = asyncio.get_event_loop()
@@ -125,10 +118,8 @@ class IPConnection:
                 try:
                     logger.info("Connecting to IP module. Try %d/%d"% (tries, max_tries))
 
-                    _, self.connection = await loop.create_connection(
-                        lambda: IPConnectionProtocol(self.on_connection_lost, self.key), host=self.host,
-                        port=self.port)
-
+                    _, self.connection = await loop.create_connection(self.make_protocol,
+                                                                                   host=self.host, port=self.port)
                     if await self.connect_to_panel():
                         return True
                 except OSError as e:
@@ -212,9 +203,7 @@ class IPConnection:
                 logger.error(stun.get_error(stun_r))
                 return False
 
-            _, self.connection = await loop.create_connection(
-                lambda: IPConnectionProtocol(self.on_connection_lost, self.key),
-                sock=self.client1.sock)
+            _, self.connection = await loop.create_connection(self.make_protocol, sock=self.client1.sock)
             logger.info("Connected to Site: {}".format(cfg.IP_CONNECTION_SITEID))
         except Exception:
             logger.exception("Unable to negotiate connection to site")
@@ -299,13 +288,9 @@ class IPConnection:
         if not self.refresh_stun():
             raise ConnectionError('Failed to refresh STUN')
 
-        if self.connected:
-            self.connection.send_message(data)
-            return True
-        else:
-            raise ConnectionError('Failed to send message to IP module')
+        return super(IPConnection, self).write(data)
 
-    async def read(self, sz=37, timeout=None):
+    async def read(self, timeout=None):
         """Read data from the IP Port, if available, until the timeout is exceeded"""
 
         if not timeout:
@@ -319,15 +304,6 @@ class IPConnection:
             message, payload = result
             return payload
         return None
-
-    def timeout(self, timeout=5.0):
-        self.default_timeout = timeout
-
-    def close(self):
-        """Closes the socket"""
-        if self.connection:
-            self.connection.close()
-        self.connected = False
 
     @staticmethod
     def get_site_info(email, siteid):
