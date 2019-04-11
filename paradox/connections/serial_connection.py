@@ -69,13 +69,23 @@ class SerialConnectionProtocol(ConnectionProtocol):
         while len(self.buffer) >= MIN_MESSAGE_LEN:
             logger.debug(len(self.buffer))
 
-            potential_packet_length = self.buffer[1]
+            # Start of EVO message detection
+            first_nibble = self.buffer[0] >> 4
+            if first_nibble in [0x00, 0xF]:  # EVO does not have length field in these packets
+                potential_packet_length = 0
+            elif first_nibble == 0xC:
+                # TODO: EVO can have 524 byte messages. Starts from Cx. byte 2 and 3 is message length
+                potential_packet_length = 0
+            else:
+                potential_packet_length = self.buffer[1]
+
             if len(self.buffer) >= potential_packet_length >= MIN_MESSAGE_LEN:
                 frame = self.buffer[:potential_packet_length]
                 if checksum(frame):
                     self.buffer = self.buffer[len(frame):]  # Remove message
                     self.on_frame(frame)
                     continue  # In case buffer contains more than one frame
+            # End of EVO message detection
 
             if len(self.buffer) >= 37:
                 frame = self.buffer[:37]
@@ -84,7 +94,6 @@ class SerialConnectionProtocol(ConnectionProtocol):
                     self.on_frame(frame)
                     continue  # In case buffer contains more than one frame
                 elif 37 <= potential_packet_length <= 71:
-                    # EVO also has 524 byte message length. Starts from Cx
                     break
                 else:
                     self.buffer = self.buffer[1:]
