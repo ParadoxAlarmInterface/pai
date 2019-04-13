@@ -6,7 +6,7 @@ from pytest_mock import mocker
 
 from construct import Container
 
-from paradox.lib.async import AsyncMessageManager, MessageHandler, FutureMessageHandler
+from paradox.lib.async_message_manager import AsyncMessageManager, MessageHandler, FutureMessageHandler
 from paradox.hardware.evo.parsers import LiveEvent, ReadEEPROM, ReadEEPROMResponse
 
 class EventMessageHandler(MessageHandler):

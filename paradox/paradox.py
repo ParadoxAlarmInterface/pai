@@ -15,7 +15,7 @@ from paradox import event
 from enum import Enum
 
 from paradox.config import config as cfg
-from paradox.lib.async import AsyncMessageManager, EventMessageHandler, ErrorMessageHandler
+from paradox.lib.async_message_manager import AsyncMessageManager, EventMessageHandler, ErrorMessageHandler
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
