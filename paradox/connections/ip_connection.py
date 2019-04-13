@@ -110,7 +110,7 @@ class IPConnection(Connection):
                     r = await self.connect_to_site()
 
                     if r and self.site_info is not None:
-                        if await self.connect_to_panel():
+                        if await self.connect_to_module():
                             return True
                 except Exception:
                     logger.exception('Try %d/%d. Unable to connect to SITE ID' % (tries, max_tries))
@@ -120,7 +120,10 @@ class IPConnection(Connection):
 
                     _, self.connection = await loop.create_connection(self.make_protocol,
                                                                                    host=self.host, port=self.port)
-                    if await self.connect_to_panel():
+                    if cfg.IP_CONNECTION_BARE:
+                        return True
+
+                    if await self.connect_to_module():
                         return True
                 except OSError as e:
                     logger.error('Connect to IP Module failed (try %d/%d): %s' % (tries, max_tries, str(e)))
@@ -210,7 +213,7 @@ class IPConnection(Connection):
 
         return True
 
-    async def connect_to_panel(self):
+    async def connect_to_module(self):
         try:
             logger.debug("Authenticating with IP Module")
 

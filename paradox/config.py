@@ -31,6 +31,7 @@ class Config:
         "IP_CONNECTION_SITEID": (None, [str, type(None)]),            # If defined, connection will be made through this method.
         "IP_CONNECTION_EMAIL": (None, [str, type(None)]),             # Email registered in the site
         "IP_CONNECTION_PANEL_SERIAL": (None, [str, type(None)]),      # Serial number to be used in multi-panel sites. None for first
+        "IP_CONNECTION_BARE": False,                                  # IP endpoint connects directly to panel. Used for Serial Tunnels over TCP
         # Paradox
         "KEEP_ALIVE_INTERVAL": 10,        # Interval between status updates
 
