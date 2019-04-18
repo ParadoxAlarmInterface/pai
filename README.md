@@ -15,6 +15,10 @@ For further information and detailed usage refer to the [Wiki](https://github.co
 On Android, if you install [MQTT Dash](https://play.google.com/store/apps/details?id=net.routix.mqttdash), and [follow the instructions](https://github.com/jpbarraca/pai/wiki#mqtt-dash) you will automatically get a panel like this:
 ![mqtt_dash](https://user-images.githubusercontent.com/497717/52603920-d4984d80-2e60-11e9-9772-578b10576b3c.jpg)
 
+## Branch build statuses
+- [master](https://github.com/jpbarraca/pai/tree/master) [![Build Status Master](https://travis-ci.org/jpbarraca/pai.svg?branch=master)](https://travis-ci.org/jpbarraca/pai)
+- [dev](https://github.com/jpbarraca/pai/tree/dev) [![Build Status Dev](https://travis-ci.org/jpbarraca/pai.svg?branch=dev)](https://travis-ci.org/jpbarraca/pai)
+
 ## How to use
 
 ### Docker
