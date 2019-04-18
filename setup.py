@@ -1,23 +1,10 @@
+# coding: utf-8
+
 import sys
 import setuptools
 
-from setuptools.command.test import test as TestCommand
-
-class PyTest(TestCommand):
-    user_options = [("pytest-args=", "a", "Arguments to pass to pytest")]
-
-    def initialize_options(self):
-        TestCommand.initialize_options(self)
-        self.pytest_args = ""
-
-    def run_tests(self):
-        import shlex
-
-        # import here, cause outside the eggs aren't loaded
-        import pytest
-
-        errno = pytest.main(shlex.split(self.pytest_args))
-        sys.exit(errno)
+needs_pytest = {'pytest', 'test', 'ptr'}.intersection(sys.argv)
+pytest_runner = ['pytest-runner'] if needs_pytest else []
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
@@ -33,8 +20,10 @@ setuptools.setup(
     url="https://github.com/jpbarraca/pai",
     packages=['config', 'paradox'],
     install_requires=[],
+    setup_requires=[] + pytest_runner,
     tests_require=[
         'pytest',
+        'pytest-env',
         'pytest-mock',
         'mock'
     ],
@@ -42,6 +31,5 @@ setuptools.setup(
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: EPL License",
         "Operating System :: OS Independent",
-    ],
-    cmdclass={"pytest": PyTest},
+    ]
 )

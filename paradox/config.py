@@ -162,13 +162,18 @@ class Config:
     def load(alt_locations=None):
         Config.CONFIG_LOADED = False
 
+        env_config_path = os.environ.get('PAI_CONFIG_FILE')
+
         if alt_locations is not None:
             locations = alt_locations
+        elif env_config_path:
+            locations = [env_config_path]
         else:
             locations = ['/etc/pai/pai.conf',
                          '/usr/local/etc/pai/pai.conf',
                          '~/.local/etc/pai.conf',
-                         'pai.conf']
+                         'pai.conf'
+                         ]
 
         for location in locations:
             location = os.path.expanduser(location)
