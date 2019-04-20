@@ -135,7 +135,7 @@ class Paradox:
 
             if reply:
                 logger.info("Found Panel {} version {}.{} build {}".format(
-                    (reply.fields.value.label.strip(b'\0 ').decode('utf-8')),
+                    (reply.fields.value.label.strip(b'\0 ').decode(cfg.LABEL_ENCODING)),
                     reply.fields.value.application.version,
                     reply.fields.value.application.revision,
                     reply.fields.value.application.build))

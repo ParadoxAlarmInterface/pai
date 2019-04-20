@@ -177,13 +177,18 @@ class Panel:
 
             key = b_label \
                 .replace(b'\0', b'_') \
-                .replace(b' ', b'_') \
-                .replace(b' ', b'_') \
-                .decode('utf-8')
+                .replace(b' ', b'_')
 
-            label = b_label \
-                .replace(b'\0', b' ') \
-                .decode('utf-8')
+            label = b_label.replace(b'\0', b' ')
+
+            try:
+                key = key.decode(cfg.LABEL_ENCODING)
+                label = label.decode(cfg.LABEL_ENCODING)
+            except UnicodeDecodeError:
+                logger.warn('Unable to properly decode label {} using the {} encoding.\n \
+                    Specify a different encoding using the LABEL_ENCODING configuration option.'.format(b_label, cfg.LABEL_ENCODING))
+                key = key.decode('utf-8', errors='ignore')
+                label = label.decode('utf-8', errors='ignore')
 
             properties = template.copy()
             properties['id'] = index

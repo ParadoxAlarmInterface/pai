@@ -37,6 +37,7 @@ class Config:
 
         "LIMITS": {},  # By default all zones will be monitored
 
+        "LABEL_ENCODING": "utf-8",											  # Encoding to use when decoding labels. See https://docs.python.org/3/library/codecs.html#standard-encodings
         "LABEL_REFRESH_INTERVAL": (15 * 60, int, (0, 0xFFFFFFFF)),            # Interval between refresh of labels
         "OUTPUT_PULSE_DURATION": (1, int, (1, 60)),                           # Duration of a PGM pulse in seconds
         "PARTITIONS_CHANGE_NOTIFICATION_IGNORE": ['arm_full', 'exit_delay'],  # Do not send notifications for these changes
