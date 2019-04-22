@@ -10,6 +10,7 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 re_magick_placeholder = re.compile('@(?P<type>[a-z]+)(:?#(?P<source>[a-z0-9_]+))?')
 
+from paradox.config import config as cfg
 
 class Formatter(string.Formatter):
 
