@@ -209,6 +209,11 @@ class Config:
                 else:
                     default_type = [type(default)]
 
+                if float in default_type and not int in default_type:
+                    default_type.append(int)
+                if int in default_type and not float in default_type:
+                    default_type.append(float)
+
                 if type(v) in default_type:
                     setattr(Config, k, v)
                 else:
