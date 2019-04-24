@@ -67,8 +67,6 @@ class SerialConnectionProtocol(ConnectionProtocol):
         self.buffer += recv_data
     
         while len(self.buffer) >= MIN_MESSAGE_LEN:
-            logger.debug(len(self.buffer))
-
             # Start of EVO message detection
             first_nibble = self.buffer[0] >> 4
             if first_nibble in [0x00, 0xF]:  # EVO does not have length field in these packets
