@@ -235,10 +235,10 @@ class Panel(PanelBase):
             if command == 'pulse':
                 args = dict(action=PGM_ACTIONS['on'], argument=(output - 1))
                 reply = await self.core.send_wait(PerformAction, args, reply_expected=0x04)
-                if reply is not None:
-                    accepted = True
+                if reply is None:
+                    continue
 
-                await asyncio.sleep(1)
+                await asyncio.sleep(cfg.OUTPUT_PULSE_DURATION)
                 args = dict(action=PGM_ACTIONS['off'], argument=(output - 1))
                 reply = await self.core.send_wait(PerformAction, args, reply_expected=0x04)
                 if reply is not None:

@@ -39,7 +39,7 @@ class Config:
 
         "LABEL_ENCODING": "utf-8",											  # Encoding to use when decoding labels. See https://docs.python.org/3/library/codecs.html#standard-encodings
         "LABEL_REFRESH_INTERVAL": (15 * 60, int, (0, 0xFFFFFFFF)),            # Interval between refresh of labels
-        "OUTPUT_PULSE_DURATION": (1, int, (1, 60)),                           # Duration of a PGM pulse in seconds
+        "OUTPUT_PULSE_DURATION": (1, float, (0, 0xFFFFFFFF)),                 # Duration of a PGM pulse in seconds
         "PARTITIONS_CHANGE_NOTIFICATION_IGNORE": ['arm_full', 'exit_delay'],  # Do not send notifications for these changes
         "STATUS_REQUESTS": [0, 1, 2, 3, 4, 5],
         "SYNC_TIME": True,                                       # Update panel time
