@@ -107,8 +107,11 @@ class IPInterface(Interface):
                         self.logger.warn("Client connection denied")
 
                 else:
-                    logging.info("Receiving data")
-                    data = r.recv(1024)
+                    try:
+                        data = r.recv(1024)
+                    except:
+                        data = ''
+
                     if len(data) == 0:
                         self.handle_disconnect()
                         s_list = [server_socket]
@@ -131,7 +134,7 @@ class IPInterface(Interface):
     async def connection_watch(self):
         while self.client_socket is None:
             tstart = time.time()
-            payload = await self.alarm.send_wait()
+            payload = await self.alarm.send_wait_simple()
             tend = time.time()
             payload_len = len(payload)
             if payload is not None:
@@ -139,23 +142,25 @@ class IPInterface(Interface):
                 flags = 0x73
 
                 m = ip_message.build(dict(header=dict(length=payload_len, unknown0=2, flags=flags, command=0), payload=payload))
-                self.logger.debug("IP -> AP: {}".format(binascii.hexlify(m)))
+                if cfg.LOGGING_DUMP_PACKETS:
+                    self.logger.debug("IP -> AP: {}".format(binascii.hexlify(m)))
                 self.client_socket.send(m)
 
-            if tend - tstart < 0.1:
-                time.sleep(0.1)
 
     def process_client_message(self, client, data):
         encrypt_key = self.key
         message = ip_message.parse(data)
         in_payload = message.payload
-        self.logger.debug("AP -> IP: {}".format(binascii.hexlify(data)))
+        if cfg.LOGGING_DUMP_PACKETS:
+            self.logger.debug("AP -> IP: {}".format(binascii.hexlify(data)))
+        
         if len(in_payload) >= 16  and message.header.flags & 0x01 != 0 and len(in_payload) % 16 == 0:
             in_payload = decrypt(in_payload, encrypt_key)[:message.header.length]
 
         in_payload = in_payload[:message.header.length]
         assert len(in_payload) == message.header.length, 'Message payload length does not match with length in header'
-        self.logger.debug("AP -> IP unencrypted payload: {}".format(binascii.hexlify(in_payload)))
+        if cfg.LOGGING_DUMP_PACKETS:
+            self.logger.debug("AP -> IP unencrypted payload: {}".format(binascii.hexlify(in_payload)))
 
 
         force_plain_text = False
@@ -186,7 +191,7 @@ class IPInterface(Interface):
             response_code = 0x02
             flags = 0x73
             try:
-                out_payload = self.alarm.send_wait_simple(message=in_payload)  # this probably needs to run multiple times, as we may have multiple replies pending from the panel
+                out_payload = self.alarm.send_wait_simple(message=in_payload, timeout=0.2)  # this probably needs to run multiple times, as we may have multiple replies pending from the panel
             except Exception:
                 self.logger.exception("Send to panel")
                 return
@@ -200,13 +205,17 @@ class IPInterface(Interface):
             if message.header.flags & 0x08 != 0:
                 out_payload = out_payload.ljust((payload_length // 16) * 16, bytes([0xee]))
 
-            self.logger.debug("IP -> AP unencrypted payload: {}".format(binascii.hexlify(out_payload)))
+            if cfg.LOGGING_DUMP_PACKETS:
+                self.logger.debug("IP -> AP unencrypted payload: {}".format(binascii.hexlify(out_payload)))
 
             if message.header.flags & 0x01 != 0 and not force_plain_text:
                 out_payload = encrypt(out_payload, encrypt_key)
 
             m = ip_message.build(dict(header=dict(length=payload_length, unknown0=response_code, flags=flags, command=message.header.command), payload=out_payload))
-            self.logger.debug("IP -> AP: {}".format(binascii.hexlify(m)))
+            
+            if cfg.LOGGING_DUMP_PACKETS:
+                self.logger.debug("IP -> AP: {}".format(binascii.hexlify(m)))
+            
             client.send(m)
 
     # def event(self, raw):

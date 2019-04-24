@@ -255,6 +255,7 @@ class Paradox:
     async def receive(self, timeout=5.0):
         # TODO: Get rid of receive worker
         # with serial_lock:
+        
         data = self.connection.read(timeout=timeout)
         if isinstance(data, Awaitable):
             try:
@@ -276,7 +277,7 @@ class Paradox:
             if recv_message is None:
                 logger.debug("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in data)))
                 return None
-
+            
             self.message_manager.schedule_message_handling(recv_message)  # schedule handling in the loop
         except Exception:
             logging.exception("Error parsing message")
@@ -294,8 +295,9 @@ class Paradox:
 
             if not wait:
                 return None
-
+            
             data = self.connection.read(timeout=timeout)
+            
             if isinstance(data, Awaitable):
                 future = asyncio.run_coroutine_threadsafe(data, self.work_loop)
                 try:
@@ -572,6 +574,7 @@ class Paradox:
             logger.error("Got ERROR Message: {}".format(message))
 
     def disconnect(self):
+        logger.info("Disconnecting from the Alarm Panel")
         self.run = STATE_STOP
         self.loop_wait = False
         if self.receive_worker_task:
@@ -583,23 +586,30 @@ class Paradox:
             logger.info("Disconnected from the Alarm Panel")
 
     def pause(self):
+        logger.info("Pausing PAI")
         asyncio.run_coroutine_threadsafe(self.pause_async(), self.work_loop)
 
     async def pause_async(self):
+        logger.info("Pausing PAI Async")
         if self.run == STATE_RUN:
-            logger.info("Disconnecting from the Alarm Panel")
+            logger.info("Pausing from the Alarm Panel")
             self.run = STATE_PAUSE
             self.loop_wait = False
             await self.send_wait(self.panel.get_message('CloseConnection'), None, reply_expected=0x07)
+            if self.receive_worker_task:
+                self.receive_worker_task.cancel()
 
     def resume(self):
+        logger.info("Resuming PAI")
         asyncio.run_coroutine_threadsafe(self.resume_async(), self.work_loop)
 
     async def resume_async(self):
+        logger.info("Resuming PAI Async")
         if self.run == STATE_PAUSE:
             await self.connect_async()
 
     def clean_session(self):
+        logger.info("Clean Session")
         if self.connection.connected:
             if not self.panel:
                 panel = create_panel(self)
