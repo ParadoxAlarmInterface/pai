@@ -18,34 +18,36 @@ import signal
 
 from paradox.config import config as cfg
 
-FORMAT = '%(asctime)s - %(levelname)-8s - %(name)s - %(message)s'
-
-logger = logging.getLogger('PAI')
-logger_level = cfg.LOGGING_LEVEL_CONSOLE
-
-if cfg.LOGGING_FILE is not None:
-    logfile_handler = RotatingFileHandler(cfg.LOGGING_FILE, mode='a',
-                        maxBytes=cfg.LOGGING_FILE_MAX_SIZE*1024*1024, 
-                        backupCount=cfg.LOGGING_FILE_MAX_FILES,
-                        encoding=None, delay=0)
-
-    logfile_handler.setLevel(cfg.LOGGING_LEVEL_FILE)
-    logfile_handler.setFormatter(logging.Formatter(FORMAT))
-    logger.addHandler(logfile_handler)
-    logger_level = min(logger_level, cfg.LOGGING_LEVEL_FILE)
-
-logconsole_handler = logging.StreamHandler()
-logconsole_handler.setLevel(cfg.LOGGING_LEVEL_CONSOLE)
-logconsole_handler.setFormatter(logging.Formatter(FORMAT))
-logger.addHandler(logconsole_handler)
-
-logger.setLevel(logger_level)
 
 from paradox.paradox import Paradox
 from paradox.interfaces.interface_manager import InterfaceManager
 
 alarm = None
 interface_manager = None
+
+logger = logging.getLogger('PAI')
+FORMAT = '%(asctime)s - %(levelname)-8s - %(name)s - %(message)s'
+
+def config_logger(logger):
+    logger_level = cfg.LOGGING_LEVEL_CONSOLE
+
+    if cfg.LOGGING_FILE is not None:
+        logfile_handler = RotatingFileHandler(cfg.LOGGING_FILE, mode='a',
+                            maxBytes=cfg.LOGGING_FILE_MAX_SIZE*1024*1024, 
+                            backupCount=cfg.LOGGING_FILE_MAX_FILES,
+                            encoding=None, delay=0)
+
+        logfile_handler.setLevel(cfg.LOGGING_LEVEL_FILE)
+        logfile_handler.setFormatter(logging.Formatter(FORMAT))
+        logger.addHandler(logfile_handler)
+        logger_level = min(logger_level, cfg.LOGGING_LEVEL_FILE)
+
+    logconsole_handler = logging.StreamHandler()
+    logconsole_handler.setLevel(cfg.LOGGING_LEVEL_CONSOLE)
+    logconsole_handler.setFormatter(logging.Formatter(FORMAT))
+    logger.addHandler(logconsole_handler)
+
+    logger.setLevel(logger_level)
 
 def exit_handler(signal=None, frame=None):
     global alarm, interface_manager
@@ -64,8 +66,18 @@ def exit_handler(signal=None, frame=None):
     sys.exit(0)
 
 
-def main():
+def main(args):
     global alarm, interface_manager
+    
+    if 'config' in args and args.config is not None:
+        import os
+        config_file = os.path.abspath(args.config)
+        cfg.load(config_file)
+    else:
+        cfg.load()
+
+    config_logger(logger)
+
     logger.info("Starting Paradox Alarm Interface")
     logger.info("Console Log level set to {}".format(cfg.LOGGING_LEVEL_CONSOLE))
 

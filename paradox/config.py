@@ -156,8 +156,6 @@ class Config:
     def __init__(self):
         if Config.CONFIG_LOADED:
             return
-        self.load()
-
 
     @staticmethod
     def load(alt_locations=None):
@@ -166,7 +164,7 @@ class Config:
         env_config_path = os.environ.get('PAI_CONFIG_FILE')
 
         if alt_locations is not None:
-            locations = alt_locations
+            locations = [alt_locations]
         elif env_config_path:
             locations = [env_config_path]
         else:
