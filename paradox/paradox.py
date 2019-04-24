@@ -266,9 +266,6 @@ class Paradox:
         if data is None or len(data) == 0:
             return None
 
-        if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("PC <- A {}".format(binascii.hexlify(data)))
-
         try:
             recv_message = self.panel.parse_message(data, direction='frompanel')
 
@@ -290,10 +287,6 @@ class Paradox:
         if not self.connection.connected:
             raise ConnectionError('Not connected')
 
-        if message is not None:
-            if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("PC -> A {}".format(binascii.hexlify(message)))
-
         with serial_lock:
             if message is not None:
                 self.connection.timeout(timeout)
@@ -309,9 +302,6 @@ class Paradox:
                     data = future.result(5)
                 except asyncio.TimeoutError:
                     data = None
-
-        if data is not None and cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("PC <- A {}".format(binascii.hexlify(data)))
 
         return data
 
@@ -332,9 +322,6 @@ class Paradox:
 
         while retries >= 0:
             retries -= 1
-
-            if message is not None and cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("PC -> A {}".format(binascii.hexlify(message)))
 
             with serial_lock:
                 if message is not None:
