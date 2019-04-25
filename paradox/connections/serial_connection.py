@@ -44,14 +44,14 @@ class SerialConnectionProtocol(ConnectionProtocol):
         self.on_port_open()
  
     async def _send_message(self, message):
+
+        if cfg.LOGGING_DUMP_PACKETS:
+            logger.debug("PAI->SER {}".format(binascii.hexlify(message)))
+
         await self.transport.write(message)
         self.last_sent_message_time = time.time()
 
     def send_message(self, message):
-        
-        if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("PC -> Serial {}".format(binascii.hexlify(message)))
-        
         asyncio.run_coroutine_threadsafe(self._send_message(message), self.loop)
 
     async def read_message(self, timeout=5):
@@ -59,7 +59,7 @@ class SerialConnectionProtocol(ConnectionProtocol):
 
     def on_frame(self, frame):
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("Serial -> PC {}".format(binascii.hexlify(frame)))
+            logger.debug("PAI<-SER {}".format(binascii.hexlify(frame)))
 
         self.read_queue.put_nowait(frame)
 
