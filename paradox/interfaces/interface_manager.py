@@ -84,7 +84,7 @@ class InterfaceManager:
         try:
             interface.set_notify(self)
         except Exception:
-            logger("Error registering interface {}".format(interface.name))
+            logger.exception("Error registering interface {}".format(interface.name))
 
     def event(self, raw):
         for interface in self.interfaces:

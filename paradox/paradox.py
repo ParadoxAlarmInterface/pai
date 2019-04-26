@@ -159,6 +159,8 @@ class Paradox:
                 raise ConnectionError("Failed to initialize communication")
 
             # Now we need to start async message reading worker
+            self.run = STATE_RUN
+
             self.receive_worker_task = self.work_loop.create_task(self.receive_worker())
 
             if cfg.SYNC_TIME:
@@ -176,7 +178,6 @@ class Paradox:
 
             await self.panel.update_labels()
 
-            self.run = STATE_RUN
 
             logger.info("Connection OK")
             self.loop_wait = False
@@ -241,16 +242,20 @@ class Paradox:
                 await asyncio.sleep(min(time.time() - tstart, 1))
 
     async def receive_worker(self):
+        logger.debug("Receive worker started")
         async_supported = asyncio.iscoroutinefunction(self.connection.read)
         try:
             while True:
+                logger.debug("Receive worker loop")
                 if async_supported:
                     await self.receive()
                 else:
                     await self.receive()
                     await asyncio.sleep(0.1)  # we need this until we use fully async receive. This lets other loop events to continue their work
         except asyncio.CancelledError:
-            pass
+            logger.debug("Receive worker canceled")
+
+        logger.debug("Receive worker stopped")
 
     async def receive(self, timeout=5.0):
         # TODO: Get rid of receive worker
@@ -267,6 +272,9 @@ class Paradox:
         if data is None or len(data) == 0:
             return None
 
+        self.message_manager.schedule_raw_message_handling(data)
+
+
         try:
             recv_message = self.panel.parse_message(data, direction='frompanel')
 
@@ -277,8 +285,9 @@ class Paradox:
             if recv_message is None:
                 logger.debug("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in data)))
                 return None
-            
-            self.message_manager.schedule_message_handling(recv_message)  # schedule handling in the loop
+
+            if self.run != STATE_PAUSE:
+                self.message_manager.schedule_message_handling(recv_message)  # schedule handling in the loop
         except Exception:
             logging.exception("Error parsing message")
             return None
@@ -577,8 +586,6 @@ class Paradox:
         logger.info("Disconnecting from the Alarm Panel")
         self.run = STATE_STOP
         self.loop_wait = False
-        if self.receive_worker_task:
-            self.receive_worker_task.cancel()
 
         self.clean_session()
         if self.connection.connected:
@@ -595,9 +602,8 @@ class Paradox:
             logger.info("Pausing from the Alarm Panel")
             self.run = STATE_PAUSE
             self.loop_wait = False
-            await self.send_wait(self.panel.get_message('CloseConnection'), None, reply_expected=0x07)
-            if self.receive_worker_task:
-                self.receive_worker_task.cancel()
+            await self.send_wait(self.panel.get_message('CloseConnection'), None)
+
 
     def resume(self):
         logger.info("Resuming PAI")
