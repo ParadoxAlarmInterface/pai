@@ -53,7 +53,7 @@ class IPConnectionProtocol(ConnectionProtocol):
             message_payload = message.payload[:message.header.length]
 
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("PAI<-IPC {}".format(binascii.hexlify(self.buffer)))
+            logger.debug("PAI<-IPC {}".format(binascii.hexlify(message_payload)))
 
         return message, message_payload
 
