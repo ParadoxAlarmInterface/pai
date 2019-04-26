@@ -70,8 +70,9 @@ class IPInterface():
 
     def stop(self):
         logger.info("Stopping IP Interface")
-        self.server.cancel()
-        self.server = None
+        if self.server is not None:
+            self.server.cancel()
+            self.server = None
         self.started = False
 
     def start(self):
