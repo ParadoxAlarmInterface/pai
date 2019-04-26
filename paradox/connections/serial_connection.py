@@ -49,7 +49,6 @@ class SerialConnectionProtocol(ConnectionProtocol):
             logger.debug("PAI->SER {}".format(binascii.hexlify(message)))
 
         await self.transport.write(message)
-        self.last_sent_message_time = time.time()
 
     def send_message(self, message):
         asyncio.run_coroutine_threadsafe(self._send_message(message), self.loop)
@@ -65,8 +64,10 @@ class SerialConnectionProtocol(ConnectionProtocol):
 
     def data_received(self, recv_data):
         self.buffer += recv_data
-    
+        logger.debug("Buffer:  {}".format(binascii.hexlify(self.buffer)))
+
         while len(self.buffer) >= MIN_MESSAGE_LEN:
+
             # Start of EVO message detection
             first_nibble = self.buffer[0] >> 4
             if first_nibble in [0x00, 0xF]:  # EVO does not have length field in these packets
@@ -85,6 +86,7 @@ class SerialConnectionProtocol(ConnectionProtocol):
                     continue  # In case buffer contains more than one frame
             # End of EVO message detection
 
+
             if len(self.buffer) >= 37:
                 frame = self.buffer[:37]
                 if checksum(frame):
@@ -100,6 +102,7 @@ class SerialConnectionProtocol(ConnectionProtocol):
 
     def connection_lost(self, exc):
         logger.error('The serial port was closed')
+        self.buffer = b''
         super(SerialConnectionProtocol, self).connection_lost(exc)
 
 
