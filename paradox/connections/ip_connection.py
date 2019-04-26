@@ -27,18 +27,18 @@ class IPConnectionProtocol(ConnectionProtocol):
 
     def send_raw(self, raw):
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("PAI->Mod {}".format(binascii.hexlify(raw)))
+            logger.debug("PAI -> Mod {}".format(binascii.hexlify(raw)))
         self.transport.write(raw)
 
     def send_message(self, message):
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("PAI->IPC {}".format(binascii.hexlify(message)))
+            logger.debug("PAI -> IPC {}".format(binascii.hexlify(message)))
 
         payload = encrypt(message, self.key)
         msg = ip_message.build(
             dict(header=dict(length=len(message), unknown0=0x04, flags=0x09, command=0x00, encrypt=1), payload=payload))
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("IPC->Mod {}".format(binascii.hexlify(msg)))
+            logger.debug("IPC -> Mod {}".format(binascii.hexlify(msg)))
         self.transport.write(msg)
 
     async def read_message(self, timeout=5):
@@ -53,7 +53,7 @@ class IPConnectionProtocol(ConnectionProtocol):
             message_payload = message.payload[:message.header.length]
 
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("PAI<-IPC {}".format(binascii.hexlify(message_payload)))
+            logger.debug("IPC -> PAI {}".format(binascii.hexlify(message_payload)))
 
         return message, message_payload
 
@@ -73,7 +73,7 @@ class IPConnectionProtocol(ConnectionProtocol):
             return
 
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("IPC<-Mod {}".format(binascii.hexlify(self.buffer)))
+            logger.debug("Mod -> IPC {}".format(binascii.hexlify(self.buffer)))
 
         self.read_queue.put_nowait(self._get_message_payload(self.buffer))
         self.buffer = b''

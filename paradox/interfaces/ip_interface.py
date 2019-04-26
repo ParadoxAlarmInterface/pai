@@ -110,7 +110,7 @@ class IPInterface():
 
         if data is not None:
             if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("PNL->IPI {}".format(binascii.hexlify(data)))
+                logger.debug("PNL -> IPI {}".format(binascii.hexlify(data)))
 
             payload_len = len(data)
 
@@ -121,7 +121,7 @@ class IPInterface():
                 dict(header=dict(length=payload_len, unknown0=2, flags=flags, command=0), payload=payload))
 
             if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("IPI->APP {}".format(binascii.hexlify(m)))
+                logger.debug("IPI -> APP {}".format(binascii.hexlify(m)))
 
             self.client_writer.write(m)
         return False # Block further message processing
@@ -158,7 +158,7 @@ class IPInterface():
                 continue
 
             if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("IPI<-APP {}".format(binascii.hexlify(data)))
+                logger.debug("APP -> IPI {}".format(binascii.hexlify(data)))
 
             message = ip_message.parse(data)
             in_payload = message.payload
@@ -170,7 +170,7 @@ class IPInterface():
 
             assert len(in_payload) == message.header.length, 'Message payload length does not match with length in header'
             if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("IPI<-APP {}".format(binascii.hexlify(in_payload)))
+                logger.debug("IPI -> IPI {}".format(binascii.hexlify(in_payload)))
 
             force_plain_text = False
             response_code = 0x01
@@ -217,7 +217,7 @@ class IPInterface():
                     out_payload = out_payload.ljust((payload_length // 16) * 16, bytes([0xee]))
 
                 if cfg.LOGGING_DUMP_PACKETS:
-                    logger.debug("IPI->APP {}".format(binascii.hexlify(out_payload)))
+                    logger.debug("IPI -> IPI {}".format(binascii.hexlify(out_payload)))
 
                 if message.header.flags & 0x01 != 0 and not force_plain_text:
                     out_payload = encrypt(out_payload, self.connection_key)
@@ -225,7 +225,7 @@ class IPInterface():
                 m = ip_message.build(dict(header=dict(length=payload_length, unknown0=response_code, flags=flags, command=message.header.command), payload=out_payload))
 
                 if cfg.LOGGING_DUMP_PACKETS:
-                    logger.debug("IPI->PNL {}".format(binascii.hexlify(m)))
+                    logger.debug("IPI -> APP {}".format(binascii.hexlify(m)))
 
                 writer.write(m)
                 await writer.drain()

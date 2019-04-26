@@ -46,7 +46,7 @@ class SerialConnectionProtocol(ConnectionProtocol):
     async def _send_message(self, message):
 
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("PAI->SER {}".format(binascii.hexlify(message)))
+            logger.debug("PAI -> SER {}".format(binascii.hexlify(message)))
 
         await self.transport.write(message)
 
@@ -58,7 +58,7 @@ class SerialConnectionProtocol(ConnectionProtocol):
 
     def on_frame(self, frame):
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("PAI<-SER {}".format(binascii.hexlify(frame)))
+            logger.debug("SER -> PAI {}".format(binascii.hexlify(frame)))
 
         self.read_queue.put_nowait(frame)
 
