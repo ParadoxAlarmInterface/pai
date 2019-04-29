@@ -54,9 +54,11 @@ class SerialConnectionProtocol(ConnectionProtocol):
         asyncio.run_coroutine_threadsafe(self._send_message(message), self.loop)
 
     async def read_message(self, timeout=5):
+        logger.debug("read_message")
         return await asyncio.wait_for(self.read_queue.get(), timeout=timeout)
 
     def on_frame(self, frame):
+        logger.debug("on_frame")
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("SER -> PAI {}".format(binascii.hexlify(frame)))
 
@@ -64,41 +66,41 @@ class SerialConnectionProtocol(ConnectionProtocol):
 
     def data_received(self, recv_data):
         self.buffer += recv_data
-        logger.debug("Buffer:  {}".format(binascii.hexlify(self.buffer)))
+        if cfg.LOGGING_DUMP_PACKETS:
+            logger.debug("Recv: {}".format(binascii.hexlify(recv_data)))
+            logger.debug("Buffer:  {}".format(binascii.hexlify(self.buffer)))
 
         while len(self.buffer) >= MIN_MESSAGE_LEN:
-
-            # Start of EVO message detection
-            first_nibble = self.buffer[0] >> 4
-            if first_nibble in [0x00, 0xF]:  # EVO does not have length field in these packets
-                potential_packet_length = 0
-            elif first_nibble == 0xC:
-                # TODO: EVO can have 524 byte messages. Starts from Cx. byte 2 and 3 is message length
-                potential_packet_length = 0
-            else:
+            if self.buffer[0] >> 4 == 0:
+                potential_packet_length = 37
+            elif self.buffer[0] >> 4 in [1, 3, 4, 5, 6, 7, 8, 9]:
+                potential_packet_length = self.buffer[1] if self.buffer[1] > 0 and self.buffer[1] <= 71  else 37
+            elif self.buffer[0] >> 4 in [0x0A, 0x0B, 0x0D]:
                 potential_packet_length = self.buffer[1]
-
-            if len(self.buffer) >= potential_packet_length >= MIN_MESSAGE_LEN:
-                frame = self.buffer[:potential_packet_length]
-                if checksum(frame):
-                    self.buffer = self.buffer[len(frame):]  # Remove message
-                    self.on_frame(frame)
-                    continue  # In case buffer contains more than one frame
-            # End of EVO message detection
-
-
-            if len(self.buffer) >= 37:
-                frame = self.buffer[:37]
-                if checksum(frame):
-                    self.buffer = self.buffer[len(frame):]  # Remove message
-                    self.on_frame(frame)
-                    continue  # In case buffer contains more than one frame
-                elif 37 <= potential_packet_length <= 71:
-                    break
+            elif self.buffer[0] >> 4 == 0x0C:
+                potential_packet_length = self.buffer[1] * 256 + self.buffer[2]
+            elif self.buffer[0] >> 4 == 0x0E:
+                if self.buffer[1] in [0x14, 0x00, 0xFF]: # MG/SP in 21st century and EVO Live Events
+                    potential_packet_length = 37
                 else:
-                    self.buffer = self.buffer[1:]
+                    potential_packet_length = self.buffer[1]
             else:
+                potential_packet_length = 37
+            
+            logger.debug("Potential Length: {}".format(potential_packet_length))
+
+            if len(self.buffer) < potential_packet_length:
                 break
+
+            frame = self.buffer[:potential_packet_length]
+
+            if checksum(frame):
+                logger.debug("Have valid frame")
+                self.buffer = self.buffer[len(frame):]  # Remove message
+                self.on_frame(frame)
+            else:
+                logger.debug("searching")
+                self.buffer = self.buffer[1:]
 
     def connection_lost(self, exc):
         logger.error('The serial port was closed')
