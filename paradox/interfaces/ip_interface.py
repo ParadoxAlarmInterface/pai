@@ -93,6 +93,9 @@ class IPInterface():
     def event(self, event):
         pass
 
+    def notify(self, source, message, level):
+        pass
+
     def change(self, element, label, panel_property, value):
         """ Enqueues a change """
 
