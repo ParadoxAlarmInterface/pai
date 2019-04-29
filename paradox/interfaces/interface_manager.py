@@ -1,8 +1,6 @@
 
 import logging
 
-FORMAT = '%(asctime)s - %(levelname)-8s - %(name)s - %(message)s'
-
 logger = logging.getLogger('PAI').getChild(__name__)
 
 
