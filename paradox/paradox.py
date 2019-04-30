@@ -592,12 +592,8 @@ class Paradox:
             self.connection.close()
             logger.info("Disconnected from the Alarm Panel")
 
-    def pause(self):
+    async def pause(self):
         logger.info("Pausing PAI")
-        asyncio.run_coroutine_threadsafe(self.pause_async(), self.work_loop)
-
-    async def pause_async(self):
-        logger.info("Pausing PAI Async")
         if self.run == STATE_RUN:
             logger.info("Pausing from the Alarm Panel")
             self.run = STATE_PAUSE
@@ -605,12 +601,8 @@ class Paradox:
             await self.send_wait(self.panel.get_message('CloseConnection'), None)
 
 
-    def resume(self):
+    async def resume(self):
         logger.info("Resuming PAI")
-        asyncio.run_coroutine_threadsafe(self.resume_async(), self.work_loop)
-
-    async def resume_async(self):
-        logger.info("Resuming PAI Async")
         if self.run == STATE_PAUSE:
             await self.connect_async()
 

@@ -67,7 +67,7 @@ class ClientConnection():
 
         if data is not None:
             if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("PNL -> IPI {}".format(binascii.hexlify(data)))
+                logger.debug("PNL -> IPI (payload) {}".format(binascii.hexlify(data)))
 
             payload_len = len(data)
 
@@ -78,7 +78,7 @@ class ClientConnection():
                 dict(header=dict(length=payload_len, unknown0=2, flags=flags, command=0), payload=payload))
 
             if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("IPI -> APP {}".format(binascii.hexlify(m)))
+                logger.debug("IPI -> APP (raw) {}".format(binascii.hexlify(m)))
 
             self.client_writer.write(m)
 
@@ -98,7 +98,7 @@ class ClientConnection():
                 continue
 
             if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("APP -> IPI {}".format(binascii.hexlify(data)))
+                logger.debug("APP -> IPI (raw) {}".format(binascii.hexlify(data)))
 
             message = ip_message.parse(data)
             in_payload = message.payload
@@ -111,7 +111,7 @@ class ClientConnection():
             assert len(in_payload) == message.header.length, "Message payload length does not match with length in " \
                                                              "header "
             if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("IPI -> IPI {}".format(binascii.hexlify(in_payload)))
+                logger.debug("APP -> IPI (payload) {}".format(binascii.hexlify(in_payload)))
 
             force_plain_text = False
             response_code = 0x01
@@ -163,7 +163,7 @@ class ClientConnection():
                     break
 
             else:
-                logger.warn("UNKNOWN: {}".format(binascii.hexlify(data)))
+                logger.warn("UNKNOWN: raw: {}, payload: {}".format(binascii.hexlify(data), binascii.hexlify(in_payload)))
                 continue
 
             if out_payload is not None:
@@ -173,7 +173,7 @@ class ClientConnection():
                     out_payload = out_payload.ljust((payload_length // 16) * 16, bytes([0xee]))
 
                 if cfg.LOGGING_DUMP_PACKETS:
-                    logger.debug("IPI -> IPI {}".format(binascii.hexlify(out_payload)))
+                    logger.debug("IPI -> IPI (payload) {}".format(binascii.hexlify(out_payload)))
 
                 if message.header.flags & 0x01 != 0 and not force_plain_text:
                     out_payload = encrypt(out_payload, self.connection_key)
@@ -188,7 +188,7 @@ class ClientConnection():
                     payload=out_payload))
 
                 if cfg.LOGGING_DUMP_PACKETS:
-                    logger.debug("IPI -> APP {}".format(binascii.hexlify(m)))
+                    logger.debug("IPI -> APP (raw) {}".format(binascii.hexlify(m)))
 
                 self.client_writer.write(m)
                 await self.client_writer.drain()
@@ -215,8 +215,8 @@ class IPInterface():
         if not self.server and self.started:
             self.start()
 
-    def on_connection_lost(self):
-        logger.error('Connection with client was lost')
+    # def on_connection_lost(self):
+    #     logger.error('Connection with client was lost')
 
     def stop(self):
         logger.info("Stopping IP Interface")
@@ -265,11 +265,12 @@ class IPInterface():
             RAWMessageHandler(connection.handle_panel_message, name=handler_name)
         )
 
-        logger.info("Client connected")
-        self.alarm.pause()
+        logger.info("Client %d connected" % self.client_nr)
+        await self.alarm.pause()
 
         await connection.handle()
 
         logger.debug("Resuming")
         self.alarm.message_manager.deregister_handler(handler_name)
-        self.alarm.resume()
+        await self.alarm.resume()
+        logger.info("Client %d disconnected" % self.client_nr)
