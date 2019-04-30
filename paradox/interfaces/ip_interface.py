@@ -46,58 +46,13 @@ ip_payload_connect_response = Struct(
     'unknown4' / Default(Int8ub, 0xee)
 )
 
-class IPInterface():
-    def __init__(self):
-        self.key = cfg.IP_INTERFACE_PASSWORD
-        self.addr = cfg.IP_INTERFACE_BIND_ADDRESS
-        self.port = cfg.IP_INTERFACE_BIND_PORT
-        self.connection_key = self.key
-        self.alarm = None
-        self.server = None
-        self.started = False
-        self.name = 'ip_interface'
-
-    def set_alarm(self, alarm):
-        logger.debug("Set alarm")
+class ClientConnection():
+    def __init__(self, reader, writer, alarm, key):
+        self.client_writer = writer
+        self.client_reader = reader
         self.alarm = alarm
-
-        if not self.server and self.started:
-            self.start()
-
-    def on_connection_lost(self):
-        logger.error('Connection with client was lost')
-
-
-    def stop(self):
-        logger.info("Stopping IP Interface")
-        if self.server is not None:
-            self.server.cancel()
-            self.server = None
-        self.started = False
-
-    def start(self):
-        logger.info("Starting IP Interface")
-        self.started = True
-        if not self.alarm:
-            logger.info("No alarm set")
-            return
-
-        coro = asyncio.start_server(self.handle_client, '0.0.0.0', 10000, loop=self.alarm.work_loop)
-        self.server = self.alarm.work_loop.create_task(coro)
-
-        logger.info("IP Interface started")
-
-    def set_notify(self, tmp):
-        pass
-
-    def event(self, event):
-        pass
-
-    def notify(self, source, message, level):
-        pass
-
-    def change(self, element, label, panel_property, value):
-        """ Enqueues a change """
+        self.interface_password = key
+        self.connection_key = key
 
     async def handle_panel_message(self, data):
         """
@@ -127,32 +82,15 @@ class IPInterface():
                 logger.debug("IPI -> APP {}".format(binascii.hexlify(m)))
 
             self.client_writer.write(m)
-        return False # Block further message processing
 
+        return False  # Block further message processing
 
-    async def handle_client(self, reader, writer):
-        """
-        Handle message from the remote client.
-
-        :param reader: Socket read stream from the client
-        :param writer: Socket write stream to the client
-        :return: None
-        """
-        self.client_writer = writer
-        self.client_reader = reader
-
-        logger.info("Client connected")
-        self.alarm.pause()
-        self.key = cfg.IP_INTERFACE_PASSWORD
-
-        self.connection_key = self.key
+    async def handle(self):
         next_connection_key = self.connection_key
-
-        self.alarm.message_manager.register_handler(RAWMessageHandler(self.handle_panel_message, name="ip_interface"))
 
         while True:
             try:
-                data = await reader.read(1000)
+                data = await self.client_reader.read(1000)
             except:
                 logger.info("Client disconnected")
                 break
@@ -180,7 +118,7 @@ class IPInterface():
             if message.header.command == 0xf0:
                 password = in_payload
 
-                if password != self.key:
+                if password != self.interface_password:
                     logger.warn("Authentication Error")
                     break
                 else:
@@ -190,17 +128,20 @@ class IPInterface():
                 next_connection_key = binascii.hexlify(os.urandom(8)).upper()
 
                 out_payload = ip_payload_connect_response.build(dict(key=next_connection_key, major=0, minor=32, ip_major=1, ip_minor=50, unknown=113, unknown2=6, unknown3=0x15, unknown4=44))
-                flags = 0x39
 
+                flags = 0x39
             elif message.header.command == 0xf2:
                 out_payload = b'\x00'
                 flags = 0x39
             elif message.header.command == 0xf3:
                 out_payload = binascii.unhexlify('0100000000000000000000000000000000')
                 flags = 0x3b
+            elif message.header.command == 0xf4:
+                out_payload = b'\x00'
+                flags = 0x39
             elif message.header.command == 0xf8:
                 out_payload = b'\x01'
-                flags = 0x7b
+                flags = 0x39
             elif message.header.command == 0x00:
                 response_code = 0x02
                 flags = 0x73
@@ -208,6 +149,7 @@ class IPInterface():
                     out_payload = self.alarm.connection.write(in_payload)
                 except Exception:
                     logger.exception("Send to panel")
+                    break
 
             else:
                 logger.warn("UNKNOWN: {}".format(binascii.hexlify(data)))
@@ -230,12 +172,85 @@ class IPInterface():
                 if cfg.LOGGING_DUMP_PACKETS:
                     logger.debug("IPI -> APP {}".format(binascii.hexlify(m)))
 
-                writer.write(m)
-                await writer.drain()
+                self.client_writer.write(m)
+                await self.client_writer.drain()
 
                 if self.connection_key != next_connection_key:
                     self.connection_key = next_connection_key
 
+
+class IPInterface():
+    def __init__(self):
+        self.key = cfg.IP_INTERFACE_PASSWORD
+        self.addr = cfg.IP_INTERFACE_BIND_ADDRESS
+        self.port = cfg.IP_INTERFACE_BIND_PORT
+        self.alarm = None
+        self.server = None
+        self.started = False
+        self.name = 'ip_interface'
+        self.client_nr = 0
+
+    def set_alarm(self, alarm):
+        logger.debug("Set alarm")
+        self.alarm = alarm
+
+        if not self.server and self.started:
+            self.start()
+
+    def on_connection_lost(self):
+        logger.error('Connection with client was lost')
+
+
+    def stop(self):
+        logger.info("Stopping IP Interface")
+        if self.server is not None:
+            self.server.cancel()
+            self.server = None
+        self.started = False
+
+    def start(self):
+        logger.info("Starting IP Interface")
+        self.started = True
+        if not self.alarm:
+            logger.info("No alarm set")
+            return
+
+        coro = asyncio.start_server(self.handle_client, self.addr, self.port, loop=self.alarm.work_loop)
+        self.server = self.alarm.work_loop.create_task(coro)
+
+        logger.info("IP Interface started")
+
+    def set_notify(self, tmp):
+        pass
+
+    def event(self, event):
+        pass
+
+    def notify(self, source, message, level):
+        pass
+
+    def change(self, element, label, panel_property, value):
+        """ Enqueues a change """
+
+    async def handle_client(self, reader, writer):
+        """
+        Handle message from the remote client.
+
+        :param reader: Socket read stream from the client
+        :param writer: Socket write stream to the client
+        :return: None
+        """
+        connection = ClientConnection(reader, writer, self.alarm, self.key)
+
+        self.client_nr = (self.client_nr + 1) % 256
+        handler_name = "%s_%d" % (self.name, self.client_nr)
+        self.alarm.message_manager.register_handler(RAWMessageHandler(connection.handle_panel_message, name=handler_name))
+
+        logger.info("Client connected")
+        self.alarm.pause()
+
+        await connection.handle()
+
         logger.debug("Resuming")
-        self.alarm.message_manager.deregister_handler('ip_interface')
+        self.alarm.message_manager.deregister_handler(handler_name)
         self.alarm.resume()
