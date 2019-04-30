@@ -29,9 +29,10 @@ class Panel:
     mem_map = {}
     event_map = {}
 
-    def __init__(self, core, product_id):
+    def __init__(self, core, product_id, variable_message_length = True):
         self.core = core
         self.product_id = product_id
+        self.variable_message_length = variable_message_length
 
     def parse_message(self, message, direction='topanel') -> Optional[Container]:
         if message is None or len(message) == 0:

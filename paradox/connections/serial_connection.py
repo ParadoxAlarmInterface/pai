@@ -12,16 +12,14 @@ from .connection import Connection, ConnectionProtocol
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
-MIN_MESSAGE_LEN = 4
-
 last = 0
 
 
-def checksum(data):
+def checksum(data, min_message_length):
     """Calculates the 8bit checksum of Paradox messages"""
     c = 0
 
-    if data is None or len(data) < MIN_MESSAGE_LEN:
+    if data is None or len(data) < min_message_length:
         return False
 
     for i in data[:-1]:
@@ -32,12 +30,13 @@ def checksum(data):
 
 
 class SerialConnectionProtocol(ConnectionProtocol):
-    def __init__(self, on_port_open, on_port_closed):
+    def __init__(self, on_port_open, on_port_closed, variable_message_length = True):
         super(SerialConnectionProtocol, self).__init__()
         self.buffer = b''
         self.on_port_open = on_port_open
         self.on_port_closed = on_port_closed
         self.loop = asyncio.get_event_loop()
+        self.variable_message_length = variable_message_length
 
     def connection_made(self, transport):
         super(SerialConnectionProtocol, self).connection_made(transport)
@@ -70,23 +69,29 @@ class SerialConnectionProtocol(ConnectionProtocol):
             logger.debug("Recv: {}".format(binascii.hexlify(recv_data)))
             logger.debug("Buffer:  {}".format(binascii.hexlify(self.buffer)))
 
-        while len(self.buffer) >= MIN_MESSAGE_LEN:
-            if self.buffer[0] >> 4 == 0:
-                potential_packet_length = 37
-            elif self.buffer[0] >> 4 in [1, 3, 4, 5, 6, 7, 8, 9]:
-                potential_packet_length = self.buffer[1] if self.buffer[1] > 0 and self.buffer[1] <= 71  else 37
-            elif self.buffer[0] >> 4 in [0x0A, 0x0B, 0x0D]:
-                potential_packet_length = self.buffer[1]
-            elif self.buffer[0] >> 4 == 0x0C:
-                potential_packet_length = self.buffer[1] * 256 + self.buffer[2]
-            elif self.buffer[0] >> 4 == 0x0E:
-                if self.buffer[1] < 37 or self.buffer[1] == 0xFF: # MG/SP in 21st century and EVO Live Events. Probable values=0x13, 0x13, 0x00, 0xFF
+        min_length = 4 if self.variable_message_length else 37
+
+        while len(self.buffer) >= min_length:
+            if self.variable_message_length:
+                if self.buffer[0] >> 4 == 0:
                     potential_packet_length = 37
-                else:
+                elif self.buffer[0] >> 4 in [1, 3, 4, 5, 6, 7, 8, 9]:
+                    potential_packet_length = self.buffer[1] if self.buffer[1] > 0 and self.buffer[1] <= 71  else 37
+                elif self.buffer[0] >> 4 in [0x0A, 0x0B, 0x0D]:
                     potential_packet_length = self.buffer[1]
+                elif self.buffer[0] >> 4 == 0x0C:
+                    potential_packet_length = self.buffer[1] * 256 + self.buffer[2]
+                elif self.buffer[0] >> 4 == 0x0E:
+                    if self.buffer[1] < 37 or self.buffer[1] == 0xFF: # MG/SP in 21st century and EVO Live Events. Probable values=0x13, 0x13, 0x00, 0xFF
+                        potential_packet_length = 37
+                    else:
+                        potential_packet_length = self.buffer[1]
+                else:
+                    potential_packet_length = 37
+
             else:
                 potential_packet_length = 37
-            
+
             logger.debug("Potential Length: {}".format(potential_packet_length))
 
             if len(self.buffer) < potential_packet_length:
@@ -94,7 +99,7 @@ class SerialConnectionProtocol(ConnectionProtocol):
 
             frame = self.buffer[:potential_packet_length]
 
-            if checksum(frame):
+            if checksum(frame, min_length):
                 logger.debug("Have valid frame")
                 self.buffer = self.buffer[len(frame):]  # Remove message
                 self.on_frame(frame)
@@ -134,7 +139,8 @@ class SerialCommunication(Connection):
         self.connected = False
 
     def make_protocol(self):
-        return SerialConnectionProtocol(self.on_port_open, self.on_port_closed)
+        self.connection = SerialConnectionProtocol(self.on_port_open, self.on_port_closed)
+        return self.connection
 
     async def connect(self):
         logger.info("Connecting to serial port {}".format(self.port_path))
@@ -149,3 +155,6 @@ class SerialCommunication(Connection):
                                         self.baud)
 
         return await self.connected_future
+
+    def set_variable_message_length(self, mode):
+        self.connection.variable_message_length = mode
