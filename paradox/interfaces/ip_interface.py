@@ -21,17 +21,17 @@ from paradox.config import config as cfg
 logger = logging.getLogger('PAI').getChild(__name__)
 
 ip_message = Struct(
-        "header" / Aligned(16,Struct(
-            "sof" / Const(0xaa, Int8ub),
-            "length" / Int16ul,
-            "unknown0" / Default(Int8ub, 0x01),
-            "flags" / Int8ub,
-            "command" / Int8ub,
-            "sub_command" / Default(Int8ub, 0x00),
-            'unknown1' / Default(Int8ub, 0x00),
-            'encrypt' / Default(Int8ub, 0x03),
-        ), b'\xee'),
-        "payload" / Aligned(16, GreedyBytes, b'\xee'))
+    "header" / Aligned(16, Struct(
+        "sof" / Const(0xaa, Int8ub),
+        "length" / Int16ul,
+        "unknown0" / Default(Int8ub, 0x01),
+        "flags" / Int8ub,
+        "command" / Int8ub,
+        "sub_command" / Default(Int8ub, 0x00),
+        'unknown1' / Default(Int8ub, 0x00),
+        'encrypt' / Default(Int8ub, 0x03),
+    ), b'\xee'),
+    "payload" / Aligned(16, GreedyBytes, b'\xee'))
 
 ip_payload_connect_response = Struct(
     'command' / Const(0x00, Int8ub),
@@ -46,6 +46,7 @@ ip_payload_connect_response = Struct(
     'unknown4' / Default(Int8ub, 0xee)
 )
 
+
 class ClientConnection():
     def __init__(self, reader, writer, alarm, key):
         self.client_writer = writer
@@ -57,9 +58,7 @@ class ClientConnection():
     async def handle_panel_message(self, data):
         """
         Handle message from panel, which must be sent to the client
-
         """
-
         if isinstance(data, Awaitable):
             try:
                 data = await data
@@ -104,12 +103,13 @@ class ClientConnection():
             message = ip_message.parse(data)
             in_payload = message.payload
 
-            if len(in_payload) >= 16  and message.header.flags & 0x01 != 0 and len(in_payload) % 16 == 0:
+            if len(in_payload) >= 16 and message.header.flags & 0x01 != 0 and len(in_payload) % 16 == 0:
                 in_payload = decrypt(in_payload, self.connection_key)[:message.header.length]
 
             in_payload = in_payload[:message.header.length]
 
-            assert len(in_payload) == message.header.length, 'Message payload length does not match with length in header'
+            assert len(in_payload) == message.header.length, "Message payload length does not match with length in " \
+                                                             "header "
             if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug("IPI -> IPI {}".format(binascii.hexlify(in_payload)))
 
@@ -127,7 +127,18 @@ class ClientConnection():
                 # Generate a new key
                 next_connection_key = binascii.hexlify(os.urandom(8)).upper()
 
-                out_payload = ip_payload_connect_response.build(dict(key=next_connection_key, major=0, minor=32, ip_major=1, ip_minor=50, unknown=113, unknown2=6, unknown3=0x15, unknown4=44))
+                out_payload = ip_payload_connect_response.build(
+                    dict(
+                        key=next_connection_key,
+                        major=0,
+                        minor=32,
+                        ip_major=1,
+                        ip_minor=50,
+                        unknown=113,
+                        unknown2=6,
+                        unknown3=0x15,
+                        unknown4=44
+                    ))
 
                 flags = 0x39
             elif message.header.command == 0xf2:
@@ -167,7 +178,14 @@ class ClientConnection():
                 if message.header.flags & 0x01 != 0 and not force_plain_text:
                     out_payload = encrypt(out_payload, self.connection_key)
 
-                m = ip_message.build(dict(header=dict(length=payload_length, unknown0=response_code, flags=flags, command=message.header.command), payload=out_payload))
+                m = ip_message.build(dict(
+                    header=dict(
+                        length=payload_length,
+                        unknown0=response_code,
+                        flags=flags,
+                        command=message.header.command
+                    ),
+                    payload=out_payload))
 
                 if cfg.LOGGING_DUMP_PACKETS:
                     logger.debug("IPI -> APP {}".format(binascii.hexlify(m)))
@@ -199,7 +217,6 @@ class IPInterface():
 
     def on_connection_lost(self):
         logger.error('Connection with client was lost')
-
 
     def stop(self):
         logger.info("Stopping IP Interface")
@@ -244,7 +261,9 @@ class IPInterface():
 
         self.client_nr = (self.client_nr + 1) % 256
         handler_name = "%s_%d" % (self.name, self.client_nr)
-        self.alarm.message_manager.register_handler(RAWMessageHandler(connection.handle_panel_message, name=handler_name))
+        self.alarm.message_manager.register_handler(
+            RAWMessageHandler(connection.handle_panel_message, name=handler_name)
+        )
 
         logger.info("Client connected")
         self.alarm.pause()
