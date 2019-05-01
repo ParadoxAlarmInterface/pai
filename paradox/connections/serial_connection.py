@@ -30,13 +30,12 @@ def checksum(data, min_message_length):
 
 
 class SerialConnectionProtocol(ConnectionProtocol):
-    def __init__(self, on_port_open, on_port_closed, variable_message_length = True):
+    def __init__(self, on_port_open, on_port_closed):
         super(SerialConnectionProtocol, self).__init__()
         self.buffer = b''
         self.on_port_open = on_port_open
         self.on_port_closed = on_port_closed
         self.loop = asyncio.get_event_loop()
-        self.variable_message_length = variable_message_length
 
     def connection_made(self, transport):
         super(SerialConnectionProtocol, self).connection_made(transport)
@@ -69,10 +68,10 @@ class SerialConnectionProtocol(ConnectionProtocol):
             logger.debug("Recv: {}".format(binascii.hexlify(recv_data)))
             logger.debug("Buffer:  {}".format(binascii.hexlify(self.buffer)))
 
-        min_length = 4 if self.variable_message_length else 37
+        min_length = 4 if self.use_variable_message_length else 37
 
         while len(self.buffer) >= min_length:
-            if self.variable_message_length:
+            if self.use_variable_message_length:
                 if self.buffer[0] >> 4 == 0:
                     potential_packet_length = 37
                 elif self.buffer[0] >> 4 in [1, 3, 4, 5, 6, 7, 8, 9]:
@@ -112,7 +111,6 @@ class SerialConnectionProtocol(ConnectionProtocol):
         self.buffer = b''
         super(SerialConnectionProtocol, self).connection_lost(exc)
 
-
 class SerialCommunication(Connection):
     def __init__(self, port, baud=9600, timeout=5):
         super(SerialCommunication, self).__init__(timeout=timeout)
@@ -139,8 +137,7 @@ class SerialCommunication(Connection):
         self.connected = False
 
     def make_protocol(self):
-        self.connection = SerialConnectionProtocol(self.on_port_open, self.on_port_closed)
-        return self.connection
+        return SerialConnectionProtocol(self.on_port_open, self.on_port_closed)
 
     async def connect(self):
         logger.info("Connecting to serial port {}".format(self.port_path))
@@ -155,6 +152,3 @@ class SerialCommunication(Connection):
                                         self.baud)
 
         return await self.connected_future
-
-    def set_variable_message_length(self, mode):
-        self.connection.variable_message_length = mode

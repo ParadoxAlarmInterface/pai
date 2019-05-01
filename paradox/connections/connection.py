@@ -7,6 +7,7 @@ class ConnectionProtocol(asyncio.Protocol):
     def __init__(self):
         self.transport = None
         self.read_queue = asyncio.Queue()
+        self.use_variable_message_length = True
 
     def connection_made(self, transport):
         self.transport = transport
@@ -18,6 +19,9 @@ class ConnectionProtocol(asyncio.Protocol):
 
     def connection_lost(self, exc):
         self.read_queue = asyncio.Queue()
+
+    def variable_message_length(self, mode):
+        self.use_variable_message_length = mode
 
 class Connection:
     def __init__(self, timeout=5.0):
@@ -55,3 +59,7 @@ class Connection:
             self.connection.close()
             self.connection = None
         self.connected = False
+
+    def variable_message_length(self, mode):
+        if self.connection is not None:
+            self.connection.variable_message_length(mode)

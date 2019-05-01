@@ -127,7 +127,7 @@ class Paradox:
 
         if not self.panel:
             self.panel = create_panel(self)
-            self.connection.set_variable_message_length(self.panel.variable_message_length)
+            self.connection.variable_message_length(self.panel.variable_message_length)
 
         try:
             logger.info("Initiating communication")
