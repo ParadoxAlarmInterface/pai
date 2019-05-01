@@ -6,7 +6,6 @@ import random
 import socket
 import binascii
 import struct
-import argparse
 
 STUN_PORT = 3478
 

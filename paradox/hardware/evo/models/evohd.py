@@ -1,7 +1,12 @@
+import logging
 from ..panel import Panel_EVOBase
+from typing import Optional
 
+from construct import Container
 
-class Panel_EVO192(Panel_EVOBase):
+logger = logging.getLogger('PAI').getChild(__name__)
+
+class Panel_EVOHD(Panel_EVOBase):
     mem_map = {
         "elements": {
             "zone": {
@@ -11,7 +16,7 @@ class Panel_EVO192(Panel_EVOBase):
                     range(0x062f7, 0x068f7, 0x10)  # EVO192 = EVO96 + 96 zones
                 ]},
             "pgm": {
-                "label_offset": 0, "addresses": [range(0x07082, 0x7482, 0x20)], "template": {
+                "label_offset": 0, "addresses": [range(0x070a6, 0x7486, 0x20)], "template": {  # A bit off from EVO 192
                     "on": False,
                     "pulse": False}
             },
@@ -34,3 +39,7 @@ class Panel_EVO192(Panel_EVOBase):
             }
         }
     }
+
+    def request_status(self, i) -> Optional[Container]:
+        logger.warning("Status requesting for EVOHD is not implemented")
+        return None

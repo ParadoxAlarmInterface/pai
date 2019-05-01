@@ -40,9 +40,9 @@ event_map = {
     9: dict(level=EventLevel.INFO, change=dict(arm=True), type='partition', message='{label} Arming with master'),
     10: dict(level=EventLevel.INFO, change=dict(arm=True), type='partition', message='{label} Arming with user code'),
     11: dict(level=EventLevel.INFO, change=dict(arm=True), type='partition', message='Arming with keyswitch {label}'),
-    12: dict(level=EventLevel.INFO, change=dict(arm=True), type='partition', message='Special arming', sub={
+    12: dict(level=EventLevel.INFO, change=dict(arm=True), type='partition', message='Special arming', sub={  # no label passed
         0: dict(type='partition', message='Auto arming'),
-        1: dict(type='partition', message='Arming with Winload', user=lambda x, *_ : x.raw.event.minor2),
+        1: dict(type='partition', message='Arming with Winload by {@user}', user=lambda x, *_ : x.raw.event.minor2),
         2: dict(type='partition', message='Late to close'),
         3: dict(type='partition', message='No movement arming'),
         4: dict(type='partition', message='Partial arming'),
@@ -62,12 +62,12 @@ event_map = {
     19: dict(level=EventLevel.INFO, type='user', message='{label} Alarm cancelled with master'),
     20: dict(level=EventLevel.INFO, type='user', message='{label} Alarm cancelled with user code'),
     21: dict(level=EventLevel.INFO, type='keyswitch', message='{label} Alarm cancelled with keyswitch'),
-    22: dict(level=EventLevel.INFO, change=dict(arm=False), type='partition', message='{label} Special disarming', sub={
+    22: dict(level=EventLevel.INFO, change=dict(arm=False), type='partition', message='{label} Special disarming', sub={  # no label passed
         0: dict(type='partition', message='Auto arm cancelled'),
         1: dict(type='partition', message='One-touch stay/instant disarm'),
-        2: dict(type='partition', message='Disarming with Winload', user=lambda x, *_ : x.raw.event.minor2),
-        3: dict(type='partition', message='Disarmining with Winload after alarm', user=lambda x, *_ : x.raw.event.minor2),
-        4: dict(type='partition', message='Winload cancelled alarm', user=lambda x, *_ : x.raw.event.minor2),
+        2: dict(type='partition', message='Disarming with Winload by {@user}', user=lambda x, *_ : x.raw.event.minor2),
+        3: dict(type='partition', message='Disarmining with Winload after alarm by {@user}', user=lambda x, *_ : x.raw.event.minor2),
+        4: dict(type='partition', message='Winload cancelled alarm by {@user}', user=lambda x, *_ : x.raw.event.minor2),
         5: dict(type='partition', message='Future use'),
         6: dict(type='partition', message='Future use'),
         7: dict(type='partition', message='Future use'),

@@ -10,7 +10,7 @@ import binascii
 import json
 import requests
 
-from config import user as cfg
+from paradox.config import config as cfg
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -25,6 +25,7 @@ class IPConnection:
         self.host = host
         self.port = port
         self.site_info = None
+        self.module = None
         self.connection_timestamp = 0
 
     def connect(self):
@@ -72,11 +73,37 @@ class IPConnection:
         if self.site_info is None:
             self.site_info = self.get_site_info(siteid=cfg.IP_CONNECTION_SITEID, email=cfg.IP_CONNECTION_EMAIL)
 
+
         if self.site_info is None:
             logger.error("Unable to get site info")
             return False
         try:
             xoraddr = binascii.unhexlify(self.site_info['site'][0]['module'][0]['xoraddr'])
+            if self.site_info is None:
+                logger.error("Unable to get site info")
+                return False
+            
+            logger.debug("Site Info: {}".format(json.dumps(self.site_info, indent=4)))
+            
+            if cfg.IP_CONNECTION_PANEL_SERIAL is not None:
+                for site in self.site_info['site']:
+                    for module in site:
+                        logger.debug("Found module with panel serial: {}".format(module['panelSerial']))
+                        if module['panelSerial'] == cfg.IP_CONNECTION_PANEL_SERIAL:
+                            self.module = module
+                            break
+
+                    if self.module is not None:
+                        break
+            else:
+                self.module = self.site_info[0]['module']
+
+            if self.module is None:
+                self.site_info = None  # Reset state
+                logger.error("Unable to find module with desired panel serial")
+                return False
+
+            xoraddr = binascii.unhexlify(self.module['xoraddr'])
 
             stun_host = 'turn.paradoxmyhome.com'
 
@@ -225,7 +252,7 @@ class IPConnection:
                 return True
             else:
                 return False
-        except Exception as e:
+        except Exception:
             logger.exception("Error writing to socket.")
             raise ConnectionError()
 

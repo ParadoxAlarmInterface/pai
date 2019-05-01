@@ -1,5 +1,6 @@
 from .panel import Panel
 
+
 def create_panel(core, product_id=None) -> Panel:
     if product_id is None:
         return Panel(core, product_id)
@@ -12,6 +13,13 @@ def create_panel(core, product_id=None) -> Panel:
     elif product_id == 'DIGIPLEX_EVO_192':
         from . import evo
         return evo.Panel_EVO192(core, product_id)
-    else:
+    elif product_id == 'DIGIPLEX_EVO_HD':
+        from . import evo
+        return evo.Panel_EVOHD(core, product_id)
+    elif product_id in ['SPECTRA_SP5500', 'SPECTRA_SP6000', 'SPECTRA_SP7000', 'MAGELLAN_MG5000', 'MAGELLAN_MG5050']:
         from . import spectra_magellan
         return spectra_magellan.Panel(core, product_id)
+    else:
+        raise NotImplementedError(
+            "We are not sure what panel you have (product_id: %s). Please create an issue. Maybe we can help you." % str(product_id))
+

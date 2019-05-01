@@ -1,4 +1,3 @@
-import binascii
 from paradox.hardware.evo.parsers import LiveEvent
 from paradox.hardware.evo.event import event_map
 from paradox.event import Event
@@ -99,4 +98,12 @@ def test_event_clock_restore():
     raw = LiveEvent.parse(payload)
     event = Event(event_map, raw)
     assert "Trouble restore: Clock loss restore" == event.message
+    print(event)
+
+def test_disconnect_event():
+    payload = b'\xe0\xff\xe1\xe8\x14\x13\x02\x11\x0f%-\x00\x05\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00H'
+
+    raw = LiveEvent.parse(payload)
+    event = Event(event_map, raw)
+    assert "Special events: WinLoad out (disconnected)" == event.message
     print(event)

@@ -5,13 +5,13 @@ from itertools import chain
 from typing import Optional
 
 from construct import Construct, Struct, BitStruct, Const, Nibble, Checksum, Padding, Bytes, this, RawCopy, Int8ub, \
-    Default, Enum, Flag, BitsInteger, Int16ub, Container
+    Default, Enum, Flag, BitsInteger, Int16ub, Container, EnumIntegerString
 
 from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum
 
-logger = logging.getLogger('PAI').getChild(__name__)
+from paradox.config import config as cfg
 
-from config import user as cfg
+logger = logging.getLogger('PAI').getChild(__name__)
 
 
 def iterate_properties(data):
@@ -33,20 +33,22 @@ class Panel:
         self.core = core
         self.product_id = product_id
 
-    def parse_message(self, message) -> Optional[Container]:
+    def parse_message(self, message, direction='topanel') -> Optional[Container]:
         if message is None or len(message) == 0:
             return None
-
-        if message[0] == 0x72 and message[1] == 0:
-            return InitiateCommunication.parse(message)
-        elif message[0] == 0x72 and message[1] == 0xFF:
-            return InitiateCommunicationResponse.parse(message)
-        elif message[0] == 0x5F:
-            return StartCommunication.parse(message)
-        elif message[0] == 0x00 and message[4] > 0:
-            return StartCommunicationResponse.parse(message)
+        
+        if direction == 'topanel':
+            if message[0] == 0x72 and message[1] == 0:
+                return InitiateCommunication.parse(message)
+            elif message[0] == 0x5F:
+                return StartCommunication.parse(message)
         else:
-            return None
+            if message[0] == 0x72 and message[1] == 0xFF:
+                return InitiateCommunicationResponse.parse(message)
+            elif message[0] == 0x00 and message[4] > 0:
+                return StartCommunicationResponse.parse(message)
+            else:
+                return None
 
     def get_message(self, name) -> Construct:
         clsmembers = dict(inspect.getmembers(sys.modules[__name__]))
@@ -55,11 +57,58 @@ class Panel:
         else:
             raise ResourceWarning('{} parser not found'.format(name))
 
+    def get_error_message(self, error_code) -> str:
+        # This is from EVO and may not apply to all panels
+
+        error_str = str(error_code)
+        if isinstance(error_code, EnumIntegerString):
+            error_code = int(error_code)
+
+        if error_code == 0x00:
+            message = "Requested command did not work"
+        elif error_code == 0x01:
+            message = "User Code is invalid"
+        elif error_code == 0x02:
+            message = "Partition in code lockout (too many bad entries)"
+        elif error_code == 0x05:
+            message = "Panel will disconnect"
+        elif error_code == 0x10:
+            message = "Panel Not connected"
+        elif error_code == 0x11:
+            message = "Panel Already Connected"
+        elif error_code == 0x12:
+            message = "Invalid PC Password"
+        elif error_code == 0x13:
+            message = "Winload on phone line"
+        elif error_code == 0x14:
+            message = "Invalid Module address"
+        elif error_code == 0x15:
+            message = "Cannot write in RAM"
+        elif error_code == 0x16:
+            message = "Request to Upgrade Failed"
+        elif error_code == 0x17:
+            message = "Record number out of range"
+        elif error_code == 0x19:
+            message = "Invalid record type"
+        elif error_code == 0x1A:
+            message = "Multi-Bus not supported"
+        elif error_code == 0x1B:
+            message = "Incorrect number of users"
+        elif error_code == 0x1C:
+            message = "Invalid label number"
+        else:
+            message = error_str
+
+        return message
+
     def encode_password(self, password) -> bytes:
         res = [0] * 2
 
         if password is None:
             return b'\x00\x00'
+
+        if len(password) != 4:
+            raise(Exception("Password length must be equal to 4. Got {}".format(len(password))))
 
         if not password.isdigit():
             return password
@@ -207,6 +256,8 @@ class Panel:
     def control_outputs(self, outputs, command) -> bool:
         raise NotImplementedError("override control_outputs in a subclass")
 
+    def dump_memory(self):
+        raise NotImplementedError("override dump_memory in a subclass")
 
 InitiateCommunication = Struct("fields" / RawCopy(
     Struct("po" / BitStruct(
@@ -259,7 +310,7 @@ StartCommunication = Struct("fields" / RawCopy(
     Struct(
         "po" / Struct("command" / Const(0x5F, Int8ub)),
         "validation" / Const(0x20, Int8ub),
-        "not_used0" / Padding(31),
+        "_not_used0" / Padding(31),
         "source_id" / Default(CommunicationSourceIDEnum, 1),
         "user_id" / Struct(
             "high" / Default(Int8ub, 0),
@@ -275,14 +326,14 @@ StartCommunicationResponse = Struct("fields" / RawCopy(
                              "Windload_connected" / Flag,
                              "NeWare_connected" / Flag)
                          ),
-        "not_used0" / Bytes(3),
+        "_not_used0" / Bytes(3),
         "product_id" / ProductIdEnum,
         "firmware" / Struct(
             "version" / Int8ub,
             "revision" / Int8ub,
             "build" / Int8ub),
         "panel_id" / Int16ub,
-        "not_used1" / Bytes(5),
+        "_not_used1" / Bytes(5),
         "transceiver" / Struct(
             "firmware_build" / Int8ub,
             "family" / Int8ub,
@@ -290,12 +341,12 @@ StartCommunicationResponse = Struct("fields" / RawCopy(
             "firmware_revision" / Int8ub,
             "noise_floor_level" / Int8ub,
             "status" / BitStruct(
-                "not_used" / BitsInteger(6),
+                "_not_used" / BitsInteger(6),
                 "noise_floor_high" / Flag,
                 "constant_carrier" / Flag,
             ),
             "hardware_revision" / Int8ub,
         ),
-        "not_used2" / Bytes(14),
+        "_not_used2" / Bytes(14),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))

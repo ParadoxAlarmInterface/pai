@@ -13,7 +13,7 @@ import os
 from paradox.lib.crypto import encrypt, decrypt
 from paradox.interfaces import Interface
 
-from config import user as cfg
+from paradox.config import config as cfg
 
 ip_message = Struct(
         "header" / Aligned(16,Struct(
@@ -123,7 +123,7 @@ class IPInterface(Interface):
         self.alarm.resume()
 
     def connection_watch(self):
-        while self.client_socket != None:
+        while self.client_socket is None:
             tstart = time.time()
             payload = self.alarm.send_wait()
             tend = time.time()

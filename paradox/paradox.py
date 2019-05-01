@@ -1,19 +1,19 @@
 # -*- coding: utf-8 -*-
 
 import binascii
-import datetime
 import logging
 import time
 from collections import defaultdict, MutableMapping
 from threading import Lock
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Iterable
 
 from construct import Container
 
-from config import user as cfg
 from paradox.hardware import create_panel
 from paradox import event
 from enum import Enum
+
+from paradox.config import config as cfg
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -85,9 +85,9 @@ class Paradox:
     def reset(self):
 
         # Keep track of alarm state
-        self.data["power"].update(dict(label='power'))
-        self.data["rf"].update(dict(label='rf'))
-        self.data["troubles"].update(dict(label='troubles'))
+        self.data['system'] = dict(power=dict(label='power', key='power', id=0), 
+                                   rf=dict(label='rf', key='rf', id=1), 
+                                   troubles=dict(label='troubles', key='troubles', id=2) )
 
         self.last_power_update = 0
         self.run = STATE_STOP
@@ -101,14 +101,14 @@ class Paradox:
             self.run = STATE_STOP
             return False
 
+        self.run = STATE_STOP
+
         self.connection.timeout(0.5)
 
         logger.info("Connecting to panel")
 
         # Reset all states
         self.reset()
-
-        self.run = STATE_RUN
 
         if not self.panel:
             self.panel = create_panel(self)
@@ -131,7 +131,6 @@ class Paradox:
                                    args=dict(source_id=0x02), reply_expected=0x00)
 
             if reply is None:
-                self.run = STATE_STOP
                 return False
 
             self.panel = create_panel(self, reply.fields.value.product_id)  # Now we know what panel it is. Let's
@@ -139,7 +138,6 @@ class Paradox:
 
             result = self.panel.initialize_communication(reply, cfg.PASSWORD)
             if not result:
-                self.run = STATE_STOP
                 return False
             self.send_wait()  # Read WinLoad in (connected) event
 
@@ -147,7 +145,18 @@ class Paradox:
                 self.sync_time()
                 self.send_wait()  # Read Clock loss restore event
 
+            if cfg.DEVELOPMENT_DUMP_MEMORY:
+                if hasattr(self.panel, 'dump_memory') and callable(self.panel.dump_memory):
+                    logger.warn("Requested memory dump. Dumping...")
+                    self.panel.dump_memory()
+                    logger.warn("Memory dump completed. Exiting pai.")
+                    raise SystemExit()
+                else:
+                    logger.warn("Requested memory dump, but current panel type does not support it yet.")
+
             self.panel.update_labels()
+
+            self.run = STATE_RUN
 
             logger.info("Connection OK")
             self.loop_wait = False
@@ -162,9 +171,9 @@ class Paradox:
     def sync_time(self):
         logger.debug("Synchronizing panel time")
 
-        now = datetime.datetime.now()
-        args = dict(century=int(now.year / 100), year=int(now.year % 100),
-                    month=now.month, day=now.day, hour=now.hour, minute=now.minute)
+        now = time.localtime()
+        args = dict(century=int(now.tm_year / 100), year=int(now.tm_year % 100),
+                    month=now.tm_mon, day=now.tm_mday, hour=now.tm_hour, minute=now.tm_min)
 
         reply = self.send_wait(self.panel.get_message('SetTimeDate'), args, reply_expected=0x03)
         if reply is None:
@@ -178,11 +187,16 @@ class Paradox:
             while self.run == STATE_PAUSE:
                 time.sleep(5)
 
+            # May happend when out of sleep
+            if self.run == STATE_STOP:
+                break
+
             self.loop_wait = True
 
             tstart = time.time()
             try:
                 for i in cfg.STATUS_REQUESTS:
+                    logger.debug("Requesting status: %d" % i)
                     reply = self.panel.request_status(i)
                     if reply is not None:
                         tstart = time.time()
@@ -197,6 +211,10 @@ class Paradox:
                 self.send_wait(None, timeout=min(time.time() - tstart, 1))
 
     def send_wait_simple(self, message=None, timeout=5, wait=True) -> Optional[bytes]:
+        # Connection closed
+        if self.connection is None:
+            return
+
         if message is not None:
             if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug("PC -> A {}".format(binascii.hexlify(message)))
@@ -224,6 +242,10 @@ class Paradox:
                   timeout=5,
                   reply_expected=None) -> Optional[Container]:
 
+        # Connection closed
+        if self.connection is None:
+            return
+
         if message is None and message_type is not None:
             message = message_type.build(dict(fields=dict(value=args)))
 
@@ -250,7 +272,7 @@ class Paradox:
                 logger.debug("PC <- A {}".format(binascii.hexlify(data)))
 
             try:
-                recv_message = self.panel.parse_message(data)
+                recv_message = self.panel.parse_message(data, direction='frompanel')
                 # No message
                 if recv_message is None:
                     logger.debug("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in data)))
@@ -261,7 +283,7 @@ class Paradox:
 
             if cfg.LOGGING_DUMP_MESSAGES:
                 logger.debug(recv_message)
-
+            
             # Events are async
             if recv_message.fields.value.po.command == 0xe:  # Events
                 try:
@@ -276,14 +298,25 @@ class Paradox:
 
                 retries += 1  # Ignore this try
 
-            elif recv_message.fields.value.po.command == 0x70:  # Terminate connection
+            elif recv_message.fields.value.po.command == 0x7 and data[1] != 0xff:  # Error
                 self.handle_error(recv_message)
                 return None
 
-            elif reply_expected is not None and recv_message.fields.value.po.command != reply_expected:
-                logging.error("Got message {} but expected {}".format(recv_message.fields.value.po.command,
-                                                                      reply_expected))
-                logging.error("Detail:\n{}".format(recv_message))
+            elif reply_expected is not None:
+                if isinstance(reply_expected, Iterable):
+                    if any(recv_message.fields.value.po.command == expected for expected in reply_expected):
+                        return recv_message
+                    else:
+                        logging.error("Got message {} but expected on of [{}]".format(recv_message.fields.value.po.command,
+                                                                              ", ".join(reply_expected)))
+                        logging.error("Detail:\n{}".format(recv_message))
+                else:
+                    if recv_message.fields.value.po.command == reply_expected:
+                        return recv_message
+                    else:
+                        logging.error("Got message {} but expected {}".format(recv_message.fields.value.po.command,
+                                                                              reply_expected))
+                        logging.error("Detail:\n{}".format(recv_message))
             else:
                 return recv_message
 
@@ -487,7 +520,11 @@ class Paradox:
 
     def handle_error(self, message):
         """Handle ErrorMessage"""
-        logger.warn("Got ERROR Message: {}".format(message.fields.value.message))
+        error_enum = message.fields.value.message
+
+        message = self.panel.get_error_message(error_enum)
+        logger.error("Got ERROR Message: {}".format(message))
+
         self.run = STATE_STOP
 
     def disconnect(self):
@@ -504,7 +541,6 @@ class Paradox:
             self.run = STATE_PAUSE
             self.loop_wait = False
             self.send_wait(self.panel.get_message('CloseConnection'), None, reply_expected=0x07)
-            self.connection.close()
 
     def resume(self):
         if self.run == STATE_PAUSE:

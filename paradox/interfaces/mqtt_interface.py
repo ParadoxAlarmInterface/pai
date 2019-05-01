@@ -5,20 +5,10 @@ import json
 import os
 import re
 
-from config import user as cfg
-
-from paradox.lib.utils import SortableTuple
+from paradox.lib.utils import SortableTuple, JSONByteEncoder
 from paradox.interfaces import Interface
 
-PARTITION_HOMEBRIDGE_COMMANDS = dict(
-    STAY_ARM='arm_stay', AWAY_ARM='arm', NIGHT_ARM='arm_sleep', DISARM='disarm')
-PARTITION_HOMEASSISTANT_COMMANDS = dict(
-    ARM_AWAY='arm', NIGHT_ARM='arm_sleep', DISARM='disarm')
-
-PARTITION_HOMEBRIDGE_STATES = dict(
-    alarm='ALARM_TRIGGERED', stay_arm='STAY_ARM', arm='AWAY_ARM', sleep_arm='NIGHT_ARM', disarm='DISARMED')
-PARTITION_HOMEASSISTANT_STATES = dict(
-    alarm='triggered', stay_arm='armed_away', arm='armed_away', sleep_arm='armed_home', disarm='disarmed')
+from paradox.config import config as cfg
 
 ELEMENT_TOPIC_MAP = dict(partition=cfg.MQTT_PARTITION_TOPIC, zone=cfg.MQTT_ZONE_TOPIC,
                          output=cfg.MQTT_OUTPUT_TOPIC, repeater=cfg.MQTT_REPEATER_TOPIC,
@@ -66,17 +56,20 @@ class MQTTInterface(Interface):
         last_republish = time.time()
 
         while True:
-            item = self.queue.get()
-            if item[1] == 'change':
-                self.handle_change(item[2])
-            elif item[1] == 'event':
-                self.handle_event(item[2])
-            elif item[1] == 'command':
-                if item[2] == 'stop':
-                    break
-            if time.time() - last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
-                self.republish()
-                last_republish = time.time()
+            try:
+                item = self.queue.get()
+                if item[1] == 'change':
+                    self.handle_change(item[2])
+                elif item[1] == 'event':
+                    self.handle_event(item[2])
+                elif item[1] == 'command':
+                    if item[2] == 'stop':
+                        break
+                if time.time() - last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
+                    self.republish()
+                    last_republish = time.time()
+            except Exception as e:
+                self.logger.exception("ERROR in MQTT Run loop")
 
         if self.connected:
             self.mqtt.disconnect()
@@ -152,10 +145,10 @@ class MQTTInterface(Interface):
         # Process a Partition Command
         elif topics[2] == cfg.MQTT_PARTITION_TOPIC:
 
-            if command in PARTITION_HOMEBRIDGE_COMMANDS and cfg.MQTT_HOMEBRIDGE_ENABLE:
-                command = PARTITION_HOMEBRIDGE_COMMANDS[command]
-            elif command in PARTITION_HOMEASSISTANT_COMMANDS and cfg.MQTT_HOMEASSISTANT_ENABLE:
-                command = PARTITION_HOMEASSISTANT_COMMANDS[command]
+            if command in cfg.MQTT_PARTITION_HOMEBRIDGE_COMMANDS and cfg.MQTT_HOMEBRIDGE_ENABLE:
+                command = cfg.MQTT_PARTITION_HOMEBRIDGE_COMMANDS[command]
+            elif command in cfg.MQTT_PARTITION_HOMEASSISTANT_COMMANDS and cfg.MQTT_HOMEASSISTANT_ENABLE:
+                command = cfg.MQTT_PARTITION_HOMEASSISTANT_COMMANDS[command]
 
             if command.startswith('code_toggle-'):
                 tokens = command.split('-')
@@ -248,22 +241,31 @@ class MQTTInterface(Interface):
                      'online', 0, cfg.MQTT_RETAIN)
 
     def handle_event(self, raw):
-        """Handle Live Event"""
+        """
+        Handle Live Event
+
+        :param raw: object with properties (can have byte properties)
+        :return:
+        """
 
         if cfg.MQTT_PUBLISH_RAW_EVENTS:
             self.publish('{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                         cfg.MQTT_EVENTS_TOPIC,
                                         cfg.MQTT_RAW_TOPIC),
-                         json.dumps(raw.props), 0, cfg.MQTT_RETAIN)
+                         json.dumps(raw.props, ensure_ascii=False, cls=JSONByteEncoder), 0, cfg.MQTT_RETAIN)
 
     def handle_change(self, raw):
         element, label, attribute, value = raw
         """Handle Property Change"""
-
+        
         # Keep track of ARM state
         if element == 'partition':
             if label not in self.partitions:
                 self.partitions[label] = dict()
+
+                # After we get 2 partitions, lets publish a dashboard
+                if cfg.MQTT_DASH_PUBLISH and len(self.partitions) == 2:
+                    self.publish_dash(cfg.MQTT_DASH_TEMPLATE, list(self.partitions.keys()))
 
             self.partitions[label][attribute] = value
 
@@ -287,11 +289,11 @@ class MQTTInterface(Interface):
         if element == 'partition':
             if cfg.MQTT_HOMEBRIDGE_ENABLE:
                 self.handle_change_external(element, label, attribute, value, element_topic,
-                                            PARTITION_HOMEBRIDGE_STATES, cfg.MQTT_HOMEBRIDGE_SUMMARY_TOPIC, 'hb')
+                                            cfg.MQTT_PARTITION_HOMEBRIDGE_STATES, cfg.MQTT_HOMEBRIDGE_SUMMARY_TOPIC, 'hb')
 
             if cfg.MQTT_HOMEASSISTANT_ENABLE:
                 self.handle_change_external(element, label, attribute, value, element_topic,
-                                            PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC,
+                                            cfg.MQTT_PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC,
                                             'hass')
 
     def handle_change_external(self, element, label, attribute,
@@ -302,16 +304,16 @@ class MQTTInterface(Interface):
             self.armed[service] = dict()
 
         if label not in self.armed[service]:
-            self.armed[service][label] = (None, None, False)
+            self.armed[service][label] = dict(attribute=None, state=None, alarm=False)
 
         # Property changing to True: Alarm or arm
         if value:
-            if attribute == 'alarm':
+            if attribute in ['alarm', 'bell_activated', 'strobe_alarm', 'silent_alarm', 'audible_alarm'] and not self.armed[service][label]['alarm']:
                 state = states_map['alarm']
-                self.armed[service][label][2] = True
+                self.armed[service][label]['alarm'] = True
 
             # only process if not armed already
-            elif self.armed[service][label][0] is None:
+            elif self.armed[service][label]['attribute'] is None:
                 if attribute == 'stay_arm':
                     state = states_map['stay_arm']
                 elif attribute == 'arm':
@@ -321,20 +323,21 @@ class MQTTInterface(Interface):
                 else:
                     return
 
-                self.armed[service][label] = (attribute, state, self.armed[service][label][2])
+                self.armed[service][label]['attribute'] = attribute
+                self.armed[service][label]['state'] = state
             else:
                 return  # Do not publish a change
 
         # Property changing to False: Disarm or alarm stop
         else:
             # Alarm stopped
-            if attribute == 'alarm' and self.armed[service][label][2]:
-                state = self.armed[service][label][1]
-                self.armed[service][label][2] = False
+            if attribute in ['alarm', 'strobe_alarm', 'audible_alarm', 'bell_activated', 'silent_alarm'] and self.armed[service][label]['alarm']:
+                state = self.armed[service][label]['state']  # Restore the ARM state
+                self.armed[service][label]['alarm'] = False  # Reset alarm state
 
-            elif attribute in ['stay_arm', 'arm', 'sleep_arm'] and self.armed[service][label][0] == attribute:
+            elif attribute in ['stay_arm', 'arm', 'sleep_arm'] and self.armed[service][label]['attribute'] == attribute:
                 state = states_map['disarm']
-                self.armed[service][label] = (None, None, self.armed[service][label][2])
+                self.armed[service][label] = dict(attribute=None, state=None, alarm=False)
             else:
                 return  # Do not publish a change
 
@@ -353,3 +356,16 @@ class MQTTInterface(Interface):
         for k in list(self.cache.keys()):
             v = self.cache[k]
             self.mqtt.publish(k, v['value'], v['qos'], v['retain'])
+
+    def publish_dash(self, fname, partitions):
+        if len(partitions) < 2:
+            return
+
+        if os.path.exists(fname):
+            with open(fname, 'r') as f:
+                data = f.read()
+                data = data.replace('__PARTITION1__', partitions[0]).replace('__PARTITION2__', partitions[1])
+                self.mqtt.publish(cfg.MQTT_DASH_TOPIC, data, 2, True)
+                self.logger.info("MQTT Dash panel published to {}".format(cfg.MQTT_DASH_TOPIC))
+        else:
+            self.logger.warn("MQTT DASH Template not found: {}".format(fname))
