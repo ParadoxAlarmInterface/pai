@@ -9,6 +9,8 @@ import logging
 LOGGING_LEVEL_CONSOLE = logging.INFO # See documentation of Logging package
 LOGGING_LEVEL_FILE = logging.ERROR
 LOGGING_FILE = None             	# or set to file path LOGGING_FILE='/var/log/paradox.log'
+LOGGING_FILE_MAX_SIZE = 10          # Max log file size in MB
+LOGGING_FILE_MAX_FILES = 2          # Max old log files to keep
 LOGGING_DUMP_PACKETS = False    	# Dump RAW Packets to log
 LOGGING_DUMP_MESSAGES = False   	# Dump Messages to log
 LOGGING_DUMP_STATUS = False         # Dump Status to log
@@ -21,6 +23,7 @@ CONNECTION_TYPE = 'Serial'  		# Serial or IP
 
 # Serial Connection Details
 SERIAL_PORT = '/dev/ttyS1' 		# Pathname of the Serial Port
+SERIAL_BAUD = 9600              # Use 38400(default setting) or 57600 for EVO
 
 # IP Connection Defails
 IP_CONNECTION_HOST = '127.0.0.1'	# IP Module address when using direct IP Connection
@@ -28,6 +31,8 @@ IP_CONNECTION_PORT = 10000		# IP Module port when using direct IP Connection
 IP_CONNECTION_PASSWORD = b'0000' 	# IP Module password
 IP_CONNECTION_SITEID = None 		# SITE ID. IF defined, connection will be made through this method.
 IP_CONNECTION_EMAIL = None 		# Email registered in the site
+IP_CONNECTION_PANEL_SERIAL = None  # Use a specific panel. Set it to None to use the first
+IP_CONNECTION_BARE = False      # No not expect an IP150 module. Used this for base Serial over TCP tunnels
 
 # Paradox
 KEEP_ALIVE_INTERVAL = 10   		# Interval between status updates
@@ -43,6 +48,7 @@ LIMITS = { # By default all zones will be monitored
     # 'keypad': range(1, 9)     # Keypads to monitor
 }
 
+LABEL_ENCODING = 'utf-8'                # Encoding to use when decoding labels
 LABEL_REFRESH_INTERVAL = 15 * 60        # Interval between refresh of labels
 OUTPUT_PULSE_DURATION = 1               # Duration of a PGM pulse in seconds
 PARTITIONS_CHANGE_NOTIFICATION_IGNORE = ['arm_full', 'exit_delay'] # Do not send notifications for these notificions
@@ -64,8 +70,6 @@ MQTT_PASSWORD = None    		# MQTT Password
 MQTT_RETAIN = True      		# Publish messages with Retain
 MQTT_BIND_ADDRESS = '127.0.0.1'
 MQTT_REPUBLISH_INTERVAL = 60 * 60 * 12  # Interval for republishing all data
-MQTT_HOMEBRIDGE_ENABLE = False
-MQTT_HOMEASSISTANT_ENABLE = False
 
 # MQTT Topics
 MQTT_BASE_TOPIC = 'paradox'             # Root of all topics
@@ -81,14 +85,62 @@ MQTT_OUTPUT_TOPIC = 'outputs'
 MQTT_KEYPAD_TOPIC = 'keypads'
 MQTT_STATES_TOPIC = 'states'
 MQTT_RAW_TOPIC = 'raw'
-MQTT_HOMEBRIDGE_SUMMARY_TOPIC = 'current'
-MQTT_HOMEASSISTANT_SUMMARY_TOPIC = 'current_hass'
 
 MQTT_NOTIFICATIONS_TOPIC = 'notifications'
 MQTT_PUBLISH_RAW_EVENTS = True
 MQTT_INTERFACE_TOPIC = 'interface'
 MQTT_TOGGLE_CODES = {}
 MQTT_USE_NUMERIC_STATES = False         # use 0 and 1 instead of True and False
+
+# MQTT Homebridge
+MQTT_HOMEBRIDGE_ENABLE = False
+
+# Topic to use
+# Defaults to paradox/states/partitions/PARTITION/current
+MQTT_HOMEBRIDGE_SUMMARY_TOPIC = 'current'
+
+# Homebridge states map
+# Key = Paradox State
+# Value = State propagated to Homebridge
+MQTT_PARTITION_HOMEBRIDGE_STATES = dict(
+    alarm='ALARM_TRIGGERED',
+    stay_arm='STAY_ARM',
+    arm='AWAY_ARM',
+    sleep_arm='NIGHT_ARM',
+    disarm='DISARMED')
+# Homebridge control map
+# Key = Command from Homebridge
+# Value = Command sent to Panel
+MQTT_PARTITION_HOMEBRIDGE_COMMANDS = dict(
+    STAY_ARM='arm_stay',
+    AWAY_ARM='arm',
+    NIGHT_ARM='arm_sleep',
+    DISARM='disarm')
+
+# MQTT Homeassistant
+MQTT_HOMEASSISTANT_ENABLE = False
+
+# Topic to use
+# Defaults to paradox/states/partitions/PARTITION/current_hass
+MQTT_HOMEASSISTANT_SUMMARY_TOPIC = 'current_hass'
+
+# Homeassistant states map
+# Key = Paradox State
+# Value = State propagated to Homeassistant
+MQTT_PARTITION_HOMEASSISTANT_STATES = dict(
+                             alarm='triggered', 
+                             stay_arm='armed_home',
+                             arm='armed_away',
+                             sleep_arm='armed_night',
+                             disarm='disarmed')
+# Homeassistant control map
+# Key = Command from Homeassistant
+# Value = Command sent to Panel
+MQTT_PARTITION_HOMEASSISTANT_COMMANDS = dict(
+                                arm_home='arm_stay', 
+                                arm_away='arm',
+                                arm_night='arm_sleep',
+                                disarm='disarm')
 
 # Interfaces
 COMMAND_ALIAS = {						# alias for commands through text based interfaces

@@ -6,190 +6,271 @@ import time
 import logging
 import socket
 import select
-from construct import GreedyBytes, Struct, Aligned, Const, Int8ub, Bytes, this, Int16ub, Int16ul, BitStruct, Default, BitsInteger, Flag, Enum
+from construct import GreedyBytes, Struct, Aligned, Const, Int8ub, Bytes, Int16ul, Default
 from threading import Thread, Event
 import binascii
 import os
+from typing import Awaitable
 from paradox.lib.crypto import encrypt, decrypt
-from paradox.interfaces import Interface
+from paradox.lib.async_message_manager import RAWMessageHandler
+
+import asyncio
 
 from paradox.config import config as cfg
 
-ip_message = Struct(
-        "header" / Aligned(16,Struct(
-            "sof" / Const(0xaa, Int8ub),
-            "length" / Int16ul,
-            "unknown0" / Default(Int8ub, 0x01),
-            "flags" / Int8ub,
-            "command" / Int8ub,
-            "sub_command" / Default(Int8ub, 0x00),
-            'unknown1' / Default(Int8ub, 0x0a),
-            'encrypt' / Default(Int8ub, 0x00),
-        ), b'\xee'),
-        "payload" / Aligned(16, GreedyBytes, b'\xee'))
+logger = logging.getLogger('PAI').getChild(__name__)
 
-ip_payload_connect_response = Aligned(16, Struct(
+ip_message = Struct(
+    "header" / Aligned(16, Struct(
+        "sof" / Const(0xaa, Int8ub),
+        "length" / Int16ul,
+        "unknown0" / Default(Int8ub, 0x01),
+        "flags" / Int8ub,
+        "command" / Int8ub,
+        "sub_command" / Default(Int8ub, 0x00),
+        'unknown1' / Default(Int8ub, 0x00),
+        'encrypt' / Default(Int8ub, 0x03),
+    ), b'\xee'),
+    "payload" / Aligned(16, GreedyBytes, b'\xee'))
+
+ip_payload_connect_response = Struct(
     'command' / Const(0x00, Int8ub),
     'key' / Bytes(16),
     'major' / Int8ub,
     'minor' / Int8ub,
     'ip_major' / Default(Int8ub, 5),
     'ip_minor' / Default(Int8ub, 2),
-    'unknown' / Default(Int8ub, 0x00)), b'\xee')
+    'unknown' / Default(Int8ub, 0x00),
+    'unknown2' / Default(Int8ub, 0x00),
+    'unknown3' / Default(Int8ub, 0x00),
+    'unknown4' / Default(Int8ub, 0xee)
+)
 
 
-class IPInterface(Interface):
-    """Interface Class using a IP Interface"""
-    name = 'IPI'
+class ClientConnection():
+    def __init__(self, reader, writer, alarm, key):
+        self.client_writer = writer
+        self.client_reader = reader
+        self.alarm = alarm
+        self.interface_password = key
+        self.connection_key = key
 
-    def __init__(self):
-        super().__init__()
+    async def handle_panel_message(self, data):
+        """
+        Handle message from panel, which must be sent to the client
+        """
+        if isinstance(data, Awaitable):
+            try:
+                data = await data
+            except asyncio.TimeoutError:
+                return False
 
-        self.logger = logging.getLogger('PAI').getChild(__name__)
-        self.server_socket = None
-        self.client_socket = None
-        self.client_address = None
-        self.stop_running = Event()
-        self.key = cfg.IP_INTERFACE_PASSWORD
+        if data is not None:
+            if cfg.LOGGING_DUMP_PACKETS:
+                logger.debug("PNL -> IPI (payload) {}".format(binascii.hexlify(data)))
 
-    def stop(self):
-        """ Stops the IP Interface Thread"""
-        self.logger.debug("Stopping IP Interface")
-        self.stop_running.set()
-        self.logger.debug("IP Stopped")
+            payload_len = len(data)
 
-    def run(self):
-        self.logger.info("Starting IP Interface")
+            payload = encrypt(data, self.connection_key)
+            flags = 0x73
 
-        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            m = ip_message.build(
+                dict(header=dict(length=payload_len, unknown0=2, flags=flags, command=0), payload=payload))
 
-        server_socket.bind((cfg.IP_INTERFACE_BIND_ADDRESS, cfg.IP_INTERFACE_BIND_PORT))
-        server_socket.listen(1)
-        self.logger.info("IP Open")
+            if cfg.LOGGING_DUMP_PACKETS:
+                logger.debug("IPI -> APP (raw) {}".format(binascii.hexlify(m)))
 
-        s_list = [server_socket]
+            self.client_writer.write(m)
 
-        self.client_socket = None
-        self.stop_running.clear()
-        self.logger.debug("Waiting for the Alarm")
+        return False  # Block further message processing
 
-        # Wait for the alarm
-        while not self.alarm and not self.stop_running.isSet():
-            time.sleep(5)
-        self.logger.info("Ready")
+    async def handle(self):
+        next_connection_key = self.connection_key
+
         while True:
-            rd, wt, ex = select.select(s_list, [], s_list, 5)
-
-            if self.stop_running.isSet():
+            try:
+                data = await self.client_reader.read(1000)
+            except:
+                logger.info("Client disconnected")
                 break
 
-            for r in rd:
-                if r == server_socket:
-                    if self.client_socket is None:
-                        self.client_socket, client_address = r.accept()
-                        s_list = [server_socket, self.client_socket]
+            if not data:
+                continue
 
-                        self.alarm.pause()
-                        self.client_thread = Thread(target=self.connection_watch)
+            if cfg.LOGGING_DUMP_PACKETS:
+                logger.debug("APP -> IPI (raw) {}".format(binascii.hexlify(data)))
 
-                        self.logger.info("New client connected: {}".format(client_address))
-                    else:
-                        self.client_socket, client_address = r.accept()
-                        self.client_socket.close()
-                        self.logger.warn("Client connection denied")
-                        self.client_socket = None
+            message = ip_message.parse(data)
+            in_payload = message.payload
 
+            if len(in_payload) >= 16 and message.header.flags & 0x01 != 0 and len(in_payload) % 16 == 0:
+                in_payload = decrypt(in_payload, self.connection_key)[:message.header.length]
+
+            in_payload = in_payload[:message.header.length]
+
+            assert len(in_payload) == message.header.length, "Message payload length does not match with length in " \
+                                                             "header "
+            if cfg.LOGGING_DUMP_PACKETS:
+                logger.debug("APP -> IPI (payload) {}".format(binascii.hexlify(in_payload)))
+
+            force_plain_text = False
+            response_code = 0x01
+            if message.header.command == 0xf0:
+                password = in_payload
+
+                if password != self.interface_password:
+                    logger.warn("Authentication Error")
+                    break
                 else:
-                    logging.info("Receiving data")
-                    data = r.recv(1024)
-                    if len(data) == 0:
-                        self.handle_disconnect()
-                        s_list = [server_socket]
-                        break
-                    else:
-                        self.process_client_message(r, data)
+                    logger.info("Authentication Success")
 
-    def handle_disconnect(self):
-        self.key = cfg.IP_INTERFACE_PASSWORD
-        self.logger.info("Client disconnected")
-        try:
-            if self.client_socket is not None:
-                self.client_socket.close()
-        except Exception:
-            pass
+                # Generate a new key
+                next_connection_key = binascii.hexlify(os.urandom(8)).upper()
 
-        self.client_socket = None
-        self.alarm.resume()
+                out_payload = ip_payload_connect_response.build(
+                    dict(
+                        key=next_connection_key,
+                        major=0,
+                        minor=32,
+                        ip_major=1,
+                        ip_minor=50,
+                        unknown=113,
+                        unknown2=6,
+                        unknown3=0x15,
+                        unknown4=44
+                    ))
 
-    def connection_watch(self):
-        while self.client_socket is None:
-            tstart = time.time()
-            payload = self.alarm.send_wait()
-            tend = time.time()
-            payload_len = len(payload)
-            if payload is not None:
-                payload = encrypt(payload, self.key)
+                flags = 0x39
+            elif message.header.command == 0xf2:
+                out_payload = b'\x00'
+                flags = 0x39
+            elif message.header.command == 0xf3:
+                out_payload = binascii.unhexlify('0100000000000000000000000000000000')
+                flags = 0x3b
+            elif message.header.command == 0xf4:
+                out_payload = b'\x00'
+                flags = 0x39
+            elif message.header.command == 0xf8:
+                out_payload = b'\x01'
+                flags = 0x39
+            elif message.header.command == 0x00:
+                response_code = 0x02
                 flags = 0x73
+                try:
+                    out_payload = self.alarm.connection.write(in_payload)
+                except Exception:
+                    logger.exception("Send to panel")
+                    break
 
-                m = ip_message.build(dict(header=dict(length=payload_len, unknown0=2, flags=flags, command=0), payload=payload))
-                self.logger.debug("IP -> AP: {}".format(binascii.hexlify(m)))
-                self.client_socket.send(m)
+            else:
+                logger.warn("UNKNOWN: raw: {}, payload: {}".format(binascii.hexlify(data), binascii.hexlify(in_payload)))
+                continue
 
-            if tend - tstart < 0.1:
-                time.sleep(0.1)
+            if out_payload is not None:
+                payload_length = len(out_payload)
 
-    def process_client_message(self, client, data):
-        message = ip_message.parse(data)
-        message_payload = data[16:]
-        self.logger.debug("AP -> IP: {}".format(binascii.hexlify(data)))
-        if len(message_payload) >= 16  and message.header.flags & 0x01 != 0 and len(message_payload) % 16 == 0:
-            message_payload = decrypt(message_payload, self.key)[:37]
+                if message.header.flags & 0x08 != 0:
+                    out_payload = out_payload.ljust((payload_length // 16) * 16, bytes([0xee]))
 
-        force_plain_text = False
-        response_code = 0x01
-        if message.header.command == 0xf0:
-            password = message_payload[:4]
+                if cfg.LOGGING_DUMP_PACKETS:
+                    logger.debug("IPI -> IPI (payload) {}".format(binascii.hexlify(out_payload)))
 
-            if password != cfg.IP_INTERFACE_PASSWORD:
-                self.logger.warn("Authentication Error")
-                return
+                if message.header.flags & 0x01 != 0 and not force_plain_text:
+                    out_payload = encrypt(out_payload, self.connection_key)
 
-            # Generate a new key
-            self.key = binascii.hexlify(os.urandom(8)).upper()
+                m = ip_message.build(dict(
+                    header=dict(
+                        length=payload_length,
+                        unknown0=response_code,
+                        flags=flags,
+                        command=message.header.command
+                    ),
+                    payload=out_payload))
 
-            payload = ip_payload_connect_response.build(dict(key=self.key, major=0x0, minor=32, ip_major=4, ip_minor=48))
-            force_plain_text = True
+                if cfg.LOGGING_DUMP_PACKETS:
+                    logger.debug("IPI -> APP (raw) {}".format(binascii.hexlify(m)))
 
-        elif message.header.command == 0xf2:
-            payload = b'\x00'
-        elif message.header.command == 0xf3:
-            payload = binascii.unhexlify('0100000000000000000000000000000000')
-        elif message.header.command == 0xf8:
-            payload = b'\x01'
-        elif message.header.command == 0x00:
-            response_code = 0x02
-            try:
-                payload = self.alarm.send_wait_simple(message=message_payload[:37])
-            except Exception:
-                self.logger.exception("Send to panel")
-                return
-        else:
-            self.logger.warn("UNKNOWN: {}".format(binascii.hexlify(data)))
+                self.client_writer.write(m)
+                await self.client_writer.drain()
+
+                if self.connection_key != next_connection_key:
+                    self.connection_key = next_connection_key
+
+
+class IPInterface():
+    def __init__(self):
+        self.key = cfg.IP_INTERFACE_PASSWORD
+        self.addr = cfg.IP_INTERFACE_BIND_ADDRESS
+        self.port = cfg.IP_INTERFACE_BIND_PORT
+        self.alarm = None
+        self.server = None
+        self.started = False
+        self.name = 'ip_interface'
+        self.client_nr = 0
+
+    def set_alarm(self, alarm):
+        logger.debug("Set alarm")
+        self.alarm = alarm
+
+        if not self.server and self.started:
+            self.start()
+
+    # def on_connection_lost(self):
+    #     logger.error('Connection with client was lost')
+
+    def stop(self):
+        logger.info("Stopping IP Interface")
+        if self.server is not None:
+            self.server.cancel()
+            self.server = None
+        self.started = False
+
+    def start(self):
+        logger.info("Starting IP Interface")
+        self.started = True
+        if not self.alarm:
+            logger.info("No alarm set")
             return
 
-        if payload is not None:
-            flags = 0x38
-            payload_length = len(payload)
+        coro = asyncio.start_server(self.handle_client, self.addr, self.port, loop=self.alarm.work_loop)
+        self.server = self.alarm.work_loop.create_task(coro)
 
-            if message.header.flags & 0x01 != 0 and not force_plain_text:
-                payload = encrypt(payload, self.key)
+        logger.info("IP Interface started")
 
-                if message.header.command == 0x00:
-                    flags = 0x73
-                else:
-                    flags = 0x39
+    def set_notify(self, tmp):
+        pass
 
-            m = ip_message.build(dict(header=dict(length=payload_length, unknown0=response_code, flags=flags, command=message.header.command), payload=payload))
-            self.logger.debug("IP -> AP: {}".format(binascii.hexlify(m)))
-            client.send(m)
+    def event(self, event):
+        pass
+
+    def notify(self, source, message, level):
+        pass
+
+    def change(self, element, label, panel_property, value):
+        """ Enqueues a change """
+
+    async def handle_client(self, reader, writer):
+        """
+        Handle message from the remote client.
+
+        :param reader: Socket read stream from the client
+        :param writer: Socket write stream to the client
+        :return: None
+        """
+        connection = ClientConnection(reader, writer, self.alarm, self.key)
+
+        self.client_nr = (self.client_nr + 1) % 256
+        handler_name = "%s_%d" % (self.name, self.client_nr)
+        self.alarm.message_manager.register_handler(
+            RAWMessageHandler(connection.handle_panel_message, name=handler_name)
+        )
+
+        logger.info("Client %d connected" % self.client_nr)
+        await self.alarm.pause()
+
+        await connection.handle()
+
+        logger.debug("Resuming")
+        self.alarm.message_manager.deregister_handler(handler_name)
+        await self.alarm.resume()
+        logger.info("Client %d disconnected" % self.client_nr)

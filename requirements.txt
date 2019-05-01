@@ -3,11 +3,13 @@
 # Mandatory packages
 require-python-3
 construct>=2.9.43
+argparse>=1.4.0
 #
 # Optional
 #
 # Direct connection and GSM
 pyserial>=3.4
+pyserial-asyncio>=0.4
 #
 # MQTT Support
 paho_mqtt>=1.3.1
@@ -17,7 +19,7 @@ pushbullet.py>=0.11.0
 ws4py>=0.4.2
 #
 # Pushover support
-# chump>=1.6.0
+chump>=1.6.0
 #
 # IP150 >4.0 Support
 requests>=2.20.0

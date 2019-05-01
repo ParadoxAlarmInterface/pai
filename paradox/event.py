@@ -10,13 +10,18 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 re_magick_placeholder = re.compile('@(?P<type>[a-z]+)(:?#(?P<source>[a-z0-9_]+))?')
 
+from paradox.config import config as cfg
+
 class Formatter(string.Formatter):
-    def _hasattr(self, event, key):
+
+    @staticmethod
+    def _hasattr(event, key):
         if key in event.additional_data:
             return True
         return hasattr(event, key)
 
-    def _getattr(self, event, key):
+    @staticmethod
+    def _getattr(event, key):
         if key in event.additional_data:
             return event.additional_data[key]
         return getattr(event, key)
@@ -27,13 +32,13 @@ class Formatter(string.Formatter):
             label_provider = event.label_provider
             m = re_magick_placeholder.match(key)
             if m:
-                type = m.group('type')
-                source = m.group('source') or (type if self._hasattr(event, type) else 'minor')
+                element_type = m.group('type')
+                source = m.group('source') or (element_type if self._hasattr(event, element_type) else 'minor')
                 key = self._getattr(event, source)
 
-                return label_provider(type, key)
+                return label_provider(element_type, key)
             else:
-                logger.error('Magic placeholder "%s" has wrong format' % key)
+                logger.error('Magic placeholder "{}" has wrong format'.format(key))
                 return "{error}"
 
         return self._getattr(event, key)
@@ -68,28 +73,28 @@ class Event:
         else:
             self.label_provider = lambda type, id: "[{}:{}]".format(type, id)
 
-
         if event is not None:
             self.parse(event)
 
     def __repr__(self):
-        vars = {}
-        vars.update(self.__dict__)
-        vars['message'] = self.message
+        lvars = {}
+        lvars.update(self.__dict__)
+        lvars['message'] = self.message
 
         return str(self.__class__) + '\n' + '\n'.join(
-            ('{} = {}'.format(item, vars[item]) for item in vars if not item.startswith('_')))
+            ('{} = {}'.format(item, lvars[item]) for item in lvars if not item.startswith('_')))
 
     def parse(self, event):
         if event.fields.value.po.command != 0x0e:
-            raise(Exception("Invalid Event"))
+            raise (Exception("Invalid Event"))
 
         self.raw = copy(event.fields.value)  # Event raw data
         self.timestamp = self.raw.time  # Event timestamp
         self.partition = self.raw.partition  # Event Partition. if Type is system, partition may not be relevant
         self.module = self.raw.module_serial  # Event Module Serial
         self.label_type = self.raw.get('label_type', None)  # Type of element triggering the event
-        self.label = self.raw.label.replace(b'\0', b' ').strip(b' ').decode('utf-8')  # Event Element Label. May be overwride localy
+        self.label = self.raw.label.replace(b'\0', b' ').strip(b' ').decode(
+            cfg.LABEL_ENCODING)  # Event Element Label. May be overwride localy
         self.major = self.raw.event.major  # Event major code
         self.minor = self.raw.event.minor  # Event minor code
 
@@ -97,7 +102,7 @@ class Event:
 
     def _parse_map(self):
         if self.major not in self._event_map:
-            raise(Exception("Unknown event major: {}".format(self.raw)))
+            raise (Exception("Unknown event major: {}".format(self.raw)))
 
         event_map = copy(self._event_map[self.major])  # for inplace modifications
 

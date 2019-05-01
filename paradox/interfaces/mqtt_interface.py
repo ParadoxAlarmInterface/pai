@@ -10,16 +10,6 @@ from paradox.interfaces import Interface
 
 from paradox.config import config as cfg
 
-PARTITION_HOMEBRIDGE_COMMANDS = dict(
-    STAY_ARM='arm_stay', AWAY_ARM='arm', NIGHT_ARM='arm_sleep', DISARM='disarm')
-PARTITION_HOMEASSISTANT_COMMANDS = dict(
-    armed_home='arm_stay', armed_away='arm', armed_sleep='arm_sleep', disarmed='disarm')
-
-PARTITION_HOMEBRIDGE_STATES = dict(
-    alarm='ALARM_TRIGGERED', stay_arm='STAY_ARM', arm='AWAY_ARM', sleep_arm='NIGHT_ARM', disarm='DISARMED')
-PARTITION_HOMEASSISTANT_STATES = dict(
-    alarm='triggered', stay_arm='armed_home', arm='armed_away', sleep_arm='armed_sleep', disarm='disarmed')
-
 ELEMENT_TOPIC_MAP = dict(partition=cfg.MQTT_PARTITION_TOPIC, zone=cfg.MQTT_ZONE_TOPIC,
                          output=cfg.MQTT_OUTPUT_TOPIC, repeater=cfg.MQTT_REPEATER_TOPIC,
                          bus=cfg.MQTT_BUS_TOPIC, keypad=cfg.MQTT_KEYPAD_TOPIC,
@@ -47,15 +37,18 @@ class MQTTInterface(Interface):
         self.mqtt.on_connect = self.handle_connect
         self.mqtt.on_disconnect = self.handle_disconnect
         self.connected = False
-
         self.cache = dict()
-
         self.armed = dict()
 
     def run(self):
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
             self.mqtt.username_pw_set(
                 username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
+        
+        self.mqtt.will_set('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+                                             cfg.MQTT_INTERFACE_TOPIC,
+                                             self.__class__.__name__),
+                           'offline', 0, retain=True)
 
         self.mqtt.connect(host=cfg.MQTT_HOST,
                           port=cfg.MQTT_PORT,
@@ -78,29 +71,35 @@ class MQTTInterface(Interface):
                 if time.time() - last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
                     self.republish()
                     last_republish = time.time()
-            except Exception as e:
+            except Exception:
                 self.logger.exception("ERROR in MQTT Run loop")
 
+
         if self.connected:
+            # Need to set as disconnect will delete the last will
+            self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+                                       cfg.MQTT_INTERFACE_TOPIC,
+                                       self.__class__.__name__),
+                     'offline', 0, retain=True)
+        
             self.mqtt.disconnect()
-            time.sleep(0.5)
+
+        self.mqtt.loop_stop()
 
     def stop(self):
         """ Stops the MQTT Interface Thread"""
-        self.mqtt.disconnect()
         self.logger.debug("Stopping MQTT Interface")
         self.queue.put_nowait(SortableTuple((0, 'command', 'stop')))
-        self.mqtt.loop_stop()
         self.join()
 
     def event(self, raw):
         """ Enqueues an event"""
         self.queue.put_nowait(SortableTuple((2, 'event', raw)))
 
-    def change(self, element, label, property, value):
+    def change(self, element, label, panel_property, value):
         """ Enqueues a change """
         self.queue.put_nowait(SortableTuple(
-            (2, 'change', (element, label, property, value))))
+            (2, 'change', (element, label, panel_property, value))))
 
     # Handlers here
     def handle_message(self, client, userdata, message):
@@ -155,10 +154,10 @@ class MQTTInterface(Interface):
         # Process a Partition Command
         elif topics[2] == cfg.MQTT_PARTITION_TOPIC:
 
-            if command in PARTITION_HOMEBRIDGE_COMMANDS and cfg.MQTT_HOMEBRIDGE_ENABLE:
-                command = PARTITION_HOMEBRIDGE_COMMANDS[command]
-            elif command in PARTITION_HOMEASSISTANT_COMMANDS and cfg.MQTT_HOMEASSISTANT_ENABLE:
-                command = PARTITION_HOMEASSISTANT_COMMANDS[command]
+            if command in cfg.MQTT_PARTITION_HOMEBRIDGE_COMMANDS and cfg.MQTT_HOMEBRIDGE_ENABLE:
+                command = cfg.MQTT_PARTITION_HOMEBRIDGE_COMMANDS[command]
+            elif command in cfg.MQTT_PARTITION_HOMEASSISTANT_COMMANDS and cfg.MQTT_HOMEASSISTANT_ENABLE:
+                command = cfg.MQTT_PARTITION_HOMEASSISTANT_COMMANDS[command]
 
             if command.startswith('code_toggle-'):
                 tokens = command.split('-')
@@ -215,17 +214,6 @@ class MQTTInterface(Interface):
         self.logger.info("MQTT Broker Disconnected")
         self.connected = False
 
-        time.sleep(1)
-
-        if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
-            self.mqtt.username_pw_set(
-                username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
-
-        self.mqtt.connect(host=cfg.MQTT_HOST,
-                          port=cfg.MQTT_PORT,
-                          keepalive=cfg.MQTT_KEEPALIVE,
-                          bind_address=cfg.MQTT_BIND_ADDRESS)
-
     def handle_connect(self, mqttc, userdata, flags, result):
         self.logger.info("MQTT Broker Connected")
 
@@ -240,15 +228,10 @@ class MQTTInterface(Interface):
             "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
                               cfg.MQTT_NOTIFICATIONS_TOPIC, "#"))
 
-        self.mqtt.will_set('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                             cfg.MQTT_INTERFACE_TOPIC,
-                                             self.__class__.__name__),
-                           'offline', 0, cfg.MQTT_RETAIN)
-
         self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                        cfg.MQTT_INTERFACE_TOPIC,
                                        self.__class__.__name__),
-                     'online', 0, cfg.MQTT_RETAIN)
+                     'online', 0, retain=True)
 
     def handle_event(self, raw):
         """
@@ -299,11 +282,11 @@ class MQTTInterface(Interface):
         if element == 'partition':
             if cfg.MQTT_HOMEBRIDGE_ENABLE:
                 self.handle_change_external(element, label, attribute, value, element_topic,
-                                            PARTITION_HOMEBRIDGE_STATES, cfg.MQTT_HOMEBRIDGE_SUMMARY_TOPIC, 'hb')
+                                            cfg.MQTT_PARTITION_HOMEBRIDGE_STATES, cfg.MQTT_HOMEBRIDGE_SUMMARY_TOPIC, 'hb')
 
             if cfg.MQTT_HOMEASSISTANT_ENABLE:
                 self.handle_change_external(element, label, attribute, value, element_topic,
-                                            PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC,
+                                            cfg.MQTT_PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC,
                                             'hass')
 
     def handle_change_external(self, element, label, attribute,

@@ -21,13 +21,14 @@ from paradox.config import config as cfg
 
 class PushBulletWSClient(WebSocketBaseClient):
 
-    def init(self):
+    def init(self, interface):
         """ Initializes the PB WS Client"""
 
         self.logger = logging.getLogger('PAI').getChild(__name__)
         self.pb = Pushbullet(cfg.PUSHBULLET_KEY, cfg.PUSHBULLET_SECRET)
         self.manager = WebSocketManager()
         self.alarm = None
+        self.interface = interface
 
     def stop(self):
         self.terminate()
@@ -74,7 +75,7 @@ class PushBulletWSClient(WebSocketBaseClient):
                     continue
 
                 if p.get('sender_email_normalized') in cfg.PUSHBULLET_CONTACTS:
-                    ret = self.send_command(p.get('body'))
+                    ret = self.interface.send_command(p.get('body'))
 
                     if ret:
                         self.logger.info("From {} ACCEPTED: {}".format(p.get('sender_email_normalized'), p.get('body')))
@@ -94,7 +95,13 @@ class PushBulletWSClient(WebSocketBaseClient):
         self.close()
 
     def send_message(self, msg, dstchat=None):
-        for chat in self.pb.chats:
+        if dstchat is None:
+            dstchat = self.pb.chats
+
+        if not isinstance(dstchat, list):
+            dstchat = [dstchat]
+
+        for chat in dstchat:
             if chat.email in cfg.PUSHBULLET_CONTACTS:
                 try:
                     self.pb.push_note("paradox", msg, chat=chat)
@@ -124,7 +131,7 @@ class PushBulletInterface(Interface):
         self.logger.info("Starting Pushbullet Interface")
         try:
             self.pb_ws = PushBulletWSClient('wss://stream.pushbullet.com/websocket/{}'.format(cfg.PUSHBULLET_KEY))
-            self.pb_ws.init()
+            self.pb_ws.init(self)
             self.pb_ws.connect()
 
             while True:
@@ -153,9 +160,9 @@ class PushBulletInterface(Interface):
         """ Enqueues an event"""
         self.queue.put_nowait(SortableTuple((2, 'event', raw)))
 
-    def change(self, element, label, property, value):
+    def change(self, element, label, panel_property, value):
         """ Enqueues a change """
-        self.queue.put_nowait(SortableTuple((2, 'change', (element, label, property, value))))
+        self.queue.put_nowait(SortableTuple((2, 'change', (element, label, panel_property, value))))
 
     def notify(self, source, message, level):
         self.queue.put_nowait(SortableTuple((2, 'notify', (source, message, level))))
@@ -169,8 +176,8 @@ class PushBulletInterface(Interface):
         self.pb_ws.notify('panel', raw.message, raw.level)
 
     def handle_change(self, raw):
-        element, label, property, value = raw
-        self.pb_ws.change(element, label, property, value)
+        element, label, panel_property, value = raw
+        self.pb_ws.change(element, label, panel_property, value)
 
     def handle_notify(self, raw):
         sender, message, level = raw

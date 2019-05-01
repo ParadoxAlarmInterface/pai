@@ -1,121 +1,154 @@
 # -*- coding: utf-8 -*-
 
-import serial
+import binascii
 import logging
 import time
 
+import asyncio
+import serial_asyncio
+
+from paradox.config import config as cfg
+from .connection import Connection, ConnectionProtocol
+
 logger = logging.getLogger('PAI').getChild(__name__)
 
+last = 0
 
-class SerialCommunication:
 
-    def __init__(self, port):
-        self.serialport = port
-        self.comm = None
+def checksum(data, min_message_length):
+    """Calculates the 8bit checksum of Paradox messages"""
+    c = 0
 
-    def connect(self, baud=9600, timeout=1):
-        """Connects the serial port"""
+    if data is None or len(data) < min_message_length:
+        return False
 
-        try:  # if reconnect
-            if self.comm:
-                self.close()
-        except Exception:
-            logger.exception("Cannot close Serial Port")
+    for i in data[:-1]:
+        c += i
 
-        logger.debug("Opening Serial port: {}".format(self.serialport))
-        self.comm = serial.Serial()
-        self.comm.baudrate = baud
-        self.comm.port = self.serialport
-        self.comm.timeout = timeout
+    r = (c % 256) == data[-1]
+    return r
 
-        try:
-            self.comm.open()
-            logger.debug("Serial port open!")
-            return True
-        except Exception as e:
-            logger.exception("Unable to open serial port: {}".format(self.serialport))
-            return False
 
-    def write(self, data):
-        """Write data to serial port"""
+class SerialConnectionProtocol(ConnectionProtocol):
+    def __init__(self, on_port_open, on_port_closed):
+        super(SerialConnectionProtocol, self).__init__()
+        self.buffer = b''
+        self.on_port_open = on_port_open
+        self.on_port_closed = on_port_closed
+        self.loop = asyncio.get_event_loop()
 
-        try:
-            self.comm.write(data)
-            return True
-        except Exception:
-            logger.exception("Error writing to serial port")
-            return False
+    def connection_made(self, transport):
+        super(SerialConnectionProtocol, self).connection_made(transport)
+        self.on_port_open()
+ 
+    async def _send_message(self, message):
 
-    def read(self, sz=37, timeout=5):
-        """Read data from the serial port, if available, until the timeout is exceeded"""
-        self.comm.timeout = timeout / 5.0
+        if cfg.LOGGING_DUMP_PACKETS:
+            logger.debug("PAI -> SER {}".format(binascii.hexlify(message)))
 
-        data = b""
-        tstart = time.time()
-        read_sz = sz
+        await self.transport.write(message)
 
-        while time.time() < (tstart + timeout):
-            recv_data = self.comm.read(read_sz)
+    def send_message(self, message):
+        asyncio.run_coroutine_threadsafe(self._send_message(message), self.loop)
 
-            if recv_data is None:
-                continue
+    async def read_message(self, timeout=5):
+        logger.debug("read_message")
+        return await asyncio.wait_for(self.read_queue.get(), timeout=timeout)
 
-            data += recv_data
+    def on_frame(self, frame):
+        logger.debug("on_frame")
+        if cfg.LOGGING_DUMP_PACKETS:
+            logger.debug("SER -> PAI {}".format(binascii.hexlify(frame)))
 
-            if len(data) < sz:
-                continue
+        self.read_queue.put_nowait(frame)
 
-            while not self.checksum(data) and len(data) >= 37:
-                data = data[1:]
+    def data_received(self, recv_data):
+        self.buffer += recv_data
+        if cfg.LOGGING_DUMP_PACKETS:
+            logger.debug("Recv: {}".format(binascii.hexlify(recv_data)))
+            logger.debug("Buffer:  {}".format(binascii.hexlify(self.buffer)))
 
-            i = 0
-            while i < 37 and data[i] == 0:
-                i = i + 1
+        min_length = 4 if self.use_variable_message_length else 37
 
-            if i == 37:
-                data = data[37:]
-                continue
-
-            if not self.checksum(data):
-                if self.comm.in_waiting > 0:
-                    read_sz = self.comm.in_waiting
+        while len(self.buffer) >= min_length:
+            if self.use_variable_message_length:
+                if self.buffer[0] >> 4 == 0:
+                    potential_packet_length = 37
+                elif self.buffer[0] >> 4 in [1, 3, 4, 5, 6, 7, 8, 9]:
+                    potential_packet_length = self.buffer[1] if self.buffer[1] > 0 and self.buffer[1] <= 71  else 37
+                elif self.buffer[0] >> 4 in [0x0A, 0x0B, 0x0D]:
+                    potential_packet_length = self.buffer[1]
+                elif self.buffer[0] >> 4 == 0x0C:
+                    potential_packet_length = self.buffer[1] * 256 + self.buffer[2]
+                elif self.buffer[0] >> 4 == 0x0E:
+                    if self.buffer[1] < 37 or self.buffer[1] == 0xFF: # MG/SP in 21st century and EVO Live Events. Probable values=0x13, 0x13, 0x00, 0xFF
+                        potential_packet_length = 37
+                    else:
+                        potential_packet_length = self.buffer[1]
                 else:
-                    read_sz = 1
+                    potential_packet_length = 37
 
-                continue
+            else:
+                potential_packet_length = 37
 
-            return data
+            logger.debug("Potential Length: {}".format(potential_packet_length))
 
-        return None
+            if len(self.buffer) < potential_packet_length:
+                break
 
-    def timeout(self, timeout=5):
-        self.comm.timeout = timeout
+            frame = self.buffer[:potential_packet_length]
 
-    def close(self):
-        """Closes the serial port"""
-        self.comm.close()
-        self.comm = None
+            if checksum(frame, min_length):
+                logger.debug("Have valid frame")
+                self.buffer = self.buffer[len(frame):]  # Remove message
+                self.on_frame(frame)
+            else:
+                logger.debug("searching")
+                self.buffer = self.buffer[1:]
 
-    def flush(self):
-        """Write any pending data"""
-        self.comm.flush()
+    def connection_lost(self, exc):
+        logger.error('The serial port was closed')
+        self.buffer = b''
+        super(SerialConnectionProtocol, self).connection_lost(exc)
 
-    def getfd(self):
-        """Gets the FD associated with the serial port"""
-        if self.comm.is_open:
-            return self.comm.fileno()
+class SerialCommunication(Connection):
+    def __init__(self, port, baud=9600, timeout=5):
+        super(SerialCommunication, self).__init__(timeout=timeout)
+        self.port_path = port
+        self.baud = baud
+        self.connected_future = None
 
-        return None
+    def on_port_closed(self):
+        logger.error('Connection to panel was lost')
+        self.connected_future.set_result(False)
+        self.connected = False
 
-    def checksum(self, data):
-        """Calculates the 8bit checksum of Paradox messages"""
-        c = 0
+    def on_port_open(self):
+        logger.info('Serial port open')
+        self.connected_future.set_result(True)
+        self.connected = True
 
-        if data is None or len(data) < 37:
-            return False
+    def open_timeout(self):
+        if self.connected_future.done():
+            return
 
-        for i in data[:36]:
-            c += i
+        logger.error("Serial Port Timeout")
+        self.connected_future.set_result(False)
+        self.connected = False
 
-        r = (c % 256) == data[36]
-        return r
+    def make_protocol(self):
+        return SerialConnectionProtocol(self.on_port_open, self.on_port_closed)
+
+    async def connect(self):
+        logger.info("Connecting to serial port {}".format(self.port_path))
+        loop = asyncio.get_event_loop()
+
+        self.connected_future = loop.create_future()
+        loop.call_later(5, self.open_timeout)
+
+        _, self.connection = await serial_asyncio.create_serial_connection(loop,
+                                        self.make_protocol, 
+                                        self.port_path, 
+                                        self.baud)
+
+        return await self.connected_future

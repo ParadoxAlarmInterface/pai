@@ -27,17 +27,17 @@ events = [
 	b'e2141301040b09020b0000000000025858585858585858585858202020202001000000009a', # {'type': 'Partition', 'minor': (11, 'Disarm partition'), 'major': (2, 'Partition status')}
 ]
 
-def test_disarm_partition():
+def test_disarm_partition0():
     hex = b'e2141301040b09020b0100000000025858585858585858585858202020202001000000009b' # {'type': 'Partition', 'minor': (11, 'Disarm partition'), 'major': (2, 'Partition status')}
     payload = binascii.unhexlify(hex)
 
     raw = LiveEvent.parse(payload)
     event = Event(event_map, raw, None)
 
-    assert event.message == "Partition status: Disarm partition XXXXXXXXXXX"
+    assert event.message == "Partition [partition:2]: Disarm partition"
     print(event)
 
-def test_disarm_partition():
+def test_disarm_partition1():
     hex = b'e2141301040b09020b0100000000025858585858585858585858202020202001000000009b' # {'type': 'Partition', 'minor': (11, 'Disarm partition'), 'major': (2, 'Partition status')}
     payload = binascii.unhexlify(hex)
 
