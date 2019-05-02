@@ -179,6 +179,9 @@ class Paradox:
 
             await self.panel.update_labels()
 
+            # Update the interface with all of the items (implemented for homie, which will advertise all 
+            # of the available items as nodes)
+            await self.interface.advertise_items(self.data)
 
             logger.info("Connection OK")
             self.loop_wait = False

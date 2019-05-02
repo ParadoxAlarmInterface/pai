@@ -46,6 +46,9 @@ class Interface(Thread):
     def run(self):
         pass
 
+    def advertise_items(self, items):
+        pass
+
     def handle_change(self, raw):
         # TODO: Not consistent with handle_event
 

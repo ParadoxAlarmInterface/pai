@@ -32,10 +32,6 @@ class HomieMQTTInterface(Interface):
         super().__init__()
 
         self.logger = logging.getLogger('PAI').getChild(__name__)
-        self.mqtt = mqtt.Client("paradox_mqtt/{}".format(os.urandom(8).hex()))
-        self.mqtt.on_message = self.handle_message
-        self.mqtt.on_connect = self.handle_connect
-        self.mqtt.on_disconnect = self.handle_disconnect
         self.connected = False
 
         self.cache = dict()
@@ -43,16 +39,17 @@ class HomieMQTTInterface(Interface):
         self.armed = dict()
 
     def run(self):
+        mqtt_settings = {}
+        mqtt_settings = {
+            'MQTT_BROKER' : cfg.MQTT_HOST,
+            'MQTT_PORT' : cfg.MQTT_PORT,
+            'MQTT_KEEPALIVE' : cfg.MQTT.KEEPALIVE,
+            'MQTT_CLIENT_ID' : "paradox_mqtt/{}".format(os.urandom(8).hex())
+        }
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
-            self.mqtt.username_pw_set(
-                username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
+            mqtt_settings['MQTT_USERNAME'] = cfg.MQTT_USERNAME
+            mqtt_settings['MQTT_PASSWORD'] = cfg.MQTT_PASSWORD,
 
-        self.mqtt.connect(host=cfg.MQTT_HOST,
-                          port=cfg.MQTT_PORT,
-                          keepalive=cfg.MQTT_KEEPALIVE,
-                          bind_address=cfg.MQTT_BIND_ADDRESS)
-
-        self.mqtt.loop_start()
         last_republish = time.time()
 
         while True:
@@ -65,6 +62,8 @@ class HomieMQTTInterface(Interface):
                 elif item[1] == 'command':
                     if item[2] == 'stop':
                         break
+                elif item[1] == 'item'
+                    self.handle_advertise_item(item[2])
                 if time.time() - last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
                     self.republish()
                     last_republish = time.time()
@@ -91,6 +90,12 @@ class HomieMQTTInterface(Interface):
         """ Enqueues a change """
         self.queue.put_nowait(SortableTuple(
             (2, 'change', (element, label, property, value))))
+
+    def advertise_items(self, items):
+        """ Enqueues all items """
+        for item in items:
+            self.queue.put_nowait(SortableTuple(
+                (2, 'item', (item))))
 
     # Handlers here
     def handle_message(self, client, userdata, message):
@@ -347,6 +352,10 @@ class HomieMQTTInterface(Interface):
                                              sanitize_topic_part(label),
                                              summary_topic),
                      "{}".format(state), 0, cfg.MQTT_RETAIN)
+
+    def handle_advertise_item(self, raw):
+        item = raw
+        """handle each item"""
 
     def publish(self, topic, value, qos, retain):
         self.cache[topic] = {'value': value, 'qos': qos, 'retain': retain}
