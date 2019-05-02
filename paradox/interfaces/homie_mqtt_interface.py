@@ -62,7 +62,7 @@ class HomieMQTTInterface(Interface):
                 elif item[1] == 'command':
                     if item[2] == 'stop':
                         break
-                elif item[1] == 'item'
+                elif item[1] == 'item':
                     self.handle_advertise_item(item[2])
                 if time.time() - last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
                     self.republish()
