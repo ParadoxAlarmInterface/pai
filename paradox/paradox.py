@@ -599,8 +599,8 @@ class Paradox:
             logger.info("Pausing from the Alarm Panel")
             self.run = STATE_PAUSE
             self.loop_wait = False
-            await self.send_wait(self.panel.get_message('CloseConnection'), None)
-
+            # EVO IP150 IP Interface does not work if we send this
+            # await self.send_wait(self.panel.get_message('CloseConnection'), None)
 
     async def resume(self):
         logger.info("Resuming PAI")
