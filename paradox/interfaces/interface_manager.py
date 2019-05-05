@@ -132,11 +132,11 @@ class InterfaceManager:
                 logger.exception(
                     "Error adding alarm to interface {}".format(interface.name))
 
-    def advertise_items(self,items):
-        for interface in self.interfaces:
-            try:
-                interface.advertise_items(items)
-            except Exception:
-                logger.exception(
-                    "Error advertising items to interface {}".format(interface.name))
+    #def advertise_items(self,items):
+    #    for interface in self.interfaces:
+    #        try:
+    #            interface.advertise_items(items)
+    #        except Exception:
+    #            logger.exception(
+    #                "Error advertising items to interface {}".format(interface.name))
 

@@ -181,7 +181,10 @@ class Paradox:
 
             # Update the interface with all of the items (implemented for homie, which will advertise all 
             # of the available items as nodes)
-            await self.interface.advertise_items(self.data)
+            #self.interface.change(element_type, elements[type_key]['key'],
+            #                              property_name, property_value, initial=False)
+            for item in self.data:
+                await self.interface.change(item.element,)
 
             logger.info("Connection OK")
             self.loop_wait = False

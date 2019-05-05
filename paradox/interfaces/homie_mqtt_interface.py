@@ -62,8 +62,8 @@ class HomieMQTTInterface(Interface):
                 elif item[1] == 'command':
                     if item[2] == 'stop':
                         break
-                elif item[1] == 'item':
-                    self.handle_advertise_item(item[2])
+                #elif item[1] == 'item':
+                #    self.handle_advertise_item(item[2])
                 if time.time() - last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
                     self.republish()
                     last_republish = time.time()
@@ -71,15 +71,15 @@ class HomieMQTTInterface(Interface):
                 self.logger.exception("ERROR in MQTT Run loop")
 
         if self.connected:
-            self.mqtt.disconnect()
+            #self.mqtt.disconnect()
             time.sleep(0.5)
 
     def stop(self):
         """ Stops the MQTT Interface Thread"""
-        self.mqtt.disconnect()
+        #self.mqtt.disconnect()
         self.logger.debug("Stopping Homie MQTT Interface")
         self.queue.put_nowait(SortableTuple((0, 'command', 'stop')))
-        self.mqtt.loop_stop()
+        #self.mqtt.loop_stop()
         self.join()
 
     def event(self, raw):
@@ -212,14 +212,14 @@ class HomieMQTTInterface(Interface):
 
         time.sleep(1)
 
-        if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
-            self.mqtt.username_pw_set(
-                username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
+        #if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
+            #self.mqtt.username_pw_set(
+            #    username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
 
-        self.mqtt.connect(host=cfg.MQTT_HOST,
-                          port=cfg.MQTT_PORT,
-                          keepalive=cfg.MQTT_KEEPALIVE,
-                          bind_address=cfg.MQTT_BIND_ADDRESS)
+        #self.mqtt.connect(host=cfg.MQTT_HOST,
+        #                  port=cfg.MQTT_PORT,
+        #                  keepalive=cfg.MQTT_KEEPALIVE,
+        #                  bind_address=cfg.MQTT_BIND_ADDRESS)
 
     def handle_connect(self, mqttc, userdata, flags, result):
         self.logger.info("MQTT Broker Connected")
@@ -227,23 +227,23 @@ class HomieMQTTInterface(Interface):
         self.connected = True
         self.logger.debug(
             "Subscribing to topics in {}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC))
-        self.mqtt.subscribe(
-            "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
-                              cfg.MQTT_CONTROL_TOPIC, "#"))
+        #self.mqtt.subscribe(
+        #    "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
+        #                      cfg.MQTT_CONTROL_TOPIC, "#"))
 
-        self.mqtt.subscribe(
-            "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
-                              cfg.MQTT_NOTIFICATIONS_TOPIC, "#"))
+        #self.mqtt.subscribe(
+        #    "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
+        #                      cfg.MQTT_NOTIFICATIONS_TOPIC, "#"))
 
-        self.mqtt.will_set('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                             cfg.MQTT_INTERFACE_TOPIC,
-                                             self.__class__.__name__),
-                           'offline', 0, cfg.MQTT_RETAIN)
+        #self.mqtt.will_set('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+        #                                     cfg.MQTT_INTERFACE_TOPIC,
+        #                                     self.__class__.__name__),
+        #                   'offline', 0, cfg.MQTT_RETAIN)
 
-        self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                       cfg.MQTT_INTERFACE_TOPIC,
-                                       self.__class__.__name__),
-                     'online', 0, cfg.MQTT_RETAIN)
+        #self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+        #                               cfg.MQTT_INTERFACE_TOPIC,
+        #                               self.__class__.__name__),
+        #             'online', 0, cfg.MQTT_RETAIN)
 
     def handle_event(self, raw):
         """
@@ -253,11 +253,11 @@ class HomieMQTTInterface(Interface):
         :return:
         """
 
-        if cfg.MQTT_PUBLISH_RAW_EVENTS:
-            self.publish('{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                        cfg.MQTT_EVENTS_TOPIC,
-                                        cfg.MQTT_RAW_TOPIC),
-                         json.dumps(raw.props, ensure_ascii=False, cls=JSONByteEncoder), 0, cfg.MQTT_RETAIN)
+        #if cfg.MQTT_PUBLISH_RAW_EVENTS:
+        #    self.publish('{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+        #                                cfg.MQTT_EVENTS_TOPIC,
+        #                                cfg.MQTT_RAW_TOPIC),
+        #                 json.dumps(raw.props, ensure_ascii=False, cls=JSONByteEncoder), 0, cfg.MQTT_RETAIN)
 
     def handle_change(self, raw):
         element, label, attribute, value = raw
@@ -269,8 +269,8 @@ class HomieMQTTInterface(Interface):
                 self.partitions[label] = dict()
 
                 # After we get 2 partitions, lets publish a dashboard
-                if cfg.MQTT_DASH_PUBLISH and len(self.partitions) == 2:
-                    self.publish_dash(cfg.MQTT_DASH_TEMPLATE, list(self.partitions.keys()))
+                #if cfg.MQTT_DASH_PUBLISH and len(self.partitions) == 2:
+                #    self.publish_dash(cfg.MQTT_DASH_TEMPLATE, list(self.partitions.keys()))
 
             self.partitions[label][attribute] = value
 
@@ -284,12 +284,12 @@ class HomieMQTTInterface(Interface):
         else:
             publish_value = value
 
-        self.publish('{}/{}/{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                             cfg.MQTT_STATES_TOPIC,
-                                             element_topic,
-                                             sanitize_topic_part(label),
-                                             attribute),
-                     "{}".format(publish_value), 0, cfg.MQTT_RETAIN)
+        #self.publish('{}/{}/{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+        #                                     cfg.MQTT_STATES_TOPIC,
+        #                                     element_topic,
+        #                                     sanitize_topic_part(label),
+        #                                     attribute),
+        #             "{}".format(publish_value), 0, cfg.MQTT_RETAIN)
 
         if element == 'partition':
             if cfg.MQTT_HOMEBRIDGE_ENABLE:
@@ -353,18 +353,18 @@ class HomieMQTTInterface(Interface):
                                              summary_topic),
                      "{}".format(state), 0, cfg.MQTT_RETAIN)
 
-    def handle_advertise_item(self, raw):
-        item = raw
-        """handle each item"""
+    #def handle_advertise_item(self, raw):
+    #    item = raw
+    #    """handle each item"""
 
     def publish(self, topic, value, qos, retain):
         self.cache[topic] = {'value': value, 'qos': qos, 'retain': retain}
-        self.mqtt.publish(topic, value, qos, retain)
+        #self.mqtt.publish(topic, value, qos, retain)
 
     def republish(self):
         for k in list(self.cache.keys()):
             v = self.cache[k]
-            self.mqtt.publish(k, v['value'], v['qos'], v['retain'])
+            #self.mqtt.publish(k, v['value'], v['qos'], v['retain'])
 
     def publish_dash(self, fname, partitions):
         if len(partitions) < 2:
@@ -374,7 +374,7 @@ class HomieMQTTInterface(Interface):
             with open(fname, 'r') as f:
                 data = f.read()
                 data = data.replace('__PARTITION1__', partitions[0]).replace('__PARTITION2__', partitions[1])
-                self.mqtt.publish(cfg.MQTT_DASH_TOPIC, data, 2, True)
+                #self.mqtt.publish(cfg.MQTT_DASH_TOPIC, data, 2, True)
                 self.logger.info("MQTT Dash panel published to {}".format(cfg.MQTT_DASH_TOPIC))
         else:
             self.logger.warn("MQTT DASH Template not found: {}".format(fname))
