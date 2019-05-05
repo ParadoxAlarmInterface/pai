@@ -6,6 +6,7 @@ from construct import Container
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
+
 class Panel_EVOHD(Panel_EVOBase):
     mem_map = {
         "elements": {

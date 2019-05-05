@@ -4,8 +4,7 @@ from construct import Struct, RawCopy, BitStruct, Const, Nibble, Flag, Rebuild, 
     Bytes, this, Default, Padding, Enum, Int24ub, ExprAdapter, Byte, obj_, Array, Computed, Subconstruct, \
     ValidationError, ExprSymmetricAdapter
 
-from .adapters import PGMFlags, StatusAdapter, DateAdapter, ZoneFlags, PartitionStatus, EventAdapter, \
-    ModuleSerialAdapter
+from .adapters import PGMFlags, StatusAdapter, DateAdapter, ZoneFlags, PartitionStatus, EventAdapter
 from ..common import CommunicationSourceIDEnum, ProductIdEnum, calculate_checksum
 
 LoginConfirmationResponse = Struct("fields" / RawCopy(
@@ -15,7 +14,7 @@ LoginConfirmationResponse = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)
         ),
         "length" / Rebuild(Int8ub, lambda
@@ -147,7 +146,7 @@ LiveEvent = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "event_source" / Const(0xFF, Int8ub),
         "event_nr" / Int16ub,
@@ -158,6 +157,57 @@ LiveEvent = Struct("fields" / RawCopy(
         "label_type" / Bytes(1),
         "label" / Bytes(16),
         "_not_used0" / Bytes(1),
+    )), "checksum" / Checksum(
+    Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
+# "Event 1 requested (in compressed format) 1 (12 bytes)
+#   Byte 00: [7-3]: Day, [2-0]: Month (MSB)
+#   Byte 01: [7]: Month (LSB), [6-0]: Century
+#   Byte 02: [7-1]: Year, [0]: Hour (MSB)
+#   Byte 03: [7-4]: Hour (LSB), [3-0]: Minutes (MSB)
+#   Byte 04: [7-6]: Minutes (LSB), [5-0]: Event Group
+#   Byte 05: [7-4]: Partition, [3-0]: Event Number High Nibble
+#   Byte 06: Event Number 1
+#   Byte 07: Event Number 2
+#   Byte 08: Serial Number 1 & 2 (2 nibbles)
+#   Byte 09: Serial Number 3 & 4 (2 nibbles)
+#   Byte 10: Serial Number 5 & 6 (2 nibbles)
+#   Byte 11: Serial Number 7 & 8 (2 nibbles)"
+
+CompressedEvent = Struct(
+    "compressed" / BitStruct(
+        "day" / BitsInteger(5),
+        "month" / BitsInteger(4),
+        "century" / BitsInteger(7),
+        "year" / BitsInteger(7),
+        "hour" / BitsInteger(5),
+        "minute" / BitsInteger(6),
+        "event_group" / BitsInteger(6),
+        "partition" / BitsInteger(4),
+        "event_1_high_nibble" / BitsInteger(2),
+        "event_2_high_nibble" / BitsInteger(2)
+    ),
+    "minor_1" / Int8ub,
+    "minor_2" / Int8ub,
+    "module_serial" / Bytes(4)
+)
+
+RequestedEvent = Struct("fields" / RawCopy(
+    Struct(
+        "po" / BitStruct(
+            "command" / Const(0xE, Nibble),
+            "status" / Struct(
+                "reserved" / Flag,
+                "alarm_reporting_pending" / Flag,
+                "Winload_connected" / Flag,
+                "NeWare_connected" / Flag)),
+        "length" / Rebuild(Int8ub, lambda
+            this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+        "_not_used0" / Bytes(1),
+        "requested_event_nr" / Const(0x00, Int8ub),
+        "event_nr" / Int16ub,
+        # "data" / Bytes(lambda this: this.length - 7)
+        "data" / Array(lambda this: int((this.length - 7) / 12), CompressedEvent)
     )), "checksum" / Checksum(
     Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
@@ -198,7 +248,7 @@ ActionResponse = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "length" / Rebuild(Int8ub, lambda
             this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
@@ -271,7 +321,7 @@ ReadEEPROM = Struct("fields" / RawCopy(
         "control" / BitStruct(
             "ram_access" / Default(Flag, False),
             "alarm_reporting_pending" / Default(Flag, False),
-            "Windload_connected" / Default(Flag, False),
+            "Winload_connected" / Default(Flag, False),
             "NeWare_connected" / Default(Flag, False),
             "_not_used" / Default(BitsInteger(2), 0),
             "eeprom_address_bits" / Default(BitsInteger(2), 0)
@@ -289,7 +339,7 @@ ReadEEPROMResponse = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)
         ),
         "packet_length" / Rebuild(Int8ub, lambda
@@ -327,7 +377,7 @@ SetTimeDateResponse = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "length" / Int8ub,
         "_not_used0" / Padding(4),
@@ -372,7 +422,7 @@ PerformActionResponse = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
         "_not_used0" / Padding(4),
@@ -386,7 +436,7 @@ ErrorMessage = Struct("fields" / RawCopy(
             "status" / Struct(
                 "reserved" / Flag,
                 "alarm_reporting_pending" / Flag,
-                "Windload_connected" / Flag,
+                "Winload_connected" / Flag,
                 "NeWare_connected" / Flag)),
         "length" / Rebuild(Int8ub, lambda
             this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),

@@ -37,15 +37,18 @@ class MQTTInterface(Interface):
         self.mqtt.on_connect = self.handle_connect
         self.mqtt.on_disconnect = self.handle_disconnect
         self.connected = False
-
         self.cache = dict()
-
         self.armed = dict()
 
     def run(self):
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
             self.mqtt.username_pw_set(
                 username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
+        
+        self.mqtt.will_set('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+                                             cfg.MQTT_INTERFACE_TOPIC,
+                                             self.__class__.__name__),
+                           'offline', 0, retain=True)
 
         self.mqtt.connect(host=cfg.MQTT_HOST,
                           port=cfg.MQTT_PORT,
@@ -68,29 +71,35 @@ class MQTTInterface(Interface):
                 if time.time() - last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
                     self.republish()
                     last_republish = time.time()
-            except Exception as e:
+            except Exception:
                 self.logger.exception("ERROR in MQTT Run loop")
 
+
         if self.connected:
+            # Need to set as disconnect will delete the last will
+            self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+                                       cfg.MQTT_INTERFACE_TOPIC,
+                                       self.__class__.__name__),
+                     'offline', 0, retain=True)
+        
             self.mqtt.disconnect()
-            time.sleep(0.5)
+
+        self.mqtt.loop_stop()
 
     def stop(self):
         """ Stops the MQTT Interface Thread"""
-        self.mqtt.disconnect()
         self.logger.debug("Stopping MQTT Interface")
         self.queue.put_nowait(SortableTuple((0, 'command', 'stop')))
-        self.mqtt.loop_stop()
         self.join()
 
     def event(self, raw):
         """ Enqueues an event"""
         self.queue.put_nowait(SortableTuple((2, 'event', raw)))
 
-    def change(self, element, label, property, value):
+    def change(self, element, label, panel_property, value):
         """ Enqueues a change """
         self.queue.put_nowait(SortableTuple(
-            (2, 'change', (element, label, property, value))))
+            (2, 'change', (element, label, panel_property, value))))
 
     # Handlers here
     def handle_message(self, client, userdata, message):
@@ -205,17 +214,6 @@ class MQTTInterface(Interface):
         self.logger.info("MQTT Broker Disconnected")
         self.connected = False
 
-        time.sleep(1)
-
-        if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
-            self.mqtt.username_pw_set(
-                username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
-
-        self.mqtt.connect(host=cfg.MQTT_HOST,
-                          port=cfg.MQTT_PORT,
-                          keepalive=cfg.MQTT_KEEPALIVE,
-                          bind_address=cfg.MQTT_BIND_ADDRESS)
-
     def handle_connect(self, mqttc, userdata, flags, result):
         self.logger.info("MQTT Broker Connected")
 
@@ -230,15 +228,10 @@ class MQTTInterface(Interface):
             "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
                               cfg.MQTT_NOTIFICATIONS_TOPIC, "#"))
 
-        self.mqtt.will_set('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                             cfg.MQTT_INTERFACE_TOPIC,
-                                             self.__class__.__name__),
-                           'offline', 0, cfg.MQTT_RETAIN)
-
         self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                        cfg.MQTT_INTERFACE_TOPIC,
                                        self.__class__.__name__),
-                     'online', 0, cfg.MQTT_RETAIN)
+                     'online', 0, retain=True)
 
     def handle_event(self, raw):
         """

@@ -95,7 +95,13 @@ class PushBulletWSClient(WebSocketBaseClient):
         self.close()
 
     def send_message(self, msg, dstchat=None):
-        for chat in self.pb.chats:
+        if dstchat is None:
+            dstchat = self.pb.chats
+
+        if not isinstance(dstchat, list):
+            dstchat = [dstchat]
+
+        for chat in dstchat:
             if chat.email in cfg.PUSHBULLET_CONTACTS:
                 try:
                     self.pb.push_note("paradox", msg, chat=chat)
@@ -154,9 +160,9 @@ class PushBulletInterface(Interface):
         """ Enqueues an event"""
         self.queue.put_nowait(SortableTuple((2, 'event', raw)))
 
-    def change(self, element, label, property, value):
+    def change(self, element, label, panel_property, value):
         """ Enqueues a change """
-        self.queue.put_nowait(SortableTuple((2, 'change', (element, label, property, value))))
+        self.queue.put_nowait(SortableTuple((2, 'change', (element, label, panel_property, value))))
 
     def notify(self, source, message, level):
         self.queue.put_nowait(SortableTuple((2, 'notify', (source, message, level))))
@@ -170,8 +176,8 @@ class PushBulletInterface(Interface):
         self.pb_ws.notify('panel', raw.message, raw.level)
 
     def handle_change(self, raw):
-        element, label, property, value = raw
-        self.pb_ws.change(element, label, property, value)
+        element, label, panel_property, value = raw
+        self.pb_ws.change(element, label, panel_property, value)
 
     def handle_notify(self, raw):
         sender, message, level = raw

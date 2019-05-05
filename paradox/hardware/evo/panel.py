@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
 
+import binascii
 import inspect
 import logging
 import sys
 from typing import Optional
 
-from construct import Construct, Container, MappingError
-
-from .parsers import CloseConnection, ErrorMessage, InitializeCommunication, LoginConfirmationResponse, SetTimeDate, \
-    SetTimeDateResponse, PerformPartitionAction, PerformActionResponse, ReadEEPROMResponse, LiveEvent, ReadEEPROM, \
-    RAMDataParserMap
-from ..panel import Panel as PanelBase
+from construct import Construct, Container, MappingError, ChecksumError
 
 from .event import event_map
+from .parsers import CloseConnection, ErrorMessage, InitializeCommunication, LoginConfirmationResponse, SetTimeDate, \
+    SetTimeDateResponse, PerformPartitionAction, PerformActionResponse, ReadEEPROMResponse, LiveEvent, ReadEEPROM, \
+    RAMDataParserMap, RequestedEvent
+from ..panel import Panel as PanelBase
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -23,23 +23,23 @@ class Panel_EVOBase(PanelBase):
 
     def get_message(self, name) -> Construct:
         try:
-            return super(Panel_EVOBase, self).get_message(name)
-        except ResourceWarning as e:
             clsmembers = dict(inspect.getmembers(sys.modules[__name__]))
             if name in clsmembers:
                 return clsmembers[name]
-            else:
-                raise e
+        except ResourceWarning:
+            pass
 
-    def dump_memory(self):
+        return super(Panel_EVOBase, self).get_message(name)
+
+    async def dump_memory(self):
         """
         Dumps EEPROM and RAM memory to files
         :return:
         """
-        self.dump_memory_to_file('eeprom.bin', range(0, 0xffff, 64))
-        self.dump_memory_to_file('ram.bin', range(0, 59), True)
+        await self.dump_memory_to_file('eeprom.bin', range(0, 0xffff, 64))
+        await self.dump_memory_to_file('ram.bin', range(0, 59), True)
 
-    def dump_memory_to_file(self, file, range_, ram=False):
+    async def dump_memory_to_file(self, file, range_, ram=False):
         mem_type = "RAM" if ram else "EEPROM"
         logger.info("Dump " + mem_type)
 
@@ -50,30 +50,13 @@ class Panel_EVOBase(PanelBase):
                     address=address,
                     length=packet_length,
                     control=dict(ram_access=ram))
-                reply = self.core.send_wait(
-                    self.get_message('ReadEEPROM'), args, reply_expected=0x05)
+                logger.info("Dumping %s: address %d" % (mem_type, address))
+                reply = await self.core.send_wait(
+                    self.get_message('ReadEEPROM'), args, reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address)
 
-                retry_count = 3
-                for retry in range(1, retry_count + 1):
-                    # Avoid errors due to collision with events. It should not come here as we use reply_expected=0x05
-                    if reply is None:
-                        logger.error("Could not fully read " + mem_type)
-                        return
-
-                    if reply.fields.value.address != address:
-                        logger.debug(
-                            "Fetched and receive %s addresses (received: %d, requested: %d) do not match. Retrying %d of %d"
-                            % (mem_type, reply.fields.value.address, address,
-                               retry, retry_count))
-                        reply = self.core.send_wait(
-                            None, None, reply_expected=0x05)
-                        continue
-
-                    if retry == retry_count:
-                        logger.error('Failed to fetch %s at address: %d' %
-                                     (mem_type, address))
-
-                    break
+                if reply is None:
+                    logger.error("Could not read %s: address %d" % (mem_type, address))
+                    return
 
                 data = reply.fields.value.data
 
@@ -120,15 +103,19 @@ class Panel_EVOBase(PanelBase):
                 # elif message[0] >> 4 == 0x06 and message[2] < 0x80:
                 #     return WriteEEPROMResponse.parse(message)
                 elif message[0] >> 4 == 0x0e:
-                    return LiveEvent.parse(message)
+                    if message[1] == 0xff:
+                        return LiveEvent.parse(message)
+                    else:
+                        return RequestedEvent.parse(message)
 
+        except ChecksumError as e:
+            logger.error("ChecksumError %s, message: %s" % (str(e), binascii.hexlify(message)))
         except Exception:
-            logger.exception("Parsing message: %s" % (" ".join(
-                "{:02x} ".format(c) for c in message)))
+            logger.exception("Exception parsing message: %s" % (binascii.hexlify(message)))
 
         return None
 
-    def initialize_communication(self, reply, PASSWORD) -> bool:
+    async def initialize_communication(self, reply, PASSWORD) -> bool:
         password = self.encode_password(PASSWORD)
 
         raw_data = reply.fields.data + reply.checksum
@@ -138,7 +125,7 @@ class Panel_EVOBase(PanelBase):
             dict(fields=dict(value=parsed.fields.value)))
 
         logger.info("Initializing communication")
-        reply = self.core.send_wait(message=payload, reply_expected=[0x1, 0x0])
+        reply = await self.core.send_wait(message=payload, reply_expected=[0x1, 0x0])
 
         if reply is None:
             logger.error("Initialization Failed")
@@ -148,42 +135,47 @@ class Panel_EVOBase(PanelBase):
             logger.error("Authentication Failed. Wrong Password or User Type is not FullMaster?")
             return False
         else:  # command == 0x1
-            if reply.fields.value.po.status.Windload_connected:
+            if reply.fields.value.po.status.Winload_connected:
                 logger.info("Authentication Success")
                 return True
             else:
                 logger.error("Authentication Failed")
                 return False
 
-    def request_status(self, i) -> Optional[Container]:
+    def _request_status_reply_check(self, message, address):
+        mvars = message.fields.value
+
+        assert mvars.po.command == 0x5
+        assert mvars.control.ram_access is True
+        assert mvars.control.eeprom_address_bits == 0x0
+        assert mvars.bus_address == 0x00  # panel
+        assert mvars.address == address
+
+        return True
+
+    async def request_status(self, i) -> Optional[Container]:
         args = dict(address=i, length=64, control=dict(ram_access=True))
-        reply = self.core.send_wait(ReadEEPROM, args, reply_expected=0x05)
+        reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, i))
 
         return reply
 
     def handle_status(self, message):
         """Handle MessageStatus"""
 
-        vars = message.fields.value
+        mvars = message.fields.value
         # Check message
 
-        assert vars.po.command == 0x5
-        assert vars.control.ram_access == True
-        assert vars.control.eeprom_address_bits == 0x0
-        assert vars.bus_address == 0x00  # panel
-
-        if vars.address not in RAMDataParserMap:
+        if mvars.address not in RAMDataParserMap:
             logger.error(
-                "Parser for memory address (%d) is not implemented. Please review your STATUS_REQUESTS setting. Skipping."
-                % vars.address)
+                "Parser for memory address ({}) is not implemented. Please review your STATUS_REQUESTS setting. Skipping.".format(mvars.address))
             return
-        assert len(vars.data) == 64
+        assert len(mvars.data) == 64
 
-        parser = RAMDataParserMap[vars.address]
+        parser = RAMDataParserMap[mvars.address]
 
-        properties = parser.parse(vars.data)
+        properties = parser.parse(mvars.data)
 
-        if vars.address == 1:
+        if mvars.address == 1:
             for k in properties.troubles:
                 if k.startswith("_"):  # ignore private properties
                     continue
@@ -191,9 +183,9 @@ class Panel_EVOBase(PanelBase):
                 self.core.update_properties('system', 'troubles',
                                             {k: properties.troubles[k]})
 
-        self.process_properties_bulk(properties, vars.address)
+        self.process_properties_bulk(properties, mvars.address)
 
-    def control_partitions(self, partitions, command) -> bool:
+    async def control_partitions(self, partitions, command) -> bool:
         """
         Control Partitions
         :param list partitions: a list of partitions
@@ -203,7 +195,7 @@ class Panel_EVOBase(PanelBase):
         args = dict(commands=dict((i, command) for i in partitions))
 
         try:
-            reply = self.core.send_wait(
+            reply = await self.core.send_wait(
                 PerformPartitionAction, args, reply_expected=0x04)
         except MappingError:
             logger.error('Partition command: "%s" is not supported' % command)

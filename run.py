@@ -1,2 +1,4 @@
-from paradox import main
-main.main()
+from paradox.console_scripts.pai_run import main
+
+if __name__ == '__main__':
+    main()

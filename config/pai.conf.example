@@ -23,6 +23,7 @@ CONNECTION_TYPE = 'Serial'  		# Serial or IP
 
 # Serial Connection Details
 SERIAL_PORT = '/dev/ttyS1' 		# Pathname of the Serial Port
+SERIAL_BAUD = 9600              # Use 38400(default setting) or 57600 for EVO
 
 # IP Connection Defails
 IP_CONNECTION_HOST = '127.0.0.1'	# IP Module address when using direct IP Connection
@@ -31,6 +32,7 @@ IP_CONNECTION_PASSWORD = b'0000' 	# IP Module password
 IP_CONNECTION_SITEID = None 		# SITE ID. IF defined, connection will be made through this method.
 IP_CONNECTION_EMAIL = None 		# Email registered in the site
 IP_CONNECTION_PANEL_SERIAL = None  # Use a specific panel. Set it to None to use the first
+IP_CONNECTION_BARE = False      # No not expect an IP150 module. Used this for base Serial over TCP tunnels
 
 # Paradox
 KEEP_ALIVE_INTERVAL = 10   		# Interval between status updates
@@ -46,6 +48,7 @@ LIMITS = { # By default all zones will be monitored
     # 'keypad': range(1, 9)     # Keypads to monitor
 }
 
+LABEL_ENCODING = 'utf-8'                # Encoding to use when decoding labels
 LABEL_REFRESH_INTERVAL = 15 * 60        # Interval between refresh of labels
 OUTPUT_PULSE_DURATION = 1               # Duration of a PGM pulse in seconds
 PARTITIONS_CHANGE_NOTIFICATION_IGNORE = ['arm_full', 'exit_delay'] # Do not send notifications for these notificions

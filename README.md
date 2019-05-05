@@ -1,5 +1,8 @@
 # PAI - Paradox Alarm Interface
 
+[![Join the chat at https://gitter.im/paradox-alarm-interface/community](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/paradox-alarm-interface/community)
+
+
 Middleware that aims to connect to a Paradox Alarm panel, exposing the interface for monitoring and control via several technologies.
 With this interface it is possible to integrate Paradox panels with HomeAssistant, OpenHAB, Homebridge or other domotics system that supports MQTT, as well as several IM methods.
 
@@ -15,16 +18,27 @@ If you are having issues, or wish to discuss new features, join us at our [Gitte
 On Android, if you install [MQTT Dash](https://play.google.com/store/apps/details?id=net.routix.mqttdash), and [follow the instructions](https://github.com/jpbarraca/pai/wiki#mqtt-dash) you will automatically get a panel like this:
 ![mqtt_dash](https://user-images.githubusercontent.com/497717/52603920-d4984d80-2e60-11e9-9772-578b10576b3c.jpg)
 
+## Branch build statuses
+- [master](https://github.com/jpbarraca/pai/tree/master) [![Build Status Master](https://travis-ci.org/jpbarraca/pai.svg?branch=master)](https://travis-ci.org/jpbarraca/pai)
+- [dev](https://github.com/jpbarraca/pai/tree/dev) [![Build Status Dev](https://travis-ci.org/jpbarraca/pai.svg?branch=dev)](https://travis-ci.org/jpbarraca/pai)
+
 ## How to use
 
 ### Docker
 
 If you have docker running, this will be the easiest way:
 ```
-cd <projectFolder>
-docker build -t pai .
-docker run -it -v <projectFolder>/pai.conf:/etc/pai/pai.conf pai
+mkdir /opt/pai/etc
+mkdir /opt/pai/log
+
+wget https://raw.githubusercontent.com/jpbarraca/pai/master/config/pai.conf.example -O /opt/pai/etc
+edit /opt/pai/etc/pai.conf as needed 
+
+docker run -it -v /opt/pai/etc:/etc/pai:ro -v /opt/pai/log:/var/log/pai --device=/dev/tty.YOUR_SERIAL_PORT jpbarraca/pai
 ```
+You also try ```jpbarraca/pai:latest```
+
+The docker images do not have support for Signal.
 
 or simply:
 
@@ -41,13 +55,15 @@ git clone https://github.com/jpbarraca/pai.git
 
 2.  Copy ```config/pai.conf.example``` to ```/etc/pai/pai.conf``` and edit it to match your setup. The file uses Python syntax.
 ```
-cd config
 mkdir -p /etc/pai
-cp pai.conf.example /etc/pai/pai.conf
-cd ..
+cp config/pai.conf.example /etc/pai/pai.conf
+edit /etc/pai/pai.conf as needed
+python3 run.py
 ```
 
-3.  Install the python requirements.
+Alternatively see [#Configuration](#configuration) section for supported file locations.
+
+3.  Install the python 3.6 and its requirements.
 ```
 pip3 install -r requirements.txt
 ```
@@ -60,13 +76,44 @@ If some requirement fail to install, this may not be critical.
 * ```pyserial``` is only required when connecting to the panel directly through the serial port or using a GSM modem.
 
 
-4.  Run the script:
+## Configuration
+See [config/pai.conf.example](config/pai.conf.example) for all configuration options.
+
+Configuration file should be placed in one of these locations:
+  - /etc/pai/pai.conf
+  - /usr/local/etc/pai/pai.conf
+  - ~/.local/etc/pai.conf
+
+### EVO specifics
+As project was initially designed for SP/MG panels. EVO panels require some configuration fine tuning.
+
+Set these settings
+``` python
+STATUS_REQUESTS = list(range(1, 6))
+
+PARTITIONS_CHANGE_NOTIFICATION_IGNORE = [
+  'arm_full',
+  'exit_delay',
+  'all_zone_closed', 
+  'ready',
+  'stay_instant_ready',
+  'force_ready',
+  'entry_delay',
+  'auto_arming_engaged'
+]
+```
+
+If you use Serial connection you need to set *SERIAL_BAUD*:
+``` python
+SERIAL_BAUD = 38400 # or 57600 if you have changed default setting in Babyware
+```
+
+## Running
 ```
 python3 run.py
 ```
 
-If something goes wrong, you can edit the ```config/user.py``` to increase the debug level.
-Check ```config/defaults.py``` for all configuration options
+If something goes wrong, you can edit the configuration file to increase the debug level.
 
 
 ## Tested Environment
