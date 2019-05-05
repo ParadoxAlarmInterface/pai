@@ -52,11 +52,9 @@ class SerialConnectionProtocol(ConnectionProtocol):
         asyncio.run_coroutine_threadsafe(self._send_message(message), self.loop)
 
     async def read_message(self, timeout=5):
-        logger.debug("read_message")
         return await asyncio.wait_for(self.read_queue.get(), timeout=timeout)
 
     def on_frame(self, frame):
-        logger.debug("on_frame")
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("SER -> PAI {}".format(binascii.hexlify(frame)))
 
@@ -64,9 +62,6 @@ class SerialConnectionProtocol(ConnectionProtocol):
 
     def data_received(self, recv_data):
         self.buffer += recv_data
-        if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("Recv: {}".format(binascii.hexlify(recv_data)))
-            logger.debug("Buffer:  {}".format(binascii.hexlify(self.buffer)))
 
         min_length = 4 if self.use_variable_message_length else 37
 
@@ -91,19 +86,15 @@ class SerialConnectionProtocol(ConnectionProtocol):
             else:
                 potential_packet_length = 37
 
-            logger.debug("Potential Length: {}".format(potential_packet_length))
-
             if len(self.buffer) < potential_packet_length:
                 break
 
             frame = self.buffer[:potential_packet_length]
 
             if checksum(frame, min_length):
-                logger.debug("Have valid frame")
                 self.buffer = self.buffer[len(frame):]  # Remove message
                 self.on_frame(frame)
             else:
-                logger.debug("searching")
                 self.buffer = self.buffer[1:]
 
     def connection_lost(self, exc):
