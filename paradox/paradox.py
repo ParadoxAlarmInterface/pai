@@ -350,10 +350,8 @@ class Paradox:
                 else:
                     reply = await self.message_manager.wait_for(lambda m: m.fields.value.po.command == reply_expected, timeout=timeout*2)
 
-                if reply is None:
-                    continue
-
-            return reply
+                if reply:
+                    return reply
 
         return None
 
