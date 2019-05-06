@@ -1,5 +1,5 @@
 import logging
-from ..panel import Panel_EVOBase
+from ..panel import Panel_EVOBase, ReadEEPROM
 from typing import Optional
 
 from construct import Container
@@ -41,6 +41,6 @@ class Panel_EVOHD(Panel_EVOBase):
         }
     }
 
-    def request_status(self, i) -> Optional[Container]:
+    async def request_status(self, i) -> Optional[Container]:
         logger.warning("Status requesting for EVOHD is not implemented")
         return None
