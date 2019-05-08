@@ -108,7 +108,10 @@ class Paradox:
         return task.result()
 
     async def connect_async(self):
-        self.disconnect()  # socket needs to be also closed
+        try:
+            self.disconnect()  # socket needs to be also closed
+        except:
+            pass
 
         logger.info("Connecting to interface")
         if not await self.connection.connect():
@@ -183,8 +186,17 @@ class Paradox:
             # of the available items as nodes)
             #self.interface.change(element_type, elements[type_key]['key'],
             #                              property_name, property_value, initial=False)
-            for item in self.data:
-                await self.interface.change(item.element,)
+            for element_type in self.data:
+                print(element_type)
+                if element_type == 'zone':
+                    for subitem in self.data[element_type]:
+                        for property_name in self.data[element_type]:
+                            print (property_name)
+                            self.interface.change(element_type, self.data[element_type]['key'],
+                                              property_name, False, initial=True)
+                        print (self.data[element_type][subitem])
+
+                        
 
             logger.info("Connection OK")
             self.loop_wait = False
