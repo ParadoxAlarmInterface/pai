@@ -32,8 +32,8 @@ class EventMessageHandler(MessageHandler):
         self.name = name if name is not None else self.__class__.__name__
 
     def can_handle(self, message):
-        return message.fields.value.po.command == 0xe
-
+        values = message.fields.value
+        return values.po.command == 0xe and (not hasattr(values, "event_source") or values.event_source == 0xff)
 
 class ErrorMessageHandler(MessageHandler):
     def __init__(self, callback, name=None):

@@ -1,4 +1,6 @@
-from paradox.hardware.evo.parsers import LiveEvent
+import binascii
+
+from paradox.hardware.evo.parsers import LiveEvent, RequestedEvent
 from paradox.hardware.evo.event import event_map
 from paradox.event import Event
 
@@ -107,3 +109,16 @@ def test_disconnect_event():
     event = Event(event_map, raw)
     assert "Special events: WinLoad out (disconnected)" == event.message
     print(event)
+
+def test_requested_event():
+    payload = binascii.unhexlify('e243000009fa79942713a500060000000000819426000400090000000000819426ab8500010000000000819426ab8920010000000000819426ab8910010000000000de')
+    raw = RequestedEvent.parse(payload)
+    values = raw.fields.value
+    assert values.po.command == 0xe and (not hasattr(values, "event_source") or values.event_source == 0xff)
+    print(raw)
+
+def test_c2():
+    payload = binascii.unhexlify('c2001903000b00000001a96c7106152c00200132010000000b')
+
+def test_8207000005fa88():
+    payload = binascii.unhexlify('8207000005fa88')

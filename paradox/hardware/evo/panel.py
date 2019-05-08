@@ -11,7 +11,7 @@ from construct import Construct, Container, MappingError, ChecksumError
 from .event import event_map
 from .parsers import CloseConnection, ErrorMessage, InitializeCommunication, LoginConfirmationResponse, SetTimeDate, \
     SetTimeDateResponse, PerformPartitionAction, PerformActionResponse, ReadEEPROMResponse, LiveEvent, ReadEEPROM, \
-    RAMDataParserMap
+    RAMDataParserMap, RequestedEvent
 from ..panel import Panel as PanelBase
 
 logger = logging.getLogger('PAI').getChild(__name__)
@@ -103,7 +103,10 @@ class Panel_EVOBase(PanelBase):
                 # elif message[0] >> 4 == 0x06 and message[2] < 0x80:
                 #     return WriteEEPROMResponse.parse(message)
                 elif message[0] >> 4 == 0x0e:
-                    return LiveEvent.parse(message)
+                    if message[1] == 0xff:
+                        return LiveEvent.parse(message)
+                    else:
+                        return RequestedEvent.parse(message)
 
         except ChecksumError as e:
             logger.error("ChecksumError %s, message: %s" % (str(e), binascii.hexlify(message)))

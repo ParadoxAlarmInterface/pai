@@ -11,7 +11,6 @@ class DateAdapter(Adapter):
     def _encode(self, obj, context, path):
         return [obj.year / 100, obj.year % 100, obj.month, obj.day, obj.hour, obj.minute, obj.second]
 
-
 class ModuleSerialAdapter(Adapter):
     def _decode(self, obj, context, path):
         return hex(int(obj[0]) * 10 ^ 8 + int(obj[1]) * 10 ^ 4 + int(obj[2]) * 10 ^ 2 + int(
@@ -628,9 +627,10 @@ labelTypeMap = {0: 'No label',
 class EventAdapter(Adapter):
     def _decode(self, obj, context, path):
         event_group = obj[0]
-        event_high_nibble = obj[1] >> 4
-        event_1 = obj[2] + (event_high_nibble << 8)
-        event_2 = obj[3] + (event_high_nibble << 8)
+        event_1_high_nibble = obj[1] >> 6
+        event_2_high_nibble = (obj[1] >> 4) & 0b11
+        event_1 = obj[2] + (event_1_high_nibble << 8)
+        event_2 = obj[3] + (event_2_high_nibble << 8)
         partition = obj[1] & 0x0f
 
         return Container({
@@ -639,3 +639,19 @@ class EventAdapter(Adapter):
             'minor2': event_2,
             'partition': partition
         })
+
+# class CompressedEventAdapter(Adapter):
+#     def _decode(self, obj, context, path):
+#         day = obj[0] >> 3
+#         month = (obj[0] & 0b111) << 1 | obj[1] >> 7
+#         century = obj[1] & 0b1111111
+#         year = century * 100 + (obj[2] >> 1)
+#         hour = (obj[2] & 0b1) << 4 | obj[3] >> 4
+#         minute = (obj[3] & 0b1111) << 2 | obj[4] >> 6
+#
+#         Container({
+#             'time': datetime.datetime(year, month, day, hour, minute)
+#         })
+#
+#     def _encode(self, obj, context, path):
+#         return [obj.year / 100, obj.year % 100, obj.month, obj.day, obj.hour, obj.minute, obj.second]

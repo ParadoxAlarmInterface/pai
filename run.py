@@ -1,10 +1,4 @@
-from paradox import main
-import argparse
+from paradox.console_scripts.pai_run import main
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-c", "--config", type=str, default=None,
-                    help="specify path to an alternative configuration file")
-
-args = parser.parse_args()
-
-main.main(args)
+if __name__ == '__main__':
+    main()
