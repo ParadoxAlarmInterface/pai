@@ -43,7 +43,7 @@ class HomieMQTTInterface(Interface):
         mqtt_settings = {
             'MQTT_BROKER' : cfg.MQTT_HOST,
             'MQTT_PORT' : cfg.MQTT_PORT,
-            'MQTT_KEEPALIVE' : cfg.MQTT.KEEPALIVE,
+            'MQTT_KEEPALIVE' : cfg.MQTT_KEEPALIVE,
             'MQTT_CLIENT_ID' : "paradox_mqtt/{}".format(os.urandom(8).hex())
         }
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
@@ -62,8 +62,8 @@ class HomieMQTTInterface(Interface):
                 elif item[1] == 'command':
                     if item[2] == 'stop':
                         break
-                #elif item[1] == 'item':
-                #    self.handle_advertise_item(item[2])
+                elif item[1] == 'notify':
+                    self.handle_notify(item[2])
                 if time.time() - last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
                     self.republish()
                     last_republish = time.time()
@@ -91,11 +91,8 @@ class HomieMQTTInterface(Interface):
         self.queue.put_nowait(SortableTuple(
             (2, 'change', (element, label, property, value))))
 
-    def advertise_items(self, items):
-        """ Enqueues all items """
-        for item in items:
-            self.queue.put_nowait(SortableTuple(
-                (2, 'item', (item))))
+    def notify(self, source, message, level):
+        self.queue.put_nowait(SortableTuple((2, 'notify', (source, message, level))))
 
     # Handlers here
     def handle_message(self, client, userdata, message):
@@ -206,44 +203,44 @@ class HomieMQTTInterface(Interface):
         else:
             self.logger.error("Invalid control property {}".format(topics[2]))
 
-    def handle_disconnect(self, mqttc, userdata, rc):
-        self.logger.info("MQTT Broker Disconnected")
-        self.connected = False
+    # def handle_disconnect(self, mqttc, userdata, rc):
+    #     self.logger.info("MQTT Broker Disconnected")
+    #     self.connected = False
 
-        time.sleep(1)
+    #     time.sleep(1)
 
-        #if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
-            #self.mqtt.username_pw_set(
-            #    username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
+    #     #if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
+    #         #self.mqtt.username_pw_set(
+    #         #    username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
 
-        #self.mqtt.connect(host=cfg.MQTT_HOST,
-        #                  port=cfg.MQTT_PORT,
-        #                  keepalive=cfg.MQTT_KEEPALIVE,
-        #                  bind_address=cfg.MQTT_BIND_ADDRESS)
+    #     #self.mqtt.connect(host=cfg.MQTT_HOST,
+    #     #                  port=cfg.MQTT_PORT,
+    #     #                  keepalive=cfg.MQTT_KEEPALIVE,
+    #     #                  bind_address=cfg.MQTT_BIND_ADDRESS)
 
-    def handle_connect(self, mqttc, userdata, flags, result):
-        self.logger.info("MQTT Broker Connected")
+    # def handle_connect(self, mqttc, userdata, flags, result):
+    #     self.logger.info("MQTT Broker Connected")
 
-        self.connected = True
-        self.logger.debug(
-            "Subscribing to topics in {}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC))
-        #self.mqtt.subscribe(
-        #    "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
-        #                      cfg.MQTT_CONTROL_TOPIC, "#"))
+    #     self.connected = True
+    #     self.logger.debug(
+    #         "Subscribing to topics in {}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC))
+    #     #self.mqtt.subscribe(
+    #     #    "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
+    #     #                      cfg.MQTT_CONTROL_TOPIC, "#"))
 
-        #self.mqtt.subscribe(
-        #    "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
-        #                      cfg.MQTT_NOTIFICATIONS_TOPIC, "#"))
+    #     #self.mqtt.subscribe(
+    #     #    "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
+    #     #                      cfg.MQTT_NOTIFICATIONS_TOPIC, "#"))
 
-        #self.mqtt.will_set('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-        #                                     cfg.MQTT_INTERFACE_TOPIC,
-        #                                     self.__class__.__name__),
-        #                   'offline', 0, cfg.MQTT_RETAIN)
+    #     #self.mqtt.will_set('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+    #     #                                     cfg.MQTT_INTERFACE_TOPIC,
+    #     #                                     self.__class__.__name__),
+    #     #                   'offline', 0, cfg.MQTT_RETAIN)
 
-        #self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-        #                               cfg.MQTT_INTERFACE_TOPIC,
-        #                               self.__class__.__name__),
-        #             'online', 0, cfg.MQTT_RETAIN)
+    #     #self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+    #     #                               cfg.MQTT_INTERFACE_TOPIC,
+    #     #                               self.__class__.__name__),
+    #     #             'online', 0, cfg.MQTT_RETAIN)
 
     def handle_event(self, raw):
         """
@@ -252,17 +249,24 @@ class HomieMQTTInterface(Interface):
         :param raw: object with properties (can have byte properties)
         :return:
         """
-
+        #self.logger.debug("HOMIE: handling event: %s" % raw.props)
+        self.logger.info("HOMIE: handling event: %s level: %s" % (raw.message,raw.level))
         #if cfg.MQTT_PUBLISH_RAW_EVENTS:
         #    self.publish('{}/{}'.format(cfg.MQTT_BASE_TOPIC,
         #                                cfg.MQTT_EVENTS_TOPIC,
         #                                cfg.MQTT_RAW_TOPIC),
         #                 json.dumps(raw.props, ensure_ascii=False, cls=JSONByteEncoder), 0, cfg.MQTT_RETAIN)
 
+    def handle_notify(self, raw):
+        sender, message, level = raw
+
+        self.logger.debug(level, "sender: %s, message: %s" % (sender, message))
+
     def handle_change(self, raw):
         element, label, attribute, value = raw
         """Handle Property Change"""
         
+        self.logger.info("HOMIE: handling change: element: %s label: %s attribute: %s = %s" % (element,label,attribute,value))
         # Keep track of ARM state
         if element == 'partition':
             if label not in self.partitions:

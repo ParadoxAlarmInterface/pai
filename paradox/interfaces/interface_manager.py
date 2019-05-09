@@ -37,7 +37,7 @@ class InterfaceManager:
                 self.register(MQTTInterface())
             except Exception:
                 logger.exception("Unable to start MQTT Interface")
-
+        
         # Load Pushbullet service
         if self.conf.PUSHBULLET_ENABLE:
             try:
@@ -73,6 +73,15 @@ class InterfaceManager:
                 self.register(DummyInterface())
             except Exception:
                 logger.exception("Unable to start Dummy Interface")
+        
+        # Load an interface for exposing data and accepting commands
+        if self.conf.HOMIE_INTERFACE_ENABLE:
+            try:
+                logger.info("Using Homie MQTT Interface")
+                from paradox.interfaces.homie_mqtt_interface import HomieMQTTInterface
+                self.register(HomieMQTTInterface())
+            except Exception:
+                logger.exception("Unable to start Homie MQTT Interface")
 
     def register(self, interface):
         logger.debug("Registering Interface {}".format(interface.name))

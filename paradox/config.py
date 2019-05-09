@@ -148,6 +148,9 @@ class Config:
 
         # Dummy Interface for testing
         "DUMMY_INTERFACE_ENABLE": False,
+
+        #Homie Interface
+        "HOMIE_INTERFACE_ENABLE": True,
     }
 
     CONFIG_LOADED = False
@@ -234,7 +237,7 @@ class Config:
                     if valid:
                         setattr(Config, k, v)
                     else:
-                        logging.error("Invalid value for config argument {}. Allowed are: {}".format(type(v), k, expected_value))
+                        logging.error("Invalid value for config argument {} {}. Allowed are: {}".format(type(v), k, expected_value))
                         raise(Exception("Error parsing configuration value"))
 
         for args in os.environ:
