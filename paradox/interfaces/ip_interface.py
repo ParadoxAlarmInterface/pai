@@ -86,6 +86,7 @@ class ClientConnection():
 
     async def handle(self):
         next_connection_key = self.connection_key
+        status = 'connecting'
 
         while True:
             try:
@@ -115,6 +116,7 @@ class ClientConnection():
 
             force_plain_text = False
             response_code = 0x01
+            out_payload = None
             if message.header.command == 0xf0:
                 password = in_payload
 
@@ -148,7 +150,7 @@ class ClientConnection():
                 out_payload = binascii.unhexlify('0100000000000000000000000000000000')
                 flags = 0x3b
             elif message.header.command == 0xf4:
-                out_payload = b'\x00'
+                out_payload = b'\x01' if status == 'closing_connection' else b'\x00'
                 flags = 0x39
             elif message.header.command == 0xf8:
                 out_payload = b'\x01'
@@ -156,11 +158,18 @@ class ClientConnection():
             elif message.header.command == 0x00:
                 response_code = 0x02
                 flags = 0x73
-                try:
-                    out_payload = self.alarm.connection.write(in_payload)
-                except Exception:
-                    logger.exception("Send to panel")
-                    break
+                if in_payload[0] == 0x70 and in_payload[2] == 0x05:  # Close connection
+                    out_payload = self.alarm.panel.get_message('CloseConnection').build({})
+                    status = 'closing_connection'
+                else:
+                    try:
+                        self.alarm.connection.write(in_payload)
+                    except Exception:
+                        logger.exception("Send to panel")
+                        break
+
+                if in_payload[0] == 0x00:  # Just a status update
+                    status = 'connected'
 
             else:
                 logger.warn("UNKNOWN: raw: {}, payload: {}".format(binascii.hexlify(data), binascii.hexlify(in_payload)))
@@ -196,6 +205,8 @@ class ClientConnection():
                 if self.connection_key != next_connection_key:
                     self.connection_key = next_connection_key
 
+            if status == 'closing_connection':
+                break
 
 class IPInterface():
     def __init__(self):
@@ -269,8 +280,8 @@ class IPInterface():
         await self.alarm.pause()
 
         await connection.handle()
+        self.alarm.message_manager.deregister_handler(handler_name)
 
         logger.debug("Resuming")
-        self.alarm.message_manager.deregister_handler(handler_name)
         await self.alarm.resume()
         logger.info("Client %d disconnected" % self.client_nr)
