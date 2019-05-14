@@ -94,7 +94,7 @@ class Event:
         self.module = self.raw.module_serial  # Event Module Serial
         self.label_type = self.raw.get('label_type', None)  # Type of element triggering the event
         self.label = self.raw.label.replace(b'\0', b' ').strip(b' ').decode(
-            cfg.LABEL_ENCODING)  # Event Element Label. May be overwride localy
+            encoding=cfg.LABEL_ENCODING, errors='ignore')  # Event Element Label. May be overridden localy
         self.major = self.raw.event.major  # Event major code
         self.minor = self.raw.event.minor  # Event minor code
 
