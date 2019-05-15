@@ -1,9 +1,11 @@
-import homie
+#import homie
 import time
 import logging
 import json
 import os
 import re
+
+from homie.device_contact import Device_Contact
 
 from paradox.lib.utils import SortableTuple, JSONByteEncoder
 from paradox.interfaces import Interface
@@ -38,17 +40,32 @@ class HomieMQTTInterface(Interface):
 
         self.armed = dict()
 
+        self.homie_nodes = dict()
+
+        self.mqtt_settings = {}
+
+        self.homie_settings = {}
+
     def run(self):
-        mqtt_settings = {}
-        mqtt_settings = {
+        self.mqtt_settings = {
             'MQTT_BROKER' : cfg.MQTT_HOST,
             'MQTT_PORT' : cfg.MQTT_PORT,
             'MQTT_KEEPALIVE' : cfg.MQTT_KEEPALIVE,
-            'MQTT_CLIENT_ID' : "paradox_mqtt/{}".format(os.urandom(8).hex())
+            'MQTT_CLIENT_ID' : "paradox_mqtt/{}".format(os.urandom(8).hex()),
+
         }
+
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
-            mqtt_settings['MQTT_USERNAME'] = cfg.MQTT_USERNAME
-            mqtt_settings['MQTT_PASSWORD'] = cfg.MQTT_PASSWORD,
+            self.mqtt_settings['MQTT_USERNAME'] = cfg.MQTT_USERNAME
+            self.mqtt_settings['MQTT_PASSWORD'] = cfg.MQTT_PASSWORD
+
+        self.homie_settings = {
+            'version' : '0.0.1',
+            'topic' : 'homie', 
+            'fw_name' : 'python',
+            'fw_version' : '0.0.1', 
+            'update_interval' : 60,
+        }
 
         last_republish = time.time()
 
@@ -261,6 +278,7 @@ class HomieMQTTInterface(Interface):
         sender, message, level = raw
 
         self.logger.debug(level, "sender: %s, message: %s" % (sender, message))
+        
 
     def handle_change(self, raw):
         element, label, attribute, value = raw
@@ -304,6 +322,24 @@ class HomieMQTTInterface(Interface):
                 self.handle_change_external(element, label, attribute, value, element_topic,
                                             cfg.MQTT_PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC,
                                             'hass')
+        
+        if element == 'zone' and attribute == "open":
+            if label not in self.homie_nodes:
+                #has a node so use it.
+                self.logger.info("HOMIE: Adding new contact node for '%s'" % label) 
+                try:
+                    contact_node = Device_Contact(name=label,mqtt_settings=self.mqtt_settings,
+                                            homie_settings=self.homie_settings)
+                    contact_node.update_contact(value)                          
+                    self.homie_nodes[label] = contact_node
+                except Exception as e:
+                    self.logger.error("HOMIE: Error creating node: " + str(e))
+            else:
+                #needs a new node
+                self.logger.info("HOMIE: Found existing node for '%s'" % label)
+                contact_node = self.homie_nodes[label]
+                contact_node.update_contact(value)                          
+
 
     def handle_change_external(self, element, label, attribute,
                                value, element_topic, states_map,
