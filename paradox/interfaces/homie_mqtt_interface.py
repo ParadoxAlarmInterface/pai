@@ -358,6 +358,7 @@ class HomieMQTTInterface(Interface):
                 try:
                     #move contact_node to class, and set each zone as a node.
                     zone_node = Node_Base(self.alarm_Device,name=label,id=label_sanitised,type_=element)
+                    
                     #node.id = label
                     newProperty = Property_Boolean(zone_node,attribute,attribute)
                     zone_node.add_property(newProperty)
