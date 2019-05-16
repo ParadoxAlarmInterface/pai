@@ -78,8 +78,6 @@ class IPConnectionProtocol(ConnectionProtocol):
         self.read_queue.put_nowait(self._get_message_payload(self.buffer))
         self.buffer = b''
 
-        logger.debug("IP Connection inbound packet queue size: %d", self.read_queue.qsize())
-
     def connection_lost(self, exc):
         super(IPConnectionProtocol, self).connection_lost(exc)
         self.on_con_lost()
@@ -256,6 +254,14 @@ class IPConnection(Connection):
             self.connection.send_raw(msg)
             message_payload = await self.read()
             logger.debug("F2 answer: {}".format(binascii.hexlify(message_payload)))
+
+            # # F4
+            # logger.debug("Sending F4")
+            # msg = binascii.unhexlify('aa00000309f400000001eeeeeeee0000')
+            # self.connection.send_raw(msg)
+            # message_payload = await self.read()
+            #
+            # logger.debug("F4 answer: {}".format(binascii.hexlify(message_payload)))
 
             # F3
             logger.debug("Sending F3")

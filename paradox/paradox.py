@@ -373,10 +373,8 @@ class Paradox:
                 else:
                     reply = await self.message_manager.wait_for(lambda m: m.fields.value.po.command == reply_expected, timeout=timeout*2)
 
-                if reply is None:
-                    continue
-
-            return reply
+                if reply:
+                    return reply
 
         return None
 
@@ -577,15 +575,16 @@ class Paradox:
                     # Ignore some changes as defined in the configuration
                     # TODO: Move this to another place?
                     try:
-                        if notify != NotifyPropertyChange.NO and \
-                                ((element_type == "partition" and type_key in cfg.LIMITS['partition'] and
-                                  property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE) or
-                                 ('trouble' in property_name)):
+                        if notify != NotifyPropertyChange.NO and (
+                                (element_type == "partition"
+                                 and ('partition' not in cfg.LIMITS or type_key in cfg.LIMITS['partition'])
+                                 and property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE
+                                )
+                                or ('trouble' in property_name)
+                        ):
                             self.interface.notify("Paradox", "{} {} {}".format(elements[type_key]['key'],
                                                                                property_name,
                                                                                property_value), logging.INFO)
-                    except KeyError:
-                        logger.debug("Key 'partition' doesn't exist in cfg.LIMITS")
                     except Exception:
                         logger.exception("Trigger notifications")
 
@@ -622,8 +621,8 @@ class Paradox:
             logger.info("Pausing from the Alarm Panel")
             self.run = STATE_PAUSE
             self.loop_wait = False
-            await self.send_wait(self.panel.get_message('CloseConnection'), None)
-
+            # EVO IP150 IP Interface does not work if we send this
+            # await self.send_wait(self.panel.get_message('CloseConnection'), None)
 
     async def resume(self):
         logger.info("Resuming PAI")
