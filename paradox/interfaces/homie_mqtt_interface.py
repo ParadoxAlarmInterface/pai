@@ -1,4 +1,4 @@
-#import homie
+import homie
 import time
 import logging
 import json
@@ -7,7 +7,8 @@ import re
 
 from homie.device_base import Device_Base
 from homie.node.property.property_contact import Property_Contact
-from homie.node.node_contact import Node_Contact
+from homie.node.property.property_boolean import Property_Boolean
+from homie.node.node_contact import Node_Base
 
 from paradox.lib.utils import SortableTuple, JSONByteEncoder
 from paradox.interfaces import Interface
@@ -23,14 +24,16 @@ ELEMENT_TOPIC_MAP = dict(partition=cfg.MQTT_PARTITION_TOPIC, zone=cfg.MQTT_ZONE_
 re_topic_dirty = re.compile(r'\W')
 
 
+
 def sanitize_topic_part(name):
     return re_topic_dirty.sub('_', name).strip('_')
 
 
-class HomieMQTTInterface(Interface, Device_Base):
+class HomieMQTTInterface(Interface):
     """Interface Class using Homie to publish MQTT"""
     name = 'mqtt'
     acceptsInitialState = True
+    
 
     def __init__(self):
         super().__init__()
@@ -42,9 +45,11 @@ class HomieMQTTInterface(Interface, Device_Base):
 
         self.armed = dict()
 
-        self.nodes = {}
+        
 
-        #self.mqtt_settings = {}
+        #self.nodes = {}
+
+        self.mqtt_settings = {}
 
         #self.homie_settings = {}
 
@@ -54,12 +59,15 @@ class HomieMQTTInterface(Interface, Device_Base):
             'MQTT_PORT' : cfg.MQTT_PORT,
             'MQTT_KEEPALIVE' : cfg.MQTT_KEEPALIVE,
             'MQTT_CLIENT_ID' : "paradox_mqtt/{}".format(os.urandom(8).hex()),
+            'MQTT_USERNAME': '',
+            'MQTT_PASSWORD': '',
 
         }
 
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
             self.mqtt_settings['MQTT_USERNAME'] = cfg.MQTT_USERNAME
             self.mqtt_settings['MQTT_PASSWORD'] = cfg.MQTT_PASSWORD
+        
 
         self.homie_settings = {
             'version' : '0.0.1',
@@ -68,9 +76,9 @@ class HomieMQTTInterface(Interface, Device_Base):
             'fw_version' : '0.0.1', 
             'update_interval' : 60,
         }
-
-        self.topic = 'paradox/homie'
-
+        self.alarm_Device = Device_Base(name="paradox",mqtt_settings=self.mqtt_settings,homie_settings=self.homie_settings)
+        self.alarm_Device.topic = 'paradox/homie'
+        self.alarm_Device.start()
         last_republish = time.time()
 
         while True:
@@ -327,27 +335,36 @@ class HomieMQTTInterface(Interface, Device_Base):
                                             cfg.MQTT_PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC,
                                             'hass')
         
-        if element == 'zone' and attribute == "open":
+        if element == 'zone' and (attribute == "open"): #or attribute == "alarm"):
             try:
-                node = self.get_node(label)
+                label_sanitised = label.replace('_','').lower()
+                node = self.alarm_Device.get_node(label_sanitised)
                 self.logger.info("HOMIE: Found existing node for '%s'" % label)
-                if value:
-                    node.update_contact("OPEN")
-                else:
-                    node.update_contact("CLOSED")
-            except:
+                currentProperty = node.get_property(attribute.lower())
+                self.logger.info("HOMIE: Found existing property '%s' setting to %s" % (attribute, value))
+                currentProperty = value
+                #if value:
+                #    self.logger.info("HOMIE: Setting property to OPEN")
+                #    #node.set_property_value(attribute.lower(),"OPEN")
+                #   currentProperty = "OPEN"
+                #else:
+                #    self.logger.info("HOMIE: Setting property to OPEN")
+                #    currentProperty = "CLOSED"
+                currentProperty = node.get_property(attribute.lower())
+                self.logger.info("HOMIE: Current property setting '%s'" % currentProperty)
+            except Exception as e:
                 #has a node so use it.
                 self.logger.info("HOMIE: Adding new contact node for '%s'" % label) 
                 try:
                     #move contact_node to class, and set each zone as a node.
-                    node = Node_Contact(self,name=label)
-                    node.id = label
-                    #state = Property_Contact(self,name=attribute)
-                    #node.add_property(state)
+                    zone_node = Node_Base(self.alarm_Device,name=label,id=label_sanitised,type_=element)
+                    #node.id = label
+                    newProperty = Property_Boolean(zone_node,attribute,attribute)
+                    zone_node.add_property(newProperty)
                     
                     
                     #self.nodes[label] = node
-                    self.add_node(node)
+                    self.alarm_Device.add_node(zone_node)
                 except Exception as e:
                     self.logger.error("HOMIE: Error creating node: " + str(e))
             #else:
