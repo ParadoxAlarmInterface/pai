@@ -5,7 +5,9 @@ import json
 import os
 import re
 
-from homie.device_contact import Device_Contact
+from homie.device_base import Device_Base
+from homie.node.property.property_contact import Property_Contact
+from homie.node.node_contact import Node_Contact
 
 from paradox.lib.utils import SortableTuple, JSONByteEncoder
 from paradox.interfaces import Interface
@@ -25,14 +27,14 @@ def sanitize_topic_part(name):
     return re_topic_dirty.sub('_', name).strip('_')
 
 
-class HomieMQTTInterface(Interface):
+class HomieMQTTInterface(Interface, Device_Base):
     """Interface Class using Homie to publish MQTT"""
     name = 'mqtt'
     acceptsInitialState = True
 
     def __init__(self):
         super().__init__()
-
+        
         self.logger = logging.getLogger('PAI').getChild(__name__)
         self.connected = False
 
@@ -40,11 +42,11 @@ class HomieMQTTInterface(Interface):
 
         self.armed = dict()
 
-        self.homie_nodes = dict()
+        self.nodes = {}
 
-        self.mqtt_settings = {}
+        #self.mqtt_settings = {}
 
-        self.homie_settings = {}
+        #self.homie_settings = {}
 
     def run(self):
         self.mqtt_settings = {
@@ -61,11 +63,13 @@ class HomieMQTTInterface(Interface):
 
         self.homie_settings = {
             'version' : '0.0.1',
-            'topic' : 'homie', 
+            'topic' : 'paradox/homie', 
             'fw_name' : 'python',
             'fw_version' : '0.0.1', 
             'update_interval' : 60,
         }
+
+        self.topic = 'paradox/homie'
 
         last_republish = time.time()
 
@@ -324,21 +328,32 @@ class HomieMQTTInterface(Interface):
                                             'hass')
         
         if element == 'zone' and attribute == "open":
-            if label not in self.homie_nodes:
+            try:
+                node = self.get_node(label)
+                self.logger.info("HOMIE: Found existing node for '%s'" % label)
+                if value:
+                    node.update_contact("OPEN")
+                else:
+                    node.update_contact("CLOSED")
+            except:
                 #has a node so use it.
                 self.logger.info("HOMIE: Adding new contact node for '%s'" % label) 
                 try:
-                    contact_node = Device_Contact(name=label,mqtt_settings=self.mqtt_settings,
-                                            homie_settings=self.homie_settings)
-                    contact_node.update_contact(value)                          
-                    self.homie_nodes[label] = contact_node
+                    #move contact_node to class, and set each zone as a node.
+                    node = Node_Contact(self,name=label)
+                    node.id = label
+                    #state = Property_Contact(self,name=attribute)
+                    #node.add_property(state)
+                    
+                    
+                    #self.nodes[label] = node
+                    self.add_node(node)
                 except Exception as e:
                     self.logger.error("HOMIE: Error creating node: " + str(e))
-            else:
-                #needs a new node
-                self.logger.info("HOMIE: Found existing node for '%s'" % label)
-                contact_node = self.homie_nodes[label]
-                contact_node.update_contact(value)                          
+            #else:
+            #    #needs a new node
+            #    self.logger.info("HOMIE: Found existing node for '%s'" % label)
+            #    #node = self.get_node(label)
 
 
     def handle_change_external(self, element, label, attribute,
