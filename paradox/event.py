@@ -55,7 +55,7 @@ class EventLevel(Enum):
 
 class Event:
 
-    def __init__(self, event_map, event=None, label_provider=None):
+    def __init__(self, event_map, event=None, change=None, label_provider=None):
         self.timestamp = 0
         self._event_map = event_map
 
@@ -74,7 +74,11 @@ class Event:
             self.label_provider = lambda type, id: "[{}:{}]".format(type, id)
 
         if event is not None:
-            self.parse(event)
+            self.parse_event(event)
+        elif change is not None:
+            self.parse_change(change)
+        else:
+            raise (Exception("Must provide event or change"))
 
     def __repr__(self):
         lvars = {}
@@ -84,7 +88,29 @@ class Event:
         return str(self.__class__) + '\n' + '\n'.join(
             ('{} = {}'.format(item, lvars[item]) for item in lvars if not item.startswith('_')))
 
-    def parse(self, event):
+    def parse_change(self, change):
+        self.raw = copy(change)
+        self.timestamp = change['time']
+        self.partition = change['partition']
+        self.property = change['property']
+        self.value = change['value']
+        self.module = None
+        self.label_type = change['type']
+        self.label = change['label']
+        self.major = None
+        self.minor = None
+
+        self._parse_property_map()
+
+
+    def _parse_property_map(self):
+        if (self.label_type) not in self._property_map:
+            raise (Exception("Unknown property type: {}".format(self.label_type)))
+
+
+
+
+    def parse_event(self, event):
         if event.fields.value.po.command != 0x0e:
             raise (Exception("Invalid Event"))
 
@@ -98,9 +124,9 @@ class Event:
         self.major = self.raw.event.major  # Event major code
         self.minor = self.raw.event.minor  # Event minor code
 
-        self._parse_map()
+        self._parse_event_map()
 
-    def _parse_map(self):
+    def _parse_event_map(self):
         if self.major not in self._event_map:
             raise (Exception("Unknown event major: {}".format(self.raw)))
 

@@ -467,10 +467,16 @@ class Paradox:
             if el:
                 return el.get("label")
 
-    def handle_event(self, message):
+    def handle_event(self, message=None, change=None):
         """Process cfg.Live Event Message and dispatch it to the interface module"""
         try:
-            evt = event.Event(self.panel.event_map, message, label_provider=self.get_label)
+            if message is not None:
+                evt = event.Event(self.panel.event_map, event=message, label_provider=self.get_label)
+            elif change is not None:
+                evt = event.Event(self.panel.event_map, change=change, label_provider=self.get_label)
+            else:
+                logger.warn("Must provide event message or change")
+                return
 
             logger.debug("Handle Event: {}".format(evt))
 
@@ -545,8 +551,15 @@ class Paradox:
                                                                         old,
                                                                         property_value))
                     elements[type_key][property_name] = property_value
-                    self.interface.change(element_type, elements[type_key]['key'],
-                                          property_name, property_value, initial=False)
+
+                    self.handle_event(change={'type': element_type, 'label': elements[type_key]['key'],
+                                              'key': property_name, 'value': property_value,
+                                              'time': time.time(),
+                                              'partition': elements[type_key]['key'] if element_type == 'partition' else 0,
+                                              })
+
+                    #self.interface.change(element_type, elements[type_key]['key'],
+                    #                      property_name, property_value, initial=False)
 
                     # Trigger notifications for Partitions changes
                     # Ignore some changes as defined in the configuration
