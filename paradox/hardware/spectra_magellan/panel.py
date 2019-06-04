@@ -11,7 +11,7 @@ from typing import Optional
 from paradox.config import config as cfg
 from paradox.paradox import PublishPropertyChange
 from .event import event_map
-from property import property_map
+from .property import property_map
 from .parsers import Construct, CloseConnection, ErrorMessage, InitializeCommunication, InitializeCommunicationResponse, \
     SetTimeDate, SetTimeDateResponse, PerformAction, PerformActionResponse, ReadStatusResponse, ReadEEPROM, \
     ReadEEPROMResponse, LiveEvent, RAMDataParserMap, Container, ChecksumError
