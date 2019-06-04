@@ -37,17 +37,17 @@ property_map = {
     "ac_failure_trouble": dict(level=EventLevel.CRITICAL, type='system', 
 		message=dict(True="AC Power failure", False="AC Power restored")),
     "low_battery_trouble": dict(level=EventLevel.CRITICAL, type='system', 
-		message=dict(True="Battery is low", False="Battery level is OK")),
+		message=dict(True="Battery is low", False="Battery level is OK"))
 
-    "bell_output_overload_trouble" / Flag,
-    "bell_output_disconnected_trouble" / Flag,
-    "_not_used3" / BitsInteger(2),
-    "computer_fail_to_communicate_trouble" / Flag,
-    "voice_fail_to_communicate_trouble" / Flag,
-    "pager_fail_to_communicate_trouble" / Flag,
-    "central_2_reporting_ftc_indicator_trouble" / Flag,
-    "central_1_reporting_ftc_indicator_trouble" / Flag,
-    "telephone_line" / Flag),
+    # "bell_output_overload_trouble" / Flag,
+    # "bell_output_disconnected_trouble" / Flag,
+    # "_not_used3" / BitsInteger(2),
+    # "computer_fail_to_communicate_trouble" / Flag,
+    # "voice_fail_to_communicate_trouble" / Flag,
+    # "pager_fail_to_communicate_trouble" / Flag,
+    # "central_2_reporting_ftc_indicator_trouble" / Flag,
+    # "central_1_reporting_ftc_indicator_trouble" / Flag,
+    # "telephone_line" / Flag),
 
 
 
