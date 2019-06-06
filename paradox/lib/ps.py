@@ -2,8 +2,8 @@ from pubsub import pub
 
 PREFIX="pai_"
 
-def subscribe(listener, topic):
-    pub.subscribe(listener, PREFIX + topic)
+def subscribe(listener, topicName: str, **curriedArgs):
+    pub.subscribe(listener, PREFIX + topicName, **curriedArgs)
 
-def sendMessage(topic, *args, **kwargs):
-    pub.sendMessage(topic, *args, **kwargs)
+def sendMessage(topicName: str, **msgData):
+    pub.sendMessage(topicName, **msgData)

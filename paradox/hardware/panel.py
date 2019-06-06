@@ -154,7 +154,7 @@ class Panel:
 
             logger.info("{}: {}".format(elem_type.title(), ', '.join([v["label"] for v in self.core.data[elem_type].values()])))
 
-        ps.sendMessage('labels_loaded', self.core.data)
+        ps.sendMessage('labels_loaded', data=self.core.data)
 
     async def load_labels(self,
                     data_dict,
