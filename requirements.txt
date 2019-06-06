@@ -31,3 +31,4 @@ requests>=2.20.0
 #
 # Testing
 # pytest
+PyPubSub>=4.0.3

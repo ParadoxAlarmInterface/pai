@@ -7,9 +7,9 @@ from typing import Optional
 from construct import Construct, Struct, BitStruct, Const, Nibble, Checksum, Padding, Bytes, this, RawCopy, Int8ub, \
     Default, Enum, Flag, BitsInteger, Int16ub, Container, EnumIntegerString, Rebuild
 
-from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum
-
 from paradox.config import config as cfg
+from paradox.lib import ps
+from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -153,6 +153,8 @@ class Panel:
                              label_offset=elem_def['label_offset'])
 
             logger.info("{}: {}".format(elem_type.title(), ', '.join([v["label"] for v in self.core.data[elem_type].values()])))
+
+        ps.sendMessage('labels_loaded', self.core.data)
 
     async def load_labels(self,
                     data_dict,

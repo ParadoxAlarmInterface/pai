@@ -1,20 +1,19 @@
 # -*- coding: utf-8 -*-
 
-import binascii
+import asyncio
 import logging
 import time
-import asyncio
 from collections import defaultdict, MutableMapping
+from enum import Enum
 from threading import Lock
 from typing import Optional, Sequence, Iterable, Callable, Awaitable
 
 from construct import Container
 
-from paradox.hardware import create_panel
 from paradox import event
-from enum import Enum
-
 from paradox.config import config as cfg
+from paradox.hardware import create_panel
+from paradox.lib import ps
 from paradox.lib.async_message_manager import AsyncMessageManager, EventMessageHandler, ErrorMessageHandler
 
 logger = logging.getLogger('PAI').getChild(__name__)
@@ -153,6 +152,7 @@ class Paradox:
 
             if reply.fields.value.product_id is not None:
                 self.panel = create_panel(self, reply.fields.value.product_id)  # Now we know what panel it is. Let's
+                ps.sendMessage('panel_detected', reply.fields.value.product_id)
             # recreate panel object.
 
             result = await self.panel.initialize_communication(reply, cfg.PASSWORD)
@@ -183,6 +183,7 @@ class Paradox:
             logger.info("Connection OK")
             self.loop_wait = False
 
+            ps.sendMessage('connected')
             return True
         except ConnectionError as e:
             logger.error("Failed to connect: %s" % str(e))
