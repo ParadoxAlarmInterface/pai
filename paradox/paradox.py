@@ -152,7 +152,7 @@ class Paradox:
 
             if reply.fields.value.product_id is not None:
                 self.panel = create_panel(self, reply.fields.value.product_id)  # Now we know what panel it is. Let's
-                ps.sendMessage('panel_detected', reply.fields.value.product_id)
+                ps.sendMessage('panel_detected', product_id=reply.fields.value.product_id)
             # recreate panel object.
 
             result = await self.panel.initialize_communication(reply, cfg.PASSWORD)
