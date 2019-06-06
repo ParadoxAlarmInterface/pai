@@ -307,12 +307,12 @@ class MQTTInterface(Interface):
 
             # only process if not armed already
             elif self.armed[service][label]['attribute'] is None:
-                if attribute == 'stay_arm':
-                    state = states_map['stay_arm']
+                if attribute == 'arm_stay':
+                    state = states_map['arm_stay']
                 elif attribute == 'arm':
                     state = states_map['arm']
-                elif attribute == 'sleep_arm':
-                    state = states_map['sleep_arm']
+                elif attribute == 'arm_sleep':
+                    state = states_map['arm_sleep']
                 else:
                     return
 
@@ -328,7 +328,7 @@ class MQTTInterface(Interface):
                 state = self.armed[service][label]['state']  # Restore the ARM state
                 self.armed[service][label]['alarm'] = False  # Reset alarm state
 
-            elif attribute in ['stay_arm', 'arm', 'sleep_arm'] and self.armed[service][label]['attribute'] == attribute:
+            elif attribute in ['arm_stay', 'arm', 'arm_sleep'] and self.armed[service][label]['attribute'] == attribute:
                 state = states_map['disarm']
                 self.armed[service][label] = dict(attribute=None, state=None, alarm=False)
             else:

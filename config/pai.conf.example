@@ -104,9 +104,9 @@ MQTT_HOMEBRIDGE_SUMMARY_TOPIC = 'current'
 # Value = State propagated to Homebridge
 MQTT_PARTITION_HOMEBRIDGE_STATES = dict(
     alarm='ALARM_TRIGGERED',
-    stay_arm='STAY_ARM',
+    arm_stay='STAY_ARM',
     arm='AWAY_ARM',
-    sleep_arm='NIGHT_ARM',
+    arm_sleep='NIGHT_ARM',
     disarm='DISARMED')
 # Homebridge control map
 # Key = Command from Homebridge
@@ -129,9 +129,9 @@ MQTT_HOMEASSISTANT_SUMMARY_TOPIC = 'current_hass'
 # Value = State propagated to Homeassistant
 MQTT_PARTITION_HOMEASSISTANT_STATES = dict(
                              alarm='triggered', 
-                             stay_arm='armed_home',
+                             arm_stay='armed_home',
                              arm='armed_away',
-                             sleep_arm='armed_night',
+                             arm_sleep='armed_night',
                              disarm='disarmed')
 # Homeassistant control map
 # Key = Command from Homeassistant

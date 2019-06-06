@@ -84,16 +84,16 @@ class Config:
             'DISARM': 'disarm'},
         "MQTT_PARTITION_HOMEBRIDGE_STATES": {
             'alarm': 'ALARM_TRIGGERED',
-            'stay_arm': 'STAY_ARM',
+            'arm_stay': 'STAY_ARM',
             'arm': 'AWAY_ARM',
-            'sleep_arm': 'NIGHT_ARM',
+            'arm_sleep': 'NIGHT_ARM',
             'disarm': 'DISARMED'},
         "MQTT_HOMEASSISTANT_SUMMARY_TOPIC": 'current_hass',
         "MQTT_PARTITION_HOMEASSISTANT_STATES": {
             'alarm': 'triggered', 
-            'stay_arm': 'armed_home',
+            'arm_stay': 'armed_home',
             'arm': 'armed_away',
-            'sleep_arm': 'armed_night',
+            'arm_sleep': 'armed_night',
             'disarm': 'disarmed'},
         "MQTT_PARTITION_HOMEASSISTANT_COMMANDS": {
             'arm_home': 'arm_stay', 
