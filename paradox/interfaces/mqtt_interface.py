@@ -1,12 +1,15 @@
-import paho.mqtt.client as mqtt
-import time
-import logging
 import json
+import logging
 import os
 import re
+import time
 
-from paradox.lib.utils import SortableTuple, JSONByteEncoder
+import paho.mqtt.client as mqtt
+
 from paradox.interfaces import Interface
+from paradox.lib.utils import SortableTuple, JSONByteEncoder
+
+logger = logging.getLogger('PAI').getChild(__name__)
 
 from paradox.config import config as cfg
 
@@ -44,6 +47,12 @@ class MQTTInterface(Interface):
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
             self.mqtt.username_pw_set(
                 username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
+
+        required_mappings = 'alarm,arm,arm_stay,arm_sleep,disarm'.split(',')
+        if cfg.MQTT_HOMEBRIDGE_ENABLE:
+            self.check_config_mappings('MQTT_PARTITION_HOMEBRIDGE_STATES', required_mappings)
+        if cfg.MQTT_HOMEASSISTANT_ENABLE:
+            self.check_config_mappings('MQTT_PARTITION_HOMEASSISTANT_STATES', required_mappings)
         
         self.mqtt.will_set('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                              cfg.MQTT_INTERFACE_TOPIC,
@@ -288,6 +297,13 @@ class MQTTInterface(Interface):
                 self.handle_change_external(element, label, attribute, value, element_topic,
                                             cfg.MQTT_PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC,
                                             'hass')
+
+    def check_config_mappings(self, config_parameter, required_mappings):
+        # Check states_map
+        keys = cfg[config_parameter]
+        missing_mappings = [k for k in required_mappings if k not in keys]
+        if len(missing_mappings):
+            logger.warning(', '.join(missing_mappings) + " keys are missing from %s config." % config_parameter)
 
     def handle_change_external(self, element, label, attribute,
                                value, element_topic, states_map,
