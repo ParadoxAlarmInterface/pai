@@ -297,7 +297,7 @@ class IPConnection(Connection):
 
         return self.connected
 
-    def write(self, data):
+    def write(self, data: bytes):
         """Write data to socket"""
 
         if not self.refresh_stun():

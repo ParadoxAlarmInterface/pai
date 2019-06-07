@@ -12,6 +12,8 @@ from construct import Container
 
 from paradox import event
 from paradox.config import config as cfg
+from paradox.connections.connection import Connection
+from paradox.interfaces.interface_manager import InterfaceManager
 from paradox.hardware import create_panel
 from paradox.lib import ps
 from paradox.lib.async_message_manager import AsyncMessageManager, EventMessageHandler, ErrorMessageHandler
@@ -72,8 +74,8 @@ class Type(MutableMapping):
 class Paradox:
 
     def __init__(self,
-                 connection,
-                 interface,
+                 connection: Connection,
+                 interface: InterfaceManager,
                  retries=3):
 
         self.panel = None  # type: Panel
@@ -381,7 +383,7 @@ class Paradox:
 
         return selected
 
-    def control_zone(self, zone, command) -> bool:
+    def control_zone(self, zone: str, command: str) -> bool:
         logger.debug("Control Zone: {} - {}".format(zone, command))
 
         zones_selected = self._select(self.data['zone'], zone)  # type: Sequence[int]
@@ -407,7 +409,7 @@ class Paradox:
 
         return accepted
 
-    def control_partition(self, partition, command) -> bool:
+    def control_partition(self, partition: str, command: str) -> bool:
         logger.debug("Control Partition: {} - {}".format(partition, command))
 
         partitions_selected = self._select(self.data['partition'], partition)  # type: Sequence[int]
@@ -462,7 +464,7 @@ class Paradox:
 
         return accepted
 
-    def get_label(self, label_type, label_id):
+    def get_label(self, label_type: str, label_id):
         if label_type in self.data:
             el = self.data[label_type].get(label_id)
             if el:
@@ -505,7 +507,7 @@ class Paradox:
         except Exception as e:
             logger.exception("Handle event")
 
-    def update_properties(self, element_type, type_key, change,
+    def update_properties(self, element_type: str, type_key: str, change: dict,
                           notify=NotifyPropertyChange.DEFAULT, publish=PublishPropertyChange.DEFAULT):
         try:
             elements = self.data[element_type]

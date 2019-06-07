@@ -37,7 +37,7 @@ class Panel:
     def parse_message(self, message, direction='topanel') -> Optional[Container]:
         if message is None or len(message) == 0:
             return None
-        
+
         if direction == 'topanel':
             if message[0] == 0x72 and message[1] == 0:
                 return InitiateCommunication.parse(message)

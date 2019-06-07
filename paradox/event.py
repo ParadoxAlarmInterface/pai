@@ -55,7 +55,7 @@ class EventLevel(Enum):
 
 class Event:
 
-    def __init__(self, event_map, event=None, label_provider=None):
+    def __init__(self, event_map: dict, event=None, label_provider=None):
         self.timestamp = 0
         self._event_map = event_map
 

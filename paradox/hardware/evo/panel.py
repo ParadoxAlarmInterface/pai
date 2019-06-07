@@ -21,7 +21,7 @@ class Panel_EVOBase(PanelBase):
 
     event_map = event_map
 
-    def get_message(self, name) -> Construct:
+    def get_message(self, name: str) -> Construct:
         try:
             clsmembers = dict(inspect.getmembers(sys.modules[__name__]))
             if name in clsmembers:
@@ -62,7 +62,7 @@ class Panel_EVOBase(PanelBase):
 
                 fh.write(data)
 
-    def parse_message(self, message, direction='topanel') -> Optional[Container]:
+    def parse_message(self, message: bytes, direction='topanel') -> Optional[Container]:
         try:
             if message is None or len(message) == 0:
                 return None
@@ -115,12 +115,12 @@ class Panel_EVOBase(PanelBase):
 
         return None
 
-    async def initialize_communication(self, reply, PASSWORD) -> bool:
-        password = self.encode_password(PASSWORD)
+    async def initialize_communication(self, reply: Container, password) -> bool:
+        encoded_password = self.encode_password(password)
 
         raw_data = reply.fields.data + reply.checksum
         parsed = InitializeCommunication.parse(raw_data)
-        parsed.fields.value.pc_password = password
+        parsed.fields.value.pc_password = encoded_password
         payload = InitializeCommunication.build(
             dict(fields=dict(value=parsed.fields.value)))
 
@@ -142,7 +142,7 @@ class Panel_EVOBase(PanelBase):
                 logger.error("Authentication Failed")
                 return False
 
-    def _request_status_reply_check(self, message, address):
+    def _request_status_reply_check(self, message: Container, address: int):
         mvars = message.fields.value
 
         assert mvars.po.command == 0x5
@@ -153,13 +153,13 @@ class Panel_EVOBase(PanelBase):
 
         return True
 
-    async def request_status(self, i) -> Optional[Container]:
+    async def request_status(self, i: int) -> Optional[Container]:
         args = dict(address=i, length=64, control=dict(ram_access=True))
         reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, i))
 
         return reply
 
-    def handle_status(self, message):
+    def handle_status(self, message: Container):
         """Handle MessageStatus"""
 
         mvars = message.fields.value
@@ -185,7 +185,7 @@ class Panel_EVOBase(PanelBase):
 
         self.process_properties_bulk(properties, mvars.address)
 
-    async def control_partitions(self, partitions, command) -> bool:
+    async def control_partitions(self, partitions: list, command: str) -> bool:
         """
         Control Partitions
         :param list partitions: a list of partitions
