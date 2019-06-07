@@ -12,7 +12,7 @@ from gi.repository import GObject
 import logging
 import queue
 
-from paradox.event import EventLevel
+from paradox.event import EventLevel, Event
 from paradox.lib.utils import SortableTuple
 
 from paradox.config import config as cfg
@@ -38,7 +38,7 @@ class SignalInterface(Interface):
 
         self.logger.debug("Signal Stopped")
 
-    def event(self, event):
+    def event(self, event: Event):
         if event.level.value >= EventLevel.WARN.value:
             self.queue.put_nowait(SortableTuple(
                 (2, 'event', event)))

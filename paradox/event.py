@@ -6,43 +6,13 @@ from copy import copy
 from enum import Enum
 import datetime
 
+from construct import Container
+
 logger = logging.getLogger('PAI').getChild(__name__)
 
 re_magick_placeholder = re.compile('@(?P<type>[a-z]+)(:?#(?P<source>[a-z0-9_]+))?')
 
 from paradox.config import config as cfg
-
-class Formatter(string.Formatter):
-
-    @staticmethod
-    def _hasattr(event, key):
-        if key in event.additional_data:
-            return True
-        return hasattr(event, key)
-
-    @staticmethod
-    def _getattr(event, key):
-        if key in event.additional_data:
-            return event.additional_data[key]
-        return getattr(event, key)
-
-    def get_value(self, key, args, kwargs):
-        event = args[0]
-        if key.startswith('@'):  # pure magic is happening here
-            label_provider = event.label_provider
-            m = re_magick_placeholder.match(key)
-            if m:
-                element_type = m.group('type')
-                source = m.group('source') or (element_type if self._hasattr(event, element_type) else 'minor')
-                key = self._getattr(event, source)
-
-                return label_provider(element_type, key)
-            else:
-                logger.error('Magic placeholder "{}" has wrong format'.format(key))
-                return "{error}"
-
-        return self._getattr(event, key)
-
 
 class EventLevel(Enum):
     NOTSET = 0
@@ -54,8 +24,7 @@ class EventLevel(Enum):
 
 
 class Event:
-
-    def __init__(self, event_map: dict, event=None, label_provider=None):
+    def __init__(self, event_map: dict, message: Container=None, label_provider=None):
         self.timestamp = 0
         self._event_map = event_map
 
@@ -73,8 +42,8 @@ class Event:
         else:
             self.label_provider = lambda type, id: "[{}:{}]".format(type, id)
 
-        if event is not None:
-            self.parse(event)
+        if message is not None:
+            self.parse(message)
 
     def __repr__(self):
         lvars = {}
@@ -84,11 +53,11 @@ class Event:
         return str(self.__class__) + '\n' + '\n'.join(
             ('{} = {}'.format(item, lvars[item]) for item in lvars if not item.startswith('_')))
 
-    def parse(self, event):
-        if event.fields.value.po.command != 0x0e:
+    def parse(self, message: Container):
+        if message.fields.value.po.command != 0x0e:
             raise (Exception("Invalid Event"))
 
-        self.raw = copy(event.fields.value)  # Event raw data
+        self.raw = copy(message.fields.value)  # Event raw data
         self.timestamp = self.raw.time  # Event timestamp
         self.partition = self.raw.partition  # Event Partition. if Type is system, partition may not be relevant
         self.module = self.raw.module_serial  # Event Module Serial
@@ -143,11 +112,11 @@ class Event:
             self.id = self.partition
 
     @property
-    def message(self):
+    def message(self) -> str:
         return Formatter().format(self._message_tpl, self)
 
     @property
-    def name(self):
+    def name(self) -> str:
         key = self.partition if self.type == 'partition' else self.minor
 
         name = self.label_provider(self.type, key)
@@ -157,7 +126,7 @@ class Event:
         return '-'
 
     @property
-    def props(self):
+    def props(self) -> dict:
         dp = {}
         for key in dir(self):
             if key in ['props', 'raw']:
@@ -172,3 +141,35 @@ class Event:
                 else:
                     dp[key] = value
         return dp
+
+
+class Formatter(string.Formatter):
+
+    @staticmethod
+    def _hasattr(event: Event, key):
+        if key in event.additional_data:
+            return True
+        return hasattr(event, key)
+
+    @staticmethod
+    def _getattr(event: Event, key):
+        if key in event.additional_data:
+            return event.additional_data[key]
+        return getattr(event, key)
+
+    def get_value(self, key, args, kwargs):
+        event = args[0]
+        if key.startswith('@'):  # pure magic is happening here
+            label_provider = event.label_provider
+            m = re_magick_placeholder.match(key)
+            if m:
+                element_type = m.group('type')
+                source = m.group('source') or (element_type if self._hasattr(event, element_type) else 'minor')
+                key = self._getattr(event, source)
+
+                return label_provider(element_type, key)
+            else:
+                logger.error('Magic placeholder "{}" has wrong format'.format(key))
+                return "{error}"
+
+        return self._getattr(event, key)

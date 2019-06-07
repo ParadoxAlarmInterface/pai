@@ -10,7 +10,7 @@ import datetime
 import queue
 import serial
 
-from paradox.event import EventLevel
+from paradox.event import EventLevel, Event
 from paradox.lib.utils import SortableTuple
 
 from paradox.config import config as cfg
@@ -36,19 +36,19 @@ class GSMInterface(Interface):
 
         self.logger.debug("GSM Stopped")
 
-    def event(self, raw):
+    def event(self, event: Event):
         """ Enqueues an event"""
 
         # Fire Alarm and Strobe
         # Special Alarms
         ignore = True
-        for tag in raw.tags:
+        for tag in event.tags:
             if '_alarm' in tag:
                 ignore = False
                 break
 
         if not ignore:
-            self.queue.put_nowait(SortableTuple((2, 'event', raw)))
+            self.queue.put_nowait(SortableTuple((2, 'event', event)))
 
     def notify(self, source, message, level):
         if source == self.name:

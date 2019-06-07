@@ -6,6 +6,7 @@ import time
 
 import paho.mqtt.client as mqtt
 
+from paradox.event import Event
 from paradox.interfaces import Interface
 from paradox.lib.utils import SortableTuple, JSONByteEncoder
 
@@ -101,9 +102,9 @@ class MQTTInterface(Interface):
         self.queue.put_nowait(SortableTuple((0, 'command', 'stop')))
         self.join()
 
-    def event(self, raw):
+    def event(self, event: Event):
         """ Enqueues an event"""
-        self.queue.put_nowait(SortableTuple((2, 'event', raw)))
+        self.queue.put_nowait(SortableTuple((2, 'event', event)))
 
     def change(self, element, label, panel_property, value):
         """ Enqueues a change """

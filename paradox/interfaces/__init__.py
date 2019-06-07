@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 
-from threading import Thread, Event
+import threading
 import queue
 
 from paradox.config import config as cfg
+from paradox.event import Event
 
 
-class Interface(Thread):
+class Interface(threading.Thread):
 
     def __init__(self):
         super().__init__()
@@ -16,7 +17,7 @@ class Interface(Thread):
         self.logger = None  # assign logger in the subclass
         self.partitions = {}
 
-        self.stop_running = Event()
+        self.stop_running = threading.Event()
         self.stop_running.clear()
 
         self.queue = queue.PriorityQueue()
@@ -29,7 +30,7 @@ class Interface(Thread):
         """ Set the notification handler"""
         self.notification_handler = handler
 
-    def event(self, raw):
+    def event(self, event: Event):
         """ Enqueues an event"""
         pass
 

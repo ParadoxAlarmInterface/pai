@@ -13,7 +13,7 @@ import time
 import logging
 import json
 
-from paradox.event import EventLevel
+from paradox.event import EventLevel, Event
 from paradox.lib.utils import SortableTuple
 
 from paradox.config import config as cfg
@@ -156,9 +156,9 @@ class PushBulletInterface(Interface):
         """ Set the notification handler"""
         self.notification_handler = handler
 
-    def event(self, raw):
+    def event(self, event: Event):
         """ Enqueues an event"""
-        self.queue.put_nowait(SortableTuple((2, 'event', raw)))
+        self.queue.put_nowait(SortableTuple((2, 'event', event)))
 
     def change(self, element, label, panel_property, value):
         """ Enqueues a change """

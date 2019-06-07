@@ -470,7 +470,7 @@ class Paradox:
             if el:
                 return el.get("label")
 
-    def handle_event(self, message):
+    def handle_event(self, message: Container):
         """Process cfg.Live Event Message and dispatch it to the interface module"""
         try:
             evt = event.Event(self.panel.event_map, message, label_provider=self.get_label)

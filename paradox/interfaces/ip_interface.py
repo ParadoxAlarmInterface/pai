@@ -2,15 +2,13 @@
 
 # IP Interface
 
-import time
 import logging
-import socket
-import select
 from construct import GreedyBytes, Struct, Aligned, Const, Int8ub, Bytes, Int16ul, Default
-from threading import Thread, Event
 import binascii
 import os
 from typing import Awaitable
+
+from paradox.event import Event
 from paradox.lib.crypto import encrypt, decrypt
 from paradox.lib.async_message_manager import RAWMessageHandler
 
@@ -251,7 +249,7 @@ class IPInterface():
     def set_notify(self, tmp):
         pass
 
-    def event(self, event):
+    def event(self, event: Event):
         pass
 
     def notify(self, source, message, level):

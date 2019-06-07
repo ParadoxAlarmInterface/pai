@@ -1,6 +1,8 @@
 
 import logging
 
+from paradox.event import Event
+
 logger = logging.getLogger('PAI').getChild(__name__)
 
 
@@ -84,10 +86,10 @@ class InterfaceManager:
         except Exception:
             logger.exception("Error registering interface {}".format(interface.name))
 
-    def event(self, raw):
+    def event(self, event: Event):
         for interface in self.interfaces:
             try:
-                interface.event(raw)
+                interface.event(event)
             except Exception:
                 logger.exception(
                     "Error dispatching event to interface {}".format(interface.name))
