@@ -137,10 +137,10 @@ MQTT_PARTITION_HOMEASSISTANT_STATES = dict(
 # Key = Command from Homeassistant
 # Value = Command sent to Panel
 MQTT_PARTITION_HOMEASSISTANT_COMMANDS = dict(
-                                arm_home='arm_stay', 
-                                arm_away='arm',
-                                arm_night='arm_sleep',
-                                disarm='disarm')
+                                ARM_HOME='arm_stay',
+                                ARM_AWAY='arm',
+                                ARM_NIGHT='arm_sleep',
+                                DISARM='disarm')
 
 # Interfaces
 COMMAND_ALIAS = {						# alias for commands through text based interfaces
