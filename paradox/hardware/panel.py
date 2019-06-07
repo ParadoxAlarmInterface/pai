@@ -9,7 +9,7 @@ from construct import Construct, Struct, BitStruct, Const, Nibble, Checksum, Pad
 
 from paradox.config import config as cfg
 from paradox.lib import ps
-from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum
+from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum, HexInt
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -281,9 +281,9 @@ InitiateCommunicationResponse = Struct("fields" / RawCopy(
                         CONTROLLER_APPLICATION=1,
                         MODULE_APPLICATION=2),
         "application" / Struct(
-            "version" / Int8ub,
-            "revision" / Int8ub,
-            "build" / Int8ub),
+            "version" / HexInt,
+            "revision" / HexInt,
+            "build" / HexInt),
         "serial_number" / Bytes(4),
         "hardware" / Struct(
             "version" / Int8ub,

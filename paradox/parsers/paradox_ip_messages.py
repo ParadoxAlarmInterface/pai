@@ -1,5 +1,7 @@
 from construct import Struct, Aligned, Const, Int8ub, Bytes, Int16ub, Int16ul, Default, Enum, GreedyBytes
 
+from paradox.hardware.common import HexInt
+
 ip_message = Struct(
         "header" / Aligned(16, Struct(
             "sof" / Const(0xaa, Int8ub), 
@@ -22,7 +24,7 @@ ip_payload_connect_response = Struct(
     	user_already_connected1=0x04),
     'key'   / Bytes(16),
     'hardware_version' / Int16ub,
-    'ip_firmware_major' / Default(Int8ub, 5),
-    'ip_firmware_minor' / Default(Int8ub, 2),
+    'ip_firmware_major' / Default(HexInt, 5),
+    'ip_firmware_minor' / Default(HexInt, 2),
     'ip_module_serial'	/ Bytes(4),
     )
