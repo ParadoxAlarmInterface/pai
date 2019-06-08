@@ -470,12 +470,18 @@ class Paradox:
     def handle_event(self, message=None, change=None):
         """Process cfg.Live Event Message and dispatch it to the interface module"""
         try:
-            if message is not None:
-                evt = event.Event(self.panel.event_map, event=message, label_provider=self.get_label)
-            elif change is not None:
-                evt = event.Event(self.panel.event_map, change=change, label_provider=self.get_label)
+            evt = event.Event()
+            r = False
+            if change is not None:
+                r = evt.from_change(property_map=self.panel.property_map, change=change)
+            elif message is not None:
+                r = evt.from_live_event(self.panel.event_map, event=message, label_provider=self.get_label)
             else:
-                logger.warn("Must provide event message or change")
+                logger.warn("Must provide message or change")
+                return
+            
+            if not r:
+                logger.debug("Could not parse to Event")
                 return
 
             logger.debug("Handle Event: {}".format(evt))
@@ -556,14 +562,9 @@ class Paradox:
                     self.interface.change(element_type, elements[type_key]['key'],
                                       property_name, property_value)
 
-                    if element_type == 'partition':
-                        partition = elements[type_key]['key']
-                    else:
-                        partition = 0
+                    change = {'property': property_name, 'value': property_value, 'type': element_type, 'partition': None, 'label': elements[type_key]['key'], 'time': int(time.time())}
 
-                    change = {'property': property_name, 'value': property_value, 'type': element_type, 'partition': partition, 'label': elements[type_key]['key']}
-
-                    self.interface.handle_event(event.Event(property_map=self.panel.property_map, change=change))
+                    self.handle_event(change=change)
 
             else:
                 elements[type_key][property_name] = property_value  # Initial value

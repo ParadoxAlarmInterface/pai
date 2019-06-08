@@ -28,6 +28,10 @@ class Formatter(string.Formatter):
 
     def get_value(self, key, args, kwargs):
         event = args[0]
+        
+        if isinstance(key, int) or isinstance(key, float):
+            return key
+
         if key.startswith('@'):  # pure magic is happening here
             label_provider = event.label_provider
             m = re_magick_placeholder.match(key)
@@ -55,7 +59,7 @@ class EventLevel(Enum):
 
 class Event:
 
-    def __init__(self, event_map, property_map=None, event=None, change=None, label_provider=None):
+    def __init__(self):
         self.timestamp = 0
         # default
         self.level = EventLevel.NOTSET
@@ -66,19 +70,8 @@ class Event:
         self.change = {}
         self.additional_data = {}
         self.partition = None
-        if isinstance(label_provider, typing.Callable):
-            self.label_provider = label_provider
-        else:
-            self.label_provider = lambda type, id: "[{}:{}]".format(type, id)
-
-        if event is not None:
-            self._event_map = event_map
-            self.parse_event(event)
-        elif change is not None:
-            self._property_map = property_map
-            self.parse_change(change)
-        else:
-            raise (Exception("Must provide event or change"))
+        self._event_map = None
+        self._property_map = None
 
     def __repr__(self):
         lvars = {}
@@ -87,30 +80,69 @@ class Event:
 
         return str(self.__class__) + '\n' + '\n'.join(
             ('{} = {}'.format(item, lvars[item]) for item in lvars if not item.startswith('_')))
+    
+    def from_live_event(self, event_map, event, label_provider=None):
+        if isinstance(label_provider, typing.Callable):
+            self.label_provider = label_provider
+        else:
+            self.label_provider = lambda type, id: "[{}:{}]".format(type, id)
+        
+        self._event_map = event_map
+        self.parse_event(event)
+        
+        return self._parse_event_map()
 
-    def parse_change(self, change):
+    def from_change(self, property_map, change, label_provider=None):
+        if isinstance(label_provider, typing.Callable):
+            self.label_provider = label_provider
+        else:
+            self.label_provider = lambda type, id: "[{}:{}]".format(type, id)
+        
+        self._property_map = property_map
         self.raw = copy(change)
-        self.timestamp = change['time']
-        self.partition = change['partition']
-        self.property = change['property']
-        self.value = change['value']
-        self.module = None
-        self.label_type = change['type']
-        self.label = change['label']
-        self.major = None
-        self.minor = None
-
-        self._parse_property_map()
+        return self._parse_property_map()
 
 
     def _parse_property_map(self):
-        if (self.label_type) not in self._property_map:
-            raise (Exception("Unknown property type: {}".format(self.label_type)))
+        
+        if (self.raw['property']) not in self._property_map:
+            return False
 
+        self.timestamp = self.raw['time']
+        self.partition = self.raw['partition']
+        self.property = self.raw['property']
+        self.value = self.raw['value']
+        self.module = None
+        self.type = self.raw['type']
+        self.label = self.raw['label']
+        self.major = None
+        self.minor = None
+        
+        property_map = copy(self._property_map[self.property])  # for inplace modifications
+        callables = (k for k in property_map if isinstance(property_map[k], typing.Callable))
+        for k in callables:
+            property_map[k] = property_map[k](self, self.label_provider)
+
+        self.level = property_map.get('level', self.level)
+        tpl = property_map.get('message', self._message_tpl)
+        if isinstance(tpl, dict):
+            if self.value in tpl:
+                self._message_tpl = tpl[self.value]
+        else:
+            self._message_tpl = tpl
+        
+        self.change = {self.raw['property'] : self.raw['value']}
+        self.tags = property_map.get('tags', [])
+        
+        if self.type == 'partition':
+            self.label = self.label_provider(self.type, self.partition)
+            self.id = self.partition
+
+        return True
 
     def parse_event(self, event):
         if event.fields.value.po.command != 0x0e:
-            raise (Exception("Invalid Event"))
+            return False
 
         self.raw = copy(event.fields.value)  # Event raw data
         self.timestamp = self.raw.time  # Event timestamp
@@ -123,6 +155,8 @@ class Event:
         self.minor = self.raw.event.minor  # Event minor code
 
         self._parse_event_map()
+    
+        return True
 
     def _parse_event_map(self):
         if self.major not in self._event_map:

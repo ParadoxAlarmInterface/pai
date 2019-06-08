@@ -2,18 +2,27 @@ from paradox.event import EventLevel
 
 
 property_map = {
+        'dc': dict(level=EventLevel.DEBUG, tags=['voltage'], type='system', 
+            message="DC voltage is {value}"),
+        'vdc': dict(level=EventLevel.DEBUG, tags=['voltage'], type='system', 
+            message="VDC voltage is {value}"),
+        'battery': dict(level=EventLevel.DEBUG, tags=['voltage'], type='system', 
+            message="Battery voltage is {value}"),
+
 	#### Status 0
+        'trouble': dict(level=EventLevel.CRITICAL, tags=['trouble'], type='system', 
+            message={"True":"Trouble", "False": "No trouble"}),
 	'timer_loss_trouble': dict(level=EventLevel.CRITICAL, tags=['trouble'], type='system', 
 		message={"True":"Timer lost trouble", "False": "Timer recovered"}),
 	"fire_loop_trouble": dict(level=EventLevel.CRITICAL, tags=['trouble'], type='system', 
 		message={"True":"Fire loop", "False": "Fire loop recovered"}),
-    "module_tamper_trouble": dict(level=EventLevel.CRITICAL, tags=['trouble'], type='system', 
+        "module_tamper_trouble": dict(level=EventLevel.CRITICAL, tags=['trouble'], type='system', 
 		message={"True":"Module tampered", "False": "Module tamper cleared"}),
-    "zone_tamper_trouble": dict(level=EventLevel.CRITICAL, tags=['trouble'], type='system', 
+        "zone_tamper_trouble": dict(level=EventLevel.CRITICAL, tags=['trouble'], type='system', 
 		message={"True":"Zone tampered", "False": "Zone tamper cleared"}),
-    "communication_trouble": dict(level=EventLevel.CRITICAL, tags=['trouble'], type='system', 
+        "communication_trouble": dict(level=EventLevel.CRITICAL, tags=['trouble'], type='system', 
 		message={"True":"Communication trouble", "False": "Communication restored"}),
-    "bell_trouble": dict(level=EventLevel.CRITICAL, tags=['trouble'], type='system', 
+        "bell_trouble": dict(level=EventLevel.CRITICAL, tags=['trouble'], type='system', 
 		message={"True":"Bell trouble", "False": "Bell restored"}),
     "power_trouble": dict(level=EventLevel.CRITICAL, tags=['trouble'], type='system', 
 		message={"True":"Power trouble", "False": "Power restored"}),
@@ -68,6 +77,8 @@ property_map = {
 		message={"True":"Zone {} on fire", "False": "Zone {} not on fire"}),
 
 	###### Status 1
+        'rf_noise_floor': dict(level=EventLevel.DEBUG, tags=['RF'], type='system', 
+            message="RF Noise floor is {value}"),
 
 	###### Status 2
 	"zone_status": dict(level=EventLevel.DEBUG, type='zone', id=None, 
