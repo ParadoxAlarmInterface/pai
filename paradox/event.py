@@ -55,10 +55,8 @@ class EventLevel(Enum):
 
 class Event:
 
-    def __init__(self, event_map, event=None, change=None, label_provider=None):
+    def __init__(self, event_map, property_map=None, event=None, change=None, label_provider=None):
         self.timestamp = 0
-        self._event_map = event_map
-
         # default
         self.level = EventLevel.NOTSET
         self.tags = []
@@ -74,8 +72,10 @@ class Event:
             self.label_provider = lambda type, id: "[{}:{}]".format(type, id)
 
         if event is not None:
+            self._event_map = event_map
             self.parse_event(event)
         elif change is not None:
+            self._property_map = property_map
             self.parse_change(change)
         else:
             raise (Exception("Must provide event or change"))
@@ -106,8 +106,6 @@ class Event:
     def _parse_property_map(self):
         if (self.label_type) not in self._property_map:
             raise (Exception("Unknown property type: {}".format(self.label_type)))
-
-
 
 
     def parse_event(self, event):

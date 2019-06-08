@@ -540,6 +540,7 @@ class Paradox:
 
                     self.update_properties(element_type, type_key, dict(trouble=r), notify=notify, publish=publish)
 
+            # Standard processing of changes
             if property_name in elements[type_key]:
                 old = elements[type_key][property_name]
 
@@ -552,31 +553,17 @@ class Paradox:
                                                                         property_value))
                     elements[type_key][property_name] = property_value
 
-                    self.handle_event(change={'type': element_type, 'label': elements[type_key]['key'],
-                                              'key': property_name, 'value': property_value,
-                                              'time': time.time(),
-                                              'partition': elements[type_key]['key'] if element_type == 'partition' else 0,
-                                              })
+                    self.interface.change(element_type, elements[type_key]['key'],
+                                      property_name, property_value)
 
-                    #self.interface.change(element_type, elements[type_key]['key'],
-                    #                      property_name, property_value, initial=False)
+                    if element_type == 'partition':
+                        partition = elements[type_key]['key']
+                    else:
+                        partition = 0
 
-                    # Trigger notifications for Partitions changes
-                    # Ignore some changes as defined in the configuration
-                    # TODO: Move this to another place?
-                    try:
-                        if notify != NotifyPropertyChange.NO and (
-                                (element_type == "partition"
-                                 and ('partition' not in cfg.LIMITS or type_key in cfg.LIMITS['partition'])
-                                 and property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE
-                                )
-                                or ('trouble' in property_name)
-                        ):
-                            self.interface.notify("Paradox", "{} {} {}".format(elements[type_key]['key'],
-                                                                               property_name,
-                                                                               property_value), logging.INFO)
-                    except Exception:
-                        logger.exception("Trigger notifications")
+                    change = {'property': property_name, 'value': property_value, 'type': element_type, 'partition': partition, 'label': elements[type_key]['key']}
+
+                    self.interface.handle_event(event.Event(property_map=self.panel.property_map, change=change))
 
             else:
                 elements[type_key][property_name] = property_value  # Initial value
