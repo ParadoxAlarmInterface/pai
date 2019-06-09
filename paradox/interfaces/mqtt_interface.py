@@ -301,7 +301,7 @@ class MQTTInterface(Interface):
 
     def check_config_mappings(self, config_parameter, required_mappings):
         # Check states_map
-        keys = cfg[config_parameter]
+        keys = getattr(cfg, config_parameter).keys()
         missing_mappings = [k for k in required_mappings if k not in keys]
         if len(missing_mappings):
             logger.warning(', '.join(missing_mappings) + " keys are missing from %s config." % config_parameter)
