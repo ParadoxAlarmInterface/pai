@@ -28,11 +28,10 @@ class Formatter(string.Formatter):
 
     def get_value(self, key, args, kwargs):
         event = args[0]
-        
+       
         if isinstance(key, int) or isinstance(key, float):
             return key
-
-        if key.startswith('@'):  # pure magic is happening here
+        elif key.startswith('@'):  # pure magic is happening here
             label_provider = event.label_provider
             m = re_magick_placeholder.match(key)
             if m:
@@ -126,8 +125,8 @@ class Event:
         self.level = property_map.get('level', self.level)
         tpl = property_map.get('message', self._message_tpl)
         if isinstance(tpl, dict):
-            if self.value in tpl:
-                self._message_tpl = tpl[self.value]
+            if str(self.value) in tpl:
+                self._message_tpl = tpl[str(self.value)]
         else:
             self._message_tpl = tpl
         

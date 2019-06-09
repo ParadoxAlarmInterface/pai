@@ -66,15 +66,15 @@ property_map = {
 		message={"True":"Telephone line trouble", "False": "Telephone line OK"}),
     ######
 	"zone_open": dict(level=EventLevel.DEBUG, type='zone', id=None, 
-		message={"True":"Zone {} open", "False": "Zone {} closed"}),
+                message={"True":"Zone {label} open", "False": "Zone {label} closed"}),
 	"zone_tamper": dict(level=EventLevel.CRITICAL, type='zone', id=None,
-		message={"True":"Zone {} tampered", "False": "Zone {} not tampered"}), 
+		message={"True":"Zone {label} tampered", "False": "Zone {label} not tampered"}), 
 	"pgm_tamper": dict(level=EventLevel.CRITICAL, type='pgm', id=None,
-		message={"True":"PGM {} tampered", "False": "PGM {} not tampered"}),
+		message={"True":"PGM {label} tampered", "False": "PGM {label} not tampered"}),
 	"bus-module_tamper": dict(level=EventLevel.CRITICAL, type='bus-module', id=None, 
-		message={"True":"Bus Module {} tampered", "False": "Bus Module {} not tampered"}),
+		message={"True":"Bus Module {label} tampered", "False": "Bus Module {label} not tampered"}),
 	"zone_fire": dict(level=EventLevel.CRITICAL, type='zone', id=None, 
-		message={"True":"Zone {} on fire", "False": "Zone {} not on fire"}),
+		message={"True":"Zone {label} on fire", "False": "Zone {label} not on fire"}),
 
 	###### Status 1
         'rf_noise_floor': dict(level=EventLevel.DEBUG, tags=['RF'], type='system', 
@@ -82,19 +82,19 @@ property_map = {
 
 	###### Status 2
 	"zone_status": dict(level=EventLevel.DEBUG, type='zone', id=None, 
-		message="Zone {}: {}"),
+                message={"True": "Zone {label} Open", "False": "Zone {label} Closed"}),
 	###### Status 3
 	"zone_signal_strength": dict(level=EventLevel.DEBUG, type='zone', id=None, 
-		message="Zone {} signal strength {}"),
+		message="Zone {label} signal strength {value}"),
 	##### Status 4
 	"pgm_signal_strength": dict(level=EventLevel.DEBUG, type='pgm', id=None, 
-		message="PGM {} signal strength {}"),
+		message="PGM {label} signal strength {value}"),
 	"repeater_signal_strength": dict(level=EventLevel.DEBUG, type='repeater', id=None, 
-		message="Repeater {} signal strength {}"),
+		message="Repeater {label} signal strength {value}"),
 	"keypad_signal_strength": dict(level=EventLevel.DEBUG, type='keypad', id=None, 
-		message="PGM {} signal strength {}"),
+		message="PGM {label} signal strength {value}"),
 	##### Status 5
 	"zone_exit_delay": dict(level=EventLevel.DEBUG, type='zone', id=None, 
-		message={"True":"Zone {} in exit delay", "False": "Zone {} not in exit delay"}),
+		message={"True":"Zone {label} in exit delay", "False": "Zone {label} not in exit delay"}),
 
 }
