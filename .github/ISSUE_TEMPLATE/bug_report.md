@@ -7,19 +7,26 @@ assignees: ''
 
 ---
 
-**System**
-Describe your panel model, access mode (Serial, IP150, etc..) and hardware.
+## Alarm system
+Describe your panel model (ex: EVO192, Spectra SP4000, Magellan MG5050), access mode (Serial, IP150, etc..).
 
-**Describe the bug**
+## Environment
+- Windows, Linux, RPI...
+- Python version
+
+## Git branch
+Which Git branch you use. Did you tried "dev" branch? Please try before posting.
+
+## Describe the bug
 A clear and concise description of what the bug is.
 
-**To Reproduce**
+## To Reproduce
 Steps to reproduce the behavior:
 1. Start script '...'
 2. Do something '....'
 3. See error
 
-**Logs**
+## Logs
 PLEASE DO NOT SEND LOGS IN CLEAR TEXT AS THEY MAY CONTAIN SENSITIVE INFORMATION
 If you wish to add a log (which will greatly help us), please follow the following instructions:
 
