@@ -1,8 +1,7 @@
 ---
-name: "Feature request"
+name: "\U0001F4A1 Feature request"
 about: You think that we should add a feature
 labels: enhancement
-title: [feature] <!-- New feature -->
 
 ---
 
