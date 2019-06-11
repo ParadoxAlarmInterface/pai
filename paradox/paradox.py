@@ -517,7 +517,7 @@ class Paradox:
             logger.exception("Handle event")
 
     def update_properties(self, element_type, type_key, change,
-                          notify=NotifyPropertyChange.DEFAULT, publish=PublishPropertyChange.DEFAULT, from_event=False):
+                          notify=NotifyPropertyChange.DEFAULT, publish=PublishPropertyChange.DEFAULT):
         try:
             elements = self.data[element_type]
         except KeyError:
@@ -566,8 +566,8 @@ class Paradox:
                     # because it was already sent due to the event
                     # TODO: We are being conservative about troubles. Investigate the need for this exception
                     if not (property_name == 'trouble' and element_type == 'system'):
-                        change = {'property': property_name, 'value': property_value, 'type': element_type, 'partition': None, 'label': elements[type_key]['key'], 'time': int(time.time())}
-                        self.handle_event(change=change)
+                        evt_change = {'property': property_name, 'value': property_value, 'type': element_type, 'partition': None, 'label': elements[type_key]['key'], 'time': int(time.time())}
+                        self.handle_event(change=evt_change)
 
             else:
                 elements[type_key][property_name] = property_value  # Initial value, do not notify
