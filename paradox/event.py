@@ -44,7 +44,11 @@ class Formatter(string.Formatter):
                 logger.error('Magic placeholder "{}" has wrong format'.format(key))
                 return "{error}"
 
-        return self._getattr(event, key)
+        r = self._getattr(event, key.lower())
+        if key[0].isupper():
+            r = r.title()
+
+        return r
 
 
 class EventLevel(Enum):
