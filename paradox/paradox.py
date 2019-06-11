@@ -565,7 +565,7 @@ class Paradox:
                     # if this change originates in an event, do not send a notification
                     # because it was already sent due to the event
                     # TODO: We are being conservative about troubles. Investigate the need for this exception
-                    if not from_event or 'trouble' in property_name:
+                    if (not from_event or 'trouble' in property_name) and not (property_name == 'trouble' and element_type == 'system'):
                         change = {'property': property_name, 'value': property_value, 'type': element_type, 'partition': None, 'label': elements[type_key]['key'], 'time': int(time.time())}
                         self.handle_event(change=change)
 
