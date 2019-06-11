@@ -506,9 +506,9 @@ class Paradox:
                 logger.warn("Missing type {} for event: {}.{} {}".format(evt.type, evt.major, evt.minor, evt.message))
             # Temporary end
 
-            if len(evt.change) > 0 and evt.type in self.data and evt.id in self.data[evt.type]:
+            if change is None and len(evt.change) > 0 and evt.type in self.data and evt.id in self.data[evt.type]:
                 self.update_properties(evt.type, evt.id,
-                                       evt.change, notify=NotifyPropertyChange.NO, from_event=True)
+                                       evt.change, notify=NotifyPropertyChange.NO)
 
             # Publish event
             if self.interface is not None:
@@ -565,7 +565,7 @@ class Paradox:
                     # if this change originates in an event, do not send a notification
                     # because it was already sent due to the event
                     # TODO: We are being conservative about troubles. Investigate the need for this exception
-                    if (not from_event or 'trouble' in property_name) and not (property_name == 'trouble' and element_type == 'system'):
+                    if not (property_name == 'trouble' and element_type == 'system'):
                         change = {'property': property_name, 'value': property_value, 'type': element_type, 'partition': None, 'label': elements[type_key]['key'], 'time': int(time.time())}
                         self.handle_event(change=change)
 
