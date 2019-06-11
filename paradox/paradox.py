@@ -508,7 +508,7 @@ class Paradox:
 
             if len(evt.change) > 0 and evt.type in self.data and evt.id in self.data[evt.type]:
                 self.update_properties(evt.type, evt.id,
-                                       evt.change, notify=NotifyPropertyChange.NO)
+                                       evt.change, notify=NotifyPropertyChange.NO, from_event=True)
 
             # Publish event
             if self.interface is not None:
@@ -517,7 +517,7 @@ class Paradox:
             logger.exception("Handle event")
 
     def update_properties(self, element_type, type_key, change,
-                          notify=NotifyPropertyChange.DEFAULT, publish=PublishPropertyChange.DEFAULT):
+                          notify=NotifyPropertyChange.DEFAULT, publish=PublishPropertyChange.DEFAULT, from_event=False):
         try:
             elements = self.data[element_type]
         except KeyError:
@@ -562,12 +562,15 @@ class Paradox:
                     self.interface.change(element_type, elements[type_key]['key'],
                                       property_name, property_value)
 
-                    change = {'property': property_name, 'value': property_value, 'type': element_type, 'partition': None, 'label': elements[type_key]['key'], 'time': int(time.time())}
-
-                    self.handle_event(change=change)
+                    # if this change originates in an event, do not send a notification
+                    # because it was already sent due to the event
+                    # TODO: We are being conservative about troubles. Investigate the need for this exception
+                    if not from_event or 'trouble' in property_name:
+                        change = {'property': property_name, 'value': property_value, 'type': element_type, 'partition': None, 'label': elements[type_key]['key'], 'time': int(time.time())}
+                        self.handle_event(change=change)
 
             else:
-                elements[type_key][property_name] = property_value  # Initial value
+                elements[type_key][property_name] = property_value  # Initial value, do not notify
                 suppress = 'trouble' not in property_name
 
                 self.interface.change(element_type, elements[type_key]['key'],
