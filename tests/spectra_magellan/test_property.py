@@ -1,5 +1,6 @@
 import pytest
 import time
+import os
 
 from paradox.event import Event
 from paradox.hardware.spectra_magellan import Panel
@@ -20,7 +21,8 @@ def test_property_map_bad():
 
 
 def test_all_properties():
-    with open('properties.log', 'r') as f:
+    logfile = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'properties.log')
+    with open(logfile, 'r') as f:
         for line in f:
             aux = line.strip().split(' ')
             if aux[1] in ["True", "False"]:
