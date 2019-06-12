@@ -1,4 +1,3 @@
-import pytest
 import time
 import os
 
@@ -26,20 +25,19 @@ def test_all_properties():
         for line in f:
             aux = line.strip().split(' ')
             if aux[1] in ["True", "False"]:
-                value = True if aux[1] == "True" else False
+                values = [True, False]
             else:
-                value = float(aux[1])
+                values = [float(aux[1])]
 
             aux = aux[0].split("/")
             partition = aux[1] if aux[0] == "partitions" else None
 
-            change = dict(property=aux[2], value=value, partition=partition, time=time.time(), type=aux[0], label=aux[1])
-            print(change)
+            for value in values:
 
-            evt = Event()
-            r = evt.from_change(change=change, property_map=Panel.property_map)
-            print(evt.message)
+                change = dict(property=aux[2], value=value, partition=partition, time=time.time(), type=aux[0], label=aux[1])
+                evt = Event()
+                r = evt.from_change(change=change, property_map=Panel.property_map)
 
-            assert r
-            assert len(evt.message) > 0
+                assert r
+                assert len(evt.message) > 0
 
