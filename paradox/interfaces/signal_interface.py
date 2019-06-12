@@ -39,7 +39,7 @@ class SignalInterface(Interface):
         self.logger.debug("Signal Stopped")
 
     def event(self, event):
-        if event.level.value >= EventLevel.WARN.value:
+        if event.level.value >= EventLevel.INFO.value:
             self.queue.put_nowait(SortableTuple(
                 (2, 'event', event)))
 

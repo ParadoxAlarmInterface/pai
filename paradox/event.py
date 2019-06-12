@@ -137,10 +137,6 @@ class Event:
         
         self.change = {self.raw['property'] : self.raw['value']}
         self.tags = property_map.get('tags', [])
-        
-        if self.type == 'partition':
-            self.label = self.label_provider(self.type, self.partition)
-            self.id = self.partition
 
         return True
 
