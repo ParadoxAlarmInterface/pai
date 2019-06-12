@@ -103,13 +103,6 @@ class Event:
         
         self._property_map = property_map
         self.raw = copy(change)
-        return self._parse_property_map()
-
-
-    def _parse_property_map(self):
-        
-        if (self.raw['property']) not in self._property_map:
-            return False
 
         self.timestamp = self.raw['time']
         self.partition = self.raw['partition']
@@ -120,6 +113,14 @@ class Event:
         self.label = self.raw['label']
         self.major = None
         self.minor = None
+
+        return self._parse_property_map()
+
+
+    def _parse_property_map(self):
+        
+        if (self.raw['property']) not in self._property_map:
+            return False
         
         property_map = copy(self._property_map[self.property])  # for inplace modifications
         callables = (k for k in property_map if isinstance(property_map[k], typing.Callable))
