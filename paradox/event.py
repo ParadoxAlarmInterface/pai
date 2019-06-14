@@ -137,7 +137,7 @@ class Event:
         
         self.change = {self.raw['property'] : self.raw['value']}
         self.tags = property_map.get('tags', [])
-        self.key = "{}.{}.{}".format(self.type, self.label, ','.join(list(self.change)))
+        self.key = "{},{},{}".format(self.type, self.label, ','.join(list(self.change)))
 
         return True
 
@@ -201,7 +201,7 @@ class Event:
             self.label = self.label_provider(self.type, self.partition)
             self.id = self.partition
         
-        self.key = "{}.{}.{}".format(self.type, self.label, ','.join(list(self.change)))
+        self.key = "{},{},{}".format(self.type, self.label, ','.join(list(self.change)))
 
     @property
     def message(self):
