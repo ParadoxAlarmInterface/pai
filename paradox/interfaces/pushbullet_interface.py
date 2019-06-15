@@ -12,6 +12,7 @@ from pushbullet import Pushbullet
 import time
 import logging
 import json
+import re
 
 from paradox.event import EventLevel
 from paradox.lib.utils import SortableTuple
@@ -172,8 +173,37 @@ class PushBulletInterface(Interface):
         self.queue.put_nowait(SortableTuple((2, 'command', 'stop')))
         self.pb_ws.stop()
 
-    def handle_event(self, raw):
-        self.pb_ws.notify('panel', raw.message, raw.level)
+    def handle_event(self, event):
+        """Handle Live Event"""
+
+        major_code = event.major
+        minor_code = event.minor
+
+        # Only let some elements pass
+        allow = False
+        for ev in cfg.PUSHBULLET_ALLOW_EVENTS:
+            if isinstance(ev, tuple):
+                if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
+                    allow = True
+                    break
+            elif isinstance(ev, str):
+                if re.match(ev, event.key):
+                    allow = True
+                    break
+
+        # Ignore some events
+        for ev in cfg.PUSHBULLET_IGNORE_EVENTS:
+            if isinstance(ev, tuple):
+                if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
+                    allow = False
+                    break
+            elif isinstance(ev, str):
+                if re.match(ev, event.key):
+                    allow = False
+                    break
+
+        if allow:
+            self.pb_ws.notify('panel', event.message, event.level)
 
     def handle_change(self, raw):
         element, label, panel_property, value = raw

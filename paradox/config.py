@@ -119,8 +119,8 @@ class Config:
         "PUSHBULLET_KEY": '',                     # Authentication key used for Pushbullet
         "PUSHBULLET_SECRET": '',                  # Authentication secret used for Pushbullet
         "PUSHBULLET_CONTACTS": [],                # Pushbullet user identifiers for notifications and interaction
-        "PUSHBULLET_IGNORE_EVENTS": [],               # List of tuples or regexp matching "type:label:property" eg. [(major, minor), "zone:HOME:entry_delay", ...]
-        "PUSHBULLET_ALLOW_EVENTS": [".*"],            # Same as before but as a white list. Default is allow all
+        "PUSHBULLET_IGNORE_EVENTS": [],           # List of tuples or regexp matching "type:label:property" eg. [(major, minor), "zone:HOME:entry_delay", ...]
+        "PUSHBULLET_ALLOW_EVENTS": [".*"],        # Same as before but as a white list. Default is allow all
 
         # Pushover
         "PUSHOVER_ENABLE": False,
@@ -144,7 +144,7 @@ class Config:
         "GSM_MODEM_PORT": '',                     # Pathname of the serial port
         "GSM_CONTACTS": [],                       # Contacts that are allowed to control the panel and receive notifications through SMS
         "GSM_IGNORE_EVENTS": [],                  # List of tuples or regexp matching "type:label:property" eg. [(major, minor), "zone:HOME:entry_delay", ...]
-        "GSM_ALLOW_EVENTS": [".*"],               # Same as before but as a white list. Default is allow all
+        "GSM_ALLOW_EVENTS": ["Partition,.*,alarm"],# Same as before but as a white list. Default is to only allow alarm
 
         # IP Socket Interface
         "IP_INTERFACE_ENABLE": False,

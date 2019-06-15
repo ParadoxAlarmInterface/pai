@@ -14,7 +14,7 @@ from paradox.event import EventLevel
 from paradox.lib.utils import SortableTuple
 
 from paradox.config import config as cfg
-
+import re
 
 class GSMInterface(Interface):
     """Interface Class using GSM"""
@@ -213,5 +213,36 @@ class GSMInterface(Interface):
 
         self.send_message(raw.message())
 
-        for contact in cfg.GSM_CONTACTS:
-            self.write('ATD{}'.format(contact))
+    def handle_event(self, event):
+        """Handle Live Event"""
+        if event.level < logging.CRITICAL:
+            return
+
+        major_code = event.major
+        minor_code = event.minor
+
+        # Only let some elements pass
+        allow = False
+        for ev in cfg.GSM_ALLOW_EVENTS:
+            if isinstance(ev, tuple):
+                if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
+                    allow = True
+                    break
+            elif isinstance(ev, str):
+                if re.match(ev, event.key):
+                    allow = True
+                    break
+
+        # Ignore some events
+        for ev in cfg.GSM_IGNORE_EVENTS:
+            if isinstance(ev, tuple):
+                if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
+                    allow = False
+                    break
+            elif isinstance(ev, str):
+                if re.match(ev, event.key):
+                    allow = False
+                    break
+
+        if allow:
+            self.send_message(event.message)
