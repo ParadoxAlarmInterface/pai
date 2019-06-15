@@ -31,6 +31,7 @@ class Event:
         self.change = {}
         self.additional_data = {}
         self.partition = None
+        self._key = None
         self._event_map = None
         self._property_map = None
 
@@ -41,7 +42,6 @@ class Event:
 
         return str(self.__class__) + '\n' + '\n'.join(
             ('{} = {}'.format(item, lvars[item]) for item in lvars if not item.startswith('_')))
-
 
     def from_live_event(self, event_map: dict, event: Container, label_provider=None):
         if isinstance(label_provider, typing.Callable):
@@ -75,9 +75,7 @@ class Event:
 
         return self._parse_property_map()
 
-
     def _parse_property_map(self):
-        
         if (self.raw['property']) not in self._property_map:
             return False
         
@@ -96,7 +94,6 @@ class Event:
         
         self.change = {self.raw['property'] : self.raw['value']}
         self.tags = property_map.get('tags', [])
-        self.key = "{},{},{}".format(self.type, self.label, ','.join("=".join([key, str(val)]) for key, val in self.change.items()))
 
         return True
 
@@ -159,8 +156,13 @@ class Event:
         if self.type == 'partition':
             self.label = self.label_provider(self.type, self.partition)
             self.id = self.partition
-        
-        self.key = "{},{},{}".format(self.type, self.label, ','.join("=".join([key, str(val)]) for key, val in self.change.items()))
+
+    @property
+    def key(self):
+        if not self._key:
+            self._key = "{},{},{}".format(self.type, self.label, ','.join("=".join([key, str(val)]) for key, val in self.change.items()))
+
+        return self._key
 
     @property
     def message(self) -> str:
@@ -192,41 +194,3 @@ class Event:
                 else:
                     dp[key] = value
         return dp
-
-class Formatter(string.Formatter):
-
-    @staticmethod
-    def _hasattr(event, key):
-        if key in event.additional_data:
-            return True
-        return hasattr(event, key)
-
-    @staticmethod
-    def _getattr(event, key):
-        if key in event.additional_data:
-            return event.additional_data[key]
-        return getattr(event, key)
-
-    def get_value(self, key, args, kwargs):
-        event = args[0]
-
-        if isinstance(key, int) or isinstance(key, float):
-            return key
-        elif key.startswith('@'):  # pure magic is happening here
-            label_provider = event.label_provider
-            m = re_magick_placeholder.match(key)
-            if m:
-                element_type = m.group('type')
-                source = m.group('source') or (element_type if self._hasattr(event, element_type) else 'minor')
-                key = self._getattr(event, source)
-
-                return label_provider(element_type, key)
-            else:
-                logger.error('Magic placeholder "{}" has wrong format'.format(key))
-                return "{error}"
-
-        r = self._getattr(event, key.lower())
-        if key[0].isupper():
-            r = r.title()
-
-        return r
