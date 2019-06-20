@@ -40,7 +40,6 @@ class Config:
         "LABEL_ENCODING": "utf-8",											  # Encoding to use when decoding labels. See https://docs.python.org/3/library/codecs.html#standard-encodings
         "LABEL_REFRESH_INTERVAL": (15 * 60, int, (0, 0xFFFFFFFF)),            # Interval between refresh of labels
         "OUTPUT_PULSE_DURATION": (1, float, (0, 0xFFFFFFFF)),                 # Duration of a PGM pulse in seconds
-        "PARTITIONS_CHANGE_NOTIFICATION_IGNORE": ['arm_full', 'exit_delay'],  # Do not send notifications for these changes
         "STATUS_REQUESTS": [0, 1, 2, 3, 4, 5],
         "SYNC_TIME": True,                                       # Update panel time
         "PASSWORD": (None, [bytes, type(None)]),                 # PC Password. Set to None if Panel has no Password
@@ -120,25 +119,38 @@ class Config:
         "PUSHBULLET_KEY": '',                     # Authentication key used for Pushbullet
         "PUSHBULLET_SECRET": '',                  # Authentication secret used for Pushbullet
         "PUSHBULLET_CONTACTS": [],                # Pushbullet user identifiers for notifications and interaction
+        "PUSHBULLET_IGNORE_EVENTS": [
+            r"zone,[\w]+,no_delay=True",
+            r"zone,[\w]+,exit_delay=.*"],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+        "PUSHBULLET_ALLOW_EVENTS": [r".*"],        # Same as before but as a white list. Default is allow all
 
         # Pushover
         "PUSHOVER_ENABLE": False,
         "PUSHOVER_KEY": '',                       # Application token for Pushover
         "PUSHOVER_BROADCAST_KEYS": {              # Pushover user or group keys to broadcast notifications to
             #    '<user_key>': '*'                # value can be '*' or comma separated list of device names
+        "PUSHOVER_IGNORE_EVENTS": [
+            r"zone,[\w]+,no_delay=True",
+            r"zone,[\w]+,exit_delay=.*"],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+        "PUSHOVER_ALLOW_EVENTS": [r".*"],          # Same as before but as a white list. Default is allow all
+
         },
 
         # Signal
         "SIGNAL_ENABLE": False,
         "SIGNAL_CONTACTS": [],                    # Contacts that are allowed to control the panel and receive notifications through Signal
-        "SIGNAL_IGNORE_EVENTS": [],               # List of tuples (major, minor)
+        "SIGNAL_IGNORE_EVENTS": [
+            r"zone,[\w]+,no_delay=True",
+            r"zone,[\w]+,exit_delay=.*"],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+        "SIGNAL_ALLOW_EVENTS": [r".*"],            # Same as before but as a white list. Default is allow all
 
         # GSM
         "GSM_ENABLE": False,
         "GSM_MODEM_BAUDRATE": (115200, int, (9600, 115200)),    # Baudrate of the GSM modem
         "GSM_MODEM_PORT": '',                     # Pathname of the serial port
         "GSM_CONTACTS": [],                       # Contacts that are allowed to control the panel and receive notifications through SMS
-        "GSM_IGNORE_EVENTS": [],                  # List of tuples [(major, minor), ...]
+        "GSM_IGNORE_EVENTS": [],                  # List of tuples or regexp matching "type:label:property" eg. [(major, minor), "zone:HOME:entry_delay", ...]
+        "GSM_ALLOW_EVENTS": [r"partition,[\w]+,alarm=True"],# Same as before but as a white list. Default is to only allow alarm
 
         # IP Socket Interface
         "IP_INTERFACE_ENABLE": False,

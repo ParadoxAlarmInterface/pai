@@ -470,34 +470,47 @@ class Paradox:
             if el:
                 return el.get("label")
 
-    def handle_event(self, message: Container):
+    def handle_event(self, messag: Container=None, change: Container=None):
         """Process cfg.Live Event Message and dispatch it to the interface module"""
         try:
-            evt = event.Event(self.panel.event_map, message, label_provider=self.get_label)
+            evt = event.Event()
+            r = False
+            if change is not None:
+                r = evt.from_change(property_map=self.panel.property_map, change=change)
+            elif message is not None:
+                r = evt.from_live_event(self.panel.event_map, event=message, label_provider=self.get_label)
+            else:
+                logger.warn("Must provide message or change")
+                return
+            
+            if not r:
+                logger.debug("Could not parse to Event")
+                return
 
             logger.debug("Handle Event: {}".format(evt))
 
             # Temporary to catch labels/properties in wrong places
             # TODO: REMOVE
-            if evt.type in self.data:
-                if not evt.id:
-                    logger.warn("Missing element ID in {}/{}, m/m: {}/{}, message: {}".format(evt.type, evt.label or '?', evt.major, evt.minor, evt.message))
-                else:
-                    el = self.data[evt.type].get(evt.id)
-                    if not el:
-                        logger.warn("Missing element with ID {} in {}/{}".format(evt.id, evt.type, evt.label))
+            if message is not None:
+                if evt.type in self.data:
+                    if not evt.id:
+                        logger.warn("Missing element ID in {}/{}, m/m: {}/{}, message: {}".format(evt.type, evt.label or '?', evt.major, evt.minor, evt.message))
                     else:
-                        for k in evt.change:
-                            if k not in el:
-                                logger.warn("Missing property {} in {}/{}".format(k, evt.type, evt.label))
-                        if evt.label != el.get("label"):
-                            logger.warn(
-                                "Labels differ {} != {} in {}/{}".format(el.get("label"), evt.label, evt.type, evt.label))
-            else:
-                logger.warn("Missing type {} for event: {}.{} {}".format(evt.type, evt.major, evt.minor, evt.message))
+                        el = self.data[evt.type].get(evt.id)
+                        if not el:
+                            logger.warn("Missing element with ID {} in {}/{}".format(evt.id, evt.type, evt.label))
+                        else:
+                            for k in evt.change:
+                                if k not in el:
+                                    logger.warn("Missing property {} in {}/{}".format(k, evt.type, evt.label))
+                            if evt.label != el.get("label"):
+                                logger.warn(
+                                    "Labels differ {} != {} in {}/{}".format(el.get("label"), evt.label, evt.type, evt.label))
+                else:
+                    logger.warn("Missing type {} for event: {}.{} {}".format(evt.type, evt.major, evt.minor, evt.message))
             # Temporary end
 
-            if len(evt.change) > 0 and evt.type in self.data and evt.id in self.data[evt.type]:
+            if change is None and len(evt.change) > 0 and evt.type in self.data and evt.id in self.data[evt.type]:
                 self.update_properties(evt.type, evt.id,
                                        evt.change, notify=NotifyPropertyChange.NO)
 
@@ -537,6 +550,7 @@ class Paradox:
 
                     self.update_properties(element_type, type_key, dict(trouble=r), notify=notify, publish=publish)
 
+            # Standard processing of changes
             if property_name in elements[type_key]:
                 old = elements[type_key][property_name]
 
@@ -548,28 +562,23 @@ class Paradox:
                                                                         old,
                                                                         property_value))
                     elements[type_key][property_name] = property_value
-                    self.interface.change(element_type, elements[type_key]['key'],
-                                          property_name, property_value, initial=False)
 
-                    # Trigger notifications for Partitions changes
-                    # Ignore some changes as defined in the configuration
-                    # TODO: Move this to another place?
-                    try:
-                        if notify != NotifyPropertyChange.NO and (
-                                (element_type == "partition"
-                                 and ('partition' not in cfg.LIMITS or type_key in cfg.LIMITS['partition'])
-                                 and property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE
-                                )
-                                or ('trouble' in property_name)
-                        ):
-                            self.interface.notify("Paradox", "{} {} {}".format(elements[type_key]['key'],
-                                                                               property_name,
-                                                                               property_value), logging.INFO)
-                    except Exception:
-                        logger.exception("Trigger notifications")
+                    self.interface.change(element_type, elements[type_key]['key'],
+                                      property_name, property_value)
+
+                    # if this change originates in an event, do not send a notification
+                    # because it was already sent due to the event
+                    # TODO: We are being conservative about troubles. Investigate the need for this exception
+                    if not (property_name == 'trouble' and element_type == 'system'):
+                        if element_type == 'partition':
+                            partition = elements[type_key]['key']
+                        else:
+                            partition = ""
+                        evt_change = {'property': property_name, 'value': property_value, 'type': element_type, 'partition': partition, 'label': elements[type_key]['key'], 'time': int(time.time())}
+                        self.handle_event(change=evt_change)
 
             else:
-                elements[type_key][property_name] = property_value  # Initial value
+                elements[type_key][property_name] = property_value  # Initial value, do not notify
                 suppress = 'trouble' not in property_name
 
                 self.interface.change(element_type, elements[type_key]['key'],

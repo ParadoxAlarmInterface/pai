@@ -20,6 +20,7 @@ logger = logging.getLogger('PAI').getChild(__name__)
 class Panel_EVOBase(PanelBase):
 
     event_map = event_map
+    property_map = {}
 
     def get_message(self, name: str) -> Construct:
         try:

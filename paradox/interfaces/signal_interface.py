@@ -16,7 +16,7 @@ from paradox.event import EventLevel, Event
 from paradox.lib.utils import SortableTuple
 
 from paradox.config import config as cfg
-
+import re
 
 class SignalInterface(Interface):
     """Interface Class using Signal"""
@@ -38,8 +38,8 @@ class SignalInterface(Interface):
 
         self.logger.debug("Signal Stopped")
 
-    def event(self, event: Event):
-        if event.level.value >= EventLevel.WARN.value:
+    def event(self, event):
+        if event.level.value >= EventLevel.INFO.value:
             self.queue.put_nowait(SortableTuple(
                 (2, 'event', event)))
 
@@ -131,9 +131,28 @@ class SignalInterface(Interface):
         major_code = event.major
         minor_code = event.minor
 
+        # Only let some elements pass
+        allow = False
+        for ev in cfg.SIGNAL_ALLOW_EVENTS:
+            if isinstance(ev, tuple):
+                if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
+                    allow = True
+                    break
+            elif isinstance(ev, str):
+                if re.match(ev, event.key):
+                    allow = True
+                    break
+
         # Ignore some events
         for ev in cfg.SIGNAL_IGNORE_EVENTS:
-            if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
-                return
+            if isinstance(ev, tuple):
+                if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
+                    allow = False
+                    break
+            elif isinstance(ev, str):
+                if re.match(ev, event.key):
+                    allow = False
+                    break
 
-        self.send_message(event.message)
+        if allow:
+            self.send_message(event.message)

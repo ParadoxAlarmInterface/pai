@@ -11,6 +11,7 @@ from typing import Optional
 from paradox.config import config as cfg
 from paradox.paradox import PublishPropertyChange
 from .event import event_map
+from .property import property_map
 from .parsers import Construct, CloseConnection, ErrorMessage, InitializeCommunication, InitializeCommunicationResponse, \
     SetTimeDate, SetTimeDateResponse, PerformAction, PerformActionResponse, ReadStatusResponse, ReadEEPROM, \
     ReadEEPROMResponse, LiveEvent, RAMDataParserMap, Container, ChecksumError
@@ -26,6 +27,7 @@ PGM_ACTIONS = dict(on_override=0x30, off_override=0x31, on=0x32, off=0x33, pulse
 class Panel(PanelBase):
 
     event_map = event_map
+    property_map = property_map
 
     mem_map = {
         "status_base1": 0x8000,

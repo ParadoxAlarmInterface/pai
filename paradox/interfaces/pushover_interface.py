@@ -50,6 +50,45 @@ class PushoverInterface(Interface):
         if level < logging.INFO:
             return
 
+        self.send_message(message)
+
+    def handle_event(self, event):
+        """Handle Live Event"""
+
+        if event.level < logging.INFO:
+            return
+
+        major_code = event.major
+        minor_code = event.minor
+
+        # Only let some elements pass
+        allow = False
+        for ev in cfg.PUSHOVER_ALLOW_EVENTS:
+            if isinstance(ev, tuple):
+                if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
+                    allow = True
+                    break
+            elif isinstance(ev, str):
+                if re.match(ev, event.key):
+                    allow = True
+                    break
+
+        # Ignore some events
+        for ev in cfg.PUSHOVER_IGNORE_EVENTS:
+            if isinstance(ev, tuple):
+                if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
+                    allow = False
+                    break
+            elif isinstance(ev, str):
+                if re.match(ev, event.key):
+                    allow = False
+                    break
+
+        if allow:
+            self.send_message(event.message)
+
+    def send_message(self, message):
+
         for user_key, devices_raw in cfg.PUSHOVER_BROADCAST_KEYS.items():
             user = self.users.get(user_key)
 
