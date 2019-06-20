@@ -8,6 +8,7 @@ from ws4py.client import WebSocketBaseClient
 from ws4py.manager import WebSocketManager
 
 from pushbullet import Pushbullet
+from pubsub import pub
 
 import time
 import logging
@@ -111,6 +112,7 @@ class PushBulletWSClient(WebSocketBaseClient):
                     time.sleep(5)
 
     def notify(self, source, message, level):
+
         try:
             if level.value >= EventLevel.WARN.value:
                 self.send_message("{}".format(message))
@@ -135,16 +137,12 @@ class PushBulletInterface(Interface):
             self.pb_ws.init(self)
             self.pb_ws.connect()
 
+            pub.subscribe(self.handle_panel_event, "pai_events")
+            pub.subscribe(self.handle_notify, "pai_notifications")
+
             while True:
                 item = self.queue.get()
-
-                if item[1] == 'change':
-                    self.handle_change(item[2])
-                elif item[1] == 'event':
-                    self.handle_event(item[2])
-                elif item[1] == 'notify':
-                    self.handle_notify(item[2])
-                elif item[1] == 'command':
+                if item[1] == 'command':
                     if item[2] == 'stop':
                         break
         except Exception:
@@ -153,28 +151,17 @@ class PushBulletInterface(Interface):
     def set_alarm(self, alarm):
         self.pb_ws.set_alarm(alarm)
 
-    def set_notify(self, handler):
-        """ Set the notification handler"""
-        self.notification_handler = handler
-
-    def event(self, event: Event):
-        """ Enqueues an event"""
-        self.queue.put_nowait(SortableTuple((2, 'event', event)))
-
-    def change(self, element, label, panel_property, value):
-        """ Enqueues a change """
-        self.queue.put_nowait(SortableTuple((2, 'change', (element, label, panel_property, value))))
-
-    def notify(self, source, message, level):
-        self.queue.put_nowait(SortableTuple((2, 'notify', (source, message, level))))
 
     def stop(self):
         """ Stops the Pushbullet interface"""
         self.queue.put_nowait(SortableTuple((2, 'command', 'stop')))
         self.pb_ws.stop()
 
-    def handle_event(self, event):
+    def handle_panel_event(self, event):
         """Handle Live Event"""
+
+        if event.level.value  > EventLevel.INFO.value:
+            return
 
         major_code = event.major
         minor_code = event.minor
@@ -205,12 +192,8 @@ class PushBulletInterface(Interface):
         if allow:
             self.pb_ws.notify('panel', event.message, event.level)
 
-    def handle_change(self, raw):
-        element, label, panel_property, value = raw
-        self.pb_ws.change(element, label, panel_property, value)
-
-    def handle_notify(self, raw):
-        sender, message, level = raw
+    def handle_notify(self, message):
+        sender, message, level = message
         if sender == 'pushbullet':
             return
 

@@ -5,6 +5,8 @@ import re
 
 from chump import Application
 
+from pubsub import pub
+
 from paradox.interfaces import Interface
 from paradox.lib.utils import SortableTuple
 
@@ -28,11 +30,12 @@ class PushoverInterface(Interface):
             if not self.app.is_authenticated:
                 raise Exception('Failed to authenticate with Pushover. Please check PUSHOVER_APPLICATION_KEY')
 
+            pub.subscribe(self.handle_panel_event, "pai_events")
+            pub.subscribe(self.handle_notify, "pai_notifications")
+
             while True:
                 item = self.queue.get()
-                if item[1] == 'notify':
-                    self.handle_notify(item[2])
-                elif item[1] == 'command':
+                if item[1] == 'command':
                     if item[2] == 'stop':
                         break
         except Exception:
@@ -45,14 +48,14 @@ class PushoverInterface(Interface):
     def notify(self, source, message, level):
         self.queue.put_nowait(SortableTuple((2, 'notify', (source, message, level))))
 
-    def handle_notify(self, raw):
-        sender, message, level = raw
+    def handle_notify(self, message):
+        sender, message, level = message
         if level < logging.INFO:
             return
 
         self.send_message(message)
 
-    def handle_event(self, event):
+    def handle_panel_event(self, event):
         """Handle Live Event"""
 
         if event.level < logging.INFO:

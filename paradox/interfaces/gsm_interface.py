@@ -10,6 +10,8 @@ import datetime
 import queue
 import serial
 
+from pubsub import pub
+
 from paradox.event import EventLevel, Event
 from paradox.lib.utils import SortableTuple
 
@@ -36,30 +38,6 @@ class GSMInterface(Interface):
 
         self.logger.debug("GSM Stopped")
 
-    def event(self, event: Event):
-        """ Enqueues an event"""
-
-        # Fire Alarm and Strobe
-        # Special Alarms
-        ignore = True
-        for tag in event.tags:
-            if '_alarm' in tag:
-                ignore = False
-                break
-
-        if not ignore:
-            self.queue.put_nowait(SortableTuple((2, 'event', event)))
-
-    def notify(self, source, message, level):
-        if source == self.name:
-            return
-
-        if level.value < EventLevel.CRITICAL.value:
-            return
-
-        self.queue.put_nowait(SortableTuple(
-            (2, 'notify', (source, message, level))))
-
     def write(self, message):
         data = b''
 
@@ -81,6 +59,9 @@ class GSMInterface(Interface):
 
     def run(self):
         self.logger.info("Starting GSM Interface")
+
+        pub.subscribe(self.handle_panel_event, "pai_events")
+        pub.subscribe(self.handle_notify, "pai_notifications")
 
         try:
             while not self.stop_running.isSet():
@@ -120,21 +101,6 @@ class GSMInterface(Interface):
 
         except Exception:
             self.logger.exception("GSM loop")
-
-    def run_loop(self):
-        try:
-            item = self.queue.get(block=False, timeout=1)
-            if item[1] == 'change':
-                self.handle_change(item[2])
-            elif item[1] == 'event':
-                self.handle_event(item[2])
-            elif item[1] == 'notify':
-                self.send_message("{}: {}".format(item[2][0], item[2][1]))
-
-        except queue.Empty:
-            return True
-        except Exception:
-            self.logger.exception("loop")
 
         return True
 
@@ -203,19 +169,16 @@ class GSMInterface(Interface):
             self.notification_handler.notify(
                 self.name, "REJECTED: {}: {}".format(source, message), logging.INFO)
 
-    def handle_event(self, raw):
+    def handle_notify(self, message):
+        sender, message, level = message
+        if level > EventLevel.CRITICAL.value:
+            return
+
+        self.send_message(message)
+
+    def handle_panel_event(self, event):
         """Handle Live Event"""
-
-        # Ignore some events
-        for ev in cfg.GSM_IGNORE_EVENTS:
-            if raw.major == ev[0] and (raw.minor == ev[1] or ev[1] == -1):
-                return
-
-        self.send_message(raw.message())
-
-    def handle_event(self, event):
-        """Handle Live Event"""
-        if event.level < logging.CRITICAL:
+        if event.level.value < EventLevel.CRITICAL.value:
             return
 
         major_code = event.major

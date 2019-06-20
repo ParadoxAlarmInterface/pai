@@ -10,6 +10,8 @@ from paradox.event import Event
 from paradox.interfaces import Interface
 from paradox.lib.utils import SortableTuple, JSONByteEncoder
 
+from pubsub import pub
+
 logger = logging.getLogger('PAI').getChild(__name__)
 
 from paradox.config import config as cfg
@@ -68,14 +70,13 @@ class MQTTInterface(Interface):
         self.mqtt.loop_start()
         last_republish = time.time()
 
+        pub.subscribe(self.handle_panel_change, "pai_changes")
+        pub.subscribe(self.handle_panel_event, "pai_events")
+
         while True:
             try:
                 item = self.queue.get()
-                if item[1] == 'change':
-                    self.handle_change(item[2])
-                elif item[1] == 'event':
-                    self.handle_event(item[2])
-                elif item[1] == 'command':
+                if item[1] == 'command':
                     if item[2] == 'stop':
                         break
                 if time.time() - last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
@@ -144,7 +145,7 @@ class MQTTInterface(Interface):
                 return
 
             payload = message.payload.decode("latin").strip()
-            self.notification_handler.notify(self.name, payload, level)
+            pub.sendMessage("pai_notifications", message=dict(source=self.name, payload=payload, level=level))
             return
 
         if topics[1] != cfg.MQTT_CONTROL_TOPIC:
@@ -243,7 +244,7 @@ class MQTTInterface(Interface):
                                        self.__class__.__name__),
                      'online', 0, retain=True)
 
-    def handle_event(self, raw):
+    def handle_panel_event(self, event):
         """
         Handle Live Event
 
@@ -255,10 +256,11 @@ class MQTTInterface(Interface):
             self.publish('{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                         cfg.MQTT_EVENTS_TOPIC,
                                         cfg.MQTT_RAW_TOPIC),
-                         json.dumps(raw.props, ensure_ascii=False, cls=JSONByteEncoder), 0, cfg.MQTT_RETAIN)
+                         json.dumps(event.props, ensure_ascii=False, cls=JSONByteEncoder), 0, cfg.MQTT_RETAIN)
 
-    def handle_change(self, raw):
-        element, label, attribute, value = raw
+    def handle_panel_change(self, change):
+
+        element, label, attribute, value, initial = change
         """Handle Property Change"""
         
         # Keep track of ARM state

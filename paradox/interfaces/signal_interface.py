@@ -69,7 +69,7 @@ class SignalInterface(Interface):
         self.logger.debug("Signal Interface Running")
         
         pub.subscribe(self.handle_panel_event, "pai_events")
-        pub.subscribe(self.send_message, "notifications")
+        pub.subscribe(self.handle_notify, "pai_notifications")
 
         try:
             self.loop.run()
@@ -114,8 +114,18 @@ class SignalInterface(Interface):
             self.logger.warning("REJECTED: {}".format(message))
             self.send_message("REJECTED: {}".format(message))
 
+    def handle_notify(self, message):
+        sender, message, level = message
+        if level > EventLevel.CRITICAL.value:
+            return
+
+        self.send_message(message)
+
     def handle_panel_event(self, event):
         """Handle Live Event"""
+
+        if event.level.value  > EventLevel.INFO.value:
+            return
 
         major_code = event.major
         minor_code = event.minor

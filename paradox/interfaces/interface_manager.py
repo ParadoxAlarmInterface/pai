@@ -86,34 +86,6 @@ class InterfaceManager:
         except Exception:
             logger.exception("Error registering interface {}".format(interface.name))
 
-    def event(self, event: Event):
-        for interface in self.interfaces:
-            try:
-                interface.event(event)
-            except Exception:
-                logger.exception(
-                    "Error dispatching event to interface {}".format(interface.name))
-
-    def change(self, element, label, panel_property, value, initial=False):
-        for interface in self.interfaces:
-
-            if (not hasattr(interface, 'acceptsInitialState') or not interface.acceptsInitialState) and initial:
-                continue
-
-            try:
-                interface.change(element, label, panel_property, value)
-            except Exception:
-                logger.exception(
-                    "Error dispatching change to interface {}".format(interface.name))
-
-    def notify(self, sender, message, level=logging.INFO):
-        for interface in self.interfaces:
-            try:
-                if sender != interface.name:
-                    interface.notify(sender, message, level)
-            except Exception:
-                logger.exception(
-                    "Error dispatching notification to interface {}".format(interface.name))
 
     def stop(self):
         logger.debug("Stopping all interfaces")
