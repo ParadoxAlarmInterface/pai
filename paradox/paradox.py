@@ -81,7 +81,6 @@ class Paradox:
         self.panel = None  # type: Panel
         self.connection = connection
         self.retries = retries
-        self.interface = interface
         self.message_manager = AsyncMessageManager()
         self.work_loop = asyncio.get_event_loop() # type: asyncio.AbstractEventLoop
         self.receive_worker_task = None
@@ -515,8 +514,7 @@ class Paradox:
                                        evt.change, notify=NotifyPropertyChange.NO)
 
             # Publish event
-            if self.interface is not None:
-                self.interface.event(evt)
+            ps.sendEvent(evt)
         except Exception as e:
             logger.exception("Handle event")
 
@@ -563,7 +561,7 @@ class Paradox:
                                                                         property_value))
                     elements[type_key][property_name] = property_value
 
-                    self.interface.change(element_type, elements[type_key]['key'],
+                    ps.sendChange(element_type, elements[type_key]['key'],
                                       property_name, property_value)
 
                     # if this change originates in an event, do not send a notification
@@ -581,7 +579,7 @@ class Paradox:
                 elements[type_key][property_name] = property_value  # Initial value, do not notify
                 suppress = 'trouble' not in property_name
 
-                self.interface.change(element_type, elements[type_key]['key'],
+                ps.sendChange(element_type, elements[type_key]['key'],
                                       property_name, property_value, initial=suppress)
 
     def handle_error(self, message):

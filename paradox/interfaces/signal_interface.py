@@ -12,6 +12,8 @@ from gi.repository import GObject
 import logging
 import queue
 
+from pubsub import pub
+
 from paradox.event import EventLevel, Event
 from paradox.lib.utils import SortableTuple
 
@@ -62,9 +64,13 @@ class SignalInterface(Interface):
         self.signal.onMessageReceived = self.handle_message
         self.loop = GLib.MainLoop()
 
-        self.timer = GObject.idle_add(self.run_loop)
+        #self.timer = GObject.idle_add(self.run_loop)
 
         self.logger.debug("Signal Interface Running")
+        
+        pub.subscribe(self.handle_panel_event, "pai_events")
+        pub.subscribe(self.send_message, "notifications")
+
         try:
             self.loop.run()
 
@@ -76,23 +82,6 @@ class SignalInterface(Interface):
         except Exception:
             self.logger.exception("Signal loop")
 
-    def run_loop(self):
-        try:
-            item = self.queue.get(block=True, timeout=1)
-
-            if item[1] == 'change':
-                self.handle_change(item[2])
-            elif item[1] == 'event':
-                self.handle_event(item[2])
-            elif item[1] == 'notify':
-                self.send_message("{}: {}".format(item[2][0], item[2][1]))
-
-        except queue.Empty:
-            return True
-        except Exception:
-            self.logger.exception("loop")
-
-        return True
 
     def send_message(self, message):
         if self.signal is None:
@@ -125,7 +114,7 @@ class SignalInterface(Interface):
             self.logger.warning("REJECTED: {}".format(message))
             self.send_message("REJECTED: {}".format(message))
 
-    def handle_event(self, event):
+    def handle_panel_event(self, event):
         """Handle Live Event"""
 
         major_code = event.major
