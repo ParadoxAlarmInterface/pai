@@ -246,18 +246,6 @@ class IPInterface():
 
         logger.info("IP Interface started")
 
-    def set_notify(self, tmp):
-        pass
-
-    def event(self, event: Event):
-        pass
-
-    def notify(self, source, message, level):
-        pass
-
-    def change(self, element, label, panel_property, value):
-        """ Enqueues a change """
-
     async def handle_client(self, reader, writer):
         """
         Handle message from the remote client.

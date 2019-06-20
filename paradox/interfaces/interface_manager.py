@@ -81,10 +81,6 @@ class InterfaceManager:
         interface.start()  # Starts interface thread
 
         self.interfaces.append(interface)
-        try:
-            interface.set_notify(self)
-        except Exception:
-            logger.exception("Error registering interface {}".format(interface.name))
 
 
     def stop(self):
