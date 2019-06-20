@@ -171,7 +171,7 @@ class GSMInterface(Interface):
 
     def handle_notify(self, message):
         sender, message, level = message
-        if level > EventLevel.CRITICAL.value:
+        if level < EventLevel.CRITICAL.value:
             return
 
         self.send_message(message)

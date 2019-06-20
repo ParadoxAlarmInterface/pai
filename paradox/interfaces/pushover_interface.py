@@ -7,6 +7,7 @@ from chump import Application
 
 from pubsub import pub
 
+from paradox.event import EventLevel, Event
 from paradox.interfaces import Interface
 from paradox.lib.utils import SortableTuple
 
@@ -50,7 +51,7 @@ class PushoverInterface(Interface):
 
     def handle_notify(self, message):
         sender, message, level = message
-        if level < logging.INFO:
+        if level < EventLevel.INFO.value:
             return
 
         self.send_message(message)
@@ -58,7 +59,7 @@ class PushoverInterface(Interface):
     def handle_panel_event(self, event):
         """Handle Live Event"""
 
-        if event.level < logging.INFO:
+        if event.level < EventLevel.INFO.value:
             return
 
         major_code = event.major

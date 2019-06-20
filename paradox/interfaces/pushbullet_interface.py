@@ -160,7 +160,7 @@ class PushBulletInterface(Interface):
     def handle_panel_event(self, event):
         """Handle Live Event"""
 
-        if event.level.value  > EventLevel.INFO.value:
+        if event.level.value < EventLevel.INFO.value:
             return
 
         major_code = event.major
@@ -195,6 +195,9 @@ class PushBulletInterface(Interface):
     def handle_notify(self, message):
         sender, message, level = message
         if sender == 'pushbullet':
+            return
+
+        if level < EventLevel.INFO.value:
             return
 
         self.pb_ws.notify(sender, message, level)

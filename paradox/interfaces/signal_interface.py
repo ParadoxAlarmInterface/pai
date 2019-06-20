@@ -116,7 +116,7 @@ class SignalInterface(Interface):
 
     def handle_notify(self, message):
         sender, message, level = message
-        if level > EventLevel.CRITICAL.value:
+        if level < EventLevel.INFO.value:
             return
 
         self.send_message(message)
@@ -124,7 +124,7 @@ class SignalInterface(Interface):
     def handle_panel_event(self, event):
         """Handle Live Event"""
 
-        if event.level.value  > EventLevel.INFO.value:
+        if event.level.value  < EventLevel.INFO.value:
             return
 
         major_code = event.major
