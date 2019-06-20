@@ -86,8 +86,10 @@ class GSMInterface(Interface):
                                 message = tokens[6]
                                 self.handle_message(timestamp, source, message)
                             elif tokens[0].startswith('+CUSD:'):
-                                self.notification_handler.notify(
-                                    self.name, tokens[1], logging.INFO)
+                                pub.sendMessage("pai_notifications",
+                                                message=dict(source=self.name,
+                                                message=tokens[1],
+                                                level=logging.INFO))
                     else:
                         self.run_loop()
 
@@ -148,26 +150,25 @@ class GSMInterface(Interface):
         if self.alarm is None:
             return
 
-        self.notification_handler.notify(
-            self.name, "{}: {}".format(source, message), logging.INFO)
-
         if source in cfg.GSM_CONTACTS:
             ret = self.send_command(message)
 
             if ret:
                 self.logger.info("ACCEPTED: {}".format(message))
                 self.send_sms(source, "ACCEPTED: {}".format(message))
-                self.notification_handler.notify(
-                    self.name, "ACCEPTED: {}: {}".format(source, message), logging.INFO)
+                message =  "ACCEPTED: {}: {}".format(source, message)
             else:
                 self.logger.warning("REJECTED: {}".format(message))
                 self.send_sms(source, "REJECTED: {}".format(message))
-                self.notification_handler.notify(
-                    self.name, "REJECTED: {}: {}".format(source, message), logging.INFO)
+                message =  "REJECTED: {}: {}".format(source, message)
         else:
             self.logger.warning("REJECTED: {}".format(message))
-            self.notification_handler.notify(
-                self.name, "REJECTED: {}: {}".format(source, message), logging.INFO)
+            message = "REJECTED: {}: {}".format(source, message)
+
+        pub.sendMessage("pai_notifications",
+            message=dict(source=self.name,
+                         message=message,
+                         level=logging.INFO))
 
     def handle_notify(self, message):
         sender, message, level = message

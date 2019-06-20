@@ -203,8 +203,11 @@ class MQTTInterface(Interface):
                     self.logger.debug("Element {} not found".format(element))
                     return
 
-                self.notification_handler.notify('mqtt', "Command by {}: {}".format(
-                    cfg.MQTT_TOGGLE_CODES[tokens[1]], command), logging.INFO)
+                pub.sendMessage('pai_notifications', message=dict(
+                    source="mqtt",
+                    message="Command by {}: {}".format(
+                    cfg.MQTT_TOGGLE_CODES[tokens[1]], command),
+                    level=logging.INFO))
 
             self.logger.debug("Partition command: {} = {}".format(element, command))
             if not self.alarm.control_partition(element, command):
