@@ -119,24 +119,30 @@ class Config:
         "PUSHBULLET_KEY": '',                     # Authentication key used for Pushbullet
         "PUSHBULLET_SECRET": '',                  # Authentication secret used for Pushbullet
         "PUSHBULLET_CONTACTS": [],                # Pushbullet user identifiers for notifications and interaction
-        "PUSHBULLET_IGNORE_EVENTS": [],           # List of tuples or regexp matching "type:label:property" eg. [(major, minor), "zone:HOME:entry_delay", ...]
-        "PUSHBULLET_ALLOW_EVENTS": [".*"],        # Same as before but as a white list. Default is allow all
+        "PUSHBULLET_IGNORE_EVENTS": [
+            r"zone,[\w]+,no_delay=True",
+            r"zone,[\w]+,exit_delay=.*"],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+        "PUSHBULLET_ALLOW_EVENTS": [r".*"],        # Same as before but as a white list. Default is allow all
 
         # Pushover
         "PUSHOVER_ENABLE": False,
         "PUSHOVER_KEY": '',                       # Application token for Pushover
         "PUSHOVER_BROADCAST_KEYS": {              # Pushover user or group keys to broadcast notifications to
             #    '<user_key>': '*'                # value can be '*' or comma separated list of device names
-        "PUSHOVER_IGNORE_EVENTS": [],             # List of tuples or regexp matching "type:label:property" eg. [(major, minor), "zone:HOME:entry_delay", ...]
-        "PUSHOVER_ALLOW_EVENTS": [".*"],          # Same as before but as a white list. Default is allow all
+        "PUSHOVER_IGNORE_EVENTS": [
+            r"zone,[\w]+,no_delay=True",
+            r"zone,[\w]+,exit_delay=.*"],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+        "PUSHOVER_ALLOW_EVENTS": [r".*"],          # Same as before but as a white list. Default is allow all
 
         },
 
         # Signal
         "SIGNAL_ENABLE": False,
         "SIGNAL_CONTACTS": [],                    # Contacts that are allowed to control the panel and receive notifications through Signal
-        "SIGNAL_IGNORE_EVENTS": [],               # List of tuples or regexp matching "type:label:property" eg. [(major, minor), "zone:HOME:entry_delay", ...]
-        "SIGNAL_ALLOW_EVENTS": [".*"],            # Same as before but as a white list. Default is allow all
+        "SIGNAL_IGNORE_EVENTS": [
+            r"zone,[\w]+,no_delay=True",
+            r"zone,[\w]+,exit_delay=.*"],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+        "SIGNAL_ALLOW_EVENTS": [r".*"],            # Same as before but as a white list. Default is allow all
 
         # GSM
         "GSM_ENABLE": False,
@@ -144,7 +150,7 @@ class Config:
         "GSM_MODEM_PORT": '',                     # Pathname of the serial port
         "GSM_CONTACTS": [],                       # Contacts that are allowed to control the panel and receive notifications through SMS
         "GSM_IGNORE_EVENTS": [],                  # List of tuples or regexp matching "type:label:property" eg. [(major, minor), "zone:HOME:entry_delay", ...]
-        "GSM_ALLOW_EVENTS": ["Partition,.*,alarm"],# Same as before but as a white list. Default is to only allow alarm
+        "GSM_ALLOW_EVENTS": [r"partition,[\w]+,alarm=True"],# Same as before but as a white list. Default is to only allow alarm
 
         # IP Socket Interface
         "IP_INTERFACE_ENABLE": False,
