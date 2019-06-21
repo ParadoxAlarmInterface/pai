@@ -51,7 +51,9 @@ class Event:
         self._event_map = event_map
         self.parse_event(event)
         
-        return self._parse_event_map()
+        self._parse_event_map()
+
+        return True
 
     def from_change(self, property_map, change, label_provider=None):
         if isinstance(label_provider, typing.Callable):
