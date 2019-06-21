@@ -1,5 +1,3 @@
-import string
-import re
 import typing
 import logging
 from copy import copy
@@ -7,10 +5,9 @@ from enum import Enum
 import datetime
 
 from construct import Container
+from paradox.lib.format import EventMessageFormatter
 
 logger = logging.getLogger('PAI').getChild(__name__)
-
-re_magick_placeholder = re.compile('@(?P<type>[a-z]+)(:?#(?P<source>[a-z0-9_]+))?')
 
 from paradox.config import config as cfg
 
@@ -21,7 +18,6 @@ class EventLevel(Enum):
     WARN = 30
     ERROR = 40
     CRITICAL = 50
-
 
 class Event:
     def __init__(self):
@@ -168,7 +164,7 @@ class Event:
 
     @property
     def message(self) -> str:
-        return Formatter().format(self._message_tpl, self)
+        return EventMessageFormatter().format(self._message_tpl, self)
 
     @property
     def name(self) -> str:
