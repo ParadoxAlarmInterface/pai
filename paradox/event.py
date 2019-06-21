@@ -34,6 +34,7 @@ class Event:
         self._key = None
         self._event_map = None
         self._property_map = None
+        self.label_provider = lambda type, id: "[{}:{}]".format(type, id)
 
     def __repr__(self):
         lvars = {}
@@ -46,8 +47,6 @@ class Event:
     def from_live_event(self, event_map: dict, event: Container, label_provider=None):
         if isinstance(label_provider, typing.Callable):
             self.label_provider = label_provider
-        else:
-            self.label_provider = lambda type, id: "[{}:{}]".format(type, id)
         
         self._event_map = event_map
         self.parse_event(event)
@@ -57,8 +56,6 @@ class Event:
     def from_change(self, property_map, change, label_provider=None):
         if isinstance(label_provider, typing.Callable):
             self.label_provider = label_provider
-        else:
-            self.label_provider = lambda type, id: "[{}:{}]".format(type, id)
         
         self._property_map = property_map
         self.raw = copy(change)

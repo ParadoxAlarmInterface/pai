@@ -38,6 +38,13 @@ def test_property_map_bad():
     r = evt.from_change(change=change, property_map=Panel.property_map)
     assert not r
 
+def test_partition_arm_message():
+    change = dict(property='arm', value=True, partition=1, time=time.time(), type='partition', label='Fridge')
+    evt = Event()
+    r = evt.from_change(change=change, property_map=Panel.property_map)
+    assert r
+    assert evt.message == "Partition Fridge is armed"
+
 @pytest.mark.parametrize("type,property,value,partition,label", generate_property_test_parameters())
 def test_property(type, property, value, partition, label):
     change = dict(property=property, value=value, partition=partition, time=time.time(), type=type, label=label)

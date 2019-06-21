@@ -9,6 +9,7 @@ from typing import Optional
 from construct import Construct, Container, MappingError, ChecksumError
 
 from .event import event_map
+from .property import property_map
 from .parsers import CloseConnection, ErrorMessage, InitializeCommunication, LoginConfirmationResponse, SetTimeDate, \
     SetTimeDateResponse, PerformPartitionAction, PerformActionResponse, ReadEEPROMResponse, LiveEvent, ReadEEPROM, \
     RAMDataParserMap, RequestedEvent
@@ -20,7 +21,7 @@ logger = logging.getLogger('PAI').getChild(__name__)
 class Panel_EVOBase(PanelBase):
 
     event_map = event_map
-    property_map = {}
+    property_map = property_map
 
     def get_message(self, name: str) -> Construct:
         try:

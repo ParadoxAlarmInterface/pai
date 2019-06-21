@@ -99,7 +99,7 @@ class PartitionStatus(Subconstruct):
 
         'lockout' / Flag,
         'programming' / Flag,
-        'zone_bypass' / Flag,
+        'zone_bypassed' / Flag,
         'alarm_in_memory' / Flag,
         'trouble' / Flag,
         'entry_delay' / Flag,
