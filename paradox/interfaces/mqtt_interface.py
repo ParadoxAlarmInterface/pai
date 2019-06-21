@@ -262,8 +262,14 @@ class MQTTInterface(Interface):
                          json.dumps(event.props, ensure_ascii=False, cls=JSONByteEncoder), 0, cfg.MQTT_RETAIN)
 
     def handle_panel_change(self, change):
+        logger.debug(change)
 
-        element, label, attribute, value, initial = change
+        attribute = change['property']
+        label = change['label']
+        value = change['value']
+        initial = change['initial']
+        element = change['type']
+
         """Handle Property Change"""
         
         # Keep track of ARM state
