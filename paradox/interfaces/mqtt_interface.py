@@ -10,7 +10,7 @@ from paradox.event import Event
 from paradox.interfaces import Interface
 from paradox.lib.utils import SortableTuple, JSONByteEncoder
 
-from pubsub import pub
+from paradox.lib import ps
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -70,8 +70,8 @@ class MQTTInterface(Interface):
         self.mqtt.loop_start()
         last_republish = time.time()
 
-        pub.subscribe(self.handle_panel_change, "pai_changes")
-        pub.subscribe(self.handle_panel_event, "pai_events")
+        ps.subscribe(self.handle_panel_change, "changes")
+        ps.subscribe(self.handle_panel_event, "events")
 
         while True:
             try:
@@ -145,7 +145,7 @@ class MQTTInterface(Interface):
                 return
 
             payload = message.payload.decode("latin").strip()
-            pub.sendMessage("pai_notifications", message=dict(source=self.name, payload=payload, level=level))
+            ps.sendMessage("notifications", message=dict(source=self.name, payload=payload, level=level))
             return
 
         if topics[1] != cfg.MQTT_CONTROL_TOPIC:
@@ -203,7 +203,7 @@ class MQTTInterface(Interface):
                     self.logger.debug("Element {} not found".format(element))
                     return
 
-                pub.sendMessage('pai_notifications', message=dict(
+                ps.sendMessage('notifications', message=dict(
                     source="mqtt",
                     message="Command by {}: {}".format(
                     cfg.MQTT_TOGGLE_CODES[tokens[1]], command),

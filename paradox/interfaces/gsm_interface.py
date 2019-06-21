@@ -10,7 +10,7 @@ import datetime
 import queue
 import serial
 
-from pubsub import pub
+from paradox.lib import ps
 
 from paradox.event import EventLevel, Event
 from paradox.lib.utils import SortableTuple
@@ -60,8 +60,8 @@ class GSMInterface(Interface):
     def run(self):
         self.logger.info("Starting GSM Interface")
 
-        pub.subscribe(self.handle_panel_event, "pai_events")
-        pub.subscribe(self.handle_notify, "pai_notifications")
+        ps.subscribe(self.handle_panel_event, "events")
+        ps.subscribe(self.handle_notify, "notifications")
 
         try:
             while not self.stop_running.isSet():
@@ -86,7 +86,7 @@ class GSMInterface(Interface):
                                 message = tokens[6]
                                 self.handle_message(timestamp, source, message)
                             elif tokens[0].startswith('+CUSD:'):
-                                pub.sendMessage("pai_notifications",
+                                ps.sendMessage("notifications",
                                                 message=dict(source=self.name,
                                                 message=tokens[1],
                                                 level=logging.INFO))
@@ -165,7 +165,7 @@ class GSMInterface(Interface):
             self.logger.warning("REJECTED: {}".format(message))
             message = "REJECTED: {}: {}".format(source, message)
 
-        pub.sendMessage("pai_notifications",
+        ps.sendMessage("notifications",
             message=dict(source=self.name,
                          message=message,
                          level=logging.INFO))

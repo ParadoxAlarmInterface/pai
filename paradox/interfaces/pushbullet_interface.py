@@ -8,7 +8,7 @@ from ws4py.client import WebSocketBaseClient
 from ws4py.manager import WebSocketManager
 
 from pushbullet import Pushbullet
-from pubsub import pub
+from paradox.lib import ps
 
 import time
 import logging
@@ -137,8 +137,8 @@ class PushBulletInterface(Interface):
             self.pb_ws.init(self)
             self.pb_ws.connect()
 
-            pub.subscribe(self.handle_panel_event, "pai_events")
-            pub.subscribe(self.handle_notify, "pai_notifications")
+            ps.subscribe(self.handle_panel_event, "events")
+            ps.subscribe(self.handle_notify, "notifications")
 
             while True:
                 item = self.queue.get()

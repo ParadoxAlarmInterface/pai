@@ -12,7 +12,7 @@ from gi.repository import GObject
 import logging
 import queue
 
-from pubsub import pub
+from paradox.lib import ps
 
 from paradox.event import EventLevel, Event
 from paradox.lib.utils import SortableTuple
@@ -68,8 +68,8 @@ class SignalInterface(Interface):
 
         self.logger.debug("Signal Interface Running")
         
-        pub.subscribe(self.handle_panel_event, "pai_events")
-        pub.subscribe(self.handle_notify, "pai_notifications")
+        ps.subscribe(self.handle_panel_event, "events")
+        ps.subscribe(self.handle_notify, "notifications")
 
         try:
             self.loop.run()
@@ -124,7 +124,7 @@ class SignalInterface(Interface):
     def handle_panel_event(self, event):
         """Handle Live Event"""
 
-        if event.level.value  < EventLevel.INFO.value:
+        if event.level.value < EventLevel.INFO.value:
             return
 
         major_code = event.major

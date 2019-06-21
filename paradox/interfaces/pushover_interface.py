@@ -5,7 +5,7 @@ import re
 
 from chump import Application
 
-from pubsub import pub
+from paradox.lib import ps
 
 from paradox.event import EventLevel, Event
 from paradox.interfaces import Interface
@@ -31,8 +31,8 @@ class PushoverInterface(Interface):
             if not self.app.is_authenticated:
                 raise Exception('Failed to authenticate with Pushover. Please check PUSHOVER_APPLICATION_KEY')
 
-            pub.subscribe(self.handle_panel_event, "pai_events")
-            pub.subscribe(self.handle_notify, "pai_notifications")
+            ps.subscribe(self.handle_panel_event, "events")
+            ps.subscribe(self.handle_notify, "notifications")
 
             while True:
                 item = self.queue.get()
