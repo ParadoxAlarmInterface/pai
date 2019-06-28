@@ -28,12 +28,6 @@ STATE_PAUSE = 2
 STATE_ERROR = 3
 
 
-class NotifyPropertyChange(Enum):
-    NO = 0
-    DEFAULT = 1
-    YES = 2
-
-
 class PublishPropertyChange(Enum):
     NO = 0
     DEFAULT = 1
@@ -469,25 +463,24 @@ class Paradox:
             if el:
                 return el.get("label")
 
-    def handle_event(self, message: Container=None, change: Container=None):
+    def handle_event(self, message: Container=None):
         """Process cfg.Live Event Message and dispatch it to the interface module"""
         try:
             evt = event.Event()
+
             r = False
-            if change is not None:
-                r = evt.from_change(property_map=self.panel.property_map, change=change)
-            elif message is not None:
-                r = evt.from_live_event(self.panel.event_map, event=message, label_provider=self.get_label)
+            logger.debug("Handle event from panel message: {}".format(message))
+            r = evt.from_live_event(self.panel.event_map, event=message, label_provider=self.get_label)
+            if r:
+                if len(evt.change) == 0:
+                    # Publish event
+                    ps.sendEvent(evt)
             else:
-                logger.warn("Must provide message or change")
-                return
-            
-            if not r:
-                logger.debug("Could not parse to Event")
+                logger.debug("Error creating event")
                 return
 
-            logger.debug("Handle Event: {}".format(evt))
-
+            logger.debug("Event: {}".format(evt))
+                
             # Temporary to catch labels/properties in wrong places
             # TODO: REMOVE
             if message is not None:
@@ -508,18 +501,15 @@ class Paradox:
                 else:
                     logger.warn("Missing type {} for event: {}.{} {}".format(evt.type, evt.major, evt.minor, evt.message))
             # Temporary end
+            
+            # The event has changes. Update the state
+            if len(evt.change) > 0 and evt.type in self.data and evt.id in self.data[evt.type]:
+                self.update_properties(evt.type, evt.id, evt.change)
 
-            if change is None and len(evt.change) > 0 and evt.type in self.data and evt.id in self.data[evt.type]:
-                self.update_properties(evt.type, evt.id,
-                                       evt.change, notify=NotifyPropertyChange.NO)
-
-            # Publish event
-            ps.sendEvent(evt)
         except Exception as e:
             logger.exception("Handle event")
 
-    def update_properties(self, element_type: str, type_key: str, change: dict,
-                          notify=NotifyPropertyChange.DEFAULT, publish=PublishPropertyChange.DEFAULT):
+    def update_properties(self, element_type: str, type_key: str, change: dict, publish=PublishPropertyChange.DEFAULT):
         try:
             elements = self.data[element_type]
         except KeyError:
@@ -537,22 +527,23 @@ class Paradox:
 
             # Virtual property "Trouble"
             # True if element has ANY type of alarm
-            if 'trouble' in property_name and property_name != 'trouble':
+            if 'trouble' in property_name and property_name !='trouble':
                 if property_value:
-                    self.update_properties(element_type, type_key, dict(trouble=True), notify=notify, publish=publish)
+                    self.update_properties(element_type, type_key, dict(trouble=True), publish=publish)
                 else:
                     r = False
                     for kk, vv in elements[type_key].items():
                         if 'trouble' in kk:
                             r = r or elements[type_key][kk]
 
-                    self.update_properties(element_type, type_key, dict(trouble=r), notify=notify, publish=publish)
+                    self.update_properties(element_type, type_key, dict(trouble=r), publish=publish)
 
             # Standard processing of changes
             if property_name in elements[type_key]:
                 old = elements[type_key][property_name]
 
-                if old != change[property_name] or publish == PublishPropertyChange.YES \
+                if old != change[property_name] \
+                        or publish == PublishPropertyChange.YES \
                         or cfg.PUSH_UPDATE_WITHOUT_CHANGE:
                     logger.debug("Change {}/{}/{} from {} to {}".format(element_type,
                                                                         elements[type_key]['key'],
@@ -560,20 +551,27 @@ class Paradox:
                                                                         old,
                                                                         property_value))
                     elements[type_key][property_name] = property_value
-
+                    
                     ps.sendChange(element_type, elements[type_key]['key'],
                                       property_name, property_value)
 
-                    # if this change originates in an event, do not send a notification
-                    # because it was already sent due to the event
-                    # TODO: We are being conservative about troubles. Investigate the need for this exception
+                    # Ignore change if is a generic trouble. 
                     if not (property_name == 'trouble' and element_type == 'system'):
                         if element_type == 'partition':
                             partition = elements[type_key]['key']
                         else:
                             partition = ""
-                        evt_change = {'property': property_name, 'value': property_value, 'type': element_type, 'partition': partition, 'label': elements[type_key]['key'], 'time': int(time.time())}
-                        self.handle_event(change=evt_change)
+
+                        evt_change = {'property': property_name, 'value': property_value, 'type': element_type, 
+                                      'partition': partition, 'label': elements[type_key]['key'], 'time': int(time.time())}
+                        
+                        evt = event.Event()
+                        r = evt.from_change(property_map=self.panel.property_map, change=evt_change)
+                        if r:
+                            logger.debug("Event: {}".format(evt))
+                            ps.sendEvent(evt)
+                        else:
+                            logger.warn("Could not create event from change")
 
             else:
                 elements[type_key][property_name] = property_value  # Initial value, do not notify
