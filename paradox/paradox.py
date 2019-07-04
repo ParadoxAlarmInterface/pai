@@ -207,7 +207,8 @@ class Paradox:
 
     async def async_loop(self):
         logger.debug("Loop start")
-
+        
+        replies_missing = 0
         while self.run != STATE_STOP:
 
             while self.run == STATE_PAUSE:
@@ -226,13 +227,21 @@ class Paradox:
                     reply = await self.panel.request_status(i)
                     if reply is not None:
                         tstart = time.time()
+                        replies_missing = 0
                         self.panel.handle_status(reply)
                     else:
                         logger.error("No reply to status request: %d" % i)
+                        replies_missing += 1
+                        if replies_missing > 10:
+                            logger.error("Lost communication with panel")
+                            self.disconnect()
+                            return
+
             except ConnectionError:
                 raise
             except Exception:
                 logger.exception("Loop")
+            
 
             # cfg.Listen for events
             while time.time() - tstart < cfg.KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
@@ -243,7 +252,6 @@ class Paradox:
         async_supported = asyncio.iscoroutinefunction(self.connection.read)
         try:
             while True:
-                logger.debug("Receive worker loop")
                 if async_supported:
                     await self.receive()
                 else:
