@@ -27,8 +27,8 @@ SERIAL_BAUD = 9600              # Use 38400(default setting) or 57600 for EVO
 
 # IP Connection Defails
 IP_CONNECTION_HOST = '127.0.0.1'	# IP Module address when using direct IP Connection
-IP_CONNECTION_PORT = 10000		# IP Module port when using direct IP Connection
-IP_CONNECTION_PASSWORD = b'0000' 	# IP Module password
+IP_CONNECTION_PORT = 10000		    # IP Module port when using direct IP Connection
+IP_CONNECTION_PASSWORD = b'paradox' # IP Module password. "paradox" is default.
 IP_CONNECTION_SITEID = None 		# SITE ID. IF defined, connection will be made through this method.
 IP_CONNECTION_EMAIL = None 		# Email registered in the site
 IP_CONNECTION_PANEL_SERIAL = None  # Use a specific panel. Set it to None to use the first
@@ -54,7 +54,7 @@ OUTPUT_PULSE_DURATION = 1               # Duration of a PGM pulse in seconds
 PARTITIONS_CHANGE_NOTIFICATION_IGNORE = ['arm_full', 'exit_delay'] # Do not send notifications for these notificions
 STATUS_REQUESTS = [0, 1, 2, 3, 4, 5]
 SYNC_TIME = True    			# Update panel time
-PASSWORD = b'0000'   			# PC Password. Set to None if Panel has no Password
+PASSWORD = b'0000'   			# PC Password. Set to None if Panel has no Password. Master user password. Usually first user's password.
 
 POWER_UPDATE_INTERVAL = 60      	# Interval between updates of the battery, DC and VDC voltages
 PUSH_POWER_UPDATE_WITHOUT_CHANGE = True # Always notify interfaces of power changes
