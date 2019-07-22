@@ -245,7 +245,8 @@ class Paradox:
 
             # cfg.Listen for events
             while time.time() - tstart < cfg.KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
-                await asyncio.sleep(min(time.time() - tstart, 1))
+                wait_time = max((tstart + cfg.KEEP_ALIVE_INTERVAL) - time.time(), 0)
+                await asyncio.sleep(wait_time)
 
     async def receive_worker(self):
         logger.debug("Receive worker started")
