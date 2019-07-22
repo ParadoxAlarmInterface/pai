@@ -27,7 +27,7 @@ class Config:
         # IP Connection Details
         "IP_CONNECTION_HOST": '127.0.0.1',                            # IP Module address when using direct IP Connection
         "IP_CONNECTION_PORT": (10000, int, (1, 65535)),               # IP Module port when using direct IP Connection
-        "IP_CONNECTION_PASSWORD": (b'0000', [bytes, type(None)]),     # IP Module password
+        "IP_CONNECTION_PASSWORD": (b'paradox', [bytes, type(None)]),  # IP Module password. "paradox" is default.
         "IP_CONNECTION_SITEID": (None, [str, type(None)]),            # If defined, connection will be made through this method.
         "IP_CONNECTION_EMAIL": (None, [str, type(None)]),             # Email registered in the site
         "IP_CONNECTION_PANEL_SERIAL": (None, [str, type(None)]),      # Serial number to be used in multi-panel sites. None for first
@@ -42,7 +42,7 @@ class Config:
         "OUTPUT_PULSE_DURATION": (1, float, (0, 0xFFFFFFFF)),                 # Duration of a PGM pulse in seconds
         "STATUS_REQUESTS": [0, 1, 2, 3, 4, 5],
         "SYNC_TIME": True,                                       # Update panel time
-        "PASSWORD": (None, [bytes, type(None)]),                 # PC Password. Set to None if Panel has no Password
+        "PASSWORD": (None, [bytes, type(None)]),                 # PC Password. Set to None if Panel has no Password. Master user password. Usually first user's password.
 
         "POWER_UPDATE_INTERVAL": (60, int, (0, 0xFFFFFFFF)),     # Interval between updates of the Power voltages
         "PUSH_POWER_UPDATE_WITHOUT_CHANGE": True,  # Always notify interfaces of power changes
