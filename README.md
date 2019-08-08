@@ -22,6 +22,18 @@ On Android, if you install [MQTT Dash](https://play.google.com/store/apps/detail
 - [master](https://github.com/jpbarraca/pai/tree/master) [![Build Status Master](https://travis-ci.org/jpbarraca/pai.svg?branch=master)](https://travis-ci.org/jpbarraca/pai)
 - [dev](https://github.com/jpbarraca/pai/tree/dev) [![Build Status Dev](https://travis-ci.org/jpbarraca/pai.svg?branch=dev)](https://travis-ci.org/jpbarraca/pai)
 
+## Things you need to have to be able to connect
+We support two connection options: via Serial and via IP150 Module
+
+#### For all connection methods
+- **PC Password:** 4 digit `[0-9a-f]` password.
+Can be looked up in Babyware (_Right click on a panel ⇾ Properties ⇾ PC Communication (BabyWare) ⇾ PC Communication (BabyWare) ⇾ PC Password_)
+#### In case of IP150 you need additionally:
+- **IP Module password**: Default is `paradox`
+##### For IP150 firmware > 4.0 if you connect via Paradox Cloud (SWAN)
+- **SITE ID**
+- **Email registered in the site**
+
 ## How to use
 
 ### Docker
