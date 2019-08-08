@@ -54,7 +54,9 @@ OUTPUT_PULSE_DURATION = 1               # Duration of a PGM pulse in seconds
 PARTITIONS_CHANGE_NOTIFICATION_IGNORE = ['arm_full', 'exit_delay'] # Do not send notifications for these notificions
 STATUS_REQUESTS = [0, 1, 2, 3, 4, 5]
 SYNC_TIME = True    			# Update panel time
-PASSWORD = b'0000'   			# PC Password. Set to None if Panel has no Password. In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) -> PC Communication (Babyware) Tab.
+PASSWORD = b'0000'   			# PC Password. Set to None if Panel has no Password.
+                                # In Babyware: Right click on yourpanel -> Properties -> PC Communication (Babyware) ->
+                                # PC Communication (Babyware) Tab.
 
 POWER_UPDATE_INTERVAL = 60      	# Interval between updates of the battery, DC and VDC voltages
 PUSH_POWER_UPDATE_WITHOUT_CHANGE = True # Always notify interfaces of power changes
@@ -163,14 +165,16 @@ PUSHOVER_BROADCAST_KEYS = {             # Pushover user or group keys to broadca
 
 # Signal
 SIGNAL_ENABLE = False
-SIGNAL_CONTACTS = []                    # Contacts that are allowed to control the panel and receive notifications through Signal
+SIGNAL_CONTACTS = []                    # Contacts that are allowed to control the panel and receive notifications
+                                        # through Signal
 SIGNAL_IGNORE_EVENTS = []               # List of tuples (major, minor)
 
 # GSM
 GSM_ENABLE = False
 GSM_MODEM_BAUDRATE = 115200             # Baudrate of the GSM modem
 GSM_MODEM_PORT = ''                     # Pathname of the serial port
-GSM_CONTACTS = []                       # Contacts that are allowed to control the panel and receive notifications through SMS
+GSM_CONTACTS = []                       # Contacts that are allowed to control the panel and receive notifications
+                                        # through SMS
 GSM_IGNORE_EVENTS = []                  # List of tuples [(major, minor), ...]
 
 # IP Socket Interface
