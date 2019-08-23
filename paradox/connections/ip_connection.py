@@ -220,6 +220,7 @@ class IPConnection(Connection):
             logger.info("Connected to Site: {}".format(cfg.IP_CONNECTION_SITEID))
         except Exception:
             logger.exception("Unable to negotiate connection to site")
+            return False
 
         return True
 
