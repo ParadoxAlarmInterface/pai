@@ -1,0 +1,18 @@
+@startuml
+User->Panel: Arm partition
+Panel->PAI: Live event (Arming with user code)
+PAI->PAI: change(arm=True)
+PAI->MQTT: "/arm=True"
+
+Panel->Panel: exit_delay started
+PAI->Panel: Request status (every 10s)
+Panel-->PAI: Response
+PAI->PAI: change(exit_delay=True)
+PAI->MQTT: "/exit_delay=True"
+
+Panel->Panel: exit_delay ended, panel armed
+PAI->Panel: Request status (every 10s)
+Panel-->PAI: Response
+PAI->PAI: change(exit_delay=False)
+PAI->MQTT: "/exit_delay=False"
+@enduml
