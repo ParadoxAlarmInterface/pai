@@ -1,20 +1,21 @@
 # -*- coding: utf-8 -*-
 
-import binascii
+import asyncio
 import logging
 import time
-import asyncio
 from collections import defaultdict, MutableMapping
+from enum import Enum
 from threading import Lock
 from typing import Optional, Sequence, Iterable, Callable, Awaitable
 
 from construct import Container
 
-from paradox.hardware import create_panel
 from paradox import event
-from enum import Enum
-
 from paradox.config import config as cfg
+from paradox.connections.connection import Connection
+from paradox.interfaces.interface_manager import InterfaceManager
+from paradox.hardware import create_panel
+from paradox.lib import ps
 from paradox.lib.async_message_manager import AsyncMessageManager, EventMessageHandler, ErrorMessageHandler
 
 logger = logging.getLogger('PAI').getChild(__name__)
@@ -25,12 +26,6 @@ STATE_STOP = 0
 STATE_RUN = 1
 STATE_PAUSE = 2
 STATE_ERROR = 3
-
-
-class NotifyPropertyChange(Enum):
-    NO = 0
-    DEFAULT = 1
-    YES = 2
 
 
 class PublishPropertyChange(Enum):
@@ -73,14 +68,13 @@ class Type(MutableMapping):
 class Paradox:
 
     def __init__(self,
-                 connection,
-                 interface,
+                 connection: Connection,
+                 interface: InterfaceManager,
                  retries=3):
 
         self.panel = None  # type: Panel
         self.connection = connection
         self.retries = retries
-        self.interface = interface
         self.message_manager = AsyncMessageManager()
         self.work_loop = asyncio.get_event_loop() # type: asyncio.AbstractEventLoop
         self.receive_worker_task = None
@@ -156,6 +150,7 @@ class Paradox:
 
             if reply.fields.value.product_id is not None:
                 self.panel = create_panel(self, reply.fields.value.product_id)  # Now we know what panel it is. Let's
+                ps.sendMessage('panel_detected', product_id=reply.fields.value.product_id)
             # recreate panel object.
 
             result = await self.panel.initialize_communication(reply, cfg.PASSWORD)
@@ -206,6 +201,7 @@ class Paradox:
             logger.info("Connection OK")
             self.loop_wait = False
 
+            ps.sendMessage('connected')
             return True
         except ConnectionError as e:
             logger.error("Failed to connect: %s" % str(e))
@@ -234,7 +230,8 @@ class Paradox:
 
     async def async_loop(self):
         logger.debug("Loop start")
-
+        
+        replies_missing = 0
         while self.run != STATE_STOP:
 
             while self.run == STATE_PAUSE:
@@ -253,24 +250,32 @@ class Paradox:
                     reply = await self.panel.request_status(i)
                     if reply is not None:
                         tstart = time.time()
+                        replies_missing = 0
                         self.panel.handle_status(reply)
                     else:
                         logger.error("No reply to status request: %d" % i)
+                        replies_missing += 1
+                        if replies_missing > 10:
+                            logger.error("Lost communication with panel")
+                            self.disconnect()
+                            return
+
             except ConnectionError:
                 raise
             except Exception:
                 logger.exception("Loop")
+            
 
             # cfg.Listen for events
             while time.time() - tstart < cfg.KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
-                await asyncio.sleep(min(time.time() - tstart, 1))
+                wait_time = max((tstart + cfg.KEEP_ALIVE_INTERVAL) - time.time(), 0)
+                await asyncio.sleep(wait_time)
 
     async def receive_worker(self):
         logger.debug("Receive worker started")
         async_supported = asyncio.iscoroutinefunction(self.connection.read)
         try:
             while True:
-                logger.debug("Receive worker loop")
                 if async_supported:
                     await self.receive()
                 else:
@@ -403,7 +408,7 @@ class Paradox:
 
         return selected
 
-    def control_zone(self, zone, command) -> bool:
+    def control_zone(self, zone: str, command: str) -> bool:
         logger.debug("Control Zone: {} - {}".format(zone, command))
 
         zones_selected = self._select(self.data['zone'], zone)  # type: Sequence[int]
@@ -429,7 +434,7 @@ class Paradox:
 
         return accepted
 
-    def control_partition(self, partition, command) -> bool:
+    def control_partition(self, partition: str, command: str) -> bool:
         logger.debug("Control Partition: {} - {}".format(partition, command))
 
         partitions_selected = self._select(self.data['partition'], partition)  # type: Sequence[int]
@@ -484,51 +489,59 @@ class Paradox:
 
         return accepted
 
-    def get_label(self, label_type, label_id):
+    def get_label(self, label_type: str, label_id):
         if label_type in self.data:
             el = self.data[label_type].get(label_id)
             if el:
                 return el.get("label")
 
-    def handle_event(self, message):
+    def handle_event(self, message: Container=None):
         """Process cfg.Live Event Message and dispatch it to the interface module"""
         try:
-            evt = event.Event(self.panel.event_map, message, label_provider=self.get_label)
+            evt = event.Event()
 
-            logger.debug("Handle Event: {}".format(evt))
+            r = False
+            logger.debug("Handle event from panel message: {}".format(message))
+            r = evt.from_live_event(self.panel.event_map, event=message, label_provider=self.get_label)
+            if r:
+                if len(evt.change) == 0:
+                    # Publish event
+                    ps.sendEvent(evt)
+            else:
+                logger.debug("Error creating event")
+                return
 
+            logger.debug("Event: {}".format(evt))
+                
             # Temporary to catch labels/properties in wrong places
             # TODO: REMOVE
-            if evt.type in self.data:
-                if not evt.id:
-                    logger.warn("Missing element ID in {}/{}, m/m: {}/{}, message: {}".format(evt.type, evt.label or '?', evt.major, evt.minor, evt.message))
-                else:
-                    el = self.data[evt.type].get(evt.id)
-                    if not el:
-                        logger.warn("Missing element with ID {} in {}/{}".format(evt.id, evt.type, evt.label))
+            if message is not None:
+                if evt.type in self.data:
+                    if not evt.id:
+                        logger.warn("Missing element ID in {}/{}, m/m: {}/{}, message: {}".format(evt.type, evt.label or '?', evt.major, evt.minor, evt.message))
                     else:
-                        for k in evt.change:
-                            if k not in el:
-                                logger.warn("Missing property {} in {}/{}".format(k, evt.type, evt.label))
-                        if evt.label != el.get("label"):
-                            logger.warn(
-                                "Labels differ {} != {} in {}/{}".format(el.get("label"), evt.label, evt.type, evt.label))
-            else:
-                logger.warn("Missing type {} for event: {}.{} {}".format(evt.type, evt.major, evt.minor, evt.message))
+                        el = self.data[evt.type].get(evt.id)
+                        if not el:
+                            logger.warn("Missing element with ID {} in {}/{}".format(evt.id, evt.type, evt.label))
+                        else:
+                            for k in evt.change:
+                                if k not in el:
+                                    logger.warn("Missing property {} in {}/{}".format(k, evt.type, evt.label))
+                            if evt.label != el.get("label"):
+                                logger.warn(
+                                    "Labels differ {} != {} in {}/{}".format(el.get("label"), evt.label, evt.type, evt.label))
+                else:
+                    logger.warn("Missing type {} for event: {}.{} {}".format(evt.type, evt.major, evt.minor, evt.message))
             # Temporary end
-
+            
+            # The event has changes. Update the state
             if len(evt.change) > 0 and evt.type in self.data and evt.id in self.data[evt.type]:
-                self.update_properties(evt.type, evt.id,
-                                       evt.change, notify=NotifyPropertyChange.NO)
+                self.update_properties(evt.type, evt.id, evt.change)
 
-            # Publish event
-            if self.interface is not None:
-                self.interface.event(evt)
         except Exception as e:
             logger.exception("Handle event")
 
-    def update_properties(self, element_type, type_key, change,
-                          notify=NotifyPropertyChange.DEFAULT, publish=PublishPropertyChange.DEFAULT):
+    def update_properties(self, element_type: str, type_key: str, change: dict, publish=PublishPropertyChange.DEFAULT):
         try:
             elements = self.data[element_type]
         except KeyError:
@@ -546,21 +559,23 @@ class Paradox:
 
             # Virtual property "Trouble"
             # True if element has ANY type of alarm
-            if 'trouble' in property_name and property_name != 'trouble':
+            if 'trouble' in property_name and property_name !='trouble':
                 if property_value:
-                    self.update_properties(element_type, type_key, dict(trouble=True), notify=notify, publish=publish)
+                    self.update_properties(element_type, type_key, dict(trouble=True), publish=publish)
                 else:
                     r = False
                     for kk, vv in elements[type_key].items():
                         if 'trouble' in kk:
                             r = r or elements[type_key][kk]
 
-                    self.update_properties(element_type, type_key, dict(trouble=r), notify=notify, publish=publish)
+                    self.update_properties(element_type, type_key, dict(trouble=r), publish=publish)
 
+            # Standard processing of changes
             if property_name in elements[type_key]:
                 old = elements[type_key][property_name]
 
-                if old != change[property_name] or publish == PublishPropertyChange.YES \
+                if old != change[property_name] \
+                        or publish == PublishPropertyChange.YES \
                         or cfg.PUSH_UPDATE_WITHOUT_CHANGE:
                     logger.debug("Change {}/{}/{} from {} to {}".format(element_type,
                                                                         elements[type_key]['key'],
@@ -568,31 +583,33 @@ class Paradox:
                                                                         old,
                                                                         property_value))
                     elements[type_key][property_name] = property_value
-                    self.interface.change(element_type, elements[type_key]['key'],
-                                          property_name, property_value, initial=False)
+                    
+                    ps.sendChange(element_type, elements[type_key]['key'],
+                                      property_name, property_value)
 
-                    # Trigger notifications for Partitions changes
-                    # Ignore some changes as defined in the configuration
-                    # TODO: Move this to another place?
-                    try:
-                        if notify != NotifyPropertyChange.NO and (
-                                (element_type == "partition"
-                                 and ('partition' not in cfg.LIMITS or type_key in cfg.LIMITS['partition'])
-                                 and property_name not in cfg.PARTITIONS_CHANGE_NOTIFICATION_IGNORE
-                                )
-                                or ('trouble' in property_name)
-                        ):
-                            self.interface.notify("Paradox", "{} {} {}".format(elements[type_key]['key'],
-                                                                               property_name,
-                                                                               property_value), logging.INFO)
-                    except Exception:
-                        logger.exception("Trigger notifications")
+                    # Ignore change if is a generic trouble. 
+                    if not (property_name == 'trouble' and element_type == 'system'):
+                        if element_type == 'partition':
+                            partition = elements[type_key]['key']
+                        else:
+                            partition = ""
+
+                        evt_change = {'property': property_name, 'value': property_value, 'type': element_type, 
+                                      'partition': partition, 'label': elements[type_key]['key'], 'time': int(time.time())}
+                        
+                        evt = event.Event()
+                        r = evt.from_change(property_map=self.panel.property_map, change=evt_change)
+                        if r:
+                            logger.debug("Event: {}".format(evt))
+                            ps.sendEvent(evt)
+                        else:
+                            logger.warn("Could not create event from change")
 
             else:
-                elements[type_key][property_name] = property_value  # Initial value
+                elements[type_key][property_name] = property_value  # Initial value, do not notify
                 suppress = 'trouble' not in property_name
 
-                self.interface.change(element_type, elements[type_key]['key'],
+                ps.sendChange(element_type, elements[type_key]['key'],
                                       property_name, property_value, initial=suppress)
 
     def handle_error(self, message):

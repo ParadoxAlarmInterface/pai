@@ -11,6 +11,7 @@ from typing import Optional
 from paradox.config import config as cfg
 from paradox.paradox import PublishPropertyChange
 from .event import event_map
+from .property import property_map
 from .parsers import Construct, CloseConnection, ErrorMessage, InitializeCommunication, InitializeCommunicationResponse, \
     SetTimeDate, SetTimeDateResponse, PerformAction, PerformActionResponse, ReadStatusResponse, ReadEEPROM, \
     ReadEEPROMResponse, LiveEvent, RAMDataParserMap, Container, ChecksumError
@@ -26,6 +27,7 @@ PGM_ACTIONS = dict(on_override=0x30, off_override=0x31, on=0x32, off=0x33, pulse
 class Panel(PanelBase):
 
     event_map = event_map
+    property_map = property_map
 
     mem_map = {
         "status_base1": 0x8000,
@@ -46,7 +48,7 @@ class Panel(PanelBase):
         }
     }
 
-    def get_message(self, name) -> Construct:
+    def get_message(self, name: str) -> Construct:
         try:
             clsmembers = dict(inspect.getmembers(sys.modules[__name__]))
             if name in clsmembers:
@@ -56,7 +58,7 @@ class Panel(PanelBase):
 
         return super(Panel, self).get_message(name)
 
-    def parse_message(self, message, direction='topanel') -> Optional[Container]:
+    def parse_message(self, message: bytes, direction='topanel') -> Optional[Container]:
         try:
             if message is None or len(message) == 0:
                 return None
@@ -104,13 +106,13 @@ class Panel(PanelBase):
             logger.exception("Exception parsing message: %s" % (binascii.hexlify(message)))
         return None
 
-    async def initialize_communication(self, reply, PASSWORD):
-        password = self.encode_password(PASSWORD)
+    async def initialize_communication(self, reply: Container, password):
+        encoded_password = self.encode_password(password)
 
         args = dict(product_id=reply.fields.value.product_id,
                     firmware=reply.fields.value.firmware,
                     panel_id=reply.fields.value.panel_id,
-                    pc_password=password,
+                    pc_password=encoded_password,
                     user_code=0x000000,
                     _not_used1=0x19,
                     source_id=0x02
@@ -130,13 +132,13 @@ class Panel(PanelBase):
             logger.error("Authentication Failed. Wrong Password?")
             return False
 
-    async def request_status(self, i):
+    async def request_status(self, i: int):
         args = dict(address=self.mem_map['status_base1'] + i)
         reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=0x05)
 
         return reply
 
-    def handle_status(self, message):
+    def handle_status(self, message: Container):
         """Handle MessageStatus"""
         mvars = message.fields.value
 
@@ -177,7 +179,7 @@ class Panel(PanelBase):
         elif 1 <= mvars.address <= 5:
             self.process_properties_bulk(properties, mvars.address)
 
-    async def control_zones(self, zones, command) -> bool:
+    async def control_zones(self, zones: list, command: str) -> bool:
         """
         Control zones
         :param list zones: a list of zones
@@ -198,7 +200,7 @@ class Panel(PanelBase):
 
         return accepted
 
-    async def control_partitions(self, partitions, command) -> bool:
+    async def control_partitions(self, partitions: list, command: str) -> bool:
         """
         Control Partitions
         :param list partitions: a list of partitions
