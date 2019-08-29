@@ -208,6 +208,8 @@ class Paradox:
     async def async_loop(self):
         logger.debug("Loop start")
         
+        first_loop = True
+
         replies_missing = 0
         while self.run != STATE_STOP:
 
@@ -242,6 +244,9 @@ class Paradox:
             except Exception:
                 logger.exception("Loop")
             
+            if first_loop:
+                first_loop = False
+                ps.sendInternal('properties_enumerated')
 
             # cfg.Listen for events
             while time.time() - tstart < cfg.KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
