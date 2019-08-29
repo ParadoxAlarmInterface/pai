@@ -296,7 +296,7 @@ class HomieMQTTInterface(Interface):
         element, label, attribute, value = raw
         """Handle Property Change"""
         
-        self.logger.info("HOMIE: handling change: element: %s label: %s attribute: %s = %s" % (element,label,attribute,value))
+        
         # Keep track of ARM state
         if element == 'partition':
             if label not in self.partitions:
@@ -336,6 +336,7 @@ class HomieMQTTInterface(Interface):
                                             'hass')
         
         if element == 'zone' and (attribute == "open"): #or attribute == "alarm"):
+            self.logger.info("HOMIE: handling change: element: %s label: %s attribute: %s = %s" % (element,label,attribute,value))
             try:
                 label_sanitised = label.replace('_','').lower()
                 node = self.alarm_Device.get_node(label_sanitised)
@@ -358,21 +359,25 @@ class HomieMQTTInterface(Interface):
                 try:
                     #move contact_node to class, and set each zone as a node.
                     zone_node = Node_Base(self.alarm_Device,name=label,id=label_sanitised,type_=element)
-                    
+                    self.logger.info("HOMIE: Adding new property boolean '%s'" % attribute) 
                     #node.id = label
-                    newProperty = Property_Boolean(zone_node,attribute,attribute)
+                    newProperty = Property_Boolean(zone_node,id=attribute.lower(),name=attribute.lower(),value=value)
                     zone_node.add_property(newProperty)
                     
                     
                     #self.nodes[label] = node
                     self.alarm_Device.add_node(zone_node)
                 except Exception as e:
-                    self.logger.error("HOMIE: Error creating node: " + str(e))
+                    self.logger.error("HOMIE: Error creating node: %s with error: %s" %(zone_node.name, str(e)))
             #else:
             #    #needs a new node
             #    self.logger.info("HOMIE: Found existing node for '%s'" % label)
             #    #node = self.get_node(label)
 
+    def validate_id(self,id):
+        if isinstance(id, str):
+            r = re.compile(r'(^(?!\-)[a-z0-9\-]+(?<!\-)$)')
+            return id if r.match(id) else False
 
     def handle_change_external(self, element, label, attribute,
                                value, element_topic, states_map,
