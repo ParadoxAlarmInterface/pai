@@ -34,3 +34,4 @@ git+https://github.com/mjcumming/HomieV3.git
 #
 # Testing
 # pytest
+PyPubSub>=4.0.3

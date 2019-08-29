@@ -12,11 +12,13 @@ from gi.repository import GObject
 import logging
 import queue
 
-from paradox.event import EventLevel
+from paradox.lib import ps
+
+from paradox.event import EventLevel, Event
 from paradox.lib.utils import SortableTuple
 
 from paradox.config import config as cfg
-
+import re
 
 class SignalInterface(Interface):
     """Interface Class using Signal"""
@@ -39,7 +41,7 @@ class SignalInterface(Interface):
         self.logger.debug("Signal Stopped")
 
     def event(self, event):
-        if event.level.value >= EventLevel.WARN.value:
+        if event.level.value >= EventLevel.INFO.value:
             self.queue.put_nowait(SortableTuple(
                 (2, 'event', event)))
 
@@ -62,9 +64,13 @@ class SignalInterface(Interface):
         self.signal.onMessageReceived = self.handle_message
         self.loop = GLib.MainLoop()
 
-        self.timer = GObject.idle_add(self.run_loop)
+        #self.timer = GObject.idle_add(self.run_loop)
 
         self.logger.debug("Signal Interface Running")
+        
+        ps.subscribe(self.handle_panel_event, "events")
+        ps.subscribe(self.handle_notify, "notifications")
+
         try:
             self.loop.run()
 
@@ -76,23 +82,6 @@ class SignalInterface(Interface):
         except Exception:
             self.logger.exception("Signal loop")
 
-    def run_loop(self):
-        try:
-            item = self.queue.get(block=True, timeout=1)
-
-            if item[1] == 'change':
-                self.handle_change(item[2])
-            elif item[1] == 'event':
-                self.handle_event(item[2])
-            elif item[1] == 'notify':
-                self.send_message("{}: {}".format(item[2][0], item[2][1]))
-
-        except queue.Empty:
-            return True
-        except Exception:
-            self.logger.exception("loop")
-
-        return True
 
     def send_message(self, message):
         if self.signal is None:
@@ -125,15 +114,44 @@ class SignalInterface(Interface):
             self.logger.warning("REJECTED: {}".format(message))
             self.send_message("REJECTED: {}".format(message))
 
-    def handle_event(self, event):
+    def handle_notify(self, message):
+        sender, message, level = message
+        if level < EventLevel.INFO.value:
+            return
+
+        self.send_message(message)
+
+    def handle_panel_event(self, event):
         """Handle Live Event"""
+
+        if event.level.value < EventLevel.INFO.value:
+            return
 
         major_code = event.major
         minor_code = event.minor
 
+        # Only let some elements pass
+        allow = False
+        for ev in cfg.SIGNAL_ALLOW_EVENTS:
+            if isinstance(ev, tuple):
+                if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
+                    allow = True
+                    break
+            elif isinstance(ev, str):
+                if re.match(ev, event.key):
+                    allow = True
+                    break
+
         # Ignore some events
         for ev in cfg.SIGNAL_IGNORE_EVENTS:
-            if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
-                return
+            if isinstance(ev, tuple):
+                if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
+                    allow = False
+                    break
+            elif isinstance(ev, str):
+                if re.match(ev, event.key):
+                    allow = False
+                    break
 
-        self.send_message(event.message)
+        if allow:
+            self.send_message(event.message)

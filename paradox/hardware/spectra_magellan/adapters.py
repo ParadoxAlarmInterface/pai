@@ -76,8 +76,8 @@ class PartitionStatusAdapter(Adapter):
                 audible_alarm=obj[0 + i * 4] & 0x40 != 0,
                 silent_alarm=obj[0 + i * 4] & 0x20 != 0,
                 strobe_alarm=obj[0 + i * 4] & 0x10 != 0,
-                stay_arm=obj[0 + i * 4] & 0x04 != 0,
-                sleep_arm=obj[0 + i * 4] & 0x02 != 0,
+                arm_stay=obj[0 + i * 4] & 0x04 != 0,
+                arm_sleep=obj[0 + i * 4] & 0x02 != 0,
                 arm=obj[0 + i * 4] & 0x01 != 0,
                 bell_activated=obj[1 + i * 4] & 0x80 != 0,
                 auto_arming_engaged=obj[1 + i * 4] & 0x40 != 0,
@@ -101,7 +101,7 @@ class PartitionStatusAdapter(Adapter):
                 in_remote_delay=obj[3 + i * 4] & 0x10 != 0,
                 _not_used4=obj[3 + i * 4] & 0x08 != 0,
                 stayd_mode_active=obj[3 + i * 4] & 0x04 != 0,
-                force_arm=obj[3 + i * 4] & 0x02 != 0,
+                arm_force=obj[3 + i * 4] & 0x02 != 0,
                 ready_status=obj[3 + i * 4] & 0x01 != 0,
             )
 

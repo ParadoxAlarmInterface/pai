@@ -7,9 +7,9 @@ from typing import Optional
 from construct import Construct, Struct, BitStruct, Const, Nibble, Checksum, Padding, Bytes, this, RawCopy, Int8ub, \
     Default, Enum, Flag, BitsInteger, Int16ub, Container, EnumIntegerString, Rebuild
 
-from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum
-
 from paradox.config import config as cfg
+from paradox.lib import ps
+from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum, HexInt
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -28,6 +28,7 @@ def iterate_properties(data):
 class Panel:
     mem_map = {}
     event_map = {}
+    property_map = {}
 
     def __init__(self, core, product_id, variable_message_length = True):
         self.core = core
@@ -37,7 +38,7 @@ class Panel:
     def parse_message(self, message, direction='topanel') -> Optional[Container]:
         if message is None or len(message) == 0:
             return None
-        
+
         if direction == 'topanel':
             if message[0] == 0x72 and message[1] == 0:
                 return InitiateCommunication.parse(message)
@@ -153,6 +154,8 @@ class Panel:
                              label_offset=elem_def['label_offset'])
 
             logger.info("{}: {}".format(elem_type.title(), ', '.join([v["label"] for v in self.core.data[elem_type].values()])))
+
+        ps.sendMessage('labels_loaded', data=self.core.data)
 
     async def load_labels(self,
                     data_dict,
@@ -279,9 +282,9 @@ InitiateCommunicationResponse = Struct("fields" / RawCopy(
                         CONTROLLER_APPLICATION=1,
                         MODULE_APPLICATION=2),
         "application" / Struct(
-            "version" / Int8ub,
-            "revision" / Int8ub,
-            "build" / Int8ub),
+            "version" / HexInt,
+            "revision" / HexInt,
+            "build" / HexInt),
         "serial_number" / Bytes(4),
         "hardware" / Struct(
             "version" / Int8ub,

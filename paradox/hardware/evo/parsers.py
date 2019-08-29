@@ -71,7 +71,7 @@ RAMDataParserMap = {
             "time_lost_trouble" / Flag,
 
             "ac_trouble" / Flag,
-            "battery_fail_trouble" / Flag,
+            "battery_failure_trouble" / Flag,
             "aux_limit_trouble" / Flag,
             "bell_limit_trouble" / Flag,
             "bell_absent_trouble" / Flag,
