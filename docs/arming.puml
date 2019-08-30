@@ -1,0 +1,29 @@
+@startuml
+title Arming process
+actor User
+participant Panel
+participant PAI #99FF99
+participant MQTT #99CCFF
+User->Panel: Arm partition
+Panel->PAI: Live event (Arming with user code)
+PAI->PAI: change(arm=True)
+PAI->MQTT: "/arm=True"
+
+Panel->Panel: exit_delay started
+...status request period (every 10s)...
+group @1: may not happen if you have short exit_delay < status request time
+PAI->Panel: Request status
+Panel-->PAI: Response
+PAI->PAI: change(exit_delay=True)
+PAI->MQTT: "/exit_delay=True"
+end
+|||
+Panel->Panel: exit_delay ended, panel armed
+...status request period (every 10s)...
+PAI->Panel: Request status
+Panel-->PAI: Response
+group happens only if @1 happened
+PAI->PAI: change(exit_delay=False)
+PAI->MQTT: "/exit_delay=False"
+end
+@enduml
