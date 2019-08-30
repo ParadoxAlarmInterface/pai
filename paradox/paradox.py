@@ -181,21 +181,21 @@ class Paradox:
             # of the available items as nodes)
             #self.interface.change(element_type, elements[type_key]['key'],
             #                              property_name, property_value, initial=False)
-            try:
+            # try:
                 
-                for element_type in self.data:
-                    print(element_type)
-                    if element_type == 'zone':
-                        elements = self.data[element_type]
-                        for type_key in elements:
-                            print (type_key)
-                            for property_name in elements[type_key]: # 1 2 3
-                                print (property_name)
-                                print ("%s-%s=%s" % (type_key,property_name,elements[type_key][property_name]))
-                                #self.interface.change(element_type, self.data[element_type]['key'],
-                                #                property_name, False, initial=True)
-            except:
-                pass
+            #     for element_type in self.data:
+            #         print(element_type)
+            #         if element_type == 'zone':
+            #             elements = self.data[element_type]
+            #             for type_key in elements:
+            #                 print (type_key)
+            #                 for property_name in elements[type_key]: # 1 2 3
+            #                     print (property_name)
+            #                     print ("%s-%s=%s" % (type_key,property_name,elements[type_key][property_name]))
+            #                     #self.interface.change(element_type, self.data[element_type]['key'],
+            #                     #                property_name, False, initial=True)
+            # except:
+            #     pass
 
 
             logger.info("Connection OK")

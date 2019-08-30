@@ -16,8 +16,7 @@ from paradox.lib.utils import SortableTuple, JSONByteEncoder
 
 from paradox.lib import ps
 
-#logger = logging.getLogger('PAI').getChild(__name__)
-logger = logging.getLogger('')
+logger = logging.getLogger('PAI').getChild(__name__)
 
 from paradox.config import config as cfg
 
@@ -62,7 +61,7 @@ class HomieMQTTInterface(Interface):
 
         self.homie_settings = {
             'version' : '0.0.1',
-            'topic' : 'paradox/homie', 
+            'topic' : cfg.HOMIE_BASE_TOPIC, 
             'fw_name' : 'python',
             'fw_version' : '0.0.1', 
             'update_interval' : 60,
@@ -86,7 +85,7 @@ class HomieMQTTInterface(Interface):
             self.check_config_mappings('MQTT_PARTITION_HOMEASSISTANT_STATES', required_mappings)
         
         self.alarm_Device = Device_Base(name="paradox",mqtt_settings=self.mqtt_settings,homie_settings=self.homie_settings)
-        self.alarm_Device.topic = 'paradox/homie'
+        #self.alarm_Device.topic = 'paradox/homie'
         self.alarm_Device.start()
         last_republish = time.time()
         
@@ -108,7 +107,7 @@ class HomieMQTTInterface(Interface):
 
         if self.connected:
             # Need to set as disconnect will delete the last will
-            self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+            self.publish('{}/{}/{}'.format(cfg.HOMIE_BASE_TOPIC,
                                        cfg.MQTT_INTERFACE_TOPIC,
                                        self.__class__.__name__),
                      'offline', 0, retain=True)
@@ -253,7 +252,7 @@ class HomieMQTTInterface(Interface):
 
         self.connected = True
         self.logger.debug(
-            "Subscribing to topics in {}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC))
+            "Subscribing to topics in {}/{}".format(cfg.HOMIE_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC))
         # self.mqtt.subscribe(
         #     "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
         #                       cfg.MQTT_CONTROL_TOPIC, "#"))
@@ -425,7 +424,7 @@ class HomieMQTTInterface(Interface):
             else:
                 return  # Do not publish a change
 
-        self.publish('{}/{}/{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+        self.publish('{}/{}/{}/{}/{}'.format(cfg.HOMIE_BASE_TOPIC,
                                              cfg.MQTT_STATES_TOPIC,
                                              element_topic,
                                              sanitize_topic_part(label),

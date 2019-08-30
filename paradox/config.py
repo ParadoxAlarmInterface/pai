@@ -163,6 +163,7 @@ class Config:
 
         #Homie Interface
         "HOMIE_INTERFACE_ENABLE": True,
+        "HOMIE_BASE_TOPIC": "homie/"
     }
 
     CONFIG_LOADED = False

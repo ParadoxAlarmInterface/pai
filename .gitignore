@@ -99,3 +99,5 @@ ENV/
 pai.conf
 tests/pai.conf
 pai.log
+.vscode/settings.json
+.vscode/launch.json
