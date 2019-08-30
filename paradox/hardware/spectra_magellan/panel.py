@@ -132,9 +132,17 @@ class Panel(PanelBase):
             logger.error("Authentication Failed. Wrong Password?")
             return False
 
+    def _request_status_reply_check(self, message: Container, address: int):
+        mvars = message.fields.value
+
+        assert mvars.po.command == 0x05
+        assert mvars.address == address
+
+        return True
+
     async def request_status(self, i: int):
         args = dict(address=self.mem_map['status_base1'] + i)
-        reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=0x05)
+        reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, args['address']))
 
         return reply
 
@@ -174,10 +182,7 @@ class Panel(PanelBase):
 
                 self.core.update_properties('system', 'troubles', {k: properties.troubles[k]})
 
-            self.process_properties_bulk(properties, mvars.address)
-
-        elif 1 <= mvars.address <= 5:
-            self.process_properties_bulk(properties, mvars.address)
+        return properties
 
     async def control_zones(self, zones: list, command: str) -> bool:
         """

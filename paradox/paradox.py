@@ -228,7 +228,8 @@ class Paradox:
                     if reply is not None:
                         tstart = time.time()
                         replies_missing = 0
-                        self.panel.handle_status(reply)
+                        properties = self.panel.handle_status(reply)
+                        self.panel.process_properties_bulk(properties, i)
                     else:
                         logger.error("No reply to status request: %d" % i)
                         replies_missing += 1
