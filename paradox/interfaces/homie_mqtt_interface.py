@@ -1,17 +1,23 @@
-import homie
-import time
-import logging
 import json
+import logging
 import os
 import re
+import time
 
 from homie.device_base import Device_Base
 from homie.node.property.property_contact import Property_Contact
 from homie.node.property.property_boolean import Property_Boolean
 from homie.node.node_contact import Node_Base
 
-from paradox.lib.utils import SortableTuple, JSONByteEncoder
+
+from paradox.event import Event
 from paradox.interfaces import Interface
+from paradox.lib.utils import SortableTuple, JSONByteEncoder
+
+from paradox.lib import ps
+
+#logger = logging.getLogger('PAI').getChild(__name__)
+logger = logging.getLogger('')
 
 from paradox.config import config as cfg
 
@@ -24,36 +30,20 @@ ELEMENT_TOPIC_MAP = dict(partition=cfg.MQTT_PARTITION_TOPIC, zone=cfg.MQTT_ZONE_
 re_topic_dirty = re.compile(r'\W')
 
 
-
 def sanitize_topic_part(name):
     return re_topic_dirty.sub('_', name).strip('_')
 
 
 class HomieMQTTInterface(Interface):
-    """Interface Class using Homie to publish MQTT"""
+    """Interface Class using MQTT subscribing to the Homie convention"""
     name = 'mqtt'
     acceptsInitialState = True
-    
 
     def __init__(self):
         super().__init__()
-        
+
         self.logger = logging.getLogger('PAI').getChild(__name__)
-        self.connected = False
-
-        self.cache = dict()
-
-        self.armed = dict()
-
         
-
-        #self.nodes = {}
-
-        self.mqtt_settings = {}
-
-        #self.homie_settings = {}
-
-    def run(self):
         self.mqtt_settings = {
             'MQTT_BROKER' : cfg.MQTT_HOST,
             'MQTT_PORT' : cfg.MQTT_PORT,
@@ -61,6 +51,7 @@ class HomieMQTTInterface(Interface):
             'MQTT_CLIENT_ID' : "paradox_mqtt/{}".format(os.urandom(8).hex()),
             'MQTT_USERNAME': '',
             'MQTT_PASSWORD': '',
+            'MQTT_SHARE_CLIENT': True,
 
         }
 
@@ -76,52 +67,70 @@ class HomieMQTTInterface(Interface):
             'fw_version' : '0.0.1', 
             'update_interval' : 60,
         }
+        
+        self.connected = False
+        self.cache = dict()
+        self.armed = dict()
+
+    def run(self):
+        if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
+            self.mqtt.username_pw_set(
+                username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
+
+        
+
+        required_mappings = 'alarm,arm,arm_stay,arm_sleep,disarm'.split(',')
+        if cfg.MQTT_HOMEBRIDGE_ENABLE:
+            self.check_config_mappings('MQTT_PARTITION_HOMEBRIDGE_STATES', required_mappings)
+        if cfg.MQTT_HOMEASSISTANT_ENABLE:
+            self.check_config_mappings('MQTT_PARTITION_HOMEASSISTANT_STATES', required_mappings)
+        
         self.alarm_Device = Device_Base(name="paradox",mqtt_settings=self.mqtt_settings,homie_settings=self.homie_settings)
         self.alarm_Device.topic = 'paradox/homie'
         self.alarm_Device.start()
         last_republish = time.time()
+        
+        ps.subscribe(self.handle_panel_change, "changes")
+        ps.subscribe(self.handle_panel_event, "events")
 
         while True:
             try:
                 item = self.queue.get()
-                if item[1] == 'change':
-                    self.handle_change(item[2])
-                elif item[1] == 'event':
-                    self.handle_event(item[2])
-                elif item[1] == 'command':
+                if item[1] == 'command':
                     if item[2] == 'stop':
                         break
-                elif item[1] == 'notify':
-                    self.handle_notify(item[2])
                 if time.time() - last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
                     self.republish()
                     last_republish = time.time()
-            except Exception as e:
+            except Exception:
                 self.logger.exception("ERROR in MQTT Run loop")
 
+
         if self.connected:
-            #self.mqtt.disconnect()
-            time.sleep(0.5)
+            # Need to set as disconnect will delete the last will
+            self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+                                       cfg.MQTT_INTERFACE_TOPIC,
+                                       self.__class__.__name__),
+                     'offline', 0, retain=True)
+        
+            self.mqtt.disconnect()
+
+        self.mqtt.loop_stop()
 
     def stop(self):
         """ Stops the MQTT Interface Thread"""
-        #self.mqtt.disconnect()
-        self.logger.debug("Stopping Homie MQTT Interface")
+        self.logger.debug("Stopping MQTT Interface")
         self.queue.put_nowait(SortableTuple((0, 'command', 'stop')))
-        #self.mqtt.loop_stop()
         self.join()
 
-    def event(self, raw):
+    def event(self, event: Event):
         """ Enqueues an event"""
-        self.queue.put_nowait(SortableTuple((2, 'event', raw)))
+        self.queue.put_nowait(SortableTuple((2, 'event', event)))
 
-    def change(self, element, label, property, value):
+    def change(self, element, label, panel_property, value):
         """ Enqueues a change """
         self.queue.put_nowait(SortableTuple(
-            (2, 'change', (element, label, property, value))))
-
-    def notify(self, source, message, level):
-        self.queue.put_nowait(SortableTuple((2, 'notify', (source, message, level))))
+            (2, 'change', (element, label, panel_property, value))))
 
     # Handlers here
     def handle_message(self, client, userdata, message):
@@ -156,7 +165,7 @@ class HomieMQTTInterface(Interface):
                 return
 
             payload = message.payload.decode("latin").strip()
-            self.notification_handler.notify(self.name, payload, level)
+            ps.sendMessage("notifications", message=dict(source=self.name, payload=payload, level=level))
             return
 
         if topics[1] != cfg.MQTT_CONTROL_TOPIC:
@@ -214,8 +223,11 @@ class HomieMQTTInterface(Interface):
                     self.logger.debug("Element {} not found".format(element))
                     return
 
-                self.notification_handler.notify('mqtt', "Command by {}: {}".format(
-                    cfg.MQTT_TOGGLE_CODES[tokens[1]], command), logging.INFO)
+                ps.sendMessage('notifications', message=dict(
+                    source="mqtt",
+                    message="Command by {}: {}".format(
+                    cfg.MQTT_TOGGLE_CODES[tokens[1]], command),
+                    level=logging.INFO))
 
             self.logger.debug("Partition command: {} = {}".format(element, command))
             if not self.alarm.control_partition(element, command):
@@ -232,70 +244,53 @@ class HomieMQTTInterface(Interface):
         else:
             self.logger.error("Invalid control property {}".format(topics[2]))
 
-    # def handle_disconnect(self, mqttc, userdata, rc):
-    #     self.logger.info("MQTT Broker Disconnected")
-    #     self.connected = False
+    def handle_disconnect(self, mqttc, userdata, rc):
+        self.logger.info("MQTT Broker Disconnected")
+        self.connected = False
 
-    #     time.sleep(1)
+    def handle_connect(self, mqttc, userdata, flags, result):
+        self.logger.info("MQTT Broker Connected")
 
-    #     #if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
-    #         #self.mqtt.username_pw_set(
-    #         #    username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
+        self.connected = True
+        self.logger.debug(
+            "Subscribing to topics in {}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC))
+        # self.mqtt.subscribe(
+        #     "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
+        #                       cfg.MQTT_CONTROL_TOPIC, "#"))
 
-    #     #self.mqtt.connect(host=cfg.MQTT_HOST,
-    #     #                  port=cfg.MQTT_PORT,
-    #     #                  keepalive=cfg.MQTT_KEEPALIVE,
-    #     #                  bind_address=cfg.MQTT_BIND_ADDRESS)
+        # self.mqtt.subscribe(
+        #     "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
+        #                       cfg.MQTT_NOTIFICATIONS_TOPIC, "#"))
 
-    # def handle_connect(self, mqttc, userdata, flags, result):
-    #     self.logger.info("MQTT Broker Connected")
+        # self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+        #                                cfg.MQTT_INTERFACE_TOPIC,
+        #                                self.__class__.__name__),
+        #              'online', 0, retain=True)
 
-    #     self.connected = True
-    #     self.logger.debug(
-    #         "Subscribing to topics in {}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC))
-    #     #self.mqtt.subscribe(
-    #     #    "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
-    #     #                      cfg.MQTT_CONTROL_TOPIC, "#"))
-
-    #     #self.mqtt.subscribe(
-    #     #    "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
-    #     #                      cfg.MQTT_NOTIFICATIONS_TOPIC, "#"))
-
-    #     #self.mqtt.will_set('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-    #     #                                     cfg.MQTT_INTERFACE_TOPIC,
-    #     #                                     self.__class__.__name__),
-    #     #                   'offline', 0, cfg.MQTT_RETAIN)
-
-    #     #self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-    #     #                               cfg.MQTT_INTERFACE_TOPIC,
-    #     #                               self.__class__.__name__),
-    #     #             'online', 0, cfg.MQTT_RETAIN)
-
-    def handle_event(self, raw):
+    def handle_panel_event(self, event):
         """
         Handle Live Event
 
         :param raw: object with properties (can have byte properties)
         :return:
         """
-        #self.logger.debug("HOMIE: handling event: %s" % raw.props)
-        self.logger.info("HOMIE: handling event: %s level: %s" % (raw.message,raw.level))
-        #if cfg.MQTT_PUBLISH_RAW_EVENTS:
-        #    self.publish('{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-        #                                cfg.MQTT_EVENTS_TOPIC,
-        #                                cfg.MQTT_RAW_TOPIC),
-        #                 json.dumps(raw.props, ensure_ascii=False, cls=JSONByteEncoder), 0, cfg.MQTT_RETAIN)
+        self.logger.info("HOMIE: handling event: %s level: %s" % (event.message,event.level))
+        # if cfg.MQTT_PUBLISH_RAW_EVENTS:
+        #     self.publish('{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+        #                                 cfg.MQTT_EVENTS_TOPIC,
+        #                                 cfg.MQTT_RAW_TOPIC),
+        #                  json.dumps(event.props, ensure_ascii=False, cls=JSONByteEncoder), 0, cfg.MQTT_RETAIN)
 
-    def handle_notify(self, raw):
-        sender, message, level = raw
+    def handle_panel_change(self, change):
+        logger.debug(change)
 
-        self.logger.debug(level, "sender: %s, message: %s" % (sender, message))
-        
+        attribute = change['property']
+        label = change['label']
+        value = change['value']
+        initial = change['initial']
+        element = change['type']
 
-    def handle_change(self, raw):
-        element, label, attribute, value = raw
         """Handle Property Change"""
-        
         
         # Keep track of ARM state
         if element == 'partition':
@@ -303,8 +298,8 @@ class HomieMQTTInterface(Interface):
                 self.partitions[label] = dict()
 
                 # After we get 2 partitions, lets publish a dashboard
-                #if cfg.MQTT_DASH_PUBLISH and len(self.partitions) == 2:
-                #    self.publish_dash(cfg.MQTT_DASH_TEMPLATE, list(self.partitions.keys()))
+                if cfg.MQTT_DASH_PUBLISH and len(self.partitions) == 2:
+                    self.publish_dash(cfg.MQTT_DASH_TEMPLATE, list(self.partitions.keys()))
 
             self.partitions[label][attribute] = value
 
@@ -334,50 +329,56 @@ class HomieMQTTInterface(Interface):
                 self.handle_change_external(element, label, attribute, value, element_topic,
                                             cfg.MQTT_PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC,
                                             'hass')
-        
-        if element == 'zone' and (attribute == "open"): #or attribute == "alarm"):
+
+        if element == 'zone' and (attribute == "open" or attribute == "alarm"):
             self.logger.info("HOMIE: handling change: element: %s label: %s attribute: %s = %s" % (element,label,attribute,value))
             try:
                 label_sanitised = label.replace('_','').lower()
-                node = self.alarm_Device.get_node(label_sanitised)
-                self.logger.info("HOMIE: Found existing node for '%s'" % label)
-                currentProperty = node.get_property(attribute.lower())
-                self.logger.info("HOMIE: Found existing property '%s' setting to %s" % (attribute, value))
-                currentProperty = value
-                #if value:
-                #    self.logger.info("HOMIE: Setting property to OPEN")
-                #    #node.set_property_value(attribute.lower(),"OPEN")
-                #   currentProperty = "OPEN"
-                #else:
-                #    self.logger.info("HOMIE: Setting property to OPEN")
-                #    currentProperty = "CLOSED"
-                currentProperty = node.get_property(attribute.lower())
-                self.logger.info("HOMIE: Current property setting '%s'" % currentProperty)
+                #Look for the node in the alarm device node list
+                if label_sanitised in self.alarm_Device.nodes:
+                    if attribute == "alarm":
+                        self.logger.info("HOMIE: Alarm Attribute Found existing node for '%s'" % label)
+
+                    #get the node if we know it is there
+                    node = self.alarm_Device.get_node(label_sanitised)
+                    self.logger.info("HOMIE: Found existing node for '%s'" % label)
+                    #get the current property being changed.
+                    currentProperty = node.get_property(attribute.lower())
+                    if currentProperty is None:
+                        #no property found with that attribute name for that zone
+                        newProperty = Property_Boolean(node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
+                        node.add_property(newProperty)
+
+                    self.logger.info("HOMIE: Found existing property '%s' setting to %s" % (attribute, value))
+                    #update the found property with the new value.
+                    node.set_property_value(attribute.lower(),value)
+                else:  #no node found, add one with the current property.
+                    try:
+                        #move contact_node to class, and set each zone as a node.
+                        zone_node = Node_Base(self.alarm_Device,name=label,id=label_sanitised,type_=element)
+                        self.logger.info("HOMIE: Adding new property boolean '%s'" % attribute) 
+                        #node.id = label
+                        newProperty = Property_Boolean(zone_node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
+                        zone_node.add_property(newProperty)
+                    
+                        #self.nodes[label] = node
+                        self.alarm_Device.add_node(zone_node)
+                    except Exception as e:
+                        self.logger.error("HOMIE: Error creating node: %s with error: %s" %(zone_node.name, str(e)))
             except Exception as e:
                 #has a node so use it.
-                self.logger.info("HOMIE: Adding new contact node for '%s'" % label) 
-                try:
-                    #move contact_node to class, and set each zone as a node.
-                    zone_node = Node_Base(self.alarm_Device,name=label,id=label_sanitised,type_=element)
-                    self.logger.info("HOMIE: Adding new property boolean '%s'" % attribute) 
-                    #node.id = label
-                    newProperty = Property_Boolean(zone_node,id=attribute.lower(),name=attribute.lower(),value=value)
-                    zone_node.add_property(newProperty)
-                    
-                    
-                    #self.nodes[label] = node
-                    self.alarm_Device.add_node(zone_node)
-                except Exception as e:
-                    self.logger.error("HOMIE: Error creating node: %s with error: %s" %(zone_node.name, str(e)))
+                self.logger.error("HOMIE: Error updating node: %s with error: %s" %(zone_node.name, str(e)))
             #else:
             #    #needs a new node
             #    self.logger.info("HOMIE: Found existing node for '%s'" % label)
             #    #node = self.get_node(label)
 
-    def validate_id(self,id):
-        if isinstance(id, str):
-            r = re.compile(r'(^(?!\-)[a-z0-9\-]+(?<!\-)$)')
-            return id if r.match(id) else False
+    def check_config_mappings(self, config_parameter, required_mappings):
+        # Check states_map
+        keys = getattr(cfg, config_parameter).keys()
+        missing_mappings = [k for k in required_mappings if k not in keys]
+        if len(missing_mappings):
+            logger.warning(', '.join(missing_mappings) + " keys are missing from %s config." % config_parameter)
 
     def handle_change_external(self, element, label, attribute,
                                value, element_topic, states_map,
@@ -397,12 +398,12 @@ class HomieMQTTInterface(Interface):
 
             # only process if not armed already
             elif self.armed[service][label]['attribute'] is None:
-                if attribute == 'stay_arm':
-                    state = states_map['stay_arm']
+                if attribute == 'arm_stay':
+                    state = states_map['arm_stay']
                 elif attribute == 'arm':
                     state = states_map['arm']
-                elif attribute == 'sleep_arm':
-                    state = states_map['sleep_arm']
+                elif attribute == 'arm_sleep':
+                    state = states_map['arm_sleep']
                 else:
                     return
 
@@ -418,7 +419,7 @@ class HomieMQTTInterface(Interface):
                 state = self.armed[service][label]['state']  # Restore the ARM state
                 self.armed[service][label]['alarm'] = False  # Reset alarm state
 
-            elif attribute in ['stay_arm', 'arm', 'sleep_arm'] and self.armed[service][label]['attribute'] == attribute:
+            elif attribute in ['arm_stay', 'arm', 'arm_sleep'] and self.armed[service][label]['attribute'] == attribute:
                 state = states_map['disarm']
                 self.armed[service][label] = dict(attribute=None, state=None, alarm=False)
             else:
@@ -430,10 +431,6 @@ class HomieMQTTInterface(Interface):
                                              sanitize_topic_part(label),
                                              summary_topic),
                      "{}".format(state), 0, cfg.MQTT_RETAIN)
-
-    #def handle_advertise_item(self, raw):
-    #    item = raw
-    #    """handle each item"""
 
     def publish(self, topic, value, qos, retain):
         self.cache[topic] = {'value': value, 'qos': qos, 'retain': retain}
