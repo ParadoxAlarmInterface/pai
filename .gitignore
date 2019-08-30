@@ -1,5 +1,6 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+.pytest_cache/*
 *.py[cod]
 *$py.class
 
@@ -97,3 +98,4 @@ ENV/
 .mypy_cache/
 pai.conf
 tests/pai.conf
+pai.log
