@@ -21,13 +21,37 @@ ELEMENT_TOPIC_MAP = dict(partition=cfg.MQTT_PARTITION_TOPIC, zone=cfg.MQTT_ZONE_
                          bus=cfg.MQTT_BUS_TOPIC, keypad=cfg.MQTT_KEYPAD_TOPIC,
                          system=cfg.MQTT_SYSTEM_TOPIC, user=cfg.MQTT_USER_TOPIC)
 
-#re_topic_dirty = re.compile(r'[+#/]')
+# re_topic_dirty = re.compile(r'[+#/]')
 re_topic_dirty = re.compile(r'\W')
 
 
 def sanitize_topic_part(name):
     return re_topic_dirty.sub('_', name).strip('_')
 
+
+class MQTTConnection(mqtt.Client):
+    def __new__(cls):
+        if not hasattr(cls, 'instance'):
+            cls.instance = super(MQTTConnection, cls).__new__(cls)
+        return cls.instance
+
+    def __init__(self):
+        super(MQTTConnection, self).__init__("paradox_mqtt/{}".format(os.urandom(8).hex()))
+        # self.on_message = self.handle_message
+        # self.on_connect = self.handle_connect
+        # self.on_disconnect = self.handle_disconnect
+
+        if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
+            self.username_pw_set(username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
+
+        self.will_set(
+            '{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, self.__class__.__name__),
+            'offline', 0, retain=True
+        )
+
+    def connect(self, host=cfg.MQTT_HOST, port=cfg.MQTT_PORT, keepalive=cfg.MQTT_KEEPALIVE, bind_address=cfg.MQTT_BIND_ADDRESS):
+        super(MQTTConnection, self).connect(host=host, port=port, keepalive=keepalive, bind_address=bind_address)
+        
 
 class MQTTInterface(Interface):
     """Interface Class using MQTT"""
@@ -38,34 +62,23 @@ class MQTTInterface(Interface):
         super().__init__()
 
         self.logger = logging.getLogger('PAI').getChild(__name__)
-        self.mqtt = mqtt.Client("paradox_mqtt/{}".format(os.urandom(8).hex()))
+        self.mqtt = MQTTConnection()
         self.mqtt.on_message = self.handle_message
         self.mqtt.on_connect = self.handle_connect
         self.mqtt.on_disconnect = self.handle_disconnect
+
         self.connected = False
         self.cache = dict()
         self.armed = dict()
 
     def run(self):
-        if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
-            self.mqtt.username_pw_set(
-                username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
-
         required_mappings = 'alarm,arm,arm_stay,arm_sleep,disarm'.split(',')
         if cfg.MQTT_HOMEBRIDGE_ENABLE:
             self.check_config_mappings('MQTT_PARTITION_HOMEBRIDGE_STATES', required_mappings)
         if cfg.MQTT_HOMEASSISTANT_ENABLE:
             self.check_config_mappings('MQTT_PARTITION_HOMEASSISTANT_STATES', required_mappings)
-        
-        self.mqtt.will_set('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                             cfg.MQTT_INTERFACE_TOPIC,
-                                             self.__class__.__name__),
-                           'offline', 0, retain=True)
 
-        self.mqtt.connect(host=cfg.MQTT_HOST,
-                          port=cfg.MQTT_PORT,
-                          keepalive=cfg.MQTT_KEEPALIVE,
-                          bind_address=cfg.MQTT_BIND_ADDRESS)
+        self.mqtt.connect()
 
         self.mqtt.loop_start()
         last_republish = time.time()
@@ -85,14 +98,13 @@ class MQTTInterface(Interface):
             except Exception:
                 self.logger.exception("ERROR in MQTT Run loop")
 
-
         if self.connected:
             # Need to set as disconnect will delete the last will
             self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                       cfg.MQTT_INTERFACE_TOPIC,
-                                       self.__class__.__name__),
-                     'offline', 0, retain=True)
-        
+                                           cfg.MQTT_INTERFACE_TOPIC,
+                                           self.__class__.__name__),
+                         'offline', 0, retain=True)
+
             self.mqtt.disconnect()
 
         self.mqtt.loop_stop()
@@ -194,7 +206,7 @@ class MQTTInterface(Interface):
                             break
 
                 elif element in self.partitions:
-                    if ('arm' in self.partitions[element] and self.partitions[element]['arm'])\
+                    if ('arm' in self.partitions[element] and self.partitions[element]['arm']) \
                             or ('exit_delay' in self.partitions[element] and self.partitions[element]['exit_delay']):
                         command = 'disarm'
                     else:
@@ -206,7 +218,7 @@ class MQTTInterface(Interface):
                 ps.sendMessage('notifications', message=dict(
                     source="mqtt",
                     message="Command by {}: {}".format(
-                    cfg.MQTT_TOGGLE_CODES[tokens[1]], command),
+                        cfg.MQTT_TOGGLE_CODES[tokens[1]], command),
                     level=logging.INFO))
 
             self.logger.debug("Partition command: {} = {}".format(element, command))
@@ -271,7 +283,7 @@ class MQTTInterface(Interface):
         element = change['type']
 
         """Handle Property Change"""
-        
+
         # Keep track of ARM state
         if element == 'partition':
             if label not in self.partitions:
@@ -329,7 +341,8 @@ class MQTTInterface(Interface):
 
         # Property changing to True: Alarm or arm
         if value:
-            if attribute in ['alarm', 'bell_activated', 'strobe_alarm', 'silent_alarm', 'audible_alarm'] and not self.armed[service][label]['alarm']:
+            if attribute in ['alarm', 'bell_activated', 'strobe_alarm', 'silent_alarm', 'audible_alarm'] and not \
+                    self.armed[service][label]['alarm']:
                 state = states_map['alarm']
                 self.armed[service][label]['alarm'] = True
 
@@ -352,7 +365,8 @@ class MQTTInterface(Interface):
         # Property changing to False: Disarm or alarm stop
         else:
             # Alarm stopped
-            if attribute in ['alarm', 'strobe_alarm', 'audible_alarm', 'bell_activated', 'silent_alarm'] and self.armed[service][label]['alarm']:
+            if attribute in ['alarm', 'strobe_alarm', 'audible_alarm', 'bell_activated', 'silent_alarm'] and \
+                    self.armed[service][label]['alarm']:
                 state = self.armed[service][label]['state']  # Restore the ARM state
                 self.armed[service][label]['alarm'] = False  # Reset alarm state
 

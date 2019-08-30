@@ -211,6 +211,7 @@ class Paradox:
         logger.debug("Requesting status: %d" % i)
         reply = await self.panel.request_status(i)
         if reply is not None:
+            logger.debug("Received status response: %d" % i)
             return self.panel.handle_status(reply)
         else:
             raise StatusRequestException("No reply to status request: %d" % i)
