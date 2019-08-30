@@ -91,6 +91,7 @@ class HomieMQTTInterface(Interface):
         
         ps.subscribe(self.handle_panel_change, "changes")
         ps.subscribe(self.handle_panel_event, "events")
+        ps.subscribe(self.handle_panel_status, "system")
 
         while True:
             try:
@@ -266,6 +267,15 @@ class HomieMQTTInterface(Interface):
         #                                self.__class__.__name__),
         #              'online', 0, retain=True)
 
+    def handle_panel_status(self, status):
+        """
+        Handle Status Message
+
+        :param raw: object with properties (can have byte properties)
+        :return:
+        """
+        self.logger.info("HOMIE: handling event: %s level: %s" % (1,2))
+
     def handle_panel_event(self, event):
         """
         Handle Live Event
@@ -371,7 +381,9 @@ class HomieMQTTInterface(Interface):
             #    #needs a new node
             #    self.logger.info("HOMIE: Found existing node for '%s'" % label)
             #    #node = self.get_node(label)
-
+        elif element == 'system':
+            self.logger.debug("HOMIE: Status element: " + change)
+            #can parse power, vdc, dc and battery under here.
     def check_config_mappings(self, config_parameter, required_mappings):
         # Check states_map
         keys = getattr(cfg, config_parameter).keys()
