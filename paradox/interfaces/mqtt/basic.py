@@ -3,18 +3,15 @@ import logging
 import os
 import re
 import time
-
-import paho.mqtt.client as mqtt
-
-from paradox.event import Event
-from paradox.interfaces import Interface
-from paradox.lib.utils import SortableTuple, JSONByteEncoder
-
-from paradox.lib import ps
-
-logger = logging.getLogger('PAI').getChild(__name__)
+import typing
+from collections import namedtuple
 
 from paradox.config import config as cfg
+from paradox.lib import ps
+from paradox.lib.utils import JSONByteEncoder
+from .core import AbstractMQTTInterface
+
+logger = logging.getLogger('PAI').getChild(__name__)
 
 ELEMENT_TOPIC_MAP = dict(partition=cfg.MQTT_PARTITION_TOPIC, zone=cfg.MQTT_ZONE_TOPIC,
                          output=cfg.MQTT_OUTPUT_TOPIC, repeater=cfg.MQTT_REPEATER_TOPIC,
@@ -24,163 +21,124 @@ ELEMENT_TOPIC_MAP = dict(partition=cfg.MQTT_PARTITION_TOPIC, zone=cfg.MQTT_ZONE_
 # re_topic_dirty = re.compile(r'[+#/]')
 re_topic_dirty = re.compile(r'\W')
 
+PreparseResponse = namedtuple('preparse_response', 'topics element content')
+
 
 def sanitize_topic_part(name):
     return re_topic_dirty.sub('_', name).strip('_')
 
 
-class MQTTConnection(mqtt.Client):
-    def __new__(cls):
-        if not hasattr(cls, 'instance'):
-            cls.instance = super(MQTTConnection, cls).__new__(cls)
-        return cls.instance
+class BasicMQTTInterface(AbstractMQTTInterface):
+    name = 'basic_mqtt'
 
     def __init__(self):
-        super(MQTTConnection, self).__init__("paradox_mqtt/{}".format(os.urandom(8).hex()))
-        # self.on_message = self.handle_message
-        # self.on_connect = self.handle_connect
-        # self.on_disconnect = self.handle_disconnect
+        super(BasicMQTTInterface, self).__init__()
 
-        if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
-            self.username_pw_set(username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
-
-        self.will_set(
-            '{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, self.__class__.__name__),
-            'offline', 0, retain=True
-        )
-
-    def connect(self, host=cfg.MQTT_HOST, port=cfg.MQTT_PORT, keepalive=cfg.MQTT_KEEPALIVE, bind_address=cfg.MQTT_BIND_ADDRESS):
-        super(MQTTConnection, self).connect(host=host, port=port, keepalive=keepalive, bind_address=bind_address)
-        
-
-class MQTTInterface(Interface):
-    """Interface Class using MQTT"""
-    name = 'mqtt'
-    acceptsInitialState = True
-
-    def __init__(self):
-        super().__init__()
-
-        self.logger = logging.getLogger('PAI').getChild(__name__)
-        self.mqtt = MQTTConnection()
-        self.mqtt.on_message = self.handle_message
-        self.mqtt.on_connect = self.handle_connect
-        self.mqtt.on_disconnect = self.handle_disconnect
-
-        self.connected = False
         self.cache = dict()
         self.armed = dict()
+        self.partitions = {}
+        self.last_republish = time.time()
 
     def run(self):
         required_mappings = 'alarm,arm,arm_stay,arm_sleep,disarm'.split(',')
         if cfg.MQTT_HOMEBRIDGE_ENABLE:
-            self.check_config_mappings('MQTT_PARTITION_HOMEBRIDGE_STATES', required_mappings)
+            self._check_config_mappings('MQTT_PARTITION_HOMEBRIDGE_STATES', required_mappings)
         if cfg.MQTT_HOMEASSISTANT_ENABLE:
-            self.check_config_mappings('MQTT_PARTITION_HOMEASSISTANT_STATES', required_mappings)
+            self._check_config_mappings('MQTT_PARTITION_HOMEASSISTANT_STATES', required_mappings)
 
-        self.mqtt.connect()
+        ps.subscribe(self._handle_panel_change, "changes")
+        ps.subscribe(self._handle_panel_event, "events")
 
-        self.mqtt.loop_start()
-        last_republish = time.time()
+        self.last_republish = time.time()
 
-        ps.subscribe(self.handle_panel_change, "changes")
-        ps.subscribe(self.handle_panel_event, "events")
+        self.mqtt.message_callback_add(
+            "{}/{}/{}/#".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC, cfg.MQTT_OUTPUT_TOPIC),
+            self._mqtt_handle_output_control
+        )
+        self.mqtt.message_callback_add(
+            "{}/{}/{}/#".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC, cfg.MQTT_ZONE_TOPIC),
+            self._mqtt_handle_zone_control
+        )
+        self.mqtt.message_callback_add(
+            "{}/{}/{}/#".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC, cfg.MQTT_PARTITION_TOPIC),
+            self._mqtt_handle_partition_control
+        )
+        self.mqtt.message_callback_add(
+            "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_NOTIFICATIONS_TOPIC, "#"),
+            self._mqtt_handle_notifications
+        )
 
-        while True:
-            try:
-                item = self.queue.get()
-                if item[1] == 'command':
-                    if item[2] == 'stop':
-                        break
-                if time.time() - last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
-                    self.republish()
-                    last_republish = time.time()
-            except Exception:
-                self.logger.exception("ERROR in MQTT Run loop")
+        super().run()
 
-        if self.connected:
-            # Need to set as disconnect will delete the last will
-            self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                           cfg.MQTT_INTERFACE_TOPIC,
-                                           self.__class__.__name__),
-                         'offline', 0, retain=True)
+    def run_loop(self, queue_item):
+        if time.time() - self.last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
+            self.republish()
+            self.last_republish = time.time()
 
-            self.mqtt.disconnect()
+    def publish(self, topic, value, qos, retain):
+        self.cache[topic] = {'value': value, 'qos': qos, 'retain': retain}
+        super().publish(topic, value, qos, retain)
 
-        self.mqtt.loop_stop()
-
-    def stop(self):
-        """ Stops the MQTT Interface Thread"""
-        self.logger.debug("Stopping MQTT Interface")
-        self.queue.put_nowait(SortableTuple((0, 'command', 'stop')))
-        self.join()
-
-    def event(self, event: Event):
-        """ Enqueues an event"""
-        self.queue.put_nowait(SortableTuple((2, 'event', event)))
-
-    def change(self, element, label, panel_property, value):
-        """ Enqueues a change """
-        self.queue.put_nowait(SortableTuple(
-            (2, 'change', (element, label, panel_property, value))))
-
-    # Handlers here
-    def handle_message(self, client, userdata, message):
-        """Handle message received from the MQTT broker"""
-        self.logger.info("message topic={}, payload={}".format(
+    def _preparse_message(self, message) -> typing.Optional[PreparseResponse]:
+        logger.info("message topic={}, payload={}".format(
             message.topic, str(message.payload.decode("utf-8"))))
 
         if message.retain:
-            return
+            logger.warning("Ignoring retained commands")
+            return None
 
         if self.alarm is None:
-            self.logger.warning("No alarm. Ignoring command")
-            return
+            logger.warning("No alarm. Ignoring command")
+            return None
 
         topic = message.topic.split(cfg.MQTT_BASE_TOPIC)[1]
 
         topics = topic.split("/")
 
         if len(topics) < 3:
-            self.logger.error(
+            logger.error(
                 "Invalid topic in mqtt message: {}".format(message.topic))
-            return
+            return None
 
-        if topics[1] == cfg.MQTT_NOTIFICATIONS_TOPIC:
+        content = message.payload.decode("latin").strip()
+
+        element = None
+        if len(topics) >= 4:
+            element = topics[3]
+
+        return PreparseResponse(topics, element, content)
+
+    def _mqtt_handle_notifications(self, client, userdata, message):
+        prep = self._preparse_message(message)
+        if prep:
+            topics = prep.topics
             if topics[2].upper() == "CRITICAL":
                 level = logging.CRITICAL
             elif topics[2].upper() == "INFO":
                 level = logging.INFO
             else:
-                self.logger.error(
+                logger.error(
                     "Invalid notification level: {}".format(topics[2]))
                 return
 
-            payload = message.payload.decode("latin").strip()
-            ps.sendMessage("notifications", message=dict(source=self.name, payload=payload, level=level))
-            return
+            ps.sendMessage("notifications", message=dict(source=self.name, payload=prep.content, level=level))
 
-        if topics[1] != cfg.MQTT_CONTROL_TOPIC:
-            self.logger.error(
-                "Invalid subtopic in mqtt message: {}".format(message.topic))
-            return
-
-        command = message.payload.decode("latin").strip()
-        element = topics[3]
-
-        # Process a Zone Command
-        if topics[2] == cfg.MQTT_ZONE_TOPIC:
+    def _mqtt_handle_zone_control(self, client, userdata, message):
+        prep = self._preparse_message(message)
+        if prep:
+            topics, element, command = prep
             if not self.alarm.control_zone(element, command):
-                self.logger.warning(
+                logger.warning(
                     "Zone command refused: {}={}".format(element, command))
 
-        # Process a Partition Command
-        elif topics[2] == cfg.MQTT_PARTITION_TOPIC:
-
-            if command in cfg.MQTT_PARTITION_HOMEBRIDGE_COMMANDS and cfg.MQTT_HOMEBRIDGE_ENABLE:
-                command = cfg.MQTT_PARTITION_HOMEBRIDGE_COMMANDS[command]
-            elif command in cfg.MQTT_PARTITION_HOMEASSISTANT_COMMANDS and cfg.MQTT_HOMEASSISTANT_ENABLE:
-                command = cfg.MQTT_PARTITION_HOMEASSISTANT_COMMANDS[command]
+    def _mqtt_handle_partition_control(self, client, userdata, message):
+        prep = self._preparse_message(message)
+        if prep:
+            topics, element, command = prep
+            # if command in cfg.MQTT_PARTITION_HOMEBRIDGE_COMMANDS and cfg.MQTT_HOMEBRIDGE_ENABLE:
+            #     command = cfg.MQTT_PARTITION_HOMEBRIDGE_COMMANDS[command]
+            # elif command in cfg.MQTT_PARTITION_HOMEASSISTANT_COMMANDS and cfg.MQTT_HOMEASSISTANT_ENABLE:
+            #     command = cfg.MQTT_PARTITION_HOMEASSISTANT_COMMANDS[command]
 
             if command.startswith('code_toggle-'):
                 tokens = command.split('-')
@@ -188,7 +146,7 @@ class MQTTInterface(Interface):
                     return
 
                 if tokens[1] not in cfg.MQTT_TOGGLE_CODES:
-                    self.logger.warning("Invalid toggle code {}".format(tokens[1]))
+                    logger.warning("Invalid toggle code {}".format(tokens[1]))
                     return
 
                 if element.lower() == 'all':
@@ -196,7 +154,7 @@ class MQTTInterface(Interface):
 
                     for k, v in self.partitions.items():
                         # If "all" and a single partition is armed, default is
-                        # to desarm
+                        # to disarm
                         for k1, v1 in self.partitions[k].items():
                             if (k1 == 'arm' or k1 == 'exit_delay' or k1 == 'entry_delay') and v1:
                                 command = 'disarm'
@@ -212,7 +170,7 @@ class MQTTInterface(Interface):
                     else:
                         command = 'arm'
                 else:
-                    self.logger.debug("Element {} not found".format(element))
+                    logger.debug("Element {} not found".format(element))
                     return
 
                 ps.sendMessage('notifications', message=dict(
@@ -221,45 +179,22 @@ class MQTTInterface(Interface):
                         cfg.MQTT_TOGGLE_CODES[tokens[1]], command),
                     level=logging.INFO))
 
-            self.logger.debug("Partition command: {} = {}".format(element, command))
+            logger.debug("Partition command: {} = {}".format(element, command))
             if not self.alarm.control_partition(element, command):
-                self.logger.warning(
+                logger.warning(
                     "Partition command refused: {}={}".format(element, command))
 
-        # Process an Output Command
-        elif topics[2] == cfg.MQTT_OUTPUT_TOPIC:
-            self.logger.debug("Output command: {} = {}".format(element, command))
+    def _mqtt_handle_output_control(self, client, userdata, message):
+        prep = self._preparse_message(message)
+        if prep:
+            topics, element, command = prep
+            logger.debug("Output command: {} = {}".format(element, command))
 
             if not self.alarm.control_output(element, command):
-                self.logger.warning(
+                logger.warning(
                     "Output command refused: {}={}".format(element, command))
-        else:
-            self.logger.error("Invalid control property {}".format(topics[2]))
 
-    def handle_disconnect(self, mqttc, userdata, rc):
-        self.logger.info("MQTT Broker Disconnected")
-        self.connected = False
-
-    def handle_connect(self, mqttc, userdata, flags, result):
-        self.logger.info("MQTT Broker Connected")
-
-        self.connected = True
-        self.logger.debug(
-            "Subscribing to topics in {}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC))
-        self.mqtt.subscribe(
-            "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
-                              cfg.MQTT_CONTROL_TOPIC, "#"))
-
-        self.mqtt.subscribe(
-            "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
-                              cfg.MQTT_NOTIFICATIONS_TOPIC, "#"))
-
-        self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                       cfg.MQTT_INTERFACE_TOPIC,
-                                       self.__class__.__name__),
-                     'online', 0, retain=True)
-
-    def handle_panel_event(self, event):
+    def _handle_panel_event(self, event):
         """
         Handle Live Event
 
@@ -273,7 +208,7 @@ class MQTTInterface(Interface):
                                         cfg.MQTT_RAW_TOPIC),
                          json.dumps(event.props, ensure_ascii=False, cls=JSONByteEncoder), 0, cfg.MQTT_RETAIN)
 
-    def handle_panel_change(self, change):
+    def _handle_panel_change(self, change):
         logger.debug(change)
 
         attribute = change['property']
@@ -291,7 +226,7 @@ class MQTTInterface(Interface):
 
                 # After we get 2 partitions, lets publish a dashboard
                 if cfg.MQTT_DASH_PUBLISH and len(self.partitions) == 2:
-                    self.publish_dash(cfg.MQTT_DASH_TEMPLATE, list(self.partitions.keys()))
+                    self._publish_dash(cfg.MQTT_DASH_TEMPLATE, list(self.partitions.keys()))
 
             self.partitions[label][attribute] = value
 
@@ -314,24 +249,26 @@ class MQTTInterface(Interface):
 
         if element == 'partition':
             if cfg.MQTT_HOMEBRIDGE_ENABLE:
-                self.handle_change_external(element, label, attribute, value, element_topic,
-                                            cfg.MQTT_PARTITION_HOMEBRIDGE_STATES, cfg.MQTT_HOMEBRIDGE_SUMMARY_TOPIC, 'hb')
+                self._handle_change_external(element, label, attribute, value, element_topic,
+                                             cfg.MQTT_PARTITION_HOMEBRIDGE_STATES, cfg.MQTT_HOMEBRIDGE_SUMMARY_TOPIC,
+                                             'hb')
 
             if cfg.MQTT_HOMEASSISTANT_ENABLE:
-                self.handle_change_external(element, label, attribute, value, element_topic,
-                                            cfg.MQTT_PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC,
-                                            'hass')
+                self._handle_change_external(element, label, attribute, value, element_topic,
+                                             cfg.MQTT_PARTITION_HOMEASSISTANT_STATES,
+                                             cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC,
+                                             'hass')
 
-    def check_config_mappings(self, config_parameter, required_mappings):
+    def _check_config_mappings(self, config_parameter, required_mappings):
         # Check states_map
         keys = getattr(cfg, config_parameter).keys()
         missing_mappings = [k for k in required_mappings if k not in keys]
         if len(missing_mappings):
             logger.warning(', '.join(missing_mappings) + " keys are missing from %s config." % config_parameter)
 
-    def handle_change_external(self, element, label, attribute,
-                               value, element_topic, states_map,
-                               summary_topic, service):
+    def _handle_change_external(self, element, label, attribute,
+                                value, element_topic, states_map,
+                                summary_topic, service):
 
         if service not in self.armed:
             self.armed[service] = dict()
@@ -383,16 +320,12 @@ class MQTTInterface(Interface):
                                              summary_topic),
                      "{}".format(state), 0, cfg.MQTT_RETAIN)
 
-    def publish(self, topic, value, qos, retain):
-        self.cache[topic] = {'value': value, 'qos': qos, 'retain': retain}
-        self.mqtt.publish(topic, value, qos, retain)
-
     def republish(self):
         for k in list(self.cache.keys()):
             v = self.cache[k]
             self.mqtt.publish(k, v['value'], v['qos'], v['retain'])
 
-    def publish_dash(self, fname, partitions):
+    def _publish_dash(self, fname, partitions):
         if len(partitions) < 2:
             return
 
@@ -401,6 +334,6 @@ class MQTTInterface(Interface):
                 data = f.read()
                 data = data.replace('__PARTITION1__', partitions[0]).replace('__PARTITION2__', partitions[1])
                 self.mqtt.publish(cfg.MQTT_DASH_TOPIC, data, 2, True)
-                self.logger.info("MQTT Dash panel published to {}".format(cfg.MQTT_DASH_TOPIC))
+                logger.info("MQTT Dash panel published to {}".format(cfg.MQTT_DASH_TOPIC))
         else:
-            self.logger.warn("MQTT DASH Template not found: {}".format(fname))
+            logger.warn("MQTT DASH Template not found: {}".format(fname))

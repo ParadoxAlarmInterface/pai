@@ -1,9 +1,9 @@
 from pytest_mock import mocker
 
-from paradox.interfaces.mqtt_interface import MQTTInterface
+from paradox.interfaces.mqtt.basic import BasicMQTTInterface
 
 def test_hass_from_arm_stay_to_arm(mocker):
-    interface = MQTTInterface()
+    interface = BasicMQTTInterface()
 
     mocker.patch.object(interface, "mqtt")
 
@@ -15,7 +15,7 @@ def test_hass_from_arm_stay_to_arm(mocker):
         'type': "partition"
     }
 
-    interface.handle_panel_change(change)
+    interface._handle_panel_change(change)
 
     interface.mqtt.publish.assert_called_with('paradox/states/partitions/Partiton_1/current_hass', 'armed_home', 0, True)
 
@@ -27,12 +27,12 @@ def test_hass_from_arm_stay_to_arm(mocker):
         'type': "partition"
     }
 
-    interface.handle_panel_change(change1)
+    interface._handle_panel_change(change1)
 
     interface.mqtt.publish.assert_called_with('paradox/states/partitions/Partiton_1/current_hass', 'armed_away', 0, True)
 
 def test_hass_from_arm_to_disarm(mocker):
-    interface = MQTTInterface()
+    interface = BasicMQTTInterface()
 
     mocker.patch.object(interface, "mqtt")
 
@@ -44,7 +44,7 @@ def test_hass_from_arm_to_disarm(mocker):
         'type': "partition"
     }
 
-    interface.handle_panel_change(change)
+    interface._handle_panel_change(change)
 
     interface.mqtt.publish.assert_called_with('paradox/states/partitions/Partiton_1/current_hass', 'armed_away', 0, True)
 
@@ -56,6 +56,6 @@ def test_hass_from_arm_to_disarm(mocker):
         'type': "partition"
     }
 
-    interface.handle_panel_change(change1)
+    interface._handle_panel_change(change1)
 
     interface.mqtt.publish.assert_called_with('paradox/states/partitions/Partiton_1/current_hass', 'disarmed', 0, True)

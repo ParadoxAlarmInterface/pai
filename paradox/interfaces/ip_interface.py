@@ -2,19 +2,17 @@
 
 # IP Interface
 
-import logging
-from construct import GreedyBytes, Struct, Aligned, Const, Int8ub, Bytes, Int16ul, Default
+import asyncio
 import binascii
+import logging
 import os
 from typing import Awaitable
 
-from paradox.event import Event
-from paradox.lib.crypto import encrypt, decrypt
-from paradox.lib.async_message_manager import RAWMessageHandler
-
-import asyncio
+from construct import GreedyBytes, Struct, Aligned, Const, Int8ub, Bytes, Int16ul, Default
 
 from paradox.config import config as cfg
+from paradox.lib.async_message_manager import RAWMessageHandler
+from paradox.lib.crypto import encrypt, decrypt
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -170,7 +168,8 @@ class ClientConnection():
                     status = 'connected'
 
             else:
-                logger.warn("UNKNOWN: raw: {}, payload: {}".format(binascii.hexlify(data), binascii.hexlify(in_payload)))
+                logger.warn(
+                    "UNKNOWN: raw: {}, payload: {}".format(binascii.hexlify(data), binascii.hexlify(in_payload)))
                 continue
 
             if out_payload is not None:
@@ -206,6 +205,7 @@ class ClientConnection():
             if status == 'closing_connection':
                 break
 
+
 class IPInterface():
     def __init__(self):
         self.key = cfg.IP_INTERFACE_PASSWORD
@@ -218,7 +218,6 @@ class IPInterface():
         self.client_nr = 0
 
     def set_alarm(self, alarm):
-        logger.debug("Set alarm")
         self.alarm = alarm
 
         if not self.server and self.started:

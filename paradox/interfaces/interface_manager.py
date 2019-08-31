@@ -1,7 +1,4 @@
-
 import logging
-
-from paradox.event import Event
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -35,8 +32,8 @@ class InterfaceManager:
         if self.conf.MQTT_ENABLE:
             try:
                 logger.info("Using MQTT Interface")
-                from paradox.interfaces.mqtt_interface import MQTTInterface
-                self.register(MQTTInterface())
+                from paradox.interfaces.mqtt.basic import BasicMQTTInterface
+                self.register(BasicMQTTInterface())
             except Exception:
                 logger.exception("Unable to start MQTT Interface")
 
@@ -81,7 +78,6 @@ class InterfaceManager:
         interface.start()  # Starts interface thread
 
         self.interfaces.append(interface)
-
 
     def stop(self):
         logger.debug("Stopping all interfaces")

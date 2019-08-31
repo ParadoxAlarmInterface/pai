@@ -11,7 +11,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="paradox-alarm-interface",
-    version="0.1",
+    version="1.0.0",
     author="João Paulo Barraca",
     author_email="jpbarraca@gmail.com",
     description="Interface to Paradox Alarm Panels",

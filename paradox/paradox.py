@@ -71,7 +71,6 @@ class Paradox:
 
     def __init__(self,
                  connection: Connection,
-                 interface: InterfaceManager,
                  retries=3):
 
         self.panel = None  # type: Panel
