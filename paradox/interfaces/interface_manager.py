@@ -37,6 +37,14 @@ class InterfaceManager:
             except Exception:
                 logger.exception("Unable to start MQTT Interface")
 
+        if self.conf.MQTT_HOMEASSISTANT_ENABLE:
+            try:
+                logger.info("Using HomeAssistant MQTT Interface")
+                from paradox.interfaces.mqtt.homeassistant import HomeAssistantMQTTInterface
+                self.register(HomeAssistantMQTTInterface())
+            except Exception:
+                logger.exception("Unable to start HomeAssistant MQTT Interface")
+
         # Load Pushbullet service
         if self.conf.PUSHBULLET_ENABLE:
             try:

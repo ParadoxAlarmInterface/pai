@@ -71,6 +71,7 @@ class Config:
         "MQTT_USER_TOPIC": 'users',               # Base for user states
         "MQTT_EVENTS_TOPIC": 'events',            # Base for events
         "MQTT_CONTROL_TOPIC": 'control',          # Base for control of othe elements (ROOT/CONTROL/TYPE)
+        "MQTT_HOMEASSISTANT_CONTROL_TOPIC": 'hass_control',
         "MQTT_OUTPUT_TOPIC": 'outputs',
         "MQTT_KEYPAD_TOPIC": 'keypads',
         "MQTT_STATES_TOPIC": 'states',

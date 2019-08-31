@@ -2,6 +2,7 @@ import functools
 import logging
 import os
 import typing
+import re
 
 from paho.mqtt.client import Client, mqtt_cs_connected
 
@@ -9,6 +10,18 @@ from paradox.config import config as cfg
 from paradox.interfaces import ThreadQueueInterface
 
 logger = logging.getLogger('PAI').getChild(__name__)
+
+ELEMENT_TOPIC_MAP = dict(partition=cfg.MQTT_PARTITION_TOPIC, zone=cfg.MQTT_ZONE_TOPIC,
+                         output=cfg.MQTT_OUTPUT_TOPIC, repeater=cfg.MQTT_REPEATER_TOPIC,
+                         bus=cfg.MQTT_BUS_TOPIC, keypad=cfg.MQTT_KEYPAD_TOPIC,
+                         system=cfg.MQTT_SYSTEM_TOPIC, user=cfg.MQTT_USER_TOPIC)
+
+# re_topic_dirty = re.compile(r'[+#/]')
+re_topic_dirty = re.compile(r'\W')
+
+
+def sanitize_topic_part(name):
+    return re_topic_dirty.sub('_', name).strip('_')
 
 
 class MQTTConnection(Client):
@@ -19,7 +32,6 @@ class MQTTConnection(Client):
 
     def __init__(self):
         super(MQTTConnection, self).__init__("paradox_mqtt/{}".format(os.urandom(8).hex()))
-        # self.on_message = functools.partial(self._call_registars, "on_message")
         self.on_connect = self._on_connect_cb
         self.on_disconnect = functools.partial(self._call_registars, "on_disconnect")
 
@@ -105,3 +117,7 @@ class AbstractMQTTInterface(ThreadQueueInterface):
 
     def publish(self, topic, value, qos, retain):
         self.mqtt.publish(topic, value, qos, retain)
+
+    def subscribe_callback(self, sub, callback: typing.Callable):
+        self.mqtt.message_callback_add(sub, callback)
+        self.mqtt.subscribe(sub)
