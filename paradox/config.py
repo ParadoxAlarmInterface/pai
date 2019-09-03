@@ -108,9 +108,6 @@ class Config:
         "MQTT_DASH_TOPIC": "metrics/exchange/pai",
         "MQTT_DASH_TEMPLATE": "/etc/pai/mqtt_dash.txt",
         
-        # MQTT HOMIE
-        "MQTT_HOMIE_ENABLE": False,
-
         # Interfaces
         "COMMAND_ALIAS": {                       # alias for commands through text based interfaces
             'arm': 'partition all arm',
