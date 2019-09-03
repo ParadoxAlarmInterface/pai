@@ -14,3 +14,6 @@ def sendEvent(event: dict):
 def sendChange(etype: str, label: str, property: str, value: str, initial: bool=False):
     payload = dict(type=etype, label=label, property=property, value=value, initial=initial)
     pub.sendMessage(PREFIX + "changes", change=payload)
+
+def sendInternal(message: str):
+    pub.sendMessage(PREFIX + "internal", message=message)
