@@ -91,7 +91,7 @@ class HomieMQTTInterface(Interface):
         
         ps.subscribe(self.handle_panel_change, "changes")
         ps.subscribe(self.handle_panel_event, "events")
-        ps.subscribe(self.handle_panel_status, "system")
+        ps.subscribe(self.handle_internal, "internal")
 
         while True:
             try:
@@ -442,6 +442,16 @@ class HomieMQTTInterface(Interface):
                                              sanitize_topic_part(label),
                                              summary_topic),
                      "{}".format(state), 0, cfg.MQTT_RETAIN)
+
+    def internal(self, message):
+        if message == "properties_enumerated":
+            
+            self.homie.setup()
+            for k in self.cache:
+                entry = self.cache[k]
+                #self.nodes[entry['label']].setProperty(entry['property']).send(entry['value'])
+            
+            self.setup_called = True
 
     def publish(self, topic, value, qos, retain):
         self.cache[topic] = {'value': value, 'qos': qos, 'retain': retain}

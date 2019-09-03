@@ -107,7 +107,7 @@ class Config:
         "MQTT_DASH_PUBLISH": False,
         "MQTT_DASH_TOPIC": "metrics/exchange/pai",
         "MQTT_DASH_TEMPLATE": "/etc/pai/mqtt_dash.txt",
-
+        
         # Interfaces
         "COMMAND_ALIAS": {                       # alias for commands through text based interfaces
             'arm': 'partition all arm',
