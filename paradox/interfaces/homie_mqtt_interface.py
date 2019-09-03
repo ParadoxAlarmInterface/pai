@@ -69,6 +69,7 @@ class HomieMQTTInterface(Interface):
         
         self.connected = False
         self.cache = dict()
+        self.setup_called = False
         self.armed = dict()
 
     def run(self):
@@ -382,8 +383,13 @@ class HomieMQTTInterface(Interface):
             #    self.logger.info("HOMIE: Found existing node for '%s'" % label)
             #    #node = self.get_node(label)
         elif element == 'system':
-            self.logger.debug("HOMIE: Status element: " + change)
+            self.logger.debug("HOMIE: Status element: " + change['type'])
+
             #can parse power, vdc, dc and battery under here.
+
+        if not self.setup_called: 
+            self.cache['{}-{}-{}'.format(change['type'], change['label'], change['property'])] = change
+        
     def check_config_mappings(self, config_parameter, required_mappings):
         # Check states_map
         keys = getattr(cfg, config_parameter).keys()
@@ -443,10 +449,9 @@ class HomieMQTTInterface(Interface):
                                              summary_topic),
                      "{}".format(state), 0, cfg.MQTT_RETAIN)
 
-    def internal(self, message):
+    def handle_internal(self, message):
         if message == "properties_enumerated":
             
-            self.homie.setup()
             for k in self.cache:
                 entry = self.cache[k]
                 #self.nodes[entry['label']].setProperty(entry['property']).send(entry['value'])
