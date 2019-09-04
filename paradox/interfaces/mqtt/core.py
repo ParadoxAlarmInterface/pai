@@ -4,7 +4,7 @@ import os
 import typing
 import re
 
-from paho.mqtt.client import Client, mqtt_cs_connected
+from paho.mqtt.client import Client, mqtt_cs_connected, MQTT_ERR_SUCCESS
 
 from paradox.config import config as cfg
 from paradox.interfaces import ThreadQueueInterface
@@ -35,8 +35,9 @@ class MQTTConnection(Client):
 
     def __init__(self):
         super(MQTTConnection, self).__init__("paradox_mqtt/{}".format(os.urandom(8).hex()))
+        self._status_topic = '{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, 'MQTTInterface')
         self.on_connect = self._on_connect_cb
-        self.on_disconnect = functools.partial(self._call_registars, "on_disconnect")
+        self.on_disconnect = self._on_disconnect_cb
         # self.on_subscribe = lambda client, userdata, mid, granted_qos: logger.debug("Subscribed: %s" %(mid))
         # self.on_message = lambda client, userdata, message: logger.debug("Message received: %s" % str(message))
         # self.on_publish = lambda client, userdata, mid: logger.debug("Message published: %s" % str(mid))
@@ -46,10 +47,7 @@ class MQTTConnection(Client):
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
             self.username_pw_set(username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
 
-        self.will_set(
-            '{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, 'MQTTInterface'),
-            'offline', 0, retain=True
-        )
+        self.will_set(self._status_topic, 'offline', 0, retain=True)
 
     def _call_registars(self, method, *args, **kwargs):
         for r in self.registrars:
@@ -67,21 +65,27 @@ class MQTTConnection(Client):
         return self._state == mqtt_cs_connected
 
     def _report_status(self, status):
-        self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                       cfg.MQTT_INTERFACE_TOPIC,
-                                       'MQTTInterface'),
-                     status, 0, retain=True)
+        self.publish(self._status_topic, status, 0, retain=True)
 
     def connect(self, host=cfg.MQTT_HOST, port=cfg.MQTT_PORT, keepalive=cfg.MQTT_KEEPALIVE,
                 bind_address=cfg.MQTT_BIND_ADDRESS):
         super(MQTTConnection, self).connect(host=host, port=port, keepalive=keepalive, bind_address=bind_address)
 
     def _on_connect_cb(self, client, userdata, flags, result):
-        if result == 0:
+        if result == MQTT_ERR_SUCCESS:
+            logger.info("MQTT Broker Connected")
             self._report_status('online')
             self._call_registars("on_connect", client, userdata, flags, result)
         else:
-            logger.error("Failed to connecto MQTT with status: %d" % result)
+            logger.error("Failed to connect to MQTT. Code: %d" % result)
+
+    def _on_disconnect_cb(self, client, userdata, rc):
+        if rc == MQTT_ERR_SUCCESS:
+            logger.info("MQTT Broker Disconnected")
+        else:
+            logger.error("MQTT Broker unexpectedly disconnected. Code: %d", rc)
+
+        self._call_registars("on_disconnect", client, userdata, rc)
 
     def disconnect(self):
         self._report_status('offline')
@@ -107,12 +111,6 @@ class AbstractMQTTInterface(ThreadQueueInterface):
         super().run()
 
         if self.mqtt.connected:
-            # Need to set as disconnect will delete the last will
-            self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                           cfg.MQTT_INTERFACE_TOPIC,
-                                           self.__class__.__name__),
-                         'offline', 0, retain=True)
-
             self.mqtt.disconnect()
 
         self.mqtt.loop_stop()
@@ -123,10 +121,10 @@ class AbstractMQTTInterface(ThreadQueueInterface):
         super().stop()
 
     def on_disconnect(self, client, userdata, rc):
-        logger.info("MQTT Broker Disconnected")
+        pass
 
     def on_connect(self, client, userdata, flags, result):
-        logger.info("MQTT Broker Connected")
+        pass
 
     def publish(self, topic, value, qos, retain):
         self.mqtt.publish(topic, value, qos, retain)

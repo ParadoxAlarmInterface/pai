@@ -338,6 +338,9 @@ class IPConnection(Connection):
     async def read(self, timeout=None):
         """Read data from the IP Port, if available, until the timeout is exceeded"""
 
+        if not self.connection:
+            return None
+
         if not timeout:
             timeout = self.default_timeout
 
