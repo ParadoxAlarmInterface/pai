@@ -157,7 +157,7 @@ class Panel_EVOBase(PanelBase):
 
     async def request_status(self, i: int) -> Optional[Container]:
         args = dict(address=i, length=64, control=dict(ram_access=True))
-        reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, i))
+        reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, args['address']))
 
         return reply
 
@@ -185,7 +185,7 @@ class Panel_EVOBase(PanelBase):
                 self.core.update_properties('system', 'troubles',
                                             {k: properties.troubles[k]})
 
-        self.process_properties_bulk(properties, mvars.address)
+        return properties
 
     async def control_partitions(self, partitions: list, command: str) -> bool:
         """

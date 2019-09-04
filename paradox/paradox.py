@@ -15,8 +15,10 @@ from paradox.config import config as cfg
 from paradox.connections.connection import Connection
 from paradox.interfaces.interface_manager import InterfaceManager
 from paradox.hardware import create_panel
+from paradox.exceptions import StatusRequestException
 from paradox.lib import ps
 from paradox.lib.async_message_manager import AsyncMessageManager, EventMessageHandler, ErrorMessageHandler
+from paradox.lib.utils import deep_merge
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -69,7 +71,6 @@ class Paradox:
 
     def __init__(self,
                  connection: Connection,
-                 interface: InterfaceManager,
                  retries=3):
 
         self.panel = None  # type: Panel
@@ -228,6 +229,15 @@ class Paradox:
         task = self.work_loop.create_task(self.async_loop())
         self.work_loop.run_until_complete(task)
 
+    async def _status_request(self, i):
+        logger.debug("Requesting status: %d" % i)
+        reply = await self.panel.request_status(i)
+        if reply is not None:
+            logger.debug("Received status response: %d" % i)
+            return self.panel.handle_status(reply)
+        else:
+            raise StatusRequestException("No reply to status request: %d" % i)
+
     async def async_loop(self):
         logger.debug("Loop start")
         
@@ -247,29 +257,19 @@ class Paradox:
 
             tstart = time.time()
             try:
-                for i in cfg.STATUS_REQUESTS:
-                    logger.debug("Requesting status: %d" % i)
-                    reply = await self.panel.request_status(i)
-                    if reply is not None:
-                        tstart = time.time()
-                        replies_missing = 0
-                        self.panel.handle_status(reply)
-                    else:
-                        logger.error("No reply to status request: %d" % i)
-                        replies_missing += 1
-                        if replies_missing > 10:
-                            logger.error("Lost communication with panel")
-                            self.disconnect()
-                            return
-
+                result = await asyncio.gather(*[self._status_request(i) for i in cfg.STATUS_REQUESTS])
+                merged = deep_merge(*result, extend_lists=True)
+                ps.sendMessage('status_update', status=merged)
+                self.panel.process_properties_bulk(merged)  # TODO: Subscribe to this event instead of calling
             except ConnectionError:
                 raise
+            except StatusRequestException:
+                replies_missing += 1
+                if replies_missing > 3:
+                    logger.error("Lost communication with panel")
+                    self.disconnect()
             except Exception:
                 logger.exception("Loop")
-            
-            if first_loop:
-                first_loop = False
-                ps.sendInternal('properties_enumerated')
 
             # cfg.Listen for events
             while time.time() - tstart < cfg.KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
@@ -386,7 +386,7 @@ class Paradox:
                 if reply:
                     return reply
 
-        return None
+        return None  # Probably it needs to throw an exception instead of returning None
 
     @staticmethod
     def _select(haystack, needle) -> Sequence[int]:

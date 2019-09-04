@@ -94,10 +94,33 @@ class IPConnection(Connection):
         self.module = None
         self.connection_timestamp = 0
 
+        self.stun_control = None
+        self.stun_tunnel = None
+        self.connection = None
+
     def on_connection_lost(self):
         logger.error('Connection to panel was lost')
         self.connected = False
         self.connection_timestamp = 0
+
+        if self.stun_control:
+            try:
+                self.stun_control.close()
+                self.stun_control = None
+            except Exception as e:
+               logger.exception("stun_control socket close failed")
+        if self.stun_tunnel:
+            try:
+                self.stun_tunnel.close()
+                self.stun_tunnel = None
+            except Exception as e:
+               logger.exception("stun_control socket close failed")
+        if self.connection:
+            try:
+                self.connection.close()
+            except Exception as e:
+               logger.exception("connection socket close failed")
+            self.connection = None
 
     def make_protocol(self):
         return IPConnectionProtocol(self.on_connection_lost, self.key)
@@ -145,12 +168,11 @@ class IPConnection(Connection):
         if self.site_info is None:
             self.site_info = self.get_site_info(siteid=cfg.IP_CONNECTION_SITEID, email=cfg.IP_CONNECTION_EMAIL)
 
-
         if self.site_info is None:
             logger.error("Unable to get site info")
             return False
         try:
-            xoraddr = binascii.unhexlify(self.site_info['site'][0]['module'][0]['xoraddr'])
+            # xoraddr = binascii.unhexlify(self.site_info['site'][0]['module'][0]['xoraddr'])
             if self.site_info is None:
                 logger.error("Unable to get site info")
                 return False
@@ -182,23 +204,23 @@ class IPConnection(Connection):
             stun_host = 'turn.paradoxmyhome.com'
 
             logger.debug("STUN TCP Change Request")
-            self.client = stun.StunClient(stun_host)
-            self.client.send_tcp_change_request()
-            stun_r = self.client.receive_response()
+            self.stun_control = stun.StunClient(stun_host)
+            self.stun_control.send_tcp_change_request()
+            stun_r = self.stun_control.receive_response()
             if stun.is_error(stun_r):
                 logger.error(stun.get_error(stun_r))
                 return False
 
             logger.debug("STUN TCP Binding Request")
-            self.client.send_binding_request()
-            stun_r = self.client.receive_response()
+            self.stun_control.send_binding_request()
+            stun_r = self.stun_control.receive_response()
             if stun.is_error(stun_r):
                 logger.error(stun.get_error(stun_r))
                 return False
 
             logger.debug("STUN Connect Request")
-            self.client.send_connect_request(xoraddr=xoraddr)
-            stun_r = self.client.receive_response()
+            self.stun_control.send_connect_request(xoraddr=xoraddr)
+            stun_r = self.stun_control.receive_response()
             if stun.is_error(stun_r):
                 logger.error(stun.get_error(stun_r))
                 return False
@@ -206,20 +228,21 @@ class IPConnection(Connection):
             self.connection_timestamp = time.time()
 
             connection_id = stun_r[0]['attr_body']
-            raddr = self.client.sock.getpeername()
+            raddr = self.stun_control.sock.getpeername()
 
             logger.debug("STUN Connection Bind Request")
-            self.client1 = stun.StunClient(host=raddr[0], port=raddr[1])
-            self.client1.send_connection_bind_request(binascii.unhexlify(connection_id))
-            stun_r = self.client1.receive_response()
+            self.stun_tunnel = stun.StunClient(host=raddr[0], port=raddr[1])
+            self.stun_tunnel.send_connection_bind_request(binascii.unhexlify(connection_id))
+            stun_r = self.stun_tunnel.receive_response()
             if stun.is_error(stun_r):
                 logger.error(stun.get_error(stun_r))
                 return False
 
-            _, self.connection = await loop.create_connection(self.make_protocol, sock=self.client1.sock)
+            _, self.connection = await loop.create_connection(self.make_protocol, sock=self.stun_tunnel.sock)
             logger.info("Connected to Site: {}".format(cfg.IP_CONNECTION_SITEID))
         except Exception:
             logger.exception("Unable to negotiate connection to site")
+            return False
 
         return True
 
@@ -315,6 +338,9 @@ class IPConnection(Connection):
     async def read(self, timeout=None):
         """Read data from the IP Port, if available, until the timeout is exceeded"""
 
+        if not self.connection:
+            return None
+
         if not timeout:
             timeout = self.default_timeout
 
@@ -355,8 +381,8 @@ class IPConnection(Connection):
             # Refresh session if required
             if time.time() - self.connection_timestamp >= 500:
                 logger.info("Refreshing session")
-                self.client.send_refresh_request()
-                stun_r = self.client.receive_response()
+                self.stun_control.send_refresh_request()
+                stun_r = self.stun_control.receive_response()
                 if stun.is_error(stun_r):
                     logger.error(stun.get_error(stun_r))
                     self.connected = False
