@@ -34,6 +34,9 @@ class MQTTConnection(Client):
         super(MQTTConnection, self).__init__("paradox_mqtt/{}".format(os.urandom(8).hex()))
         self.on_connect = self._on_connect_cb
         self.on_disconnect = functools.partial(self._call_registars, "on_disconnect")
+        # self.on_subscribe = lambda client, userdata, mid, granted_qos: logger.debug("Subscribed: %s" %(mid))
+        # self.on_message = lambda client, userdata, message: logger.debug("Message received: %s" % str(message))
+        # self.on_publish = lambda client, userdata, mid: logger.debug("Message published: %s" % str(mid))
 
         self.registrars = []
 
@@ -47,8 +50,11 @@ class MQTTConnection(Client):
 
     def _call_registars(self, method, *args, **kwargs):
         for r in self.registrars:
-            if hasattr(r, method) and isinstance(r["method"], typing.Callable):
-                r["method"](*args, **kwargs)
+            try:
+                if hasattr(r, method) and isinstance(getattr(r, method), typing.Callable):
+                    getattr(r, method)(*args, **kwargs)
+            except Exception as e:
+                logger.exception('Failed to call "%s" on "%s"', method, r.__class__.__name__)
 
     def register(self, cls):
         self.registrars.append(cls)
@@ -67,9 +73,12 @@ class MQTTConnection(Client):
                 bind_address=cfg.MQTT_BIND_ADDRESS):
         super(MQTTConnection, self).connect(host=host, port=port, keepalive=keepalive, bind_address=bind_address)
 
-    def _on_connect_cb(self, *args, **kwargs):
-        self._report_status('online')
-        self._call_registars("on_connect", *args, **kwargs)
+    def _on_connect_cb(self, client, userdata, flags, result):
+        if result == 0:
+            self._report_status('online')
+            self._call_registars("on_connect", client, userdata, flags, result)
+        else:
+            logger.error("Failed to connecto MQTT with status: %d" % result)
 
     def disconnect(self):
         self._report_status('offline')
@@ -109,10 +118,10 @@ class AbstractMQTTInterface(ThreadQueueInterface):
         logger.debug("Stopping MQTT Interface")
         super().stop()
 
-    def on_disconnect(self, mqttc, userdata, rc):
+    def on_disconnect(self, client, userdata, rc):
         logger.info("MQTT Broker Disconnected")
 
-    def on_connect(self, mqttc, userdata, flags, result):
+    def on_connect(self, client, userdata, flags, result):
         logger.info("MQTT Broker Connected")
 
     def publish(self, topic, value, qos, retain):

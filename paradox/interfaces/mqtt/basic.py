@@ -33,6 +33,10 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
         self.last_republish = time.time()
 
+        super().run()
+
+    def on_connect(self, mqttc, userdata, flags, result):
+        super().on_connect(mqttc, userdata, flags, result)
         self.subscribe_callback(
             "{}/{}/{}/#".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC, cfg.MQTT_OUTPUT_TOPIC),
             self._mqtt_handle_output_control
@@ -49,8 +53,6 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_NOTIFICATIONS_TOPIC, "#"),
             self._mqtt_handle_notifications
         )
-
-        super().run()
 
     def run_loop(self, queue_item):
         if time.time() - self.last_republish > cfg.MQTT_REPUBLISH_INTERVAL:

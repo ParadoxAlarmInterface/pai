@@ -25,12 +25,14 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         #     self._check_config_mappings('MQTT_PARTITION_HOMEBRIDGE_STATES', required_mappings)
         self._check_config_mappings('MQTT_PARTITION_HOMEASSISTANT_STATES', required_mappings)
 
+        super().run()
+
+    def on_connect(self, client, userdata, flags, result):
+        super().on_connect(client, userdata, flags, result)
         self.subscribe_callback(
             "{}/{}/{}/#".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_HOMEASSISTANT_CONTROL_TOPIC, cfg.MQTT_PARTITION_TOPIC),
             self._mqtt_handle_partition_control
         )
-
-        super().run()
 
     def _preparse_message(self, message) -> typing.Optional[PreparseResponse]:
         logger.info("message topic={}, payload={}".format(
