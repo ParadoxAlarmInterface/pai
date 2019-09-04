@@ -344,7 +344,6 @@ class HomieMQTTInterface(Interface):
                                             cfg.MQTT_PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC,
                                             'hass')
 
-        #if element == 'zone' and (attribute == "open" or attribute == "alarm"):
         if element in self.node_filter and attribute in self.node_filter[element]:
             self.logger.info("HOMIE: handling change: element: %s label: %s attribute: %s = %s" % (element,label,attribute,value))
             try:
@@ -353,7 +352,7 @@ class HomieMQTTInterface(Interface):
                 if label_sanitised in self.alarm_Device.nodes:
                     #get the node if we know it is there
                     node = self.alarm_Device.get_node(label_sanitised)
-                    self.logger.info("HOMIE: Found existing node for '%s'" % label)
+                    self.logger.debug("HOMIE: Found existing node for '%s'" % label)
                     #get the current property being changed.  We should have all these from the internal callback
                     currentProperty = node.get_property(attribute.lower())
                     #if currentProperty is None:
@@ -361,22 +360,23 @@ class HomieMQTTInterface(Interface):
                     #    newProperty = Property_Boolean(node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
                     #    node.add_property(newProperty)
 
-                    self.logger.info("HOMIE: Found existing property '%s' setting to %s" % (attribute, value))
+                    self.logger.info("HOMIE: Found existing property '%s' for '%s' setting to %s" % (attribute, label, value))
                     #update the found property with the new value.
                     node.set_property_value(attribute.lower(),value)
-                else:  #no node found, add one with the current property.
-                    try:
-                        #move contact_node to class, and set each zone as a node.
-                        zone_node = Node_Base(self.alarm_Device,name=label,id=label_sanitised,type_=element)
-                        self.logger.info("HOMIE: Adding new property boolean '%s'" % attribute) 
-                        #node.id = label
-                        newProperty = Property_Boolean(zone_node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
-                        zone_node.add_property(newProperty)
-                    
-                        #self.nodes[label] = node
-                        self.alarm_Device.add_node(zone_node)
-                    except Exception as e:
-                        self.logger.error("HOMIE: Error creating node: %s with error: %s" %(zone_node.name, str(e)))
+                #else:  #no node found, add one with the current property.
+                #    try:
+                #        #NONE OF THIS SHOULD BE NEEDED ANY MORE 2019-09-04
+                #        #move contact_node to class, and set each zone as a node.
+                #        zone_node = Node_Base(self.alarm_Device,name=label,id=label_sanitised,type_=element)
+                #        self.logger.info("HOMIE: Adding new property boolean '%s'" % attribute) 
+                #        #node.id = label
+                #        newProperty = Property_Boolean(zone_node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
+                #        zone_node.add_property(newProperty)
+                #    
+                #        #self.nodes[label] = node
+                #        self.alarm_Device.add_node(zone_node)
+                #    except Exception as e:
+                #        self.logger.error("HOMIE: Error creating node: %s with error: %s" %(zone_node.name, str(e)))
             except Exception as e:
                 #has a node so use it.
                 self.logger.error("HOMIE: Error updating node: %s with error: %s" %(zone_node.name, str(e)))
@@ -384,8 +384,8 @@ class HomieMQTTInterface(Interface):
             #    #needs a new node
             #    self.logger.info("HOMIE: Found existing node for '%s'" % label)
             #    #node = self.get_node(label)
-        elif element == 'system':
-            self.logger.debug("HOMIE: Status element: " + change['type'])
+        #elif element == 'system':
+        #    self.logger.debug("HOMIE: Status element: " + change['type'])
 
             #can parse power, vdc, dc and battery under here.
 
@@ -493,7 +493,10 @@ class HomieMQTTInterface(Interface):
                             except Exception as e:
                                 self.logger.error("HOMIE: Error creating node: %s with error: %s" %(zone_node.name, str(e)))
             
+            #setup completed (end of internal message), so when true. then change events will start updating node values.
             self.setup_called = True
+            #cache not needed any more so clar it for memory.
+            self.cache.clear()
 
     def publish(self, topic, value, qos, retain):
         self.cache[topic] = {'value': value, 'qos': qos, 'retain': retain}
