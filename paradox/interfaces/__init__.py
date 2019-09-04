@@ -27,6 +27,8 @@ class AsyncQueueInterface(Interface):
     def __init__(self):
         super().__init__()
 
+        self._started = asyncio.Event()
+        self._is_stopped = True
         self.queue = asyncio.queues.PriorityQueue()
 
     def start(self):
@@ -35,10 +37,18 @@ class AsyncQueueInterface(Interface):
     def stop(self):
         self.queue.put_nowait((0, None,))
 
+    def is_alive(self):
+        if self._is_stopped or not self._started.is_set():
+            return False
+
+        return not self._is_stopped
+
     async def run_loop(self, item):
         pass
 
     async def run(self):
+        self._is_stopped = False
+        self._started.set()
         while True:
             try:
                 _, item = await self.queue.get()
@@ -48,6 +58,9 @@ class AsyncQueueInterface(Interface):
                     await self.run_loop(item)
             except Exception:
                 logger.exception("ERROR in Run loop")
+
+        self._is_stopped = True
+        self._started.clear()
 
 
 class ThreadQueueInterface(threading.Thread, Interface):

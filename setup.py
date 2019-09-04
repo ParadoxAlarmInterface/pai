@@ -23,6 +23,7 @@ setup(
     setup_requires=[] + pytest_runner,
     tests_require=[
         'pytest',
+        'pytest-asyncio',
         'pytest-env',
         'pytest-mock',
         'mock'

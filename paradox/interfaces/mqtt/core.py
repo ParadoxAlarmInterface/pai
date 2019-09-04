@@ -7,7 +7,7 @@ import re
 from paho.mqtt.client import Client, mqtt_cs_connected, MQTT_ERR_SUCCESS
 
 from paradox.config import config as cfg
-from paradox.interfaces import ThreadQueueInterface
+from paradox.interfaces import AsyncQueueInterface
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -92,7 +92,7 @@ class MQTTConnection(Client):
         super(MQTTConnection, self).disconnect()
 
 
-class AbstractMQTTInterface(ThreadQueueInterface):
+class AbstractMQTTInterface(AsyncQueueInterface):
     """Interface Class using MQTT"""
     name = 'abstract_mqtt'
 
@@ -103,12 +103,12 @@ class AbstractMQTTInterface(ThreadQueueInterface):
         self.mqtt.register(self)
         logger.debug("Registars: %d", len(self.mqtt.registrars))
 
-    def run(self):
+    async def run(self):
         if not self.mqtt.connected:
             self.mqtt.connect()
             self.mqtt.loop_start()
 
-        super().run()
+        await super().run()
 
         if self.mqtt.connected:
             self.mqtt.disconnect()

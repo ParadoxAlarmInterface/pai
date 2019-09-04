@@ -27,13 +27,13 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         self.partitions = {}
         self.last_republish = time.time()
 
-    def run(self):
+    async def run(self):
         ps.subscribe(self._handle_panel_change, "changes")
         ps.subscribe(self._handle_panel_event, "events")
 
         self.last_republish = time.time()
 
-        super().run()
+        await super().run()
 
     def on_connect(self, mqttc, userdata, flags, result):
         super().on_connect(mqttc, userdata, flags, result)

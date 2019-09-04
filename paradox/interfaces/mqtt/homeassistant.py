@@ -5,6 +5,7 @@ from collections import namedtuple
 from .core import AbstractMQTTInterface, sanitize_topic_part, ELEMENT_TOPIC_MAP
 
 from paradox.config import config as cfg
+from paradox.lib import ps
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -19,13 +20,16 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         self.armed = dict()
         self.partitions = {}
 
-    def run(self):
+    async def run(self):
         required_mappings = 'alarm,arm,arm_stay,arm_sleep,disarm'.split(',')
         # if cfg.MQTT_HOMEBRIDGE_ENABLE:
         #     self._check_config_mappings('MQTT_PARTITION_HOMEBRIDGE_STATES', required_mappings)
         self._check_config_mappings('MQTT_PARTITION_HOMEASSISTANT_STATES', required_mappings)
 
-        super().run()
+        ps.subscribe(self._handle_status_update, "status_update")
+        ps.subscribe(self._handle_labels_loaded, "labels_loaded")
+
+        await super().run()
 
     def on_connect(self, client, userdata, flags, result):
         super().on_connect(client, userdata, flags, result)
@@ -33,6 +37,50 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             "{}/{}/{}/#".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_HOMEASSISTANT_CONTROL_TOPIC, cfg.MQTT_PARTITION_TOPIC),
             self._mqtt_handle_partition_control
         )
+
+    def _handle_labels_loaded(self, data):
+        partitions = data['partition']
+        for k, v in partitions.items():
+            data = {'status': None}
+            data.update(v)
+            self.partitions[k] = data
+
+    def _handle_status_update(self, status):
+        partition_statuses = status['partition_status']
+
+        for p_key, p_status in partition_statuses.items():
+            if p_key not in self.partitions:
+                continue
+            partition = self.partitions[p_key]
+
+            if any([
+                p_status.get('fire_alarm'),
+                p_status.get('audible_alarm'),
+                p_status.get('silent_alarm'),
+                p_status.get('panic_alarm')
+            ]):
+                new_status = 'triggered'
+            elif p_status.get('arm'):
+                if p_status.get('exit_delay'):
+                    new_status = 'pending'
+                elif p_status.get('arm_stay'):
+                    new_status = 'armed_home'
+                elif p_status.get('arm_away'):
+                    new_status = 'armed_away'
+                else:
+                    new_status = 'armed_away'
+            else:
+                new_status = 'disarmed'
+
+            if new_status and partition['status'] != new_status:
+                self.publish('{}/{}/{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+                                                     cfg.MQTT_STATES_TOPIC,
+                                                     cfg.MQTT_PARTITION_TOPIC,
+                                                     sanitize_topic_part(partition['key']),
+                                                     cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC),
+                             "{}".format(new_status), 0, cfg.MQTT_RETAIN)
+            partition['status'] = new_status
+
 
     def _preparse_message(self, message) -> typing.Optional[PreparseResponse]:
         logger.info("message topic={}, payload={}".format(
