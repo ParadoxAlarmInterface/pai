@@ -20,7 +20,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
     name = 'basic_mqtt'
 
     def __init__(self):
-        super(BasicMQTTInterface, self).__init__()
+        super().__init__()
 
         self.cache = dict()
         self.armed = dict()

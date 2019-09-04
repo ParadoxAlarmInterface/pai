@@ -25,10 +25,13 @@ def sanitize_topic_part(name):
 
 
 class MQTTConnection(Client):
-    def __new__(cls):
-        if not hasattr(cls, 'instance'):
-            cls.instance = super(MQTTConnection, cls).__new__(cls)
-        return cls.instance
+    _instance = None
+    @classmethod
+    def get_instance(cls) -> 'MQTTConnection':
+        if cls._instance is None:
+            cls._instance = MQTTConnection()
+
+        return cls._instance
 
     def __init__(self):
         super(MQTTConnection, self).__init__("paradox_mqtt/{}".format(os.urandom(8).hex()))
@@ -92,8 +95,9 @@ class AbstractMQTTInterface(ThreadQueueInterface):
     def __init__(self):
         super().__init__()
 
-        self.mqtt = MQTTConnection()
+        self.mqtt = MQTTConnection.get_instance()
         self.mqtt.register(self)
+        logger.debug("Registars: %d", len(self.mqtt.registrars))
 
     def run(self):
         if not self.mqtt.connected:
