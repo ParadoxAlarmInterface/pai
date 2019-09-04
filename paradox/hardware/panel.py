@@ -204,9 +204,9 @@ class Panel:
 
             index += 1
 
-    def process_properties_bulk(self, properties, address):
+    def process_properties_bulk(self, properties):
         if cfg.LOGGING_DUMP_STATUS:
-            logger.debug("address: %s, properties: %s", address, properties)
+            logger.debug("properties: %s", properties)
 
         for key, value in iterate_properties(properties):
 
@@ -216,12 +216,10 @@ class Panel:
             element_type = key.split('_')[0]
             limit_list = cfg.LIMITS.get(element_type)
 
-            if key in self.core.status_cache and self.core.status_cache[address][key] == value:
+            if key in self.core.status_cache and self.core.status_cache[key] == value:
                 continue
-            if address not in self.core.status_cache:
-                self.core.status_cache[address] = {}
 
-            self.core.status_cache[address][key] = value
+            self.core.status_cache[key] = value
             prop_name = '_'.join(key.split('_')[1:])
 
             if not prop_name:

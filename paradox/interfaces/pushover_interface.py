@@ -5,58 +5,46 @@ import re
 
 from chump import Application
 
+from paradox.config import config as cfg
+from paradox.event import EventLevel
+from paradox.interfaces import ThreadQueueInterface
 from paradox.lib import ps
 
-from paradox.event import EventLevel, Event
-from paradox.interfaces import Interface
-from paradox.lib.utils import SortableTuple
+logger = logging.getLogger('PAI').getChild(__name__)
 
-from paradox.config import config as cfg
 
-class PushoverInterface(Interface):
+class PushoverInterface(ThreadQueueInterface):
     """Interface Class using Pushover"""
     name = 'pushover'
 
     def __init__(self):
         super().__init__()
 
-        self.logger = logging.getLogger('PAI').getChild(__name__)
         self.app = None
         self.users = {}
 
     def run(self):
-        self.logger.info("Starting Pushover Interface")
+        logger.info("Starting Pushover Interface")
         try:
             self.app = Application(cfg.PUSHOVER_APPLICATION_KEY)
             if not self.app.is_authenticated:
                 raise Exception('Failed to authenticate with Pushover. Please check PUSHOVER_APPLICATION_KEY')
 
-            ps.subscribe(self.handle_panel_event, "events")
-            ps.subscribe(self.handle_notify, "notifications")
+            ps.subscribe(self._handle_panel_event, "events")
+            ps.subscribe(self._handle_notify, "notifications")
 
-            while True:
-                item = self.queue.get()
-                if item[1] == 'command':
-                    if item[2] == 'stop':
-                        break
+            super().run()
         except Exception:
-            self.logger.exception("Pushover")
+            logger.exception("Pushover")
 
-    def stop(self):
-        """ Stops the Pushover interface"""
-        self.queue.put_nowait(SortableTuple((2, 'command', 'stop')))
-
-    def notify(self, source, message, level):
-        self.queue.put_nowait(SortableTuple((2, 'notify', (source, message, level))))
-
-    def handle_notify(self, message):
+    def _handle_notify(self, message):
         sender, message, level = message
         if level < EventLevel.INFO.value:
             return
 
-        self.send_message(message)
+        self._send_message(message)
 
-    def handle_panel_event(self, event):
+    def _handle_panel_event(self, event):
         """Handle Live Event"""
 
         if event.level < EventLevel.INFO.value:
@@ -89,9 +77,9 @@ class PushoverInterface(Interface):
                     break
 
         if allow:
-            self.send_message(event.message)
+            self._send_message(event.message)
 
-    def send_message(self, message):
+    def _send_message(self, message):
 
         for user_key, devices_raw in cfg.PUSHOVER_BROADCAST_KEYS.items():
             user = self.users.get(user_key)
@@ -109,7 +97,7 @@ class PushoverInterface(Interface):
                 devices = list(filter(bool, re.split('[\s]*,[\s]*', devices_raw)))
 
                 for elem in (elem for elem in devices if elem not in user.devices):
-                    self.logger.warning('%s is not in the Pushover device list for the user %s' % (elem, user_key))
+                    logger.warning('%s is not in the Pushover device list for the user %s' % (elem, user_key))
 
                 for device in devices:
                     user.send_message(message, title='Alarm', device=device)

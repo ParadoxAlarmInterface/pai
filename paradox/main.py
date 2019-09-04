@@ -104,7 +104,8 @@ def main(args):
     signal.signal(signal.SIGINT, exit_handler)
 
     # Start interacting with the alarm
-    alarm = Paradox(connection=connection, interface=interface_manager)
+    alarm = Paradox(connection=connection)
+    interface_manager.set_alarm(alarm)
     retry = 1
     while True:
         logger.info("Starting...")
@@ -114,7 +115,6 @@ def main(args):
         try:
             if alarm.connect():
                 retry = 1
-                interface_manager.set_alarm(alarm)
                 alarm.loop()
             else:
                 logger.error("Unable to connect to alarm")

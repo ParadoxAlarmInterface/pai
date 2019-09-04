@@ -1,7 +1,4 @@
-
 import logging
-
-from paradox.event import Event
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -35,11 +32,19 @@ class InterfaceManager:
         if self.conf.MQTT_ENABLE:
             try:
                 logger.info("Using MQTT Interface")
-                from paradox.interfaces.mqtt_interface import MQTTInterface
-                self.register(MQTTInterface())
+                from paradox.interfaces.mqtt.basic import BasicMQTTInterface
+                self.register(BasicMQTTInterface())
             except Exception:
                 logger.exception("Unable to start MQTT Interface")
-        
+
+        if self.conf.MQTT_HOMEASSISTANT_ENABLE:
+            try:
+                logger.info("Using HomeAssistant MQTT Interface")
+                from paradox.interfaces.mqtt.homeassistant import HomeAssistantMQTTInterface
+                self.register(HomeAssistantMQTTInterface())
+            except Exception:
+                logger.exception("Unable to start HomeAssistant MQTT Interface")
+
         # Load Pushbullet service
         if self.conf.PUSHBULLET_ENABLE:
             try:
@@ -90,7 +95,6 @@ class InterfaceManager:
         interface.start()  # Starts interface thread
 
         self.interfaces.append(interface)
-
 
     def stop(self):
         logger.debug("Stopping all interfaces")
