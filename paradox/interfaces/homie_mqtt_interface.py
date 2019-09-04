@@ -344,7 +344,8 @@ class HomieMQTTInterface(Interface):
                                             cfg.MQTT_PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC,
                                             'hass')
 
-        if element == 'zone' and (attribute == "open" or attribute == "alarm"):
+        #if element == 'zone' and (attribute == "open" or attribute == "alarm"):
+        if element in self.node_filter and attribute in self.node_filter[element]:
             self.logger.info("HOMIE: handling change: element: %s label: %s attribute: %s = %s" % (element,label,attribute,value))
             try:
                 label_sanitised = label.replace('_','').lower()
@@ -353,12 +354,12 @@ class HomieMQTTInterface(Interface):
                     #get the node if we know it is there
                     node = self.alarm_Device.get_node(label_sanitised)
                     self.logger.info("HOMIE: Found existing node for '%s'" % label)
-                    #get the current property being changed.
+                    #get the current property being changed.  We should have all these from the internal callback
                     currentProperty = node.get_property(attribute.lower())
-                    if currentProperty is None:
-                        #no property found with that attribute name for that zone
-                        newProperty = Property_Boolean(node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
-                        node.add_property(newProperty)
+                    #if currentProperty is None:
+                    #    #no property found with that attribute name for that zone
+                    #    newProperty = Property_Boolean(node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
+                    #    node.add_property(newProperty)
 
                     self.logger.info("HOMIE: Found existing property '%s' setting to %s" % (attribute, value))
                     #update the found property with the new value.
@@ -462,7 +463,7 @@ class HomieMQTTInterface(Interface):
                 initial = change['initial']
                 element = change['type']
                 #if element == 'zone' and (attribute == 'open' or attribute == 'alarm'):
-                if self.node_filter[element] is not None:
+                if element in self.node_filter:
                     if attribute in self.node_filter[element]:
                         label_sanitised = label.replace('_','').lower()
                         #Look for the node in the alarm device node list
@@ -482,7 +483,7 @@ class HomieMQTTInterface(Interface):
                             try:
                                 #move contact_node to class, and set each zone as a node.
                                 zone_node = Node_Base(self.alarm_Device,name=label,id=label_sanitised,type_=element)
-                                self.logger.info("HOMIE: Adding new property boolean '%s'" % attribute) 
+                                self.logger.info("HOMIE: Adding new property boolean '%s' to node '%s'" % (attribute, label)) 
                                 #node.id = label
                                 newProperty = Property_Boolean(zone_node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
                                 zone_node.add_property(newProperty)
