@@ -32,7 +32,7 @@ class Connection:
     async def connect(self):
         raise NotImplementedError("Implement in subclass")
 
-    def write(self, data):
+    def write(self, data: bytes):
         if self.connected:
             self.connection.send_message(data)
         else:

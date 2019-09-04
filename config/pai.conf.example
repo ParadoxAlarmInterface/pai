@@ -27,8 +27,8 @@ SERIAL_BAUD = 9600              # Use 38400(default setting) or 57600 for EVO
 
 # IP Connection Defails
 IP_CONNECTION_HOST = '127.0.0.1'	# IP Module address when using direct IP Connection
-IP_CONNECTION_PORT = 10000		# IP Module port when using direct IP Connection
-IP_CONNECTION_PASSWORD = b'0000' 	# IP Module password
+IP_CONNECTION_PORT = 10000		    # IP Module port when using direct IP Connection
+IP_CONNECTION_PASSWORD = b'paradox' # IP Module password. "paradox" is default.
 IP_CONNECTION_SITEID = None 		# SITE ID. IF defined, connection will be made through this method.
 IP_CONNECTION_EMAIL = None 		# Email registered in the site
 IP_CONNECTION_PANEL_SERIAL = None  # Use a specific panel. Set it to None to use the first
@@ -54,7 +54,7 @@ OUTPUT_PULSE_DURATION = 1               # Duration of a PGM pulse in seconds
 PARTITIONS_CHANGE_NOTIFICATION_IGNORE = ['arm_full', 'exit_delay'] # Do not send notifications for these notificions
 STATUS_REQUESTS = [0, 1, 2, 3, 4, 5]
 SYNC_TIME = True    			# Update panel time
-PASSWORD = b'0000'   			# PC Password. Set to None if Panel has no Password
+PASSWORD = b'0000'   			# PC Password. Set to None if Panel has no Password. In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) -> PC Communication (Babyware) Tab.
 
 POWER_UPDATE_INTERVAL = 60      	# Interval between updates of the battery, DC and VDC voltages
 PUSH_POWER_UPDATE_WITHOUT_CHANGE = True # Always notify interfaces of power changes
@@ -104,9 +104,9 @@ MQTT_HOMEBRIDGE_SUMMARY_TOPIC = 'current'
 # Value = State propagated to Homebridge
 MQTT_PARTITION_HOMEBRIDGE_STATES = dict(
     alarm='ALARM_TRIGGERED',
-    stay_arm='STAY_ARM',
+    arm_stay='STAY_ARM',
     arm='AWAY_ARM',
-    sleep_arm='NIGHT_ARM',
+    arm_sleep='NIGHT_ARM',
     disarm='DISARMED')
 # Homebridge control map
 # Key = Command from Homebridge
@@ -129,18 +129,18 @@ MQTT_HOMEASSISTANT_SUMMARY_TOPIC = 'current_hass'
 # Value = State propagated to Homeassistant
 MQTT_PARTITION_HOMEASSISTANT_STATES = dict(
                              alarm='triggered', 
-                             stay_arm='armed_home',
+                             arm_stay='armed_home',
                              arm='armed_away',
-                             sleep_arm='armed_night',
+                             arm_sleep='armed_night',
                              disarm='disarmed')
 # Homeassistant control map
 # Key = Command from Homeassistant
 # Value = Command sent to Panel
 MQTT_PARTITION_HOMEASSISTANT_COMMANDS = dict(
-                                arm_home='arm_stay', 
-                                arm_away='arm',
-                                arm_night='arm_sleep',
-                                disarm='disarm')
+                                ARM_HOME='arm_stay',
+                                ARM_AWAY='arm',
+                                ARM_NIGHT='arm_sleep',
+                                DISARM='disarm')
 
 # Interfaces
 COMMAND_ALIAS = {						# alias for commands through text based interfaces
@@ -181,3 +181,9 @@ IP_INTERFACE_PASSWORD = b'0000'
 
 # Dummy Interface for testing
 DUMMY_INTERFACE_ENABLE = False
+
+HOMIE_INTERFACE_ENABLE: False
+HOMIE_BASE_TOPIC: 'homie/'
+HOME_NODE_FILTER: {
+            'zone': ['open']
+        }

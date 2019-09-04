@@ -2,15 +2,13 @@
 
 # IP Interface
 
-import time
 import logging
-import socket
-import select
 from construct import GreedyBytes, Struct, Aligned, Const, Int8ub, Bytes, Int16ul, Default
-from threading import Thread, Event
 import binascii
 import os
 from typing import Awaitable
+
+from paradox.event import Event
 from paradox.lib.crypto import encrypt, decrypt
 from paradox.lib.async_message_manager import RAWMessageHandler
 
@@ -247,18 +245,6 @@ class IPInterface():
         self.server = self.alarm.work_loop.create_task(coro)
 
         logger.info("IP Interface started")
-
-    def set_notify(self, tmp):
-        pass
-
-    def event(self, event):
-        pass
-
-    def notify(self, source, message, level):
-        pass
-
-    def change(self, element, label, panel_property, value):
-        """ Enqueues a change """
 
     async def handle_client(self, reader, writer):
         """

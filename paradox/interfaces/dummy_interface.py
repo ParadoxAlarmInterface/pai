@@ -7,6 +7,7 @@ from paradox.lib.utils import SortableTuple
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
+from paradox.lib import ps
 
 class DummyInterface(Interface):
     """Interface Class using Dummy"""
@@ -21,12 +22,14 @@ class DummyInterface(Interface):
 
     def run(self):
         self.logger.info("Starting Dummy Interface")
+
+        ps.subscribe(self.handle_panel_event, "events")
+        ps.subscribe(self.handle_notify, "notifications")
+
         try:
             while True:
                 item = self.queue.get()
-                if item[1] == 'notify':
-                    self.handle_notify(item[2])
-                elif item[1] == 'command':
+                if item[1] == 'command':
                     if item[2] == 'stop':
                         break
         except Exception:
@@ -36,10 +39,11 @@ class DummyInterface(Interface):
         """ Stops the Dummy interface"""
         self.queue.put_nowait(SortableTuple((2, 'command', 'stop')))
 
-    def notify(self, source, message, level):
-        self.queue.put_nowait(SortableTuple((2, 'notify', (source, message, level))))
+    def handle_notify(self, message):
+        sender, message, level = message
+        logger.log(level, "sender: %s, message: %s" % (message))
 
-    def handle_notify(self, raw):
-        sender, message, level = raw
-
-        logger.log(level, "sender: %s, message: %s" % (sender, message))
+    def handle_panel_event(self, event):
+        level = event.level
+        logger.log(level.value, event)
+        logger.log(level.value, "message: %s" % (event.message))

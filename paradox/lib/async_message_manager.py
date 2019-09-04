@@ -1,6 +1,8 @@
 import asyncio
 import logging
-from typing import Awaitable
+from typing import Awaitable, Optional
+
+from construct import Container
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -13,7 +15,7 @@ class MessageHandler:
         self.handle = callback
         self.name = name if name is not None else self.__class__.__name__
 
-    def can_handle(self, message):
+    def can_handle(self, message: Container) -> bool:
         return True
 
 
@@ -31,7 +33,7 @@ class EventMessageHandler(MessageHandler):
         self.persistent = True
         self.name = name if name is not None else self.__class__.__name__
 
-    def can_handle(self, message):
+    def can_handle(self, message: Container) -> bool:
         values = message.fields.value
         return values.po.command == 0xe and (not hasattr(values, "event_source") or values.event_source == 0xff)
 
@@ -41,7 +43,7 @@ class ErrorMessageHandler(MessageHandler):
         self.persistent = True
         self.name = name if name is not None else self.__class__.__name__
 
-    def can_handle(self, message):
+    def can_handle(self, message: Container) -> bool:
         return message.fields.value.po.command == 0x7 and hasattr(message.fields.value, "message")
 
 
@@ -62,7 +64,7 @@ class AsyncMessageManager:
         self.handlers = []
         self.raw_handlers = []
 
-    async def wait_for(self, check_fn, timeout=2):
+    async def wait_for(self, check_fn, timeout=2) -> Optional[Container]:
         future = FutureMessageHandler(check_fn, loop=self.loop)
         self.register_handler(future)
 
@@ -81,13 +83,13 @@ class AsyncMessageManager:
         self.handlers = list(filter(lambda x: x.name != name, self.handlers))
         self.raw_handlers = list(filter(lambda x: x.name != name, self.raw_handlers))
 
-    def schedule_message_handling(self, message):
+    def schedule_message_handling(self, message: Container):
         return self.loop.create_task(self.handle_message(message))
 
     def schedule_raw_message_handling(self, message):
         return self.loop.create_task(self.handle_raw_message(message))
 
-    async def handle_raw_message(self, message):
+    async def handle_raw_message(self, message: Container):
         self.raw_handlers = list(filter(lambda x: not (isinstance(x, asyncio.Future) and x.cancelled()),
                                     self.raw_handlers))  # remove timeouted futures
 
@@ -105,8 +107,7 @@ class AsyncMessageManager:
                 else:
                     return result
 
-
-    async def handle_message(self, message):
+    async def handle_message(self, message: Container):
         handler = None
 
         self.handlers = list(filter(lambda x: not (isinstance(x, asyncio.Future) and x.cancelled()),

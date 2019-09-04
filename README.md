@@ -10,7 +10,10 @@ It supports MG/SP/EVO panels connected through a serial port, which is present i
 
 Support for Magellan and Spectra panels is very stable. Support for EVO panels is being added, so YMMV. If you find a bug, please report it.
 
+
 For further information and detailed usage refer to the [Wiki](https://github.com/jpbarraca/pai/wiki).
+
+If you are having issues, or wish to discuss new features, join us at our [Gitter community](https://gitter.im/paradox-alarm-interface)
 
 On Android, if you install [MQTT Dash](https://play.google.com/store/apps/details?id=net.routix.mqttdash), and [follow the instructions](https://github.com/jpbarraca/pai/wiki#mqtt-dash) you will automatically get a panel like this:
 ![mqtt_dash](https://user-images.githubusercontent.com/497717/52603920-d4984d80-2e60-11e9-9772-578b10576b3c.jpg)
@@ -19,12 +22,23 @@ On Android, if you install [MQTT Dash](https://play.google.com/store/apps/detail
 - [master](https://github.com/jpbarraca/pai/tree/master) [![Build Status Master](https://travis-ci.org/jpbarraca/pai.svg?branch=master)](https://travis-ci.org/jpbarraca/pai)
 - [dev](https://github.com/jpbarraca/pai/tree/dev) [![Build Status Dev](https://travis-ci.org/jpbarraca/pai.svg?branch=dev)](https://travis-ci.org/jpbarraca/pai)
 
+## Things you need to have to be able to connect
+We support two connection options: via Serial and via IP150 Module
+
+#### For all connection methods
+- **PC Password:** 4 digit `[0-9a-f]` password.
+Can be looked up in Babyware (_Right click on a panel ⇾ Properties ⇾ PC Communication (BabyWare) ⇾ PC Communication (BabyWare) ⇾ PC Password_)
+#### In case of IP150 you need additionally:
+- **IP Module password**: Default is `paradox`
+##### For IP150 firmware > 4.0 if you connect via Paradox Cloud (SWAN)
+- **SITE ID**
+- **Email registered in the site**
+
 ## How to use
 
 ### Docker
 
 If you have docker running, this will be the easiest way:
-
 ```
 mkdir /opt/pai/etc
 mkdir /opt/pai/log
@@ -37,6 +51,12 @@ docker run -it -v /opt/pai/etc:/etc/pai:ro -v /opt/pai/log:/var/log/pai --device
 You also try ```jpbarraca/pai:latest```
 
 The docker images do not have support for Signal.
+
+or simply:
+
+```
+docker run -it -v <confFolder>/pai.conf:/etc/pai/pai.conf jpbarraca/pai
+```
 
 ### Manually
 

@@ -1,5 +1,6 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+.pytest_cache/*
 *.py[cod]
 *$py.class
 
@@ -50,10 +51,6 @@ coverage.xml
 *.mo
 *.pot
 
-# Django stuff:
-*.log
-local_settings.py
-
 # Flask stuff:
 instance/
 .webassets-cache
@@ -99,3 +96,8 @@ ENV/
 
 # mypy
 .mypy_cache/
+pai.conf
+tests/pai.conf
+pai.log
+.vscode/settings.json
+.vscode/launch.json

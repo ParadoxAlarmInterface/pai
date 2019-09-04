@@ -5,6 +5,9 @@ import re
 
 from chump import Application
 
+from paradox.lib import ps
+
+from paradox.event import EventLevel, Event
 from paradox.interfaces import Interface
 from paradox.lib.utils import SortableTuple
 
@@ -28,11 +31,12 @@ class PushoverInterface(Interface):
             if not self.app.is_authenticated:
                 raise Exception('Failed to authenticate with Pushover. Please check PUSHOVER_APPLICATION_KEY')
 
+            ps.subscribe(self.handle_panel_event, "events")
+            ps.subscribe(self.handle_notify, "notifications")
+
             while True:
                 item = self.queue.get()
-                if item[1] == 'notify':
-                    self.handle_notify(item[2])
-                elif item[1] == 'command':
+                if item[1] == 'command':
                     if item[2] == 'stop':
                         break
         except Exception:
@@ -45,10 +49,49 @@ class PushoverInterface(Interface):
     def notify(self, source, message, level):
         self.queue.put_nowait(SortableTuple((2, 'notify', (source, message, level))))
 
-    def handle_notify(self, raw):
-        sender, message, level = raw
-        if level < logging.INFO:
+    def handle_notify(self, message):
+        sender, message, level = message
+        if level < EventLevel.INFO.value:
             return
+
+        self.send_message(message)
+
+    def handle_panel_event(self, event):
+        """Handle Live Event"""
+
+        if event.level < EventLevel.INFO.value:
+            return
+
+        major_code = event.major
+        minor_code = event.minor
+
+        # Only let some elements pass
+        allow = False
+        for ev in cfg.PUSHOVER_ALLOW_EVENTS:
+            if isinstance(ev, tuple):
+                if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
+                    allow = True
+                    break
+            elif isinstance(ev, str):
+                if re.match(ev, event.key):
+                    allow = True
+                    break
+
+        # Ignore some events
+        for ev in cfg.PUSHOVER_IGNORE_EVENTS:
+            if isinstance(ev, tuple):
+                if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
+                    allow = False
+                    break
+            elif isinstance(ev, str):
+                if re.match(ev, event.key):
+                    allow = False
+                    break
+
+        if allow:
+            self.send_message(event.message)
+
+    def send_message(self, message):
 
         for user_key, devices_raw in cfg.PUSHOVER_BROADCAST_KEYS.items():
             user = self.users.get(user_key)

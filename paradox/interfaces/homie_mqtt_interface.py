@@ -4,7 +4,11 @@ import os
 import re
 import time
 
-import paho.mqtt.client as mqtt
+from homie.device_base import Device_Base
+from homie.node.property.property_contact import Property_Contact
+from homie.node.property.property_boolean import Property_Boolean
+from homie.node.node_contact import Node_Base
+
 
 from paradox.event import Event
 from paradox.interfaces import Interface
@@ -29,8 +33,8 @@ def sanitize_topic_part(name):
     return re_topic_dirty.sub('_', name).strip('_')
 
 
-class MQTTInterface(Interface):
-    """Interface Class using MQTT"""
+class HomieMQTTInterface(Interface):
+    """Interface Class using MQTT subscribing to the Homie convention"""
     name = 'mqtt'
     acceptsInitialState = True
 
@@ -38,18 +42,43 @@ class MQTTInterface(Interface):
         super().__init__()
 
         self.logger = logging.getLogger('PAI').getChild(__name__)
-        self.mqtt = mqtt.Client("paradox_mqtt/{}".format(os.urandom(8).hex()))
-        self.mqtt.on_message = self.handle_message
-        self.mqtt.on_connect = self.handle_connect
-        self.mqtt.on_disconnect = self.handle_disconnect
+        
+        self.mqtt_settings = {
+            'MQTT_BROKER' : cfg.MQTT_HOST,
+            'MQTT_PORT' : cfg.MQTT_PORT,
+            'MQTT_KEEPALIVE' : cfg.MQTT_KEEPALIVE,
+            'MQTT_CLIENT_ID' : "paradox_mqtt/{}".format(os.urandom(8).hex()),
+            'MQTT_USERNAME': '',
+            'MQTT_PASSWORD': '',
+            'MQTT_SHARE_CLIENT': True,
+
+        }
+
+        if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
+            self.mqtt_settings['MQTT_USERNAME'] = cfg.MQTT_USERNAME
+            self.mqtt_settings['MQTT_PASSWORD'] = cfg.MQTT_PASSWORD
+        
+
+        self.homie_settings = {
+            'version' : '0.0.1',
+            'topic' : cfg.HOMIE_BASE_TOPIC, 
+            'fw_name' : 'python',
+            'fw_version' : '0.0.1', 
+            'update_interval' : 60,
+        }
+        
         self.connected = False
         self.cache = dict()
+        self.setup_called = False
         self.armed = dict()
+        self.node_filter = cfg.HOMIE_NODE_FILTER
 
     def run(self):
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
             self.mqtt.username_pw_set(
                 username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
+
+        
 
         required_mappings = 'alarm,arm,arm_stay,arm_sleep,disarm'.split(',')
         if cfg.MQTT_HOMEBRIDGE_ENABLE:
@@ -57,21 +86,14 @@ class MQTTInterface(Interface):
         if cfg.MQTT_HOMEASSISTANT_ENABLE:
             self.check_config_mappings('MQTT_PARTITION_HOMEASSISTANT_STATES', required_mappings)
         
-        self.mqtt.will_set('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                             cfg.MQTT_INTERFACE_TOPIC,
-                                             self.__class__.__name__),
-                           'offline', 0, retain=True)
-
-        self.mqtt.connect(host=cfg.MQTT_HOST,
-                          port=cfg.MQTT_PORT,
-                          keepalive=cfg.MQTT_KEEPALIVE,
-                          bind_address=cfg.MQTT_BIND_ADDRESS)
-
-        self.mqtt.loop_start()
+        self.alarm_Device = Device_Base(name="paradox",mqtt_settings=self.mqtt_settings,homie_settings=self.homie_settings)
+        #self.alarm_Device.topic = 'paradox/homie'
+        self.alarm_Device.start()
         last_republish = time.time()
-
+        
         ps.subscribe(self.handle_panel_change, "changes")
         ps.subscribe(self.handle_panel_event, "events")
+        ps.subscribe(self.handle_internal, "internal")
 
         while True:
             try:
@@ -88,7 +110,7 @@ class MQTTInterface(Interface):
 
         if self.connected:
             # Need to set as disconnect will delete the last will
-            self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+            self.publish('{}/{}/{}'.format(cfg.HOMIE_BASE_TOPIC,
                                        cfg.MQTT_INTERFACE_TOPIC,
                                        self.__class__.__name__),
                      'offline', 0, retain=True)
@@ -233,19 +255,28 @@ class MQTTInterface(Interface):
 
         self.connected = True
         self.logger.debug(
-            "Subscribing to topics in {}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC))
-        self.mqtt.subscribe(
-            "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
-                              cfg.MQTT_CONTROL_TOPIC, "#"))
+            "Subscribing to topics in {}/{}".format(cfg.HOMIE_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC))
+        # self.mqtt.subscribe(
+        #     "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
+        #                       cfg.MQTT_CONTROL_TOPIC, "#"))
 
-        self.mqtt.subscribe(
-            "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
-                              cfg.MQTT_NOTIFICATIONS_TOPIC, "#"))
+        # self.mqtt.subscribe(
+        #     "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC,
+        #                       cfg.MQTT_NOTIFICATIONS_TOPIC, "#"))
 
-        self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                       cfg.MQTT_INTERFACE_TOPIC,
-                                       self.__class__.__name__),
-                     'online', 0, retain=True)
+        # self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+        #                                cfg.MQTT_INTERFACE_TOPIC,
+        #                                self.__class__.__name__),
+        #              'online', 0, retain=True)
+
+    def handle_panel_status(self, status):
+        """
+        Handle Status Message
+
+        :param raw: object with properties (can have byte properties)
+        :return:
+        """
+        self.logger.info("HOMIE: handling event: %s level: %s" % (1,2))
 
     def handle_panel_event(self, event):
         """
@@ -254,12 +285,12 @@ class MQTTInterface(Interface):
         :param raw: object with properties (can have byte properties)
         :return:
         """
-
-        if cfg.MQTT_PUBLISH_RAW_EVENTS:
-            self.publish('{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                        cfg.MQTT_EVENTS_TOPIC,
-                                        cfg.MQTT_RAW_TOPIC),
-                         json.dumps(event.props, ensure_ascii=False, cls=JSONByteEncoder), 0, cfg.MQTT_RETAIN)
+        self.logger.info("HOMIE: handling event: %s level: %s" % (event.message,event.level))
+        # if cfg.MQTT_PUBLISH_RAW_EVENTS:
+        #     self.publish('{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+        #                                 cfg.MQTT_EVENTS_TOPIC,
+        #                                 cfg.MQTT_RAW_TOPIC),
+        #                  json.dumps(event.props, ensure_ascii=False, cls=JSONByteEncoder), 0, cfg.MQTT_RETAIN)
 
     def handle_panel_change(self, change):
         logger.debug(change)
@@ -293,13 +324,16 @@ class MQTTInterface(Interface):
         else:
             publish_value = value
 
-        self.publish('{}/{}/{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                             cfg.MQTT_STATES_TOPIC,
-                                             element_topic,
-                                             sanitize_topic_part(label),
-                                             attribute),
-                     "{}".format(publish_value), 0, cfg.MQTT_RETAIN)
-
+        #self.publish('{}/{}/{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+        #                                     cfg.MQTT_STATES_TOPIC,
+        #                                     element_topic,
+        #                                     sanitize_topic_part(label),
+        #                                     attribute),
+        #             "{}".format(publish_value), 0, cfg.MQTT_RETAIN)
+        if not self.setup_called: 
+            self.cache['{}-{}-{}'.format(change['type'], change['label'], change['property'])] = change
+            return
+        
         if element == 'partition':
             if cfg.MQTT_HOMEBRIDGE_ENABLE:
                 self.handle_change_external(element, label, attribute, value, element_topic,
@@ -310,6 +344,53 @@ class MQTTInterface(Interface):
                                             cfg.MQTT_PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC,
                                             'hass')
 
+        if element in self.node_filter and attribute in self.node_filter[element]:
+            self.logger.info("HOMIE: handling change: element: %s label: %s attribute: %s = %s" % (element,label,attribute,value))
+            try:
+                label_sanitised = label.replace('_','').lower()
+                #Look for the node in the alarm device node list
+                if label_sanitised in self.alarm_Device.nodes:
+                    #get the node if we know it is there
+                    node = self.alarm_Device.get_node(label_sanitised)
+                    self.logger.debug("HOMIE: Found existing node for '%s'" % label)
+                    #get the current property being changed.  We should have all these from the internal callback
+                    currentProperty = node.get_property(attribute.lower())
+                    #if currentProperty is None:
+                    #    #no property found with that attribute name for that zone
+                    #    newProperty = Property_Boolean(node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
+                    #    node.add_property(newProperty)
+
+                    self.logger.info("HOMIE: Found existing property '%s' for '%s' setting to %s" % (attribute, label, value))
+                    #update the found property with the new value.
+                    node.set_property_value(attribute.lower(),value)
+                #else:  #no node found, add one with the current property.
+                #    try:
+                #        #NONE OF THIS SHOULD BE NEEDED ANY MORE 2019-09-04
+                #        #move contact_node to class, and set each zone as a node.
+                #        zone_node = Node_Base(self.alarm_Device,name=label,id=label_sanitised,type_=element)
+                #        self.logger.info("HOMIE: Adding new property boolean '%s'" % attribute) 
+                #        #node.id = label
+                #        newProperty = Property_Boolean(zone_node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
+                #        zone_node.add_property(newProperty)
+                #    
+                #        #self.nodes[label] = node
+                #        self.alarm_Device.add_node(zone_node)
+                #    except Exception as e:
+                #        self.logger.error("HOMIE: Error creating node: %s with error: %s" %(zone_node.name, str(e)))
+            except Exception as e:
+                #has a node so use it.
+                self.logger.error("HOMIE: Error updating node: %s with error: %s" %(zone_node.name, str(e)))
+            #else:
+            #    #needs a new node
+            #    self.logger.info("HOMIE: Found existing node for '%s'" % label)
+            #    #node = self.get_node(label)
+        #elif element == 'system':
+        #    self.logger.debug("HOMIE: Status element: " + change['type'])
+
+            #can parse power, vdc, dc and battery under here.
+
+        
+        
     def check_config_mappings(self, config_parameter, required_mappings):
         # Check states_map
         keys = getattr(cfg, config_parameter).keys()
@@ -362,21 +443,69 @@ class MQTTInterface(Interface):
             else:
                 return  # Do not publish a change
 
-        self.publish('{}/{}/{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+        self.publish('{}/{}/{}/{}/{}'.format(cfg.HOMIE_BASE_TOPIC,
                                              cfg.MQTT_STATES_TOPIC,
                                              element_topic,
                                              sanitize_topic_part(label),
                                              summary_topic),
                      "{}".format(state), 0, cfg.MQTT_RETAIN)
 
+    '''Use this method for receiving communication from the panel.  properties_enumerated is after update all labels'''
+    def handle_internal(self, message):
+        if message == "properties_enumerated":
+            
+            for k in self.cache:
+                change = self.cache[k]
+                #self.nodes[entry['label']].setProperty(entry['property']).send(entry['value'])
+                attribute = change['property']
+                label = change['label']
+                value = change['value']
+                initial = change['initial']
+                element = change['type']
+                #if element == 'zone' and (attribute == 'open' or attribute == 'alarm'):
+                if element in self.node_filter:
+                    if attribute in self.node_filter[element]:
+                        label_sanitised = label.replace('_','').lower()
+                        #Look for the node in the alarm device node list
+                        if label_sanitised in self.alarm_Device.nodes:
+                            self.logger.info("HOMIE: Alarm Attribute Found existing node for '%s'" % label)
+
+                            #get the node if we know it is there
+                            node = self.alarm_Device.get_node(label_sanitised)
+                            self.logger.info("HOMIE: Found existing node for '%s'" % label)
+                            #get the current property being changed.
+                            currentProperty = node.get_property(attribute.lower())
+                            if currentProperty is None:
+                                #no property found with that attribute name for that zone
+                                newProperty = Property_Boolean(node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
+                                node.add_property(newProperty)
+                        else:  #no node found, add one with the current property.
+                            try:
+                                #move contact_node to class, and set each zone as a node.
+                                zone_node = Node_Base(self.alarm_Device,name=label,id=label_sanitised,type_=element)
+                                self.logger.info("HOMIE: Adding new property boolean '%s' to node '%s'" % (attribute, label)) 
+                                #node.id = label
+                                newProperty = Property_Boolean(zone_node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
+                                zone_node.add_property(newProperty)
+                            
+                                #self.nodes[label] = node
+                                self.alarm_Device.add_node(zone_node)
+                            except Exception as e:
+                                self.logger.error("HOMIE: Error creating node: %s with error: %s" %(zone_node.name, str(e)))
+            
+            #setup completed (end of internal message), so when true. then change events will start updating node values.
+            self.setup_called = True
+            #cache not needed any more so clar it for memory.
+            self.cache.clear()
+
     def publish(self, topic, value, qos, retain):
         self.cache[topic] = {'value': value, 'qos': qos, 'retain': retain}
-        self.mqtt.publish(topic, value, qos, retain)
+        #self.mqtt.publish(topic, value, qos, retain)
 
     def republish(self):
         for k in list(self.cache.keys()):
             v = self.cache[k]
-            self.mqtt.publish(k, v['value'], v['qos'], v['retain'])
+            #self.mqtt.publish(k, v['value'], v['qos'], v['retain'])
 
     def publish_dash(self, fname, partitions):
         if len(partitions) < 2:
@@ -386,7 +515,7 @@ class MQTTInterface(Interface):
             with open(fname, 'r') as f:
                 data = f.read()
                 data = data.replace('__PARTITION1__', partitions[0]).replace('__PARTITION2__', partitions[1])
-                self.mqtt.publish(cfg.MQTT_DASH_TOPIC, data, 2, True)
+                #self.mqtt.publish(cfg.MQTT_DASH_TOPIC, data, 2, True)
                 self.logger.info("MQTT Dash panel published to {}".format(cfg.MQTT_DASH_TOPIC))
         else:
             self.logger.warn("MQTT DASH Template not found: {}".format(fname))

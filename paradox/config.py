@@ -27,7 +27,7 @@ class Config:
         # IP Connection Details
         "IP_CONNECTION_HOST": '127.0.0.1',                            # IP Module address when using direct IP Connection
         "IP_CONNECTION_PORT": (10000, int, (1, 65535)),               # IP Module port when using direct IP Connection
-        "IP_CONNECTION_PASSWORD": (b'0000', [bytes, type(None)]),     # IP Module password
+        "IP_CONNECTION_PASSWORD": (b'paradox', [bytes, type(None)]),  # IP Module password. "paradox" is default.
         "IP_CONNECTION_SITEID": (None, [str, type(None)]),            # If defined, connection will be made through this method.
         "IP_CONNECTION_EMAIL": (None, [str, type(None)]),             # Email registered in the site
         "IP_CONNECTION_PANEL_SERIAL": (None, [str, type(None)]),      # Serial number to be used in multi-panel sites. None for first
@@ -40,10 +40,9 @@ class Config:
         "LABEL_ENCODING": "utf-8",											  # Encoding to use when decoding labels. See https://docs.python.org/3/library/codecs.html#standard-encodings
         "LABEL_REFRESH_INTERVAL": (15 * 60, int, (0, 0xFFFFFFFF)),            # Interval between refresh of labels
         "OUTPUT_PULSE_DURATION": (1, float, (0, 0xFFFFFFFF)),                 # Duration of a PGM pulse in seconds
-        "PARTITIONS_CHANGE_NOTIFICATION_IGNORE": ['arm_full', 'exit_delay'],  # Do not send notifications for these changes
         "STATUS_REQUESTS": [0, 1, 2, 3, 4, 5],
         "SYNC_TIME": True,                                       # Update panel time
-        "PASSWORD": (None, [bytes, type(None)]),                 # PC Password. Set to None if Panel has no Password
+        "PASSWORD": (None, [bytes, type(None)]),                 # PC Password. Set to None if Panel has no Password. In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) -> PC Communication (Babyware) Tab.
 
         "POWER_UPDATE_INTERVAL": (60, int, (0, 0xFFFFFFFF)),     # Interval between updates of the Power voltages
         "PUSH_POWER_UPDATE_WITHOUT_CHANGE": True,  # Always notify interfaces of power changes
@@ -84,22 +83,22 @@ class Config:
             'DISARM': 'disarm'},
         "MQTT_PARTITION_HOMEBRIDGE_STATES": {
             'alarm': 'ALARM_TRIGGERED',
-            'stay_arm': 'STAY_ARM',
+            'arm_stay': 'STAY_ARM',
             'arm': 'AWAY_ARM',
-            'sleep_arm': 'NIGHT_ARM',
+            'arm_sleep': 'NIGHT_ARM',
             'disarm': 'DISARMED'},
         "MQTT_HOMEASSISTANT_SUMMARY_TOPIC": 'current_hass',
         "MQTT_PARTITION_HOMEASSISTANT_STATES": {
             'alarm': 'triggered', 
-            'stay_arm': 'armed_home',
+            'arm_stay': 'armed_home',
             'arm': 'armed_away',
-            'sleep_arm': 'armed_night',
+            'arm_sleep': 'armed_night',
             'disarm': 'disarmed'},
         "MQTT_PARTITION_HOMEASSISTANT_COMMANDS": {
-            'arm_home': 'arm_stay', 
-            'arm_away': 'arm',
-            'arm_night': 'arm_sleep',
-            'disarm': 'disarm'},
+            'ARM_HOME': 'arm_stay',
+            'ARM_AWAY': 'arm',
+            'ARM_NIGHT': 'arm_sleep',
+            'DISARM': 'disarm'},
         "MQTT_NOTIFICATIONS_TOPIC": 'notifications',
         "MQTT_PUBLISH_RAW_EVENTS": True,
         "MQTT_INTERFACE_TOPIC": 'interface',
@@ -108,7 +107,7 @@ class Config:
         "MQTT_DASH_PUBLISH": False,
         "MQTT_DASH_TOPIC": "metrics/exchange/pai",
         "MQTT_DASH_TEMPLATE": "/etc/pai/mqtt_dash.txt",
-
+        
         # Interfaces
         "COMMAND_ALIAS": {                       # alias for commands through text based interfaces
             'arm': 'partition all arm',
@@ -120,25 +119,38 @@ class Config:
         "PUSHBULLET_KEY": '',                     # Authentication key used for Pushbullet
         "PUSHBULLET_SECRET": '',                  # Authentication secret used for Pushbullet
         "PUSHBULLET_CONTACTS": [],                # Pushbullet user identifiers for notifications and interaction
+        "PUSHBULLET_IGNORE_EVENTS": [
+            r"zone,[\w]+,no_delay=True",
+            r"zone,[\w]+,exit_delay=.*"],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+        "PUSHBULLET_ALLOW_EVENTS": [r".*"],        # Same as before but as a white list. Default is allow all
 
         # Pushover
         "PUSHOVER_ENABLE": False,
         "PUSHOVER_KEY": '',                       # Application token for Pushover
         "PUSHOVER_BROADCAST_KEYS": {              # Pushover user or group keys to broadcast notifications to
             #    '<user_key>': '*'                # value can be '*' or comma separated list of device names
+        "PUSHOVER_IGNORE_EVENTS": [
+            r"zone,[\w]+,no_delay=True",
+            r"zone,[\w]+,exit_delay=.*"],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+        "PUSHOVER_ALLOW_EVENTS": [r".*"],          # Same as before but as a white list. Default is allow all
+
         },
 
         # Signal
         "SIGNAL_ENABLE": False,
         "SIGNAL_CONTACTS": [],                    # Contacts that are allowed to control the panel and receive notifications through Signal
-        "SIGNAL_IGNORE_EVENTS": [],               # List of tuples (major, minor)
+        "SIGNAL_IGNORE_EVENTS": [
+            r"zone,[\w]+,no_delay=True",
+            r"zone,[\w]+,exit_delay=.*"],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+        "SIGNAL_ALLOW_EVENTS": [r".*"],            # Same as before but as a white list. Default is allow all
 
         # GSM
         "GSM_ENABLE": False,
         "GSM_MODEM_BAUDRATE": (115200, int, (9600, 115200)),    # Baudrate of the GSM modem
         "GSM_MODEM_PORT": '',                     # Pathname of the serial port
         "GSM_CONTACTS": [],                       # Contacts that are allowed to control the panel and receive notifications through SMS
-        "GSM_IGNORE_EVENTS": [],                  # List of tuples [(major, minor), ...]
+        "GSM_IGNORE_EVENTS": [],                  # List of tuples or regexp matching "type:label:property" eg. [(major, minor), "zone:HOME:entry_delay", ...]
+        "GSM_ALLOW_EVENTS": [r"partition,[\w]+,alarm=True"],# Same as before but as a white list. Default is to only allow alarm
 
         # IP Socket Interface
         "IP_INTERFACE_ENABLE": False,
@@ -148,6 +160,13 @@ class Config:
 
         # Dummy Interface for testing
         "DUMMY_INTERFACE_ENABLE": False,
+
+        #Homie Interface
+        "HOMIE_INTERFACE_ENABLE": True,
+        "HOMIE_BASE_TOPIC": "homie/",
+        "HOMIE_NODE_FILTER": {
+            'zone': ['open']
+        }
     }
 
     CONFIG_LOADED = False
@@ -234,7 +253,7 @@ class Config:
                     if valid:
                         setattr(Config, k, v)
                     else:
-                        logging.error("Invalid value for config argument {}. Allowed are: {}".format(type(v), k, expected_value))
+                        logging.error("Invalid value for config argument {} {}. Allowed are: {}".format(type(v), k, expected_value))
                         raise(Exception("Error parsing configuration value"))
 
         for args in os.environ:
