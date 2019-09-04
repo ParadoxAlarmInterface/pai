@@ -71,6 +71,7 @@ class HomieMQTTInterface(Interface):
         self.cache = dict()
         self.setup_called = False
         self.armed = dict()
+        self.node_filter = cfg.HOMIE_NODE_FILTER
 
     def run(self):
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
@@ -329,7 +330,10 @@ class HomieMQTTInterface(Interface):
         #                                     sanitize_topic_part(label),
         #                                     attribute),
         #             "{}".format(publish_value), 0, cfg.MQTT_RETAIN)
-
+        if not self.setup_called: 
+            self.cache['{}-{}-{}'.format(change['type'], change['label'], change['property'])] = change
+            return
+        
         if element == 'partition':
             if cfg.MQTT_HOMEBRIDGE_ENABLE:
                 self.handle_change_external(element, label, attribute, value, element_topic,
@@ -346,9 +350,6 @@ class HomieMQTTInterface(Interface):
                 label_sanitised = label.replace('_','').lower()
                 #Look for the node in the alarm device node list
                 if label_sanitised in self.alarm_Device.nodes:
-                    if attribute == "alarm":
-                        self.logger.info("HOMIE: Alarm Attribute Found existing node for '%s'" % label)
-
                     #get the node if we know it is there
                     node = self.alarm_Device.get_node(label_sanitised)
                     self.logger.info("HOMIE: Found existing node for '%s'" % label)
@@ -387,8 +388,7 @@ class HomieMQTTInterface(Interface):
 
             #can parse power, vdc, dc and battery under here.
 
-        if not self.setup_called: 
-            self.cache['{}-{}-{}'.format(change['type'], change['label'], change['property'])] = change
+        
         
     def check_config_mappings(self, config_parameter, required_mappings):
         # Check states_map
@@ -449,12 +449,48 @@ class HomieMQTTInterface(Interface):
                                              summary_topic),
                      "{}".format(state), 0, cfg.MQTT_RETAIN)
 
+    '''Use this method for receiving communication from the panel.  properties_enumerated is after update all labels'''
     def handle_internal(self, message):
         if message == "properties_enumerated":
             
             for k in self.cache:
-                entry = self.cache[k]
+                change = self.cache[k]
                 #self.nodes[entry['label']].setProperty(entry['property']).send(entry['value'])
+                attribute = change['property']
+                label = change['label']
+                value = change['value']
+                initial = change['initial']
+                element = change['type']
+                #if element == 'zone' and (attribute == 'open' or attribute == 'alarm'):
+                if self.node_filter[element] is not None:
+                    if attribute in self.node_filter[element]:
+                        label_sanitised = label.replace('_','').lower()
+                        #Look for the node in the alarm device node list
+                        if label_sanitised in self.alarm_Device.nodes:
+                            self.logger.info("HOMIE: Alarm Attribute Found existing node for '%s'" % label)
+
+                            #get the node if we know it is there
+                            node = self.alarm_Device.get_node(label_sanitised)
+                            self.logger.info("HOMIE: Found existing node for '%s'" % label)
+                            #get the current property being changed.
+                            currentProperty = node.get_property(attribute.lower())
+                            if currentProperty is None:
+                                #no property found with that attribute name for that zone
+                                newProperty = Property_Boolean(node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
+                                node.add_property(newProperty)
+                        else:  #no node found, add one with the current property.
+                            try:
+                                #move contact_node to class, and set each zone as a node.
+                                zone_node = Node_Base(self.alarm_Device,name=label,id=label_sanitised,type_=element)
+                                self.logger.info("HOMIE: Adding new property boolean '%s'" % attribute) 
+                                #node.id = label
+                                newProperty = Property_Boolean(zone_node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
+                                zone_node.add_property(newProperty)
+                            
+                                #self.nodes[label] = node
+                                self.alarm_Device.add_node(zone_node)
+                            except Exception as e:
+                                self.logger.error("HOMIE: Error creating node: %s with error: %s" %(zone_node.name, str(e)))
             
             self.setup_called = True
 

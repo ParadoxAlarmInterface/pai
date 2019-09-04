@@ -181,3 +181,9 @@ IP_INTERFACE_PASSWORD = b'0000'
 
 # Dummy Interface for testing
 DUMMY_INTERFACE_ENABLE = False
+
+HOMIE_INTERFACE_ENABLE: False
+HOMIE_BASE_TOPIC: 'homie/'
+HOME_NODE_FILTER: {
+            'zone': ['open']
+        }

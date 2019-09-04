@@ -163,7 +163,10 @@ class Config:
 
         #Homie Interface
         "HOMIE_INTERFACE_ENABLE": True,
-        "HOMIE_BASE_TOPIC": "homie/"
+        "HOMIE_BASE_TOPIC": "homie/",
+        "HOMIE_NODE_FILTER": {
+            'zone': ['open']
+        }
     }
 
     CONFIG_LOADED = False
