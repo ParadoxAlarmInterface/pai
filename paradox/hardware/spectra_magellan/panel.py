@@ -142,7 +142,7 @@ class Panel(PanelBase):
 
     async def request_status(self, i: int):
         args = dict(address=self.mem_map['status_base1'] + i)
-        reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, args['address']))
+        reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, i))
 
         return reply
 
