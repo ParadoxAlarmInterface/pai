@@ -471,6 +471,10 @@ class HomieMQTTInterface(AsyncQueueInterface):
                 element = k
                 #if element == 'zone' and (attribute == 'open' or attribute == 'alarm'):
                 if element in self.node_filter:
+                    #element = 'zone'
+                    #label = 'Front door reed'
+                    #value = Front_door_reed'
+                    #can be used for creating nodes....not sure where attributes will come from 
                     if attribute in self.node_filter[element]:
                         label_sanitised = label.replace('_','').lower()
                         #Look for the node in the alarm device node list
