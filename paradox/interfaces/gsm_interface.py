@@ -1,42 +1,40 @@
 # -*- coding: utf-8 -*-
 
-# GSM interface.
-# Only exposes critical status changes and accepts commands
-from paradox.interfaces import Interface
-
-import time
-import logging
 import datetime
-import queue
+import logging
+import re
+import time
+
 import serial
 
+from paradox.config import config as cfg
+from paradox.event import EventLevel
+# GSM interface.
+# Only exposes critical status changes and accepts commands
+from paradox.interfaces import ThreadQueueInterface
 from paradox.lib import ps
 
-from paradox.event import EventLevel, Event
-from paradox.lib.utils import SortableTuple
+logger = logging.getLogger('PAI').getChild(__name__)
 
-from paradox.config import config as cfg
-import re
 
-class GSMInterface(Interface):
+class GSMInterface(ThreadQueueInterface):
     """Interface Class using GSM"""
     name = 'gsm'
 
     def __init__(self):
         super().__init__()
 
-        self.logger = logging.getLogger('PAI').getChild(__name__)
         self.port = None
         self.modem_connected = False
 
     def stop(self):
         """ Stops the GSM Interface Thread"""
-        self.logger.debug("Stopping GSM Interface")
+        logger.debug("Stopping GSM Interface")
         self.stop_running.set()
 
         self.port.close()
 
-        self.logger.debug("GSM Stopped")
+        logger.debug("GSM Stopped")
 
     def write(self, message):
         data = b''
@@ -52,16 +50,16 @@ class GSMInterface(Interface):
 
             data = data.strip().decode('latin-1')
         except Exception:
-            self.logger.exception("Modem write")
+            logger.exception("Modem write")
             self.modem_connected = False
 
         return data
 
     def run(self):
-        self.logger.info("Starting GSM Interface")
+        logger.info("Starting GSM Interface")
 
-        ps.subscribe(self.handle_panel_event, "events")
-        ps.subscribe(self.handle_notify, "notifications")
+        ps.subscribe(self._handle_panel_event, "events")
+        ps.subscribe(self._handle_notify, "notifications")
 
         try:
             while not self.stop_running.isSet():
@@ -87,28 +85,28 @@ class GSMInterface(Interface):
                                 self.handle_message(timestamp, source, message)
                             elif tokens[0].startswith('+CUSD:'):
                                 ps.sendMessage("notifications",
-                                                message=dict(source=self.name,
-                                                message=tokens[1],
-                                                level=logging.INFO))
+                                               message=dict(source=self.name,
+                                                            message=tokens[1],
+                                                            level=logging.INFO))
                     else:
                         self.run_loop()
 
                 except Exception:
                     self.modem_connected = False
-                    # self.logger.exception("")
+                    # logger.exception("")
 
         except (KeyboardInterrupt, SystemExit):
-            self.logger.debug("GSM loop stopping")
+            logger.debug("GSM loop stopping")
             return
 
         except Exception:
-            self.logger.exception("GSM loop")
+            logger.exception("GSM loop")
 
         return True
 
     def connected(self):
         if not self.modem_connected:
-            self.logger.info("Using {} at {} baud".format(
+            logger.info("Using {} at {} baud".format(
                 cfg.GSM_MODEM_PORT, cfg.GSM_MODEM_BAUDRATE))
             commands = [b'AT', b'ATE0', b'AT+CMGF=1',
                         b'AT+CNMI=1,2,0,0,0', b'AT+CUSD=1,"*111#"']
@@ -117,14 +115,14 @@ class GSMInterface(Interface):
                     cfg.GSM_MODEM_PORT, baudrate=cfg.GSM_MODEM_BAUDRATE, timeout=5)
                 for command in commands:
                     if self.port.write(command) == 0:
-                        self.logger.error("Unable to initialize modem")
+                        logger.error("Unable to initialize modem")
                         return False
             except Exception:
-                self.logger.exception("Modem connect error")
+                logger.exception("Modem connect error")
                 return False
 
             self.modem_connected = True
-            self.logger.info("Started GSM Interface")
+            logger.info("Started GSM Interface")
 
         return True
 
@@ -135,7 +133,7 @@ class GSMInterface(Interface):
 
     def send_message(self, message):
         if self.port is None:
-            self.logger.warning("GSM not available when sending message")
+            logger.warning("GSM not available when sending message")
             return
 
         for dst in cfg.GSM_CONTACTS:
@@ -144,7 +142,7 @@ class GSMInterface(Interface):
     def handle_message(self, timestamp, source, message):
         """ Handle GSM message. It should be a command """
 
-        self.logger.debug("Received Message {} {} {}".format(
+        logger.debug("Received Message {} {} {}".format(
             timestamp, source, message))
 
         if self.alarm is None:
@@ -154,30 +152,30 @@ class GSMInterface(Interface):
             ret = self.send_command(message)
 
             if ret:
-                self.logger.info("ACCEPTED: {}".format(message))
+                logger.info("ACCEPTED: {}".format(message))
                 self.send_sms(source, "ACCEPTED: {}".format(message))
-                message =  "ACCEPTED: {}: {}".format(source, message)
+                message = "ACCEPTED: {}: {}".format(source, message)
             else:
-                self.logger.warning("REJECTED: {}".format(message))
+                logger.warning("REJECTED: {}".format(message))
                 self.send_sms(source, "REJECTED: {}".format(message))
-                message =  "REJECTED: {}: {}".format(source, message)
+                message = "REJECTED: {}: {}".format(source, message)
         else:
-            self.logger.warning("REJECTED: {}".format(message))
+            logger.warning("REJECTED: {}".format(message))
             message = "REJECTED: {}: {}".format(source, message)
 
         ps.sendMessage("notifications",
-            message=dict(source=self.name,
-                         message=message,
-                         level=logging.INFO))
+                       message=dict(source=self.name,
+                                    message=message,
+                                    level=logging.INFO))
 
-    def handle_notify(self, message):
+    def _handle_notify(self, message):
         sender, message, level = message
         if level < EventLevel.CRITICAL.value:
             return
 
         self.send_message(message)
 
-    def handle_panel_event(self, event):
+    def _handle_panel_event(self, event):
         """Handle Live Event"""
         if event.level.value < EventLevel.CRITICAL.value:
             return

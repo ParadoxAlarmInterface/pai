@@ -12,6 +12,7 @@ from homie.node.node_contact import Node_Base
 
 from paradox.event import Event
 from paradox.interfaces import Interface
+from paradox.interfaces import AsyncQueueInterface
 from paradox.lib.utils import SortableTuple, JSONByteEncoder
 
 from paradox.lib import ps
@@ -33,9 +34,9 @@ def sanitize_topic_part(name):
     return re_topic_dirty.sub('_', name).strip('_')
 
 
-class HomieMQTTInterface(Interface):
+class HomieMQTTInterface(AsyncQueueInterface):
     """Interface Class using MQTT subscribing to the Homie convention"""
-    name = 'mqtt'
+    name = 'mqtt_homie'
     acceptsInitialState = True
 
     def __init__(self):
@@ -73,7 +74,7 @@ class HomieMQTTInterface(Interface):
         self.armed = dict()
         self.node_filter = cfg.HOMIE_NODE_FILTER
 
-    def run(self):
+    async def run(self):
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
             self.mqtt.username_pw_set(
                 username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
@@ -94,30 +95,34 @@ class HomieMQTTInterface(Interface):
         ps.subscribe(self.handle_panel_change, "changes")
         ps.subscribe(self.handle_panel_event, "events")
         ps.subscribe(self.handle_internal, "internal")
+        ps.subscribe(self.handle_internal, "message")
+        ps.subscribe(self.handle_labels_loaded, "labels_loaded")
 
-        while True:
-            try:
-                item = self.queue.get()
-                if item[1] == 'command':
-                    if item[2] == 'stop':
-                        break
-                if time.time() - last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
-                    self.republish()
-                    last_republish = time.time()
-            except Exception:
-                self.logger.exception("ERROR in MQTT Run loop")
+        await super().run()
+
+        # while True:
+        #     try:
+        #         item = self.queue.get()
+        #         if item[1] == 'command':
+        #             if item[2] == 'stop':
+        #                 break
+        #         if time.time() - last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
+        #             self.republish()
+        #             last_republish = time.time()
+        #     except Exception:
+        #         self.logger.exception("ERROR in MQTT Run loop")
 
 
-        if self.connected:
-            # Need to set as disconnect will delete the last will
-            self.publish('{}/{}/{}'.format(cfg.HOMIE_BASE_TOPIC,
-                                       cfg.MQTT_INTERFACE_TOPIC,
-                                       self.__class__.__name__),
-                     'offline', 0, retain=True)
+        # if self.connected:
+        #     # Need to set as disconnect will delete the last will
+        #     self.publish('{}/{}/{}'.format(cfg.HOMIE_BASE_TOPIC,
+        #                                cfg.MQTT_INTERFACE_TOPIC,
+        #                                self.__class__.__name__),
+        #              'offline', 0, retain=True)
         
-            self.mqtt.disconnect()
+        #     self.mqtt.disconnect()
 
-        self.mqtt.loop_stop()
+        # self.mqtt.loop_stop()
 
     def stop(self):
         """ Stops the MQTT Interface Thread"""
@@ -450,20 +455,26 @@ class HomieMQTTInterface(Interface):
                                              summary_topic),
                      "{}".format(state), 0, cfg.MQTT_RETAIN)
 
-    '''Use this method for receiving communication from the panel.  properties_enumerated is after update all labels'''
     def handle_internal(self, message):
-        if message == "properties_enumerated":
-            
-            for k in self.cache:
-                change = self.cache[k]
+        self.logger.info("HOMIE: Found internal message: '%s'" % message)
+
+
+    '''Use this method for receiving communication from the panel.  properties_enumerated is after update all labels'''
+    def handle_labels_loaded(self, data):
+        for k in data:
+            for change, item in data[k].items():
+                    
                 #self.nodes[entry['label']].setProperty(entry['property']).send(entry['value'])
-                attribute = change['property']
-                label = change['label']
-                value = change['value']
-                initial = change['initial']
-                element = change['type']
+                label = item['label']
+                value = item['key']
+                attribute = ''
+                element = k
                 #if element == 'zone' and (attribute == 'open' or attribute == 'alarm'):
                 if element in self.node_filter:
+                    #element = 'zone'
+                    #label = 'Front door reed'
+                    #value = Front_door_reed'
+                    #can be used for creating nodes....not sure where attributes will come from 
                     if attribute in self.node_filter[element]:
                         label_sanitised = label.replace('_','').lower()
                         #Look for the node in the alarm device node list
@@ -492,11 +503,11 @@ class HomieMQTTInterface(Interface):
                                 self.alarm_Device.add_node(zone_node)
                             except Exception as e:
                                 self.logger.error("HOMIE: Error creating node: %s with error: %s" %(zone_node.name, str(e)))
-            
-            #setup completed (end of internal message), so when true. then change events will start updating node values.
-            self.setup_called = True
-            #cache not needed any more so clar it for memory.
-            self.cache.clear()
+        
+        #setup completed (end of internal message), so when true. then change events will start updating node values.
+        self.setup_called = True
+        #cache not needed any more so clar it for memory.
+        self.cache.clear()
 
     def publish(self, topic, value, qos, retain):
         self.cache[topic] = {'value': value, 'qos': qos, 'retain': retain}

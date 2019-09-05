@@ -6,7 +6,7 @@ def subscribe(listener, topicName: str, **curriedArgs):
     pub.subscribe(listener, PREFIX + topicName, **curriedArgs)
 
 def sendMessage(topicName: str, **msgData):
-    pub.sendMessage(topicName, **msgData)
+    pub.sendMessage(PREFIX + topicName, **msgData)
 
 def sendEvent(event: dict):
     pub.sendMessage(PREFIX + "events", event=event)

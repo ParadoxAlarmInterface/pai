@@ -1,7 +1,4 @@
-
 import logging
-
-from paradox.event import Event
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -35,11 +32,29 @@ class InterfaceManager:
         if self.conf.MQTT_ENABLE:
             try:
                 logger.info("Using MQTT Interface")
-                from paradox.interfaces.mqtt_interface import MQTTInterface
-                self.register(MQTTInterface())
+                from paradox.interfaces.mqtt.basic import BasicMQTTInterface
+                self.register(BasicMQTTInterface())
             except Exception:
                 logger.exception("Unable to start MQTT Interface")
+
+        if self.conf.MQTT_HOMEASSISTANT_ENABLE:
+            try:
+                logger.info("Using HomeAssistant MQTT Interface")
+                from paradox.interfaces.mqtt.homeassistant import HomeAssistantMQTTInterface
+                self.register(HomeAssistantMQTTInterface())
+            except Exception:
+                logger.exception("Unable to start HomeAssistant MQTT Interface")
         
+        # Load an interface for exposing data and accepting commands
+        if self.conf.HOMIE_INTERFACE_ENABLE:
+            try:
+                logger.info("Using Homie MQTT Interface")
+                #from paradox.interfaces.homie_mqtt_interface import HomieMQTTInterface
+                from paradox.interfaces.mqtt.homie import HomieMQTTInterface2
+                self.register(HomieMQTTInterface2())
+            except Exception:
+                logger.exception("Unable to start Homie MQTT Interface")
+
         # Load Pushbullet service
         if self.conf.PUSHBULLET_ENABLE:
             try:
@@ -76,21 +91,13 @@ class InterfaceManager:
             except Exception:
                 logger.exception("Unable to start Dummy Interface")
         
-        # Load an interface for exposing data and accepting commands
-        if self.conf.HOMIE_INTERFACE_ENABLE:
-            try:
-                logger.info("Using Homie MQTT Interface")
-                from paradox.interfaces.homie_mqtt_interface import HomieMQTTInterface
-                self.register(HomieMQTTInterface())
-            except Exception:
-                logger.exception("Unable to start Homie MQTT Interface")
+        
 
     def register(self, interface):
         logger.debug("Registering Interface {}".format(interface.name))
         interface.start()  # Starts interface thread
 
         self.interfaces.append(interface)
-
 
     def stop(self):
         logger.debug("Stopping all interfaces")
