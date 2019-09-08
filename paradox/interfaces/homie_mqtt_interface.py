@@ -94,8 +94,7 @@ class HomieMQTTInterface(AsyncQueueInterface):
         
         ps.subscribe(self.handle_panel_change, "changes")
         ps.subscribe(self.handle_panel_event, "events")
-        ps.subscribe(self.handle_internal, "internal")
-        ps.subscribe(self.handle_internal, "message")
+        ps.subscribe(self.handle_panel_status, "status_update")
         ps.subscribe(self.handle_labels_loaded, "labels_loaded")
 
         await super().run()
@@ -281,7 +280,12 @@ class HomieMQTTInterface(AsyncQueueInterface):
         :param raw: object with properties (can have byte properties)
         :return:
         """
-        self.logger.info("HOMIE: handling event: %s level: %s" % (1,2))
+        self.logger.info("HOMIE: handling status: %s level: %s" % (1,2))
+        for element in status:
+            for item in element:
+                label = item['label']
+                value = item['key']
+                attribute = item['attribute']
 
     def handle_panel_event(self, event):
         """
@@ -339,15 +343,15 @@ class HomieMQTTInterface(AsyncQueueInterface):
             self.cache['{}-{}-{}'.format(change['type'], change['label'], change['property'])] = change
             return
         
-        if element == 'partition':
-            if cfg.MQTT_HOMEBRIDGE_ENABLE:
-                self.handle_change_external(element, label, attribute, value, element_topic,
-                                            cfg.MQTT_PARTITION_HOMEBRIDGE_STATES, cfg.MQTT_HOMEBRIDGE_SUMMARY_TOPIC, 'hb')
+        # if element == 'partition':
+        #     if cfg.MQTT_HOMEBRIDGE_ENABLE:
+        #         self.handle_change_external(element, label, attribute, value, element_topic,
+        #                                     cfg.MQTT_PARTITION_HOMEBRIDGE_STATES, cfg.MQTT_HOMEBRIDGE_SUMMARY_TOPIC, 'hb')
 
-            if cfg.MQTT_HOMEASSISTANT_ENABLE:
-                self.handle_change_external(element, label, attribute, value, element_topic,
-                                            cfg.MQTT_PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC,
-                                            'hass')
+        #     if cfg.MQTT_HOMEASSISTANT_ENABLE:
+        #         self.handle_change_external(element, label, attribute, value, element_topic,
+        #                                     cfg.MQTT_PARTITION_HOMEASSISTANT_STATES, cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC,
+        #                                     'hass')
 
         if element in self.node_filter and attribute in self.node_filter[element]:
             self.logger.info("HOMIE: handling change: element: %s label: %s attribute: %s = %s" % (element,label,attribute,value))
@@ -461,48 +465,65 @@ class HomieMQTTInterface(AsyncQueueInterface):
 
     '''Use this method for receiving communication from the panel.  properties_enumerated is after update all labels'''
     def handle_labels_loaded(self, data):
-        for k in data:
-            for change, item in data[k].items():
-                    
-                #self.nodes[entry['label']].setProperty(entry['property']).send(entry['value'])
-                label = item['label']
-                value = item['key']
-                attribute = ''
-                element = k
+        
+        for element in data:
+            if element in self.node_filter:
+                if element not in self.cache:
+                    nodes = dict()
+                    self.cache[element] = nodes
+                else:
+                    nodes = self.cache[element]
+
+                for item, itemdata in data[element].items():
+                    #Add node filter on item here
+
+                    #self.nodes[entry['label']].setProperty(entry['property']).send(entry['value'])
+                    #element = 'zone' label = 'front_door_reed'
+                    #element = system label = 'power'
+                    label = itemdata['label']
+                    value = itemdata['key']
+                    id = itemdata['id']
+                    attribute = ''
+                    #if value not in self.node_filter[element]:
+                    #    break
                 #if element == 'zone' and (attribute == 'open' or attribute == 'alarm'):
-                if element in self.node_filter:
+                    if value not in nodes:
+                        itemnode = dict()
+                        itemnode['label'] = label
+                        itemnode['index'] = id
+                        nodes[value] = itemnode
                     #element = 'zone'
                     #label = 'Front door reed'
                     #value = Front_door_reed'
                     #can be used for creating nodes....not sure where attributes will come from 
-                    if attribute in self.node_filter[element]:
-                        label_sanitised = label.replace('_','').lower()
-                        #Look for the node in the alarm device node list
-                        if label_sanitised in self.alarm_Device.nodes:
-                            self.logger.info("HOMIE: Alarm Attribute Found existing node for '%s'" % label)
+                    # if attribute in self.node_filter[element]:
+                    #     label_sanitised = label.replace('_','').lower()
+                    #     #Look for the node in the alarm device node list
+                    #     if label_sanitised in self.alarm_Device.nodes:
+                    #         self.logger.info("HOMIE: Alarm Attribute Found existing node for '%s'" % label)
 
-                            #get the node if we know it is there
-                            node = self.alarm_Device.get_node(label_sanitised)
-                            self.logger.info("HOMIE: Found existing node for '%s'" % label)
-                            #get the current property being changed.
-                            currentProperty = node.get_property(attribute.lower())
-                            if currentProperty is None:
-                                #no property found with that attribute name for that zone
-                                newProperty = Property_Boolean(node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
-                                node.add_property(newProperty)
-                        else:  #no node found, add one with the current property.
-                            try:
-                                #move contact_node to class, and set each zone as a node.
-                                zone_node = Node_Base(self.alarm_Device,name=label,id=label_sanitised,type_=element)
-                                self.logger.info("HOMIE: Adding new property boolean '%s' to node '%s'" % (attribute, label)) 
-                                #node.id = label
-                                newProperty = Property_Boolean(zone_node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
-                                zone_node.add_property(newProperty)
+                    #         #get the node if we know it is there
+                    #         node = self.alarm_Device.get_node(label_sanitised)
+                    #         self.logger.info("HOMIE: Found existing node for '%s'" % label)
+                    #         #get the current property being changed.
+                    #         currentProperty = node.get_property(attribute.lower())
+                    #         if currentProperty is None:
+                    #             #no property found with that attribute name for that zone
+                    #             newProperty = Property_Boolean(node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
+                    #             node.add_property(newProperty)
+                    #     else:  #no node found, add one with the current property.
+                    #         try:
+                    #             #move contact_node to class, and set each zone as a node.
+                    #             zone_node = Node_Base(self.alarm_Device,name=label,id=label_sanitised,type_=element)
+                    #             self.logger.info("HOMIE: Adding new property boolean '%s' to node '%s'" % (attribute, label)) 
+                    #             #node.id = label
+                    #             newProperty = Property_Boolean(zone_node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
+                    #             zone_node.add_property(newProperty)
                             
-                                #self.nodes[label] = node
-                                self.alarm_Device.add_node(zone_node)
-                            except Exception as e:
-                                self.logger.error("HOMIE: Error creating node: %s with error: %s" %(zone_node.name, str(e)))
+                    #             #self.nodes[label] = node
+                    #             self.alarm_Device.add_node(zone_node)
+                    #         except Exception as e:
+                    #             self.logger.error("HOMIE: Error creating node: %s with error: %s" %(zone_node.name, str(e)))
         
         #setup completed (end of internal message), so when true. then change events will start updating node values.
         self.setup_called = True
