@@ -2,9 +2,9 @@ import collections
 
 from construct import Struct, RawCopy, BitStruct, Const, Nibble, Flag, Rebuild, Int8ub, BitsInteger, Int16ub, Checksum, \
     Bytes, this, Default, Padding, Enum, Int24ub, ExprAdapter, Byte, obj_, Array, Computed, Subconstruct, \
-    ValidationError, ExprSymmetricAdapter
+    ValidationError, ExprSymmetricAdapter, Bitwise, BitsSwapped
 
-from .adapters import PGMFlags, StatusAdapter, DateAdapter, ZoneFlags, PartitionStatus, EventAdapter
+from .adapters import PGMFlags, StatusAdapter, DateAdapter, ZoneFlags, PartitionStatus, EventAdapter, ZoneFlagBitStruct
 from ..common import CommunicationSourceIDEnum, ProductIdEnum, calculate_checksum
 
 LoginConfirmationResponse = Struct("fields" / RawCopy(
@@ -415,7 +415,7 @@ PerformPartitionAction = Struct("fields" / RawCopy(Struct(
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
-PerformActionResponse = Struct("fields" / RawCopy(
+PerformPartitionActionResponse = Struct("fields" / RawCopy(
     Struct(
         "po" / BitStruct(
             "command" / Const(0x4, Nibble),
@@ -426,6 +426,44 @@ PerformActionResponse = Struct("fields" / RawCopy(
                 "NeWare_connected" / Flag)),
         "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
         "_not_used0" / Padding(4),
+    )),
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
+ZoneActionBitOperation = Enum(Int8ub,
+    set=0x08,
+    clear=0x00
+)
+
+class ZoneAdapter(Subconstruct):
+    def _build(self, obj, stream, context, path):
+        zones = list([i in obj for i in range(1, 193)])
+
+        return self.subcon._build(zones, stream, context, path)
+
+PerformZoneAction = Struct("fields" / RawCopy(Struct(
+        "po" / Struct(
+            "command" / Const(0xd0, Int8ub)),
+        "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+        "flags" / ZoneFlagBitStruct,
+        "operation" / ZoneActionBitOperation,
+        "_not_used" / Padding(2),
+        "zones" / ZoneAdapter(BitsSwapped(Bitwise(Array(192, Flag)))),
+    )),
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
+PerformZoneActionResponse = Struct("fields" / RawCopy(
+    Struct(
+        "po" / BitStruct(
+            "command" / Const(0xd, Nibble),
+            "status" / Struct(
+                "reserved" / Flag,
+                "alarm_reporting_pending" / Flag,
+                "Winload_connected" / Flag,
+                "NeWare_connected" / Flag)),
+        "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+        "flags" / ZoneFlagBitStruct,
+        "operation" / ZoneActionBitOperation,
+        "_not_used" / Padding(2),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
