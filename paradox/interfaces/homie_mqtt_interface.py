@@ -38,7 +38,7 @@ class HomieMQTTInterface(AsyncQueueInterface):
     """Interface Class using MQTT subscribing to the Homie convention"""
     name = 'mqtt_homie'
     acceptsInitialState = True
-
+    
     def __init__(self):
         super().__init__()
 
@@ -528,7 +528,7 @@ class HomieMQTTInterface(AsyncQueueInterface):
         #setup completed (end of internal message), so when true. then change events will start updating node values.
         self.setup_called = True
         #cache not needed any more so clar it for memory.
-        self.cache.clear()
+        #self.cache.clear()
 
     def publish(self, topic, value, qos, retain):
         self.cache[topic] = {'value': value, 'qos': qos, 'retain': retain}

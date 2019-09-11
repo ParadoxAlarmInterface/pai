@@ -26,9 +26,23 @@ def send_initial_status():
                 label='Partiton 1',
                 key='Partiton_1'
             )
+        },
+        zone={
+            1: dict(
+                id=1,
+                label='Front door reed',
+                key='Front_door_reed'
+            ),
+            2: dict(
+                id=2,
+                label='Main door',
+                key='Main_door'
+            )
         }
+
     ))
 
+    #need to figure out the structure here.  For power (battery, vdc, dc) and zones (open, alarm)
     sendMessage("status_update", status=dict(
         partition_status={
             1: dict(
@@ -40,7 +54,7 @@ def send_initial_status():
 @pytest.mark.asyncio
 async def test_homie_pending(mocker):
     interface = HomieMQTTInterface()
-    mocker.patch.object(interface, "mqtt")
+    #mocker.patch.object(interface,"run")
     interface.start()
 
     await interface._started.wait()
