@@ -48,7 +48,44 @@ def send_initial_status():
             1: dict(
                 arm=False
             )
-        }
+        },
+        zone_open={
+            1: False,
+            2: False,
+            3: True,
+            4: False,
+            5: False,
+            6: True,
+            7: False,
+            8: False,
+            9: False
+        },
+        zone_status={
+            1: dict(
+                alarm=False,
+                bypassed=False, 
+                entry_delay=False,
+                fire_delay=False,
+                no_delay=True
+                ),
+            2: dict(
+                alarm=False,
+                bypassed=False, 
+                entry_delay=False,
+                fire_delay=False,
+                no_delay=True
+                ),
+            3: dict(
+                alarm=False,
+                bypassed=False, 
+                entry_delay=False,
+                fire_delay=False,
+                no_delay=True
+            )
+        },
+        dc=13.68,
+        vdc=16.890588235294118,
+        battery=13.411764705882353
     ))
 
 @pytest.mark.asyncio

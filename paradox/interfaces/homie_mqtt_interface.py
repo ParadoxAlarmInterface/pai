@@ -282,10 +282,36 @@ class HomieMQTTInterface(AsyncQueueInterface):
         """
         self.logger.info("HOMIE: handling status: %s level: %s" % (1,2))
         for element in status:
-            for item in element:
-                label = item['label']
-                value = item['key']
-                attribute = item['attribute']
+            item = status[element]
+            if type(item) is dict:
+                for key in item:
+                    thing = element.split('_')
+                    if len(thing) > 1:
+                        attribute = thing[1]
+                        element = thing[0]
+                    else:
+                        attribute = thing[0]
+
+                    if type(item[key]) is dict:
+                        for attribute in item[key]:
+                            value = item[key][attribute]
+                    else:
+                        value = item[key]
+                        try:
+                            cacheitem = self.cache[element]
+                            for node in cacheitem:
+                                if node['index'] == key:
+                                    logging.debug("Element %s Label %s value %s" % (element,node['label'], value))
+                        except:
+                            pass
+            else:
+                attribute = element
+                value = element[attribute]
+            
+            try:
+                cacheitem = self.cache[element]
+            except:
+                pass
 
     def handle_panel_event(self, event):
         """
