@@ -67,6 +67,17 @@ class Type(MutableMapping):
         return key
 
 
+def iterate_properties(data):
+    if isinstance(data, list):
+        for key, value in enumerate(data):
+            yield (key, value)
+    elif isinstance(data, dict):
+        for key, value in data.items():
+            if type(key) == str and key.startswith('_'):  # ignore private properties
+                continue
+            yield (key, value)
+
+
 class Paradox:
 
     def __init__(self,
@@ -235,7 +246,7 @@ class Paradox:
                 result = await asyncio.gather(*[self._status_request(i) for i in cfg.STATUS_REQUESTS])
                 merged = deep_merge(*result, extend_lists=True)
                 ps.sendMessage('status_update', status=merged)
-                self.panel.process_properties_bulk(merged)  # TODO: Subscribe to this event instead of calling
+                self.work_loop.call_soon(self.process_status, merged)
             except ConnectionError:
                 raise
             except StatusRequestException:
@@ -250,6 +261,33 @@ class Paradox:
             while time.time() - tstart < cfg.KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
                 wait_time = max((tstart + cfg.KEEP_ALIVE_INTERVAL) - time.time(), 0)
                 await asyncio.sleep(wait_time)
+
+    def process_status(self, properties):
+        if cfg.LOGGING_DUMP_STATUS:
+            logger.debug("properties: %s", properties)
+
+        for key, value in iterate_properties(properties):
+            if not isinstance(value, (list, dict)):
+                continue
+
+            element_type = key.split('_')[0]
+            limit_list = cfg.LIMITS.get(element_type)
+
+            if key in self.status_cache and self.status_cache[key] == value:
+                continue
+
+            self.status_cache[key] = value
+            prop_name = '_'.join(key.split('_')[1:])
+
+            if not prop_name:
+                continue
+
+            for i, status in iterate_properties(value):
+                if limit_list is None or i in limit_list:
+                    if prop_name == 'status':
+                        self.update_properties(element_type, i, status)
+                    else:
+                        self.update_properties(element_type, i, {prop_name: status})
 
     async def receive_worker(self):
         logger.debug("Receive worker started")
