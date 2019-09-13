@@ -3,7 +3,7 @@
 import asyncio
 import logging
 import time
-from collections import defaultdict, MutableMapping
+from collections import defaultdict
 from enum import Enum
 from threading import Lock
 from typing import Optional, Sequence, Iterable, Callable, Awaitable
@@ -13,12 +13,13 @@ from construct import Container
 from paradox import event
 from paradox.config import config as cfg
 from paradox.connections.connection import Connection
-from paradox.interfaces.interface_manager import InterfaceManager
-from paradox.hardware import create_panel
 from paradox.exceptions import StatusRequestException
+from paradox.hardware import create_panel
 from paradox.lib import ps
 from paradox.lib.async_message_manager import AsyncMessageManager, EventMessageHandler, ErrorMessageHandler
 from paradox.lib.utils import deep_merge
+from paradox.models.element_type_container import ElementTypeContainer
+from paradox.parsers.status import convert_raw_status
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -34,37 +35,6 @@ class PublishPropertyChange(Enum):
     NO = 0
     DEFAULT = 1
     YES = 2
-
-
-class Type(MutableMapping):
-    def __init__(self, *args, **kwargs):
-        self.store = dict()
-        self.update(dict(*args, **kwargs))  # use the free update to set keys
-
-    def __getitem__(self, key):
-        if isinstance(key, str):
-            for k, v in self.items():
-                if "key" in v and v["key"] == key:
-                    return v
-        return self.store[self.__keytransform__(key)]
-
-    def __setitem__(self, key, value):
-        self.store[self.__keytransform__(key)] = value
-
-    def __delitem__(self, key):
-        del self.store[self.__keytransform__(key)]
-
-    def __iter__(self):
-        return iter(self.store)
-
-    def __len__(self):
-        return len(self.store)
-
-    @staticmethod
-    def __keytransform__(key):
-        if isinstance(key, str) and key.isdigit():
-            return int(key)
-        return key
 
 
 class Paradox:
@@ -83,7 +53,7 @@ class Paradox:
         self.message_manager.register_handler(EventMessageHandler(self.handle_event))
         self.message_manager.register_handler(ErrorMessageHandler(self.handle_error))
 
-        self.data = defaultdict(Type)  # dictionary of Type
+        self.data = defaultdict(ElementTypeContainer)  # dictionary of Type
         self.reset()
 
     def reset(self):
@@ -259,8 +229,7 @@ class Paradox:
             try:
                 result = await asyncio.gather(*[self._status_request(i) for i in cfg.STATUS_REQUESTS])
                 merged = deep_merge(*result, extend_lists=True)
-                ps.sendMessage('status_update', status=merged)
-                self.panel.process_properties_bulk(merged)  # TODO: Subscribe to this event instead of calling
+                self.work_loop.call_soon(self._process_status, merged)
             except ConnectionError:
                 raise
             except StatusRequestException:
@@ -275,6 +244,18 @@ class Paradox:
             while time.time() - tstart < cfg.KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
                 wait_time = max((tstart + cfg.KEEP_ALIVE_INTERVAL) - time.time(), 0)
                 await asyncio.sleep(wait_time)
+
+    def _process_status(self, raw_status: Container):
+        status = convert_raw_status(raw_status)
+        ps.sendMessage('status_update', status=status)
+
+        for element_type, element_items in status.items():
+            limit_list = cfg.LIMITS.get(element_type)
+
+            for element_item_key, element_item_status in element_items.items():
+                if limit_list is None or element_item_key in limit_list:
+                    if isinstance(element_item_status, (dict, list,)) and element_type in self.data:  # TODO: who cares if it is in self.data?
+                        self.update_properties(element_type, element_item_key, element_item_status)
 
     async def receive_worker(self):
         logger.debug("Receive worker started")
@@ -553,9 +534,6 @@ class Paradox:
             logger.debug('Error: "%s" key is missing from data' % element_type)
             return
 
-        if type_key not in elements:
-            return
-
         # Publish changes and update state
         for property_name, property_value in change.items():
 
@@ -576,7 +554,7 @@ class Paradox:
                     self.update_properties(element_type, type_key, dict(trouble=r), publish=publish)
 
             # Standard processing of changes
-            if property_name in elements[type_key]:
+            if type_key in elements and property_name in elements[type_key]:
                 old = elements[type_key][property_name]
 
                 if old != change[property_name] \

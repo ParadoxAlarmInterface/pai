@@ -14,17 +14,6 @@ from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum
 logger = logging.getLogger('PAI').getChild(__name__)
 
 
-def iterate_properties(data):
-    if isinstance(data, list):
-        for key, value in enumerate(data):
-            yield (key, value)
-    elif isinstance(data, dict):
-        for key, value in data.items():
-            if type(key) == str and key.startswith('_'):  # ignore private properties
-                continue
-            yield (key, value)
-
-
 class Panel:
     mem_map = {}
     event_map = {}
@@ -203,34 +192,6 @@ class Panel:
             data_dict[index].update(properties)
 
             index += 1
-
-    def process_properties_bulk(self, properties):
-        if cfg.LOGGING_DUMP_STATUS:
-            logger.debug("properties: %s", properties)
-
-        for key, value in iterate_properties(properties):
-
-            if not isinstance(value, (list, dict)):
-                continue
-
-            element_type = key.split('_')[0]
-            limit_list = cfg.LIMITS.get(element_type)
-
-            if key in self.core.status_cache and self.core.status_cache[key] == value:
-                continue
-
-            self.core.status_cache[key] = value
-            prop_name = '_'.join(key.split('_')[1:])
-
-            if not prop_name:
-                continue
-
-            for i, status in iterate_properties(value):
-                if limit_list is None or i in limit_list:
-                    if prop_name == 'status':
-                        self.core.update_properties(element_type, i, status)
-                    else:
-                        self.core.update_properties(element_type, i, {prop_name: status})
 
     def initialize_communication(self, reply, password):
         raise NotImplementedError("override initialize_communication in a subclass")

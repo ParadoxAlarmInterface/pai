@@ -46,7 +46,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             self.partitions[k] = data
 
     def _handle_status_update(self, status):
-        partition_statuses = status['partition_status']
+        partition_statuses = status['partition']
 
         for p_key, p_status in partition_statuses.items():
             if p_key not in self.partitions:
