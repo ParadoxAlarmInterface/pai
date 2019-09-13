@@ -18,7 +18,7 @@ def send_initial_status():
     ))
 
     sendMessage("status_update", status=dict(
-        partition_status={
+        partition={
             1: dict(
                 arm=False
             )
@@ -38,7 +38,7 @@ async def test_hass_armed_away(mocker):
     assert interface.partitions[1]['status'] == 'disarmed'
 
     sendMessage("status_update", status=dict(
-        partition_status={
+        partition={
             1: dict(
                 arm=True
             )
@@ -61,7 +61,7 @@ async def test_hass_pending(mocker):
     assert interface.partitions[1]['status'] == 'disarmed'
 
     sendMessage("status_update", status=dict(
-        partition_status={
+        partition={
             1: dict(
                 arm=True,
                 exit_delay=True
@@ -85,7 +85,7 @@ async def test_hass_arm_stay(mocker):
     assert interface.partitions[1]['status'] == 'disarmed'
 
     sendMessage("status_update", status=dict(
-        partition_status={
+        partition={
             1: dict(
                 arm=True,
                 arm_stay=True
@@ -109,7 +109,7 @@ async def test_hass_arm_stay(mocker):
     assert interface.partitions[1]['status'] == 'disarmed'
 
     sendMessage("status_update", status=dict(
-        partition_status={
+        partition={
             1: dict(
                 arm=True,
                 arm_stay=True
@@ -133,7 +133,7 @@ async def test_hass_alarm(mocker):
     assert interface.partitions[1]['status'] == 'disarmed'
 
     sendMessage("status_update", status=dict(
-        partition_status={
+        partition={
             1: dict(
                 audible_alarm=True
             )

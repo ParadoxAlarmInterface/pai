@@ -112,7 +112,7 @@ class ThreadQueueInterface(threading.Thread, Interface):
 
         # Process a Zone Command
         if element_type == 'zone':
-            if command not in ['bypass', 'clear_bypass']:
+            if command not in ['bypass', 'clear_bypass']:  # TODO: J - I think self.alarm.control_zone needs to decide which commands are supported
                 logger.error("Invalid command for Zone {}".format(command))
                 return False
 

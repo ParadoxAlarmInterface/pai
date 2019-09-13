@@ -9,14 +9,34 @@ from typing import Optional
 from construct import Construct, Container, MappingError, ChecksumError
 
 from .event import event_map
-from .property import property_map
 from .parsers import CloseConnection, ErrorMessage, InitializeCommunication, LoginConfirmationResponse, SetTimeDate, \
-    SetTimeDateResponse, PerformPartitionAction, PerformActionResponse, ReadEEPROMResponse, LiveEvent, ReadEEPROM, \
-    RAMDataParserMap, RequestedEvent
+    SetTimeDateResponse, PerformPartitionAction, PerformPartitionActionResponse, PerformZoneAction, PerformZoneActionResponse, ReadEEPROMResponse, LiveEvent, \
+    ReadEEPROM, RAMDataParserMap, RequestedEvent
+from .property import property_map
 from ..panel import Panel as PanelBase
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
+ZONE_ACTIONS = dict(
+    bypass={
+        "flags": {
+            "bypassed": True
+        },
+        "operation": "set",
+    },
+    clear_bypass={
+        "flags": {
+            "bypassed": True
+        },
+        "operation": "clear",
+    },
+    clear_alarm_memory={
+        "flags": {
+            "generated_alarm": True
+        },
+        "operation": "clear",
+    }
+)
 
 class Panel_EVOBase(PanelBase):
 
@@ -82,6 +102,8 @@ class Panel_EVOBase(PanelBase):
                     return SetTimeDate.parse(message)
                 elif message[0] == 0x40:
                     return PerformPartitionAction.parse(message)
+                elif message[0] == 0xd0:
+                    return PerformZoneAction.parse(message)
             else:
                 if message[0] >> 4 == 0x7:
                     return ErrorMessage.parse(message)
@@ -90,7 +112,9 @@ class Panel_EVOBase(PanelBase):
                 elif message[0] >> 4 == 0x03:
                     return SetTimeDateResponse.parse(message)
                 elif message[0] >> 4 == 4:
-                    return PerformActionResponse.parse(message)
+                    return PerformPartitionActionResponse.parse(message)
+                elif message[0] >> 4 == 0xd:
+                    return PerformZoneActionResponse.parse(message)
                 # elif message[0] == 0x50 and message[2] == 0x80:
                 #     return PanelStatus.parse(message)
                 # elif message[0] == 0x50 and message[2] < 0x80:
@@ -201,6 +225,28 @@ class Panel_EVOBase(PanelBase):
                 PerformPartitionAction, args, reply_expected=0x04)
         except MappingError:
             logger.error('Partition command: "%s" is not supported' % command)
+            return False
+
+        return reply is not None
+
+    async def control_zones(self, zones: list, command: str) -> bool:
+        """
+        Control zones
+        :param list zones: a list of zones
+        :param str command: textual command
+        :return: True if we have at least one success
+        """
+        if command not in ZONE_ACTIONS:
+            return False
+
+        args = ZONE_ACTIONS[command].copy()
+        args["zones"] = zones
+
+        try:
+            reply = await self.core.send_wait(
+                PerformZoneAction, args, reply_expected=0xd)
+        except MappingError:
+            logger.error('Zone command: "%s" is not supported' % command)
             return False
 
         return reply is not None
