@@ -18,6 +18,17 @@ class EventLevel(Enum):
     WARN = 30
     ERROR = 40
     CRITICAL = 50
+    
+    def __lt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value < other.value
+        return NotImplemented
+
+    def __gt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value > other.value
+        return NotImplemented
+
 
 class Event:
     def __init__(self):
