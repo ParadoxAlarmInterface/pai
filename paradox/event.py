@@ -18,17 +18,34 @@ class EventLevel(Enum):
     WARN = 30
     ERROR = 40
     CRITICAL = 50
-    
+
+    @staticmethod
+    def from_name(level="NOTSET"):
+        if level in EventLevel.__members__:
+            return EventLevel.__members__[level]
+
+        raise(Exception("Invalid log level {}. Valid levels: {}".format(level, list(EventLevel.__members__))))
+
     def __lt__(self, other):
         if self.__class__ is other.__class__:
             return self.value < other.value
+
+        if other.__class__ is int:
+            return self.value < other
+
         return NotImplemented
 
     def __gt__(self, other):
         if self.__class__ is other.__class__:
             return self.value > other.value
+
+        if other.__class__ is int:
+            return self.value > other
+
         return NotImplemented
 
+    def __str__(self):
+        return self.name
 
 class Event:
     def __init__(self):
