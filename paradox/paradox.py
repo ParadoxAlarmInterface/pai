@@ -509,6 +509,13 @@ class Paradox:
             logger.debug('Error: "%s" key is missing from data' % element_type)
             return
 
+      # Panel doesn't have this element
+        if type_key not in elements:
+            # Some panels have less elements than the ones reported in the status messages.
+            # This is not an error but the logging can be useful when adding new panels.
+            #logger.debug('Warn: {} not found in type {} with content {}'.format(type_key, element_type, list(elements)))
+            return
+
         # Publish changes and update state
         for property_name, property_value in change.items():
 
@@ -529,7 +536,7 @@ class Paradox:
                     self.update_properties(element_type, type_key, dict(trouble=r), publish=publish)
 
             # Standard processing of changes
-            if type_key in elements and property_name in elements[type_key]:
+            if property_name in elements[type_key]:
                 old = elements[type_key][property_name]
 
                 if old != change[property_name] \
