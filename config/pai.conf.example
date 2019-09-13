@@ -25,7 +25,7 @@ CONNECTION_TYPE = 'Serial'  		# Serial or IP
 SERIAL_PORT = '/dev/ttyS1' 		# Pathname of the Serial Port
 SERIAL_BAUD = 9600              # Use 38400(default setting) or 57600 for EVO
 
-# IP Connection Defails
+# IP Connection Details
 IP_CONNECTION_HOST = '127.0.0.1'	# IP Module address when using direct IP Connection
 IP_CONNECTION_PORT = 10000		    # IP Module port when using direct IP Connection
 IP_CONNECTION_PASSWORD = b'paradox' # IP Module password. "paradox" is default.
@@ -51,11 +51,11 @@ LIMITS = { # By default all zones will be monitored
 LABEL_ENCODING = 'utf-8'                # Encoding to use when decoding labels
 LABEL_REFRESH_INTERVAL = 15 * 60        # Interval between refresh of labels
 OUTPUT_PULSE_DURATION = 1               # Duration of a PGM pulse in seconds
-PARTITIONS_CHANGE_NOTIFICATION_IGNORE = ['arm_full', 'exit_delay'] # Do not send notifications for these notificions
+PARTITIONS_CHANGE_NOTIFICATION_IGNORE = ['arm_full', 'exit_delay'] # Do not send notifications for these notifications
 STATUS_REQUESTS = [0, 1, 2, 3, 4, 5]
 SYNC_TIME = True    			# Update panel time
 PASSWORD = b'0000'   			# PC Password. Set to None if Panel has no Password.
-                                # In Babyware: Right click on yourpanel -> Properties -> PC Communication (Babyware) ->
+                                # In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) ->
                                 # PC Communication (Babyware) Tab.
 
 POWER_UPDATE_INTERVAL = 60      	# Interval between updates of the battery, DC and VDC voltages

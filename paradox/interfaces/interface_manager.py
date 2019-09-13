@@ -95,7 +95,7 @@ class InterfaceManager:
                 interface.stop()
             except Exception:
                 logger.exception(
-                    "Error stoping interface {}".format(interface.name))
+                    "Error stopping interface {}".format(interface.name))
         logger.debug("All Interfaces stopped")
 
     def set_alarm(self, alarm):
