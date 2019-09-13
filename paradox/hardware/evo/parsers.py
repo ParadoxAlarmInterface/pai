@@ -58,7 +58,7 @@ RAMDataParserMap = {
     1: Struct(
         "weekday" / Int8ub,
         "pgm_flags" / PGMFlags(),
-        "_key-switch_triggered" / StatusAdapter(Bytes(4)), # TODO: Implement key-switch
+        "key-switch_triggered" / StatusAdapter(Bytes(4)),  # TODO: Implement key-switch
         "door_open" / StatusAdapter(Bytes(4)),
         "troubles" / BitStruct(
             "system_trouble" / Flag,
@@ -123,7 +123,7 @@ RAMDataParserMap = {
     ),
     4: Struct(
         "partition_status" / PartitionStatus(Bytes(16)),
-        "_panel_status" / BitStruct(
+        "panel_status" / BitStruct(
             "installer_lock_active" / Flag,
             "_free" / Padding(7)
         ),
