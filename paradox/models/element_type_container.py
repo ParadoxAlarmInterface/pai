@@ -25,6 +25,9 @@ class ElementTypeContainer(MutableMapping):
     def __len__(self):
         return len(self.store)
 
+    def filter(self, id_arr):
+        self.store = dict((i, v) for i, v in self.store.items() if i in id_arr)
+
     @staticmethod
     def __keytransform__(key):
         if isinstance(key, str) and key.isdigit():
