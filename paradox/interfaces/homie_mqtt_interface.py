@@ -306,6 +306,7 @@ class HomieMQTTInterface(AsyncQueueInterface):
                                     for attribute in item[key]:
                                         value = item[key][attribute]
                                         attribute_sanitised = attribute.replace('_','').lower()
+                                        #TODO: need to fix this, it's assuming all properties are boolean
                                         newProperty = Property_Boolean(node,id=attribute_sanitised,data_type='boolean',name=attribute.lower(),value=value)
                                         node.add_property(newProperty)
                                 else:
@@ -555,6 +556,7 @@ class HomieMQTTInterface(AsyncQueueInterface):
                     node_filter_attributes = self.node_filter[element]
                     if len(node_filter_attributes) > 1 or node_filter_attributes[0] != 'all':
                         for attribute in node_filter_attributes:
+                            #TODO: need to fix this, it's assuming all properties are boolean
                             newProperty = Property_Boolean(zone_node,id=attribute.lower(),data_type='boolean',name=attribute.lower())
                             zone_node.add_property(newProperty)
                     
