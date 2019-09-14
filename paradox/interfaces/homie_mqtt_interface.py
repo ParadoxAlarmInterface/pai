@@ -281,37 +281,62 @@ class HomieMQTTInterface(AsyncQueueInterface):
         :return:
         """
         self.logger.info("HOMIE: handling status: %s level: %s" % (1,2))
+        #get the element type = eg zone, system, troubles
         for element in status:
-            item = status[element]
-            if type(item) is dict:
-                for key in item:
-                    thing = element.split('_')
-                    if len(thing) > 1:
-                        attribute = thing[1]
-                        element = thing[0]
-                    else:
-                        attribute = thing[0]
+            # check element in node filter, which means we might have something to do with it.
+            if element in self.node_filter:
+                item = status[element]
 
-                    if type(item[key]) is dict:
-                        for attribute in item[key]:
-                            value = item[key][attribute]
-                    else:
-                        value = item[key]
-                        try:
-                            cacheitem = self.cache[element]
-                            for node in cacheitem:
-                                if node['index'] == key:
-                                    logging.debug("Element %s Label %s value %s" % (element,node['label'], value))
-                        except:
-                            pass
-            else:
-                attribute = element
-                value = element[attribute]
-            
-            try:
-                cacheitem = self.cache[element]
-            except:
-                pass
+                #get the cache element to match the status, this is just the key=label
+                cacheelement = self.cache[element]
+                if type(item) is dict:
+
+                    # here's where the status is different from the cache.
+                    for key in item:
+                        #zone: 1: {arm=True}
+                        #for a zone, the key = 1, 2 etc, needs to be matched to the labels.
+                        if type(item[key]) is dict:
+                            #get the cached label name which is used to pull the node from teh alarm device
+                            if key in cacheelement:
+                                cacheitem = cacheelement[key]
+                                node = self.alarm_Device.get_node(cacheitem)
+                                #check here if the node already has properties.....this means the node_filter has
+                                if len(node.properties) == 0:
+                                    print("need to add all attrbiutes in the item[key]")
+                                    for attribute in item[key]:
+                                        value = item[key][attribute]
+                                        attribute_sanitised = attribute.replace('_','').lower()
+                                        newProperty = Property_Boolean(node,id=attribute_sanitised,data_type='boolean',name=attribute.lower(),value=value)
+                                        node.add_property(newProperty)
+                                else:
+                                    print("Only get the values for teh attributes we care about")
+                                    for node_property in node.properties:
+                                        value = item[key][node_property]
+                                        attribute_sanitised = node_property.replace('_','').lower()
+                                        #propertytoupdate = node.get_property(attribute_sanitised)
+                                        node.set_property_value(attribute_sanitised.lower(),value)
+                                    
+                            
+
+                            
+                        else:
+                        #troubles: timer_loss_trouble=false
+                            value = item[key]
+                            try:
+                                cacheitem = self.cache[element]
+                                for node in cacheitem:
+                                    if node['index'] == key:
+                                        logging.debug("Element %s Label %s value %s" % (element,node['label'], value))
+                            except:
+                                pass
+                else:
+                    attribute = element
+                    value = element[attribute]
+                
+                try:
+                    cacheitem = self.cache[element]
+                except:
+                    pass
 
     def handle_panel_event(self, event):
         """
@@ -491,65 +516,91 @@ class HomieMQTTInterface(AsyncQueueInterface):
 
     '''Use this method for receiving communication from the panel.  properties_enumerated is after update all labels'''
     def handle_labels_loaded(self, data):
-        
+        # look through each element = eg zone, system, troubles
         for element in data:
+            #check if element type in the node filter.
             if element in self.node_filter:
                 if element not in self.cache:
+                    
                     nodes = dict()
                     self.cache[element] = nodes
                 else:
                     nodes = self.cache[element]
 
                 for item, itemdata in data[element].items():
+                    
                     #Add node filter on item here
 
                     #self.nodes[entry['label']].setProperty(entry['property']).send(entry['value'])
                     #element = 'zone' label = 'front_door_reed'
-                    #element = system label = 'power'
+                    #element = system label = 'vdc'
                     label = itemdata['label']
-                    value = itemdata['key']
+                    key = itemdata['key']
                     id = itemdata['id']
-                    attribute = ''
+                    
+                    
+
+                    label_sanitised = key.replace('_','').lower()
+                    zone_node = Node_Base(self.alarm_Device,name=label,id=label_sanitised,type_=element)
+                    
+                    #update the self.cache, with the index and key map, so it can be used to resolve
+                    # a status update on zone[1] = node["front_door_rood"]
+                    nodes[id] = label_sanitised
+
+                    #could add the properties here from the node_filter...but need to work out how to add all
+                    #when at this point they are not known
+                    #maybe if node filter has open, alarm, add those as properties.
+                    #if node_filter has "all", don't add properties.
+                    #then under update status, if node has no properties, add everything
+                    node_filter_attributes = self.node_filter[element]
+                    if len(node_filter_attributes) > 1 or node_filter_attributes[0] != 'all':
+                        for attribute in node_filter_attributes:
+                            newProperty = Property_Boolean(zone_node,id=attribute.lower(),data_type='boolean',name=attribute.lower())
+                            zone_node.add_property(newProperty)
+                    
+                    #add teh zone to the alarm device.
+                    self.alarm_Device.add_node(zone_node)
+                    
                     #if value not in self.node_filter[element]:
                     #    break
                 #if element == 'zone' and (attribute == 'open' or attribute == 'alarm'):
-                    if value not in nodes:
-                        itemnode = dict()
-                        itemnode['label'] = label
-                        itemnode['index'] = id
-                        nodes[value] = itemnode
-                    #element = 'zone'
-                    #label = 'Front door reed'
-                    #value = Front_door_reed'
-                    #can be used for creating nodes....not sure where attributes will come from 
-                    # if attribute in self.node_filter[element]:
-                    #     label_sanitised = label.replace('_','').lower()
-                    #     #Look for the node in the alarm device node list
-                    #     if label_sanitised in self.alarm_Device.nodes:
-                    #         self.logger.info("HOMIE: Alarm Attribute Found existing node for '%s'" % label)
+                #    if value not in nodes:
+                #        itemnode = dict()
+                #        itemnode['label'] = label
+                #        itemnode['index'] = id
+                #        nodes[value] = itemnode
+                #    #element = 'zone'
+                #    #label = 'Front door reed'
+                #    #value = Front_door_reed'
+                #    #can be used for creating nodes....not sure where attributes will come from 
+                #    # if attribute in self.node_filter[element]:
+                #    #     label_sanitised = label.replace('_','').lower()
+                #    #     #Look for the node in the alarm device node list
+                #    #     if label_sanitised in self.alarm_Device.nodes:
+                #    #         self.logger.info("HOMIE: Alarm Attribute Found existing node for '%s'" % label)#
 
-                    #         #get the node if we know it is there
-                    #         node = self.alarm_Device.get_node(label_sanitised)
-                    #         self.logger.info("HOMIE: Found existing node for '%s'" % label)
-                    #         #get the current property being changed.
-                    #         currentProperty = node.get_property(attribute.lower())
-                    #         if currentProperty is None:
-                    #             #no property found with that attribute name for that zone
-                    #             newProperty = Property_Boolean(node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
-                    #             node.add_property(newProperty)
-                    #     else:  #no node found, add one with the current property.
-                    #         try:
-                    #             #move contact_node to class, and set each zone as a node.
-                    #             zone_node = Node_Base(self.alarm_Device,name=label,id=label_sanitised,type_=element)
-                    #             self.logger.info("HOMIE: Adding new property boolean '%s' to node '%s'" % (attribute, label)) 
-                    #             #node.id = label
-                    #             newProperty = Property_Boolean(zone_node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
-                    #             zone_node.add_property(newProperty)
-                            
-                    #             #self.nodes[label] = node
-                    #             self.alarm_Device.add_node(zone_node)
-                    #         except Exception as e:
-                    #             self.logger.error("HOMIE: Error creating node: %s with error: %s" %(zone_node.name, str(e)))
+                #    #         #get the node if we know it is there
+                #    #         node = self.alarm_Device.get_node(label_sanitised)
+                #    #         self.logger.info("HOMIE: Found existing node for '%s'" % label)
+                #    #         #get the current property being changed.
+                #    #         currentProperty = node.get_property(attribute.lower())
+                #    #         if currentProperty is None:
+                #    #             #no property found with that attribute name for that zone
+                #    #             newProperty = Property_Boolean(node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
+                #    #             node.add_property(newProperty)
+                #    #     else:  #no node found, add one with the current property.
+                #    #         try:
+                #    #             #move contact_node to class, and set each zone as a node.
+                #    #             zone_node = Node_Base(self.alarm_Device,name=label,id=label_sanitised,type_=element)
+                #    #             self.logger.info("HOMIE: Adding new property boolean '%s' to node '%s'" % (attribute, label)) 
+                #    #             #node.id = label
+                #    #             newProperty = Property_Boolean(zone_node,id=attribute.lower(),data_type='boolean',name=attribute.lower(),value=value)
+                #    #             zone_node.add_property(newProperty)
+                #            
+                #    #             #self.nodes[label] = node
+                #    #             self.alarm_Device.add_node(zone_node)
+                #    #         except Exception as e:
+                #    #             self.logger.error("HOMIE: Error creating node: %s with error: %s" %(zone_node.name, str(e)))
         
         #setup completed (end of internal message), so when true. then change events will start updating node values.
         self.setup_called = True
