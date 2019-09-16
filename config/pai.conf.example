@@ -142,6 +142,9 @@ MQTT_PARTITION_HOMEASSISTANT_COMMANDS = dict(
                                 arm_night='arm_sleep',
                                 disarm='disarm')
 
+# MQTT Dash
+MQTT_DASH_PUBLISH = False
+
 # Interfaces
 COMMAND_ALIAS = {						# alias for commands through text based interfaces
     'arm': 'partition all arm',
