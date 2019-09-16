@@ -222,15 +222,19 @@ class Paradox:
 
     def _process_status(self, raw_status: Container):
         status = convert_raw_status(raw_status)
+
+        for limit_key, limit_arr in cfg.LIMITS.items():
+            if limit_key not in status:
+                continue
+
+            status[limit_key].filter(limit_arr)
+
         ps.sendMessage('status_update', status=status)
 
         for element_type, element_items in status.items():
-            limit_list = cfg.LIMITS.get(element_type)
-
             for element_item_key, element_item_status in element_items.items():
-                if limit_list is None or element_item_key in limit_list:
-                    if isinstance(element_item_status, (dict, list,)) and element_type in self.data:  # TODO: who cares if it is in self.data?
-                        self.update_properties(element_type, element_item_key, element_item_status)
+                if isinstance(element_item_status, (dict, list,)) and element_type in self.data:  # TODO: who cares if it is in self.data?
+                    self.update_properties(element_type, element_item_key, element_item_status)
 
     async def receive_worker(self):
         logger.debug("Receive worker started")

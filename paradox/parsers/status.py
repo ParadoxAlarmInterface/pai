@@ -34,7 +34,7 @@ def convert_raw_status(raw_status: Container) -> Dict[str, ElementTypeContainer]
             if element_type != 'troubles':  # TODO: why system["troubles"] is not OK?
                 element_type = 'system'
 
-        out[element_type] = deep_merge(out[element_type], _parse_raw_status(prop_name, value))
+        out[element_type].deep_merge(_parse_raw_status(prop_name, value))
 
     if cfg.LOGGING_DUMP_STATUS:
         logger.debug("properties: %s", raw_status)
