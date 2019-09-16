@@ -3,6 +3,7 @@ from typing import Mapping
 
 from paradox.lib.utils import deep_merge
 
+
 class ElementTypeContainer(MutableMapping):
     def __init__(self, *args, **kwargs):
         self.store = dict()
