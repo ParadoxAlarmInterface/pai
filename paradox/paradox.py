@@ -227,7 +227,7 @@ class Paradox:
             if limit_key not in status:
                 continue
 
-            status[limit_key] = dict((i, v) for i, v in status[limit_key].items() if i in limit_arr)
+            status[limit_key].filter(limit_arr)
 
         ps.sendMessage('status_update', status=status)
 
