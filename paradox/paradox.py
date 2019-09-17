@@ -454,7 +454,7 @@ class Paradox:
 
         return accepted
 
-    def get_label(self, label_type: str, label_id):
+    def get_label(self, label_type: str, label_id) -> Optional[str]:
         if label_type in self.data:
             el = self.data[label_type].get(label_id)
             if el:
@@ -463,12 +463,9 @@ class Paradox:
     def handle_event(self, message: Container=None):
         """Process cfg.Live Event Message and dispatch it to the interface module"""
         try:
-            evt = event.Event()
-
-            r = False
             logger.debug("Handle event from panel message: {}".format(message))
-            r = evt.from_live_event(self.panel.event_map, event=message, label_provider=self.get_label)
-            if r:
+            evt = event.Event.from_live_event(self.panel.event_map, event=message, label_provider=self.get_label)
+            if evt:
                 if len(evt.change) == 0:
                     # Publish event
                     ps.sendEvent(evt)
@@ -517,7 +514,7 @@ class Paradox:
         if type_key not in elements:
             # Some panels have less elements than the ones reported in the status messages.
             # This is not an error but the logging can be useful when adding new panels.
-            #logger.debug('Warn: {} not found in type {} with content {}'.format(type_key, element_type, list(elements)))
+            logger.debug('Notice: {} not found in type {} with content {}'.format(type_key, element_type, list(elements)))
             return
 
         # Publish changes and update state
@@ -565,10 +562,9 @@ class Paradox:
 
                         evt_change = {'property': property_name, 'value': property_value, 'type': element_type, 
                                       'partition': partition, 'label': elements[type_key]['key'], 'time': int(time.time())}
-                        
-                        evt = event.Event()
-                        r = evt.from_change(property_map=self.panel.property_map, change=evt_change)
-                        if r:
+
+                        evt = event.Event.from_change(property_map=self.panel.property_map, change=evt_change)
+                        if evt:
                             logger.debug("Event: {}".format(evt))
                             ps.sendEvent(evt)
                         else:
