@@ -146,13 +146,10 @@ MQTT_PARTITION_HOMEASSISTANT_COMMANDS = dict(
                                 ARM_NIGHT='arm_sleep',
                                 DISARM='disarm')
 
-# Dash App
-MQTT_DASH_PUBLISH = False
+# MQTT Dash App
+MQTT_DASH_PUBLISH = False				# Change this to TRUE if you want to use the MQTT Dash App
 MQTT_DASH_TOPIC = 'metrics/exchange/pai'
 MQTT_DASH_TEMPLATE = '/etc/pai/mqtt_dash.txt'
-
-# MQTT Dash
-MQTT_DASH_PUBLISH = False
 
 # Interfaces
 COMMAND_ALIAS = {						# alias for commands through text based interfaces
