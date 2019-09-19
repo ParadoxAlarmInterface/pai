@@ -147,7 +147,7 @@ MQTT_PARTITION_HOMEASSISTANT_COMMANDS = dict(
                                 DISARM='disarm')
 
 # MQTT Dash App
-MQTT_DASH_PUBLISH = False				# Change this to TRUE if you want to use the MQTT Dash App
+MQTT_DASH_PUBLISH = False				# Enable MQTT Dash App
 MQTT_DASH_TOPIC = 'metrics/exchange/pai'
 MQTT_DASH_TEMPLATE = '/etc/pai/mqtt_dash.txt'
 
