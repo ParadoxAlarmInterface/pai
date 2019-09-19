@@ -31,9 +31,9 @@ IP_CONNECTION_HOST = '127.0.0.1'	# IP Module address when using direct IP Connec
 IP_CONNECTION_PORT = 10000		    # IP Module port when using direct IP Connection
 IP_CONNECTION_PASSWORD = b'paradox' # IP Module password. "paradox" is default.
 IP_CONNECTION_SITEID = None 		# SITE ID. IF defined, connection will be made through this method.
-IP_CONNECTION_EMAIL = None 		# Email registered in the site
-IP_CONNECTION_PANEL_SERIAL = None  # Use a specific panel. Set it to None to use the first
-IP_CONNECTION_BARE = False      # No not expect an IP150 module. Used this for base Serial over TCP tunnels
+IP_CONNECTION_EMAIL = None 			# Email registered in the site
+IP_CONNECTION_PANEL_SERIAL = None  	# Use a specific panel. Set it to None to use the first
+IP_CONNECTION_BARE = False      	# No not expect an IP150 module. Used this for base Serial over TCP tunnels
 
 # Paradox
 KEEP_ALIVE_INTERVAL = 10   		# Interval between status updates
@@ -64,7 +64,7 @@ PUSH_POWER_UPDATE_WITHOUT_CHANGE = True # Always notify interfaces of power chan
 PUSH_UPDATE_WITHOUT_CHANGE = False      # Always notify interfaces of all changes
 
 # MQTT
-MQTT_ENABLE = False			# Enable MQTT Interface
+MQTT_ENABLE = False				# Enable MQTT Interface
 MQTT_HOST = 'localhost' 		# Hostname or address
 MQTT_PORT = 1883        		# TCP Port
 MQTT_KEEPALIVE = 60     		# Keep alive
