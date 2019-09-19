@@ -13,6 +13,7 @@ class Config:
         "LOGGING_DUMP_PACKETS": False,          # Dump RAW Packets to log
         "LOGGING_DUMP_MESSAGES": False,         # Dump Messages to log
         "LOGGING_DUMP_STATUS": False,           # Dump Status to log
+        "LOGGING_DUMP_EVENTS": False,           # Dump Event details to log
 
         # Development
         "DEVELOPMENT_DUMP_MEMORY": False,

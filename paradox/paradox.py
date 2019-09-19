@@ -473,7 +473,8 @@ class Paradox:
                 logger.debug("Error creating event")
                 return
 
-            logger.debug("Event: {}".format(evt))
+            if cfg.LOGGING_DUMP_EVENTS:
+                logger.debug("Event: {}".format(evt))
                 
             # Temporary to catch labels/properties in wrong places
             # TODO: REMOVE
