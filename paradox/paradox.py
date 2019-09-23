@@ -190,7 +190,6 @@ class Paradox:
         
         replies_missing = 0
         while self.run != STATE_STOP:
-
             while self.run == STATE_PAUSE:
                 await asyncio.sleep(5)
 
@@ -205,6 +204,7 @@ class Paradox:
                 result = await asyncio.gather(*[self._status_request(i) for i in cfg.STATUS_REQUESTS])
                 merged = deep_merge(*result, extend_lists=True)
                 self.work_loop.call_soon(self._process_status, merged)
+                replies_missing = max(0, replies_missing - 1)
             except ConnectionError:
                 raise
             except StatusRequestException:
@@ -214,6 +214,8 @@ class Paradox:
                     self.disconnect()
             except Exception:
                 logger.exception("Loop")
+            
+            logger.debug("Loop: Replies missing: {}".format(replies_missing))
 
             # cfg.Listen for events
             while time.time() - tstart < cfg.KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
