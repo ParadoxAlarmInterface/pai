@@ -49,9 +49,10 @@ class InterfaceManager:
         if self.conf.HOMIE_INTERFACE_ENABLE:
             try:
                 logger.info("Using Homie MQTT Interface")
-                #from paradox.interfaces.homie_mqtt_interface import HomieMQTTInterface
-                from paradox.interfaces.mqtt.homie import HomieMQTTInterface2
-                self.register(HomieMQTTInterface2())
+                from paradox.interfaces.homie_mqtt_interface import HomieMQTTInterface
+                #from paradox.interfaces.mqtt.homie import HomieMQTTInterface2
+                #self.register(HomieMQTTInterface2())
+                self.register(HomieMQTTInterface())
             except Exception:
                 logger.exception("Unable to start Homie MQTT Interface")
 
