@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import time
+from binascii import hexlify
 from collections import defaultdict
 from enum import Enum
 from threading import Lock
@@ -98,14 +99,18 @@ class Paradox:
         try:
             logger.info("Initiating communication")
 
-            reply = await self.send_wait(self.panel.get_message('InitiateCommunication'), None, reply_expected=0x07)
+            initiate_reply = await self.send_wait(self.panel.get_message('InitiateCommunication'), None, reply_expected=0x07)
 
-            if reply:
-                logger.info("Found Panel {} version {}.{} build {}".format(
-                    (reply.fields.value.label.strip(b'\0 ').decode(cfg.LABEL_ENCODING)),
-                    reply.fields.value.application.version,
-                    reply.fields.value.application.revision,
-                    reply.fields.value.application.build))
+            if initiate_reply:
+                model = initiate_reply.fields.value.label.strip(b'\0 ').decode(cfg.LABEL_ENCODING)
+                firmware_version = "{}.{} build {}".format(
+                    initiate_reply.fields.value.application.version,
+                    initiate_reply.fields.value.application.revision,
+                    initiate_reply.fields.value.application.build
+                )
+                serial_number = hexlify(initiate_reply.fields.value.serial_number).decode()
+
+                logger.info("Found Panel {} version {}".format(model, firmware_version))
             else:
                 raise ConnectionError("Panel did not replied to InitiateCommunication")
 
@@ -119,8 +124,8 @@ class Paradox:
 
             if reply.fields.value.product_id is not None:
                 self.panel = create_panel(self, reply.fields.value.product_id)  # Now we know what panel it is. Let's
-                ps.sendMessage('panel_detected', product_id=reply.fields.value.product_id)
-            # recreate panel object.
+                # recreate panel object.
+                ps.sendMessage('panel_detected', panel=dict(product_id=reply.fields.value.product_id, model=model, firmware_version=firmware_version, serial_number=serial_number))
 
             result = await self.panel.initialize_communication(reply, cfg.PASSWORD)
             if not result:
