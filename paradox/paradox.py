@@ -55,7 +55,7 @@ class Paradox:
 
         self.data = defaultdict(ElementTypeContainer)  # dictionary of Type
         self.reset()
-        self.status_request_lock = asyncio.Lock()
+        self.request_lock = asyncio.Lock()
 
     def reset(self):
         # Keep track of alarm state
@@ -178,14 +178,13 @@ class Paradox:
         self.work_loop.run_until_complete(task)
 
     async def _status_request(self, i):
-        async with self.status_request_lock:
-            logger.debug("Requesting status: %d" % i)
-            reply = await self.panel.request_status(i)
-            if reply is not None:
-                logger.debug("Received status response: %d" % i)
-                return self.panel.handle_status(reply)
-            else:
-                raise StatusRequestException("No reply to status request: %d" % i)
+        logger.debug("Scheduling status request: %d" % i)
+        reply = await self.panel.request_status(i)
+        if reply is not None:
+            logger.debug("Received status response: %d" % i)
+            return self.panel.handle_status(reply)
+        else:
+            raise StatusRequestException("No reply to status request: %d" % i)
 
     async def async_loop(self):
         logger.debug("Loop start")
@@ -257,8 +256,7 @@ class Paradox:
 
     async def receive(self, timeout=5.0):
         # TODO: Get rid of receive worker
-        # with serial_lock:
-        
+
         data = self.connection.read(timeout=timeout)
         if isinstance(data, Awaitable):
             try:
@@ -329,26 +327,30 @@ class Paradox:
         if message is None and message_type is not None:
             message = message_type.build(dict(fields=dict(value=args)))
 
-        while retries >= 0:
-            retries -= 1
+        retry = 0
 
-            with serial_lock:
+        while retry <= retries:
+            if retry > 0:
+                logger.debug('Request retry (%d/%d)', retry, retries)
+            retry += 1
+
+            async with self.request_lock:
                 if message is not None:
                     self.connection.timeout(timeout)
                     self.connection.write(message)
 
-            if reply_expected is not None:
-                self.work_loop.create_task(self.receive(timeout))
-                if isinstance(reply_expected, Callable):
-                    reply = await self.message_manager.wait_for(reply_expected, timeout=timeout*2)
-                elif isinstance(reply_expected, Iterable):
-                    reply = await self.message_manager.wait_for(
-                        lambda m: any(m.fields.value.po.command == expected for expected in reply_expected), timeout=timeout*2)
-                else:
-                    reply = await self.message_manager.wait_for(lambda m: m.fields.value.po.command == reply_expected, timeout=timeout*2)
+                if reply_expected is not None:
+                    self.work_loop.create_task(self.receive(timeout))
+                    if isinstance(reply_expected, Callable):
+                        reply = await self.message_manager.wait_for(reply_expected, timeout=timeout*2)
+                    elif isinstance(reply_expected, Iterable):
+                        reply = await self.message_manager.wait_for(
+                            lambda m: any(m.fields.value.po.command == expected for expected in reply_expected), timeout=timeout*2)
+                    else:
+                        reply = await self.message_manager.wait_for(lambda m: m.fields.value.po.command == reply_expected, timeout=timeout*2)
 
-                if reply:
-                    return reply
+                    if reply:
+                        return reply
 
         return None  # Probably it needs to throw an exception instead of returning None
 
