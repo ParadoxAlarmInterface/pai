@@ -1,15 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-__author__ = "João Paulo Barraca"
-__copyright__ = "Copyright 2018, João Paulo Barraca"
-__credits__ = ["Tihomir Heidelberg", "Louis Rossouw"]
-__license__ = "EPL"
-__version__ = "0.1"
-__maintainer__ = "João Paulo Barraca"
-__email__ = "jpbarraca@gmail.com"
-__status__ = "Beta"
-
 import logging
 from logging.handlers import RotatingFileHandler
 import sys

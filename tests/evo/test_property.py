@@ -28,24 +28,21 @@ def generate_property_test_parameters():
 
 def test_property_map_value():
     change = dict(property='arm',value=True,partition=1, time=time.time(), type='partition', label='Fridge')
-    evt = Event()
-    r = evt.from_change(change=change, property_map=Panel_EVO192.property_map)
-    assert r
+    evt = Event.from_change(change=change, property_map=Panel_EVO192.property_map)
+    assert evt
     assert evt.message == "Partition Fridge is armed"
 
 def test_property_map_bad():
     change = dict(property='does_not_exist',value=True,partition=None, time=time.time(), type='system', label='alarm_in_memory')
-    evt = Event()
-    r = evt.from_change(change=change, property_map=Panel_EVO192.property_map)
-    assert not r
+    evt = Event.from_change(change=change, property_map=Panel_EVO192.property_map)
+    assert not evt
 
 @pytest.mark.parametrize("property,type,value,partition,label", generate_property_test_parameters())
 def test_property(property, type, value, partition, label):
     change = dict(property=property, value=value, partition=partition, time=time.time(), type=type, label=label)
-    evt = Event()
-    r = evt.from_change(change=change, property_map=Panel_EVO192.property_map)
+    evt = Event.from_change(change=change, property_map=Panel_EVO192.property_map)
 
-    assert r
+    assert evt
     assert len(evt.message) > 0
     print(evt.message)
 
@@ -53,10 +50,9 @@ def test_property(property, type, value, partition, label):
 # def test_make_messages(property, type, value, partition, label):
 #     change = dict(property=property, value=value, partition=partition, time=time.time(), type=type, label=label)
 #
-#     evt = Event()
 #     property_map = Panel_EVO192.property_map
-#     r = evt.from_change(change=change, property_map=property_map)
-#     assert r
+#     evt = Event.from_change(change=change, property_map=property_map)
+#     assert evt
 #
 #     msg_part = property.replace("_", " ")
 #     tags = []

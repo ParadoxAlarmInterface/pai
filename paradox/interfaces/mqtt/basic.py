@@ -9,6 +9,7 @@ from collections import namedtuple
 from paradox.config import config as cfg
 from paradox.lib import ps
 from paradox.lib.utils import JSONByteEncoder
+from paradox.event import EventLevel
 from .core import AbstractMQTTInterface, sanitize_topic_part, ELEMENT_TOPIC_MAP
 
 logger = logging.getLogger('PAI').getChild(__name__)
@@ -84,7 +85,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                 "Invalid topic in mqtt message: {}".format(message.topic))
             return None
 
-        content = message.payload.decode("latin").strip()
+        content = message.payload.decode("utf-8").strip()
 
         element = None
         if len(topics) >= 4:
@@ -96,13 +97,10 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         prep = self._preparse_message(message)
         if prep:
             topics = prep.topics
-            if topics[2].upper() == "CRITICAL":
-                level = logging.CRITICAL
-            elif topics[2].upper() == "INFO":
-                level = logging.INFO
-            else:
-                logger.error(
-                    "Invalid notification level: {}".format(topics[2]))
+            try:
+                level = EventLevel.from_name(topics[2].upper())
+            except Exception as e:
+                logger.error(e)
                 return
 
             ps.sendMessage("notifications", message=dict(source=self.name, payload=prep.content, level=level))

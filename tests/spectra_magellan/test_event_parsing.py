@@ -32,8 +32,7 @@ def test_disarm_partition0():
     payload = binascii.unhexlify(hex)
 
     raw = LiveEvent.parse(payload)
-    event = Event()
-    event.from_live_event(event_map, raw, None)
+    event = Event.from_live_event(event_map, raw, None)
 
     assert event.message == "Partition [partition:2]: Disarmed"
     print(event)
@@ -51,8 +50,7 @@ def test_disarm_partition1():
         return 'Partition 2'
 
     raw = LiveEvent.parse(payload)
-    event = Event()
-    event.from_live_event(event_map, raw, label_provider)
+    event = Event.from_live_event(event_map, raw, label_provider)
 
     print(event)
 

@@ -38,16 +38,16 @@ class PushoverInterface(ThreadQueueInterface):
             logger.exception("Pushover")
 
     def _handle_notify(self, message):
-        sender, message, level = message
-        if level < EventLevel.INFO.value:
+        if message['level'] < EventLevel.INFO:
             return
 
-        self._send_message(message)
+        if message['source'] != self.name:
+            self.pb_ws.notify(message['source'], message['payload'], message['level'])
 
     def _handle_panel_event(self, event):
         """Handle Live Event"""
 
-        if event.level < EventLevel.INFO.value:
+        if event.level < EventLevel.INFO:
             return
 
         major_code = event.major

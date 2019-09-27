@@ -1,15 +1,16 @@
-import typing
+import datetime
 import logging
+import typing
 from copy import copy
 from enum import Enum
-import datetime
 
 from construct import Container
+
+from paradox.config import config as cfg
 from paradox.lib.format import EventMessageFormatter
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
-from paradox.config import config as cfg
 
 class EventLevel(Enum):
     NOTSET = 0
@@ -18,6 +19,35 @@ class EventLevel(Enum):
     WARN = 30
     ERROR = 40
     CRITICAL = 50
+
+    @staticmethod
+    def from_name(level="NOTSET"):
+        if level in EventLevel.__members__:
+            return EventLevel.__members__[level]
+
+        raise (Exception("Invalid log level {}. Valid levels: {}".format(level, list(EventLevel.__members__))))
+
+    def __lt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value < other.value
+
+        if other.__class__ is int:
+            return self.value < other
+
+        return NotImplemented
+
+    def __gt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value > other.value
+
+        if other.__class__ is int:
+            return self.value > other
+
+        return NotImplemented
+
+    def __str__(self):
+        return self.name
+
 
 class Event:
     def __init__(self):
@@ -44,40 +74,46 @@ class Event:
         return str(self.__class__) + '\n' + '\n'.join(
             ('{} = {}'.format(item, lvars[item]) for item in lvars if not item.startswith('_')))
 
-    def from_live_event(self, event_map: dict, event: Container, label_provider=None):
+    @classmethod
+    def from_live_event(cls, event_map: dict, event: Container, label_provider=None) -> "Event":
+        evt = cls()
         if isinstance(label_provider, typing.Callable):
-            self.label_provider = label_provider
-        
-        self._event_map = event_map
-        self.parse_event(event)
-        
-        self._parse_event_map()
+            evt.label_provider = label_provider
 
-        return True
+        evt._event_map = event_map
+        evt.parse_event(event)
 
-    def from_change(self, property_map, change, label_provider=None):
+        evt._parse_event_map()
+
+        return evt
+
+    @classmethod
+    def from_change(cls, property_map, change, label_provider=None) -> typing.Optional["Event"]:
+        evt = cls()
         if isinstance(label_provider, typing.Callable):
-            self.label_provider = label_provider
-        
-        self._property_map = property_map
-        self.raw = copy(change)
+            evt.label_provider = label_provider
 
-        self.timestamp = self.raw['time']
-        self.partition = self.raw['partition']
-        self.property = self.raw['property']
-        self.value = self.raw['value']
-        self.module = None
-        self.type = self.raw['type']
-        self.label = self.raw['label']
-        self.major = None
-        self.minor = None
+        evt._property_map = property_map
+        evt.raw = copy(change)
 
-        return self._parse_property_map()
+        evt.timestamp = evt.raw['time']
+        evt.partition = evt.raw['partition']
+        evt.property = evt.raw['property']
+        evt.value = evt.raw['value']
+        evt.module = None
+        evt.type = evt.raw['type']
+        evt.label = evt.raw['label']
+        evt.major = None
+        evt.minor = None
+
+        r = evt._parse_property_map()
+        if r:
+            return evt
 
     def _parse_property_map(self):
         if (self.raw['property']) not in self._property_map:
             return False
-        
+
         property_map = copy(self._property_map[self.property])  # for inplace modifications
         callables = (k for k in property_map if isinstance(property_map[k], typing.Callable))
         for k in callables:
@@ -90,8 +126,8 @@ class Event:
                 self._message_tpl = tpl[str(self.value)]
         else:
             self._message_tpl = tpl
-        
-        self.change = {self.raw['property'] : self.raw['value']}
+
+        self.change = {self.raw['property']: self.raw['value']}
         self.tags = property_map.get('tags', [])
 
         return True
@@ -106,12 +142,12 @@ class Event:
         self.module = self.raw.module_serial  # Event Module Serial
         self.label_type = self.raw.get('label_type', None)  # Type of element triggering the event
         self.label = self.raw.label.replace(b'\0', b' ').strip(b' ').decode(
-            encoding=cfg.LABEL_ENCODING, errors='ignore')  # Event Element Label. May be overridden localy
+            encoding=cfg.LABEL_ENCODING, errors='ignore')  # Event Element Label. May be overridden locally
         self.major = self.raw.event.major  # Event major code
         self.minor = self.raw.event.minor  # Event minor code
 
         self._parse_event_map()
-    
+
         return True
 
     def _parse_event_map(self):
@@ -159,7 +195,8 @@ class Event:
     @property
     def key(self):
         if not self._key:
-            self._key = "{},{},{}".format(self.type, self.label, ','.join("=".join([key, str(val)]) for key, val in self.change.items()))
+            self._key = "{},{},{}".format(self.type, self.label,
+                                          ','.join("=".join([key, str(val)]) for key, val in self.change.items()))
 
         return self._key
 

@@ -38,7 +38,7 @@ class HomieMQTTInterface(AsyncQueueInterface):
     """Interface Class using MQTT subscribing to the Homie convention"""
     name = 'mqtt_homie'
     acceptsInitialState = True
-    
+
     def __init__(self):
         super().__init__()
 
@@ -517,6 +517,7 @@ class HomieMQTTInterface(AsyncQueueInterface):
 
     '''Use this method for receiving communication from the panel.  properties_enumerated is after update all labels'''
     def handle_labels_loaded(self, data):
+
         # look through each element = eg zone, system, troubles
         for element in data:
             #check if element type in the node filter.
