@@ -55,6 +55,8 @@ class Connection:
         self.default_timeout = timeout
 
     def close(self):
+        logger.info('Closing connection')
+
         if self.connection:
             self.connection.close()
             self.connection = None

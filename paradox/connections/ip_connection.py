@@ -100,9 +100,14 @@ class IPConnection(Connection):
 
     def on_connection_lost(self):
         logger.error('Connection to panel was lost')
+        self.close()
+
+    def close(self):
+        logger.info('Closing IP Connection')
+
         self.connected = False
         self.connection_timestamp = 0
-
+        
         if self.stun_control:
             try:
                 self.stun_control.close()
