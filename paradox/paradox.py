@@ -424,7 +424,7 @@ class Paradox:
             logger.error('control_partitions timeout')
             future.cancel()
 
-        # Apply state changes
+        # TODO: Re-request status
 
         # Refresh status
         self.loop_wait = False

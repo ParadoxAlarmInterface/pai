@@ -1,5 +1,6 @@
 import logging
 import typing
+import json
 from collections import namedtuple
 
 from .core import AbstractMQTTInterface, sanitize_topic_part, ELEMENT_TOPIC_MAP
@@ -19,6 +20,8 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         super().__init__()
         self.armed = dict()
         self.partitions = {}
+
+        self.first_status = True
 
     async def run(self):
         required_mappings = 'alarm,arm,arm_stay,arm_sleep,disarm'.split(',')
@@ -72,14 +75,39 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             else:
                 new_status = 'disarmed'
 
+            state_topic = '{}/{}/{}/{}/{}'.format(
+                cfg.MQTT_BASE_TOPIC,
+                 cfg.MQTT_STATES_TOPIC,
+                 cfg.MQTT_PARTITION_TOPIC,
+                 sanitize_topic_part(partition['key']),
+                 cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC
+            )
+
+            if self.first_status:  # For HASS auto discovery
+                configuration_topic = '{}/alarm_control_panel/{}/config'.format(
+                    cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
+                    sanitize_topic_part(partition['key'])
+                )
+                command_topic = '{}/{}/{}/{}/{}'.format(
+                    cfg.MQTT_BASE_TOPIC,
+                    cfg.MQTT_HOMEASSISTANT_CONTROL_TOPIC,
+                    cfg.MQTT_PARTITION_TOPIC,
+                    sanitize_topic_part(partition['key']),
+                    cfg.MQTT_HOMEASSISTANT_CONTROL_TOPIC
+                )
+                config = dict(
+                    name=partition['label'],
+                    command_topic=command_topic,
+                    state_topic=state_topic
+                )
+
+                self.publish(configuration_topic, json.dumps(config), 0, True)
+
             if new_status and partition['status'] != new_status:
-                self.publish('{}/{}/{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                                     cfg.MQTT_STATES_TOPIC,
-                                                     cfg.MQTT_PARTITION_TOPIC,
-                                                     sanitize_topic_part(partition['key']),
-                                                     cfg.MQTT_HOMEASSISTANT_SUMMARY_TOPIC),
-                             "{}".format(new_status), 0, cfg.MQTT_RETAIN)
+                self.publish(state_topic,"{}".format(new_status), 0, cfg.MQTT_RETAIN)
             partition['status'] = new_status
+
+        self.first_status = False
 
 
     def _preparse_message(self, message) -> typing.Optional[PreparseResponse]:
