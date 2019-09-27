@@ -95,10 +95,13 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                     sanitize_topic_part(partition['key']),
                     cfg.MQTT_HOMEASSISTANT_CONTROL_TOPIC
                 )
+                # TODO: Maybe homeassistant needs a separate status topic
+                availability_topic = '{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, 'MQTTInterface')
                 config = dict(
                     name=partition['label'],
                     command_topic=command_topic,
-                    state_topic=state_topic
+                    state_topic=state_topic,
+                    availability_topic=availability_topic
                 )
 
                 self.publish(configuration_topic, json.dumps(config), 0, True)

@@ -55,6 +55,7 @@ class Paradox:
 
         self.data = defaultdict(ElementTypeContainer)  # dictionary of Type
         self.reset()
+        self.status_request_lock = asyncio.Lock()
 
     def reset(self):
         # Keep track of alarm state
@@ -177,13 +178,14 @@ class Paradox:
         self.work_loop.run_until_complete(task)
 
     async def _status_request(self, i):
-        logger.debug("Requesting status: %d" % i)
-        reply = await self.panel.request_status(i)
-        if reply is not None:
-            logger.debug("Received status response: %d" % i)
-            return self.panel.handle_status(reply)
-        else:
-            raise StatusRequestException("No reply to status request: %d" % i)
+        async with self.status_request_lock:
+            logger.debug("Requesting status: %d" % i)
+            reply = await self.panel.request_status(i)
+            if reply is not None:
+                logger.debug("Received status response: %d" % i)
+                return self.panel.handle_status(reply)
+            else:
+                raise StatusRequestException("No reply to status request: %d" % i)
 
     async def async_loop(self):
         logger.debug("Loop start")
