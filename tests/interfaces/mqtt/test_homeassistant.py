@@ -11,8 +11,8 @@ def send_initial_status():
         partition={
             1: dict(
                 id=1,
-                label='Partiton 1',
-                key='Partiton_1'
+                label='Partition 1',
+                key='Partition_1'
             )
         }
     ))

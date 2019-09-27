@@ -204,9 +204,26 @@ class Paradox:
         reply = await self.panel.request_status(i)
         if reply is not None:
             logger.debug("Received status response: %d" % i)
-            return self.panel.handle_status(reply)
+            status = self.panel.handle_status(reply)
+            return self._process_status(status)
         else:
             raise StatusRequestException("No reply to status request: %d" % i)
+
+    def _process_status(self, raw_status: Container):
+        status = convert_raw_status(raw_status)
+
+        for limit_key, limit_arr in cfg.LIMITS.items():
+            if limit_key not in status:
+                continue
+
+            status[limit_key].filter(limit_arr)
+
+        ps.sendMessage('status_update', status=status)
+
+        for element_type, element_items in status.items():
+            for element_item_key, element_item_status in element_items.items():
+                if isinstance(element_item_status, (dict, list,)) and element_type in self.data:  # TODO: who cares if it is in self.data?
+                    self.update_properties(element_type, element_item_key, element_item_status)
 
     async def async_loop(self):
         logger.debug("Loop start")
@@ -215,7 +232,6 @@ class Paradox:
 
         replies_missing = 0
         while self.run != STATE_STOP:
-
             while self.run == STATE_PAUSE:
                 await asyncio.sleep(5)
 
@@ -227,9 +243,11 @@ class Paradox:
 
             tstart = time.time()
             try:
-                result = await asyncio.gather(*[self._status_request(i) for i in cfg.STATUS_REQUESTS])
-                merged = deep_merge(*result, extend_lists=True)
-                self.work_loop.call_soon(self._process_status, merged)
+
+                for i in cfg.STATUS_REQUESTS:
+                    result = await self._status_request(i)
+                    
+                replies_missing = max(0, replies_missing - 1)
             except ConnectionError:
                 raise
             except StatusRequestException:
@@ -239,23 +257,13 @@ class Paradox:
                     self.disconnect()
             except Exception:
                 logger.exception("Loop")
+            
+            logger.debug("Loop: Replies missing: {}".format(replies_missing))
 
             # cfg.Listen for events
             while time.time() - tstart < cfg.KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
                 wait_time = max((tstart + cfg.KEEP_ALIVE_INTERVAL) - time.time(), 0)
                 await asyncio.sleep(wait_time)
-
-    def _process_status(self, raw_status: Container):
-        status = convert_raw_status(raw_status)
-        ps.sendMessage('status_update', status=status)
-
-        for element_type, element_items in status.items():
-            limit_list = cfg.LIMITS.get(element_type)
-
-            for element_item_key, element_item_status in element_items.items():
-                if limit_list is None or element_item_key in limit_list:
-                    if isinstance(element_item_status, (dict, list,)) and element_type in self.data:  # TODO: who cares if it is in self.data?
-                        self.update_properties(element_type, element_item_key, element_item_status)
 
     async def receive_worker(self):
         logger.debug("Receive worker started")
@@ -475,7 +483,7 @@ class Paradox:
 
         return accepted
 
-    def get_label(self, label_type: str, label_id):
+    def get_label(self, label_type: str, label_id) -> Optional[str]:
         if label_type in self.data:
             el = self.data[label_type].get(label_id)
             if el:
@@ -484,12 +492,9 @@ class Paradox:
     def handle_event(self, message: Container=None):
         """Process cfg.Live Event Message and dispatch it to the interface module"""
         try:
-            evt = event.Event()
-
-            r = False
             logger.debug("Handle event from panel message: {}".format(message))
-            r = evt.from_live_event(self.panel.event_map, event=message, label_provider=self.get_label)
-            if r:
+            evt = event.Event.from_live_event(self.panel.event_map, event=message, label_provider=self.get_label)
+            if evt:
                 if len(evt.change) == 0:
                     # Publish event
                     ps.sendEvent(evt)
@@ -497,7 +502,8 @@ class Paradox:
                 logger.debug("Error creating event")
                 return
 
-            logger.debug("Event: {}".format(evt))
+            if cfg.LOGGING_DUMP_EVENTS:
+                logger.debug("Event: {}".format(evt))
                 
             # Temporary to catch labels/properties in wrong places
             # TODO: REMOVE
@@ -534,6 +540,13 @@ class Paradox:
             logger.debug('Error: "%s" key is missing from data' % element_type)
             return
 
+      # Panel doesn't have this element
+        if type_key not in elements:
+            # Some panels have less elements than the ones reported in the status messages.
+            # This is not an error but the logging can be useful when adding new panels.
+            logger.debug('Notice: {} not found in type {} with content {}'.format(type_key, element_type, list(elements)))
+            return
+
         # Publish changes and update state
         for property_name, property_value in change.items():
 
@@ -554,7 +567,7 @@ class Paradox:
                     self.update_properties(element_type, type_key, dict(trouble=r), publish=publish)
 
             # Standard processing of changes
-            if type_key in elements and property_name in elements[type_key]:
+            if property_name in elements[type_key]:
                 old = elements[type_key][property_name]
 
                 if old != change[property_name] \
@@ -579,10 +592,9 @@ class Paradox:
 
                         evt_change = {'property': property_name, 'value': property_value, 'type': element_type, 
                                       'partition': partition, 'label': elements[type_key]['key'], 'time': int(time.time())}
-                        
-                        evt = event.Event()
-                        r = evt.from_change(property_map=self.panel.property_map, change=evt_change)
-                        if r:
+
+                        evt = event.Event.from_change(property_map=self.panel.property_map, change=evt_change)
+                        if evt:
                             logger.debug("Event: {}".format(evt))
                             ps.sendEvent(evt)
                         else:

@@ -27,30 +27,26 @@ def generate_property_test_parameters():
 def test_property_map_value():
 
     change = dict(property='dc',value=3.33,partition=None, time=time.time(), type='system', label='power')
-    evt = Event()
-    r = evt.from_change(change=change, property_map=Panel.property_map)
-    assert r
+    evt = Event.from_change(change=change, property_map=Panel.property_map)
+    assert evt
     assert evt.message == "DC voltage is 3.33V"
 
 def test_property_map_bad():
     change = dict(property='dcd',value=3.33,partition=None, time=time.time(), type='system', label='power')
-    evt = Event()
-    r = evt.from_change(change=change, property_map=Panel.property_map)
-    assert not r
+    evt = Event.from_change(change=change, property_map=Panel.property_map)
+    assert not evt
 
 def test_partition_arm_message():
     change = dict(property='arm', value=True, partition=1, time=time.time(), type='partition', label='Fridge')
-    evt = Event()
-    r = evt.from_change(change=change, property_map=Panel.property_map)
-    assert r
+    evt = Event.from_change(change=change, property_map=Panel.property_map)
+    assert evt
     assert evt.message == "Partition Fridge is armed"
 
 @pytest.mark.parametrize("type,property,value,partition,label", generate_property_test_parameters())
 def test_property(type, property, value, partition, label):
     change = dict(property=property, value=value, partition=partition, time=time.time(), type=type, label=label)
-    evt = Event()
-    r = evt.from_change(change=change, property_map=Panel.property_map)
+    evt = Event.from_change(change=change, property_map=Panel.property_map)
 
-    assert r
+    assert evt
     assert len(evt.message) > 0
 

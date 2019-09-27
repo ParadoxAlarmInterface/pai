@@ -1,4 +1,7 @@
 from collections import MutableMapping
+from typing import Mapping
+
+from paradox.lib.utils import deep_merge
 
 
 class ElementTypeContainer(MutableMapping):
@@ -8,8 +11,8 @@ class ElementTypeContainer(MutableMapping):
 
     def __getitem__(self, key):
         if isinstance(key, str):
-            for k, v in self.items():
-                if "key" in v and v["key"] == key:
+            for k, v in self.store.items():
+                if isinstance(v, Mapping) and "key" in v and v["key"] == key:
                     return v
         return self.store[self.__keytransform__(key)]
 
@@ -24,6 +27,12 @@ class ElementTypeContainer(MutableMapping):
 
     def __len__(self):
         return len(self.store)
+
+    def filter(self, id_arr):
+        self.store = dict((i, v) for i, v in self.store.items() if i in id_arr)
+
+    def deep_merge(self, *dicts):
+        self.store = deep_merge(self.store, *dicts)
 
     @staticmethod
     def __keytransform__(key):

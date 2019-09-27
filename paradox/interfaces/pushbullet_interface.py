@@ -111,8 +111,7 @@ class PushBulletWSClient(WebSocketBaseClient):
 
     def notify(self, source, message, level):
         try:
-            if level.value >= EventLevel.WARN.value:
-                self.send_message("{}".format(message))
+            self.send_message("{}".format(message))
         except Exception:
             logging.exception("Pushbullet notify")
 
@@ -153,7 +152,7 @@ class PushBulletInterface(ThreadQueueInterface):
     def _handle_panel_event(self, event):
         """Handle Live Event"""
 
-        if event.level.value < EventLevel.INFO.value:
+        if event.level < EventLevel.INFO:
             return
 
         major_code = event.major
@@ -186,11 +185,8 @@ class PushBulletInterface(ThreadQueueInterface):
             self.pb_ws.notify('panel', event.message, event.level)
 
     def _handle_notify(self, message):
-        sender, message, level = message
-        if sender == 'pushbullet':
+        if message['level'] < EventLevel.INFO:
             return
 
-        if level < EventLevel.INFO.value:
-            return
-
-        self.pb_ws.notify(sender, message, level)
+        if message['source'] != self.name:
+            self.pb_ws.notify(message['source'], message['payload'], message['level'])

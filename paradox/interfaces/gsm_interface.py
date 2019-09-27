@@ -166,18 +166,18 @@ class GSMInterface(ThreadQueueInterface):
         ps.sendMessage("notifications",
                        message=dict(source=self.name,
                                     message=message,
-                                    level=logging.INFO))
+                                    level=EventLevel.INFO))
 
     def _handle_notify(self, message):
-        sender, message, level = message
-        if level < EventLevel.CRITICAL.value:
+        if message['level'] < EventLevel.CRITICAL:
             return
 
-        self.send_message(message)
+        if message['source'] != self.name:
+            self.send_message(message['payload'])
 
     def _handle_panel_event(self, event):
         """Handle Live Event"""
-        if event.level.value < EventLevel.CRITICAL.value:
+        if event.level < EventLevel.CRITICAL:
             return
 
         major_code = event.major
