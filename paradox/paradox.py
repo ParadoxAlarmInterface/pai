@@ -181,26 +181,9 @@ class Paradox:
         reply = await self.panel.request_status(i)
         if reply is not None:
             logger.debug("Received status response: %d" % i)
-            status = self.panel.handle_status(reply)
-            return self._process_status(status)
+            return self.panel.handle_status(reply)
         else:
             raise StatusRequestException("No reply to status request: %d" % i)
-
-    def _process_status(self, raw_status: Container):
-        status = convert_raw_status(raw_status)
-
-        for limit_key, limit_arr in cfg.LIMITS.items():
-            if limit_key not in status:
-                continue
-
-            status[limit_key].filter(limit_arr)
-
-        ps.sendMessage('status_update', status=status)
-
-        for element_type, element_items in status.items():
-            for element_item_key, element_item_status in element_items.items():
-                if isinstance(element_item_status, (dict, list,)) and element_type in self.data:  # TODO: who cares if it is in self.data?
-                    self.update_properties(element_type, element_item_key, element_item_status)
 
     async def async_loop(self):
         logger.debug("Loop start")
@@ -218,10 +201,9 @@ class Paradox:
 
             tstart = time.time()
             try:
-
-                for i in cfg.STATUS_REQUESTS:
-                    result = await self._status_request(i)
-                    
+                result = await asyncio.gather(*[self._status_request(i) for i in cfg.STATUS_REQUESTS])
+                merged = deep_merge(*result, extend_lists=True)
+                self.work_loop.call_soon(self._process_status, merged)
                 replies_missing = max(0, replies_missing - 1)
             except ConnectionError:
                 raise
@@ -239,6 +221,22 @@ class Paradox:
             while time.time() - tstart < cfg.KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
                 wait_time = max((tstart + cfg.KEEP_ALIVE_INTERVAL) - time.time(), 0)
                 await asyncio.sleep(wait_time)
+
+    def _process_status(self, raw_status: Container):
+        status = convert_raw_status(raw_status)
+
+        for limit_key, limit_arr in cfg.LIMITS.items():
+            if limit_key not in status:
+                continue
+
+            status[limit_key].filter(limit_arr)
+
+        ps.sendMessage('status_update', status=status)
+
+        for element_type, element_items in status.items():
+            for element_item_key, element_item_status in element_items.items():
+                if isinstance(element_item_status, (dict, list,)) and element_type in self.data:  # TODO: who cares if it is in self.data?
+                    self.update_properties(element_type, element_item_key, element_item_status)
 
     async def receive_worker(self):
         logger.debug("Receive worker started")
