@@ -1,4 +1,7 @@
-FROM python:3.6-alpine
+ARG ARCH=""
+# RPI ARCH="arm32v7/"
+
+FROM ${ARCH}python:3.6-alpine3.10
 
 ENV PAI_BASE_DIR=/usr/local/pai \
   PAI_CONFIG_PATH=/etc/pai \
