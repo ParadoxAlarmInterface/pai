@@ -27,3 +27,9 @@ def test_filter():
     assert len(a) == 1
     with pytest.raises(KeyError):
         assert a[2] == {'key': 'Kids_room'}
+
+def test_hole():
+    a = ElementTypeContainer({1: {'key': 'Living_room'}, 3: {'key': 'Kids_room'}})
+
+    assert 1 in a
+    assert 3 in a
