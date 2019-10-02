@@ -62,14 +62,14 @@ class Paradox:
                                    rf=dict(label='rf', key='rf', id=1),
                                    troubles=dict(label='troubles', key='troubles', id=2))
 
-        self.status_cache = dict()
-
         self.run = State.STOP
         self.request_lock = asyncio.Lock()
         self.loop_wait_event = asyncio.Event()
 
+        ps.subscribe(self._on_status_update, "status_update")
+
     def reset(self):
-        self.status_cache = dict()
+        pass
 
     def connect(self) -> bool:
         task = self.work_loop.create_task(self.connect_async())
@@ -631,3 +631,37 @@ class Paradox:
             # Write directly as this can be called from other contexts
 
             self.connection.write(panel.get_message('CloseConnection').build(dict()))
+
+    def _on_status_update(self, status):
+        self._process_partition_statuses(status['partition'])
+        # self._process_zone_statuses(status['zone'])
+
+        self.first_status = False
+
+    def _process_partition_statuses(self, partition_statuses):
+        for p_key, p_status in partition_statuses.items():
+            if p_key not in self.data['partition']:
+                continue
+            partition = self.data['partition'][p_key]
+
+            if any([
+                p_status.get('fire_alarm'),
+                p_status.get('audible_alarm'),
+                p_status.get('silent_alarm'),
+                p_status.get('panic_alarm')
+            ]):
+                new_status = 'triggered'
+            elif p_status.get('arm'):
+                if p_status.get('exit_delay'):
+                    new_status = 'pending'
+                elif p_status.get('arm_stay'):
+                    new_status = 'armed_home'
+                elif p_status.get('arm_away'):
+                    new_status = 'armed_away'
+                else:
+                    new_status = 'armed_away'
+            else:
+                new_status = 'disarmed'
+
+            if new_status and partition.get('current_state') != new_status:
+                self.update_properties('partition', partition['key'], {"current_state": new_status})
