@@ -20,10 +20,9 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 class IPConnectionProtocol(ConnectionProtocol):
     def __init__(self, on_con_lost, key):
-        super(IPConnectionProtocol, self).__init__()
+        super(IPConnectionProtocol, self).__init__(on_con_lost=on_con_lost)
         self.buffer = b''
         self.key = key
-        self.on_con_lost = on_con_lost
 
     def send_raw(self, raw):
         if cfg.LOGGING_DUMP_PACKETS:
@@ -77,10 +76,6 @@ class IPConnectionProtocol(ConnectionProtocol):
 
         self.read_queue.put_nowait(self._get_message_payload(self.buffer))
         self.buffer = b''
-
-    def connection_lost(self, exc):
-        super(IPConnectionProtocol, self).connection_lost(exc)
-        self.on_con_lost()
 
 
 class IPConnection(Connection):
@@ -343,16 +338,10 @@ class IPConnection(Connection):
     async def read(self, timeout=None):
         """Read data from the IP Port, if available, until the timeout is exceeded"""
 
-        if not self.connection:
-            return None
-
-        if not timeout:
-            timeout = self.default_timeout
-
         if not self.refresh_stun():
-            return False
+            raise ConnectionError("Failed to refresh stun")
 
-        result = await self.connection.read_message(timeout=timeout)
+        result = await super().read(timeout)
         if result:
             message, payload = result
             return payload
