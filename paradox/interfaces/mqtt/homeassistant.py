@@ -22,6 +22,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         self.partitions = {}
         self.zones = {}
         self.device = {}
+        self.detected_panel = {}
 
         self.first_status = True
 
@@ -46,17 +47,19 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         )
 
     def _handle_labels_loaded(self, data):
-        partitions = data['partition']
+        partitions = data.get('partition', {})
         for k, v in partitions.items():
-            p_data = {'status': None}
+            p_data = {}
             p_data.update(v)
             self.partitions[k] = p_data
 
-        self.zones = data['zone']
+        self.zones = data.get('zone', {})
 
     def _handle_status_update(self, status):
-        self._process_partition_statuses(status['partition'])
-        self._process_zone_statuses(status['zone'])
+        if 'partition' in status:
+            self._process_partition_statuses(status['partition'])
+        if 'zone' in status:
+            self._process_zone_statuses(status['zone'])
 
         self.first_status = False
 
