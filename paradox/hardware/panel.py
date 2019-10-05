@@ -3,12 +3,13 @@ import logging
 import sys
 import typing
 from itertools import chain
+from collections import defaultdict
 
 from construct import Construct, Struct, BitStruct, Const, Nibble, Checksum, Padding, Bytes, this, RawCopy, Int8ub, \
     Default, Enum, Flag, BitsInteger, Int16ub, Container, EnumIntegerString, Rebuild
 
 from paradox.config import config as cfg
-from paradox.lib import ps
+from paradox.models.element_type_container import ElementTypeContainer
 from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum, HexInt
 
 logger = logging.getLogger('PAI').getChild(__name__)
@@ -127,8 +128,10 @@ class Panel:
 
         return bytes(res)
 
-    async def update_labels(self):
+    async def load_labels(self):
         logger.info("Updating Labels from Panel")
+
+        data = defaultdict(dict)
 
         for elem_type in self.mem_map['elements']:
             elem_def = self.mem_map['elements'][elem_type]
@@ -138,18 +141,18 @@ class Panel:
             if limits is not None:
                 addresses = [(i, a) for i, a in addresses if i in limits]
 
-            await self.load_labels(self.core.data[elem_type], addresses, label_offset=elem_def['label_offset'])
+            await self._load_labels(data[elem_type], addresses, label_offset=elem_def['label_offset'])
 
-            logger.info("{}: {}".format(elem_type.title(), ', '.join([v["label"] for v in self.core.data[elem_type].values()])))
+            logger.info("{}: {}".format(elem_type.title(), ', '.join([v["label"] for v in data[elem_type].values()])))
 
-        ps.sendMessage('labels_loaded', data=self.core.data)
+        return data
 
-    async def load_labels(self,
-                    data_dict: dict,
-                    addresses: typing.List[typing.Tuple[int, int]],
-                    field_length=16,
-                    label_offset=0,
-                    template=None):
+    async def _load_labels(self,
+                           data_dict: dict,
+                           addresses: typing.List[typing.Tuple[int, int]],
+                           field_length=16,
+                           label_offset=0,
+                           template=None):
         """
         Load labels from panel
 

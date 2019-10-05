@@ -66,6 +66,7 @@ class Paradox:
         self.request_lock = asyncio.Lock()
         self.loop_wait_event = asyncio.Event()
 
+        ps.subscribe(self._on_labels_load, "labels_loaded")
         ps.subscribe(self._on_status_update, "status_update")
 
     def reset(self):
@@ -148,7 +149,8 @@ class Paradox:
                 else:
                     logger.warn("Requested memory dump, but current panel type does not support it yet.")
 
-            await self.panel.update_labels()
+            labels = await self.panel.load_labels()
+            ps.sendMessage('labels_loaded', data=labels)
 
             logger.info("Connection OK")
             self.run = State.RUN
@@ -631,6 +633,10 @@ class Paradox:
             # Write directly as this can be called from other contexts
 
             self.connection.write(panel.get_message('CloseConnection').build(dict()))
+
+    def _on_labels_load(self, data):
+        for k, d in data.items():
+            self.data[k] = deep_merge(self.data[k], d)
 
     def _on_status_update(self, status):
         self._process_partition_statuses(status['partition'])
