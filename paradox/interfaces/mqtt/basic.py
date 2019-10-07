@@ -114,53 +114,56 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                     "Zone command refused: {}={}".format(element, command))
 
     def _mqtt_handle_partition_control(self, client, userdata, message):
-        prep = self._preparse_message(message)
-        if prep:
-            topics, element, command = prep
+        try:
+            prep = self._preparse_message(message)
+            if prep:
+                topics, element, command = prep
 
-            if command.startswith('code_toggle-'):
-                tokens = command.split('-')
-                if len(tokens) < 2:
-                    return
+                if command.startswith('code_toggle-'):
+                    tokens = command.split('-')
+                    if len(tokens) < 2:
+                        return
 
-                if tokens[1] not in cfg.MQTT_TOGGLE_CODES:
-                    logger.warning("Invalid toggle code {}".format(tokens[1]))
-                    return
+                    if tokens[1] not in cfg.MQTT_TOGGLE_CODES:
+                        logger.warning("Invalid toggle code {}".format(tokens[1]))
+                        return
 
-                if element.lower() == 'all':
-                    command = 'arm'
+                    if element.lower() == 'all':
+                        command = 'arm'
 
-                    for k, v in self.partitions.items():
-                        # If "all" and a single partition is armed, default is
-                        # to disarm
-                        for k1, v1 in self.partitions[k].items():
-                            if (k1 == 'arm' or k1 == 'exit_delay' or k1 == 'entry_delay') and v1:
-                                command = 'disarm'
+                        for k, v in self.partitions.items():
+                            # If "all" and a single partition is armed, default is
+                            # to disarm
+                            for k1, v1 in self.partitions[k].items():
+                                if (k1 == 'arm' or k1 == 'exit_delay' or k1 == 'entry_delay') and v1:
+                                    command = 'disarm'
+                                    break
+
+                            if command == 'disarm':
                                 break
 
-                        if command == 'disarm':
-                            break
-
-                elif element in self.partitions:
-                    if ('arm' in self.partitions[element] and self.partitions[element]['arm']) \
-                            or ('exit_delay' in self.partitions[element] and self.partitions[element]['exit_delay']):
-                        command = 'disarm'
+                    elif element in self.partitions:
+                        if ('arm' in self.partitions[element] and self.partitions[element]['arm']) \
+                                or ('exit_delay' in self.partitions[element] and self.partitions[element]['exit_delay']):
+                            command = 'disarm'
+                        else:
+                            command = 'arm'
                     else:
-                        command = 'arm'
-                else:
-                    logger.debug("Element {} not found".format(element))
-                    return
+                        logger.debug("Element {} not found".format(element))
+                        return
 
-                ps.sendMessage('notifications', message=dict(
-                    source="mqtt",
-                    message="Command by {}: {}".format(
-                        cfg.MQTT_TOGGLE_CODES[tokens[1]], command),
-                    level=logging.INFO))
+                    ps.sendMessage('notifications', message=dict(
+                        source="mqtt",
+                        payload="Command by {}: {}".format(
+                            cfg.MQTT_TOGGLE_CODES[tokens[1]], command),
+                        level=logging.INFO))
 
-            logger.debug("Partition command: {} = {}".format(element, command))
-            if not self.alarm.control_partition(element, command):
-                logger.warning(
-                    "Partition command refused: {}={}".format(element, command))
+                logger.debug("Partition command: {} = {}".format(element, command))
+                if not self.alarm.control_partition(element, command):
+                    logger.warning(
+                        "Partition command refused: {}={}".format(element, command))
+        except:
+            logger.exception("Handle Partition Control")
 
     def _mqtt_handle_output_control(self, client, userdata, message):
         prep = self._preparse_message(message)
