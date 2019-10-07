@@ -1,13 +1,12 @@
-import pytest
 import asyncio
 import binascii
-import mock
-from pytest_mock import mocker
 
+import mock
 from construct import Container
 
-from paradox.lib.async_message_manager import AsyncMessageManager, MessageHandler, FutureMessageHandler
-from paradox.hardware.evo.parsers import LiveEvent, ReadEEPROM, ReadEEPROMResponse
+from paradox.hardware.evo.parsers import LiveEvent, ReadEEPROMResponse
+from paradox.lib.async_message_manager import AsyncMessageManager, MessageHandler
+
 
 class EventMessageHandler(MessageHandler):
     def __init__(self, callback):
@@ -41,7 +40,7 @@ def test_event_handler():
 
     assert 1 == len(mh.handlers)
 
-def test_event_handler_failure(mocker):
+def test_event_handler_failure():
     # eeprom_request_bin = binascii.unhexlify('500800009f004037')
     eeprom_response_bin = binascii.unhexlify(
         '524700009f0041133e001e0e0400000000060a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000121510010705004e85')
@@ -66,7 +65,7 @@ def test_event_handler_failure(mocker):
     eh.handle.assert_not_called()
 
 
-def test_handler_two_messages(mocker):
+def test_handler_two_messages():
     def event_handler(message):
         print("event")
         return "event"
@@ -104,7 +103,7 @@ def test_handler_two_messages(mocker):
 
     assert 1 == len(mh.handlers)
 
-def test_handler_timeout(mocker):
+def test_handler_timeout():
     def event_handler(message):
         print("event")
         return "event"

@@ -100,7 +100,7 @@ event_map = {0: dict(level=EventLevel.DEBUG, change=dict(open=False), type='zone
              11: dict(level=EventLevel.DEBUG, type='remote', message='Button E pressed on remote {label}'),
              12: dict(level=EventLevel.DEBUG, type='remote', message='Cold start wireless zone {label}'),
              13: dict(level=EventLevel.DEBUG, type='remote', message='Cold start wireless module {label}'),
-             14: dict(level=EventLevel.DEBUG, type='zone', change=dict(bypass='TOGGLE'), message='Bypass programming on zone {label}'),
+             14: dict(level=EventLevel.DEBUG, type='zone', change=dict(bypassed=lambda old: not old), message='Bypass programming on zone {label}'),
              15: dict(level=EventLevel.DEBUG, type='partition', message='User code activated output {label}'),
              16: dict(level=EventLevel.DEBUG, type='zone', message='Wireless smoke maintenance signal'),
              17: dict(level=EventLevel.DEBUG, type='zone', message='Delay zone {label} alarm transmission'),
@@ -157,7 +157,7 @@ event_map = {0: dict(level=EventLevel.DEBUG, change=dict(open=False), type='zone
                            7: dict(level=EventLevel.DEBUG, message='Alarm cancelled with keyswitch'),
                            99: dict(message='Any special disarming')}
                       ),
-             35: dict(level=EventLevel.INFO, change=dict(bypass='TOOGLE'), type='zone', message='Zone {label} bypassed'),
+             35: dict(level=EventLevel.INFO, change=dict(bypassed=lambda old: not old), type='zone', message='Zone {label} bypass toggled'),
              36: dict(level=EventLevel.CRITICAL, change=dict(alarm=True), type='zone', tags=['alarm'], message='Zone {label} in alarm'),
              37: dict(level=EventLevel.CRITICAL, change=dict(fire_alarm=True), type='zone', tags=['fire', 'alarm'], message='Fire alarm {label}'),
              38: dict(level=EventLevel.CRITICAL, change=dict(alarm=False), type='zone', tags=['alarm_restore'], message='Zone {label} alarm restore'),

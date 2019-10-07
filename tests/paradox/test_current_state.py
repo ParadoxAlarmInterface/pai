@@ -1,9 +1,7 @@
 from mock import MagicMock
 
-from paradox.paradox import Paradox
-
 from paradox.lib.ps import sendMessage
-from paradox.models.element_type_container import ElementTypeContainer
+from paradox.paradox import Paradox
 
 
 def send_initial_status(alarm):
@@ -25,7 +23,7 @@ def send_initial_status(alarm):
         }
     ))
 
-    alarm.update_properties.assert_called_with('partition', 'Partition_1', {'current_state': 'disarmed'})
+    alarm.update_properties.assert_any_call('partition', 'Partition_1', {'current_state': 'disarmed'})
 
 
 def test_current_state_armed_away():
@@ -41,7 +39,7 @@ def test_current_state_armed_away():
             )
         }
     ))
-    alarm.update_properties.assert_called_with('partition', 'Partition_1', {'current_state': 'armed_away'})
+    alarm.update_properties.assert_any_call('partition', 'Partition_1', {'current_state': 'armed_away'})
 
 
 def test_current_state_pending():
@@ -58,7 +56,7 @@ def test_current_state_pending():
             )
         }
     ))
-    alarm.update_properties.assert_called_with('partition', 'Partition_1', {'current_state': 'pending'})
+    alarm.update_properties.assert_any_call('partition', 'Partition_1', {'current_state': 'pending'})
 
 
 def test_current_arm_stay():
@@ -75,7 +73,7 @@ def test_current_arm_stay():
             )
         }
     ))
-    alarm.update_properties.assert_called_with('partition', 'Partition_1', {'current_state': 'armed_home'})
+    alarm.update_properties.assert_any_call('partition', 'Partition_1', {'current_state': 'armed_home'})
 
 
 def test_current_alarm(mocker):
@@ -91,26 +89,4 @@ def test_current_alarm(mocker):
             )
         }
     ))
-    alarm.update_properties.assert_called_with('partition', 'Partition_1', {'current_state': 'triggered'})
-
-
-def test_on_labels_load(mocker):
-    alarm = Paradox(None)
-
-    sendMessage("labels_loaded", data=dict(
-        partition={
-            1: dict(
-                id=1,
-                label='Partition 1',
-                key='Partition_1'
-            )
-        }
-    ))
-
-    assert isinstance(alarm.data['partition'], ElementTypeContainer)
-
-    assert alarm.data['partition']['Partition_1'] == dict(
-        id=1,
-        label='Partition 1',
-        key='Partition_1'
-    )
+    alarm.update_properties.assert_any_call('partition', 'Partition_1', {'current_state': 'triggered'})

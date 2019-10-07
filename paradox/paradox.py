@@ -141,13 +141,13 @@ class Paradox:
 
             if cfg.DEVELOPMENT_DUMP_MEMORY:
                 if hasattr(self.panel, 'dump_memory') and callable(self.panel.dump_memory):
-                    logger.warn("Requested memory dump. Dumping...")
+                    logger.warning("Requested memory dump. Dumping...")
 
                     await self.panel.dump_memory()
-                    logger.warn("Memory dump completed. Exiting pai.")
+                    logger.warning("Memory dump completed. Exiting pai.")
                     raise SystemExit()
                 else:
-                    logger.warn("Requested memory dump, but current panel type does not support it yet.")
+                    logger.warning("Requested memory dump, but current panel type does not support it yet.")
 
             labels = await self.panel.load_labels()
             ps.sendMessage('labels_loaded', data=labels)
@@ -176,7 +176,7 @@ class Paradox:
 
         reply = await self.send_wait(self.panel.get_message('SetTimeDate'), args, reply_expected=0x03, timeout=10)
         if reply is None:
-            logger.warn("Could not set panel time")
+            logger.warning("Could not set panel time")
         else:
             logger.info("Panel time synchronized")
 
@@ -240,11 +240,6 @@ class Paradox:
             status[limit_key].filter(limit_arr)
 
         ps.sendMessage('status_update', status=status)
-
-        for element_type, element_items in status.items():
-            for element_item_key, element_item_status in element_items.items():
-                if isinstance(element_item_status, (dict, list,)) and element_type in self.data:  # TODO: who cares if it is in self.data?
-                    self.update_properties(element_type, element_item_key, element_item_status)
 
     def request_status_refresh(self):
         self.loop_wait_event.set()
@@ -492,20 +487,20 @@ class Paradox:
             if message is not None:
                 if evt.type in self.data:
                     if not evt.id:
-                        logger.warn("Missing element ID in {}/{}, m/m: {}/{}, message: {}".format(evt.type, evt.label or '?', evt.major, evt.minor, evt.message))
+                        logger.warning("Missing element ID in {}/{}, m/m: {}/{}, message: {}".format(evt.type, evt.label or '?', evt.major, evt.minor, evt.message))
                     else:
                         el = self.data[evt.type].get(evt.id)
                         if not el:
-                            logger.warn("Missing element with ID {} in {}/{}".format(evt.id, evt.type, evt.label))
+                            logger.warning("Missing element with ID {} in {}/{}".format(evt.id, evt.type, evt.label))
                         else:
                             for k in evt.change:
                                 if k not in el:
-                                    logger.warn("Missing property {} in {}/{}".format(k, evt.type, evt.label))
+                                    logger.warning("Missing property {} in {}/{}".format(k, evt.type, evt.label))
                             if evt.label != el.get("label"):
-                                logger.warn(
+                                logger.warning(
                                     "Labels differ {} != {} in {}/{}".format(el.get("label"), evt.label, evt.type, evt.label))
                 else:
-                    logger.warn("Missing type {} for event: {}.{} {}".format(evt.type, evt.major, evt.minor, evt.message))
+                    logger.warning("Missing type {} for event: {}.{} {}".format(evt.type, evt.major, evt.minor, evt.message))
             # Temporary end
             
             # The event has changes. Update the state
@@ -535,6 +530,16 @@ class Paradox:
             if property_name.startswith('_'):  # skip private properties
                 continue
 
+            key = elements[type_key]['key']
+            old = elements[type_key].get(property_name)
+
+            if isinstance(property_value, Callable):
+                try:
+                    property_value = property_value(old)
+                except Exception:
+                    logger.exception('Exception caught during property "%s" convert. Ignoring', property_name)
+                    continue
+
             # Virtual property "Trouble"
             # True if element has ANY type of alarm
             if 'trouble' in property_name and property_name !='trouble':
@@ -550,44 +555,40 @@ class Paradox:
 
             # Standard processing of changes
             if property_name in elements[type_key]:
-                old = elements[type_key][property_name]
-
-                if old != change[property_name] \
+                if old != property_value \
                         or publish == PublishPropertyChange.YES \
                         or cfg.PUSH_UPDATE_WITHOUT_CHANGE:
                     logger.debug("Change {}/{}/{} from {} to {}".format(element_type,
-                                                                        elements[type_key]['key'],
+                                                                        key,
                                                                         property_name,
                                                                         old,
                                                                         property_value))
                     elements[type_key][property_name] = property_value
                     
-                    ps.sendChange(element_type, elements[type_key]['key'],
-                                      property_name, property_value)
+                    ps.sendChange(element_type, key, property_name, property_value)
 
                     # Ignore change if is a generic trouble. 
                     if not (property_name == 'trouble' and element_type == 'system'):
                         if element_type == 'partition':
-                            partition = elements[type_key]['key']
+                            partition = key
                         else:
                             partition = ""
 
                         evt_change = {'property': property_name, 'value': property_value, 'type': element_type, 
-                                      'partition': partition, 'label': elements[type_key]['key'], 'time': int(time.time())}
+                                      'partition': partition, 'label': key, 'time': int(time.time())}
 
                         evt = event.Event.from_change(property_map=self.panel.property_map, change=evt_change)
                         if evt:
                             logger.debug("Event: {}".format(evt))
                             ps.sendEvent(evt)
                         else:
-                            logger.warn("Could not create event from change")
+                            logger.warning("Could not create event from change")
 
             else:
                 elements[type_key][property_name] = property_value  # Initial value, do not notify
                 suppress = 'trouble' not in property_name
 
-                ps.sendChange(element_type, elements[type_key]['key'],
-                                      property_name, property_value, initial=suppress)
+                ps.sendChange(element_type, key, property_name, property_value, initial=suppress)
 
     def handle_error(self, message):
         """Handle ErrorMessage"""
@@ -641,6 +642,11 @@ class Paradox:
     def _on_status_update(self, status):
         self._process_partition_statuses(status['partition'])
         # self._process_zone_statuses(status['zone'])
+
+        for element_type, element_items in status.items():
+            for element_item_key, element_item_status in element_items.items():
+                if isinstance(element_item_status, (dict, list,)) and element_type in self.data:  # TODO: who cares if it is in self.data?
+                    self.update_properties(element_type, element_item_key, element_item_status)
 
         self.first_status = False
 
