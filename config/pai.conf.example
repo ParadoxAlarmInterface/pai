@@ -141,7 +141,7 @@ GSM_IGNORE_EVENTS = []                  # List of tuples [(major, minor), ...]
 IP_INTERFACE_ENABLE = False
 IP_INTERFACE_BIND_ADDRESS = '0.0.0.0'
 IP_INTERFACE_BIND_PORT = 10000
-IP_INTERFACE_PASSWORD = b'0000'
+IP_INTERFACE_PASSWORD = b'paradox'
 
 # Dummy Interface for testing
 DUMMY_INTERFACE_ENABLE = False

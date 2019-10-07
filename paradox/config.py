@@ -134,7 +134,7 @@ class Config:
         "IP_INTERFACE_ENABLE": False,
         "IP_INTERFACE_BIND_ADDRESS": '0.0.0.0',
         "IP_INTERFACE_BIND_PORT": (10000, int, (1, 65535)),
-        "IP_INTERFACE_PASSWORD": (b'0000', [bytes, type(None)]),
+        "IP_INTERFACE_PASSWORD": (b'paradox', [bytes, type(None)]),
 
         # Dummy Interface for testing
         "DUMMY_INTERFACE_ENABLE": False,
