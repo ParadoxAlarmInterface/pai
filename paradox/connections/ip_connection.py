@@ -61,7 +61,7 @@ class IPConnectionProtocol(ConnectionProtocol):
 
         if self.buffer[0] != 0xaa:
             if len(self.buffer) > 0:
-                logger.warn('Dangling data in the receive buffer: %s' % binascii.hexlify(self.buffer))
+                logger.warning('Dangling data in the receive buffer: %s' % binascii.hexlify(self.buffer))
             self.buffer = b''
             return
 
@@ -361,7 +361,7 @@ class IPConnection(Connection):
             if req.status_code == 200:
                 return req.json()
 
-            logger.warn("Unable to get site info. Retrying...")
+            logger.warning("Unable to get site info. Retrying...")
             tries -= 1
             time.sleep(5)
 

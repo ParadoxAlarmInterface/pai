@@ -120,7 +120,7 @@ class ClientConnection():
                 password = in_payload
 
                 if password != self.interface_password:
-                    logger.warn("Authentication Error")
+                    logger.warning("Authentication Error")
                     break
                 else:
                     logger.info("Authentication Success")
@@ -171,7 +171,7 @@ class ClientConnection():
                     status = 'connected'
 
             else:
-                logger.warn(
+                logger.warning(
                     "UNKNOWN: raw: {}, payload: {}".format(binascii.hexlify(data), binascii.hexlify(in_payload)))
                 continue
 

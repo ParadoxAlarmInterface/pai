@@ -156,7 +156,7 @@ class Panel(PanelBase):
         mvars = message.fields.value
 
         if mvars.address not in RAMDataParserMap:
-            logger.warn("Unknown memory address {}".format(mvars.address))
+            logger.warning("Unknown memory address {}".format(mvars.address))
             return
 
         parser = RAMDataParserMap[mvars.address]

@@ -244,4 +244,4 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                 self.mqtt.publish(cfg.MQTT_DASH_TOPIC, data, 2, True)
                 logger.info("MQTT Dash panel published to {}".format(cfg.MQTT_DASH_TOPIC))
         else:
-            logger.warn("MQTT DASH Template not found: {}".format(fname))
+            logger.warning("MQTT DASH Template not found: {}".format(fname))
