@@ -636,7 +636,7 @@ class Paradox:
 
     def _on_labels_load(self, data):
         for k, d in data.items():
-            self.data[k] = deep_merge(self.data[k], d)
+            self.data[k].update(d)
 
     def _on_status_update(self, status):
         self._process_partition_statuses(status['partition'])

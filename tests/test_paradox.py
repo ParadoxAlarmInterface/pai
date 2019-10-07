@@ -1,7 +1,7 @@
 from paradox.paradox import Paradox
 
 from paradox.lib.ps import sendMessage
-
+from paradox.models.element_type_container import ElementTypeContainer
 
 def send_initial_status(alarm):
     sendMessage("labels_loaded", data=dict(
@@ -89,3 +89,25 @@ def test_current_alarm(mocker):
         }
     ))
     alarm.update_properties.assert_called_with('partition', 'Partition_1', {'current_state': 'triggered'})
+
+
+def test_on_labels_load(mocker):
+    alarm = Paradox(None)
+
+    sendMessage("labels_loaded", data=dict(
+        partition={
+            1: dict(
+                id=1,
+                label='Partition 1',
+                key='Partition_1'
+            )
+        }
+    ))
+
+    assert isinstance(alarm.data['partition'], ElementTypeContainer)
+
+    assert alarm.data['partition']['Partition_1'] == dict(
+        id=1,
+        label='Partition 1',
+        key='Partition_1'
+    )
