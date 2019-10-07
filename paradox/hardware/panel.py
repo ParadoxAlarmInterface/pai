@@ -1,14 +1,15 @@
 import inspect
 import logging
 import sys
+import typing
 from itertools import chain
-from typing import Optional
+from collections import defaultdict
 
 from construct import Construct, Struct, BitStruct, Const, Nibble, Checksum, Padding, Bytes, this, RawCopy, Int8ub, \
     Default, Enum, Flag, BitsInteger, Int16ub, Container, EnumIntegerString, Rebuild
 
 from paradox.config import config as cfg
-from paradox.lib import ps
+from paradox.models.element_type_container import ElementTypeContainer
 from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum, HexInt
 
 logger = logging.getLogger('PAI').getChild(__name__)
@@ -24,7 +25,7 @@ class Panel:
         self.product_id = product_id
         self.variable_message_length = variable_message_length
 
-    def parse_message(self, message, direction='topanel') -> Optional[Container]:
+    def parse_message(self, message, direction='topanel') -> typing.Optional[Container]:
         if message is None or len(message) == 0:
             return None
 
@@ -127,37 +128,45 @@ class Panel:
 
         return bytes(res)
 
-    async def update_labels(self):
+    async def load_labels(self):
         logger.info("Updating Labels from Panel")
+
+        data = defaultdict(dict)
 
         for elem_type in self.mem_map['elements']:
             elem_def = self.mem_map['elements'][elem_type]
 
-            addresses = list(chain.from_iterable(elem_def['addresses']))
+            addresses = enumerate(chain.from_iterable(elem_def['addresses']), start=1)
             limits = cfg.LIMITS.get(elem_type)
             if limits is not None:
-                addresses = [a for i, a in enumerate(addresses) if i + 1 in limits]
+                addresses = [(i, a) for i, a in addresses if i in limits]
 
-            await self.load_labels(self.core.data[elem_type],
-                             addresses,
-                             label_offset=elem_def['label_offset'])
+            await self._load_labels(data[elem_type], addresses, label_offset=elem_def['label_offset'])
 
-            logger.info("{}: {}".format(elem_type.title(), ', '.join([v["label"] for v in self.core.data[elem_type].values()])))
+            logger.info("{}: {}".format(elem_type.title(), ', '.join([v["label"] for v in data[elem_type].values()])))
 
-        ps.sendMessage('labels_loaded', data=self.core.data)
+        return data
 
-    async def load_labels(self,
-                    data_dict,
-                    addresses,
-                    field_length=16,
-                    label_offset=0,
-                    template=None):
-        """Load labels from panel"""
-        index = 1
+    async def _load_labels(self,
+                           data_dict: dict,
+                           addresses: typing.List[typing.Tuple[int, int]],
+                           field_length=16,
+                           label_offset=0,
+                           template=None):
+        """
+        Load labels from panel
+
+        :param data_dict: Dict to fill
+        :param addresses: Addresses list with indexes
+        :param field_length: Text field length
+        :param label_offset: Label offset
+        :param template: Default template
+        :return:
+        """
         if template is None:
             template = {}
 
-        for address in list(addresses):
+        for index, address in addresses:
             args = dict(address=address, length=field_length)
             reply = await self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address)
 
@@ -190,8 +199,6 @@ class Panel:
             if index not in data_dict:
                 data_dict[index] = {}
             data_dict[index].update(properties)
-
-            index += 1
 
     def initialize_communication(self, reply, password):
         raise NotImplementedError("override initialize_communication in a subclass")

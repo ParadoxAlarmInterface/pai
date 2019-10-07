@@ -48,6 +48,11 @@ class Panel(PanelBase):
         }
     }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.last_power_update = 0
+
     def get_message(self, name: str) -> Construct:
         try:
             clsmembers = dict(inspect.getmembers(sys.modules[__name__]))
@@ -162,10 +167,10 @@ class Panel(PanelBase):
             return
 
         if mvars.address == 0:
-            if time.time() - self.core.last_power_update >= cfg.POWER_UPDATE_INTERVAL:
+            if time.time() - self.last_power_update >= cfg.POWER_UPDATE_INTERVAL:
                 force = PublishPropertyChange.YES if cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE else PublishPropertyChange.NO
 
-                self.core.last_power_update = time.time()
+                self.last_power_update = time.time()
                 self.core.update_properties('system', 'power', dict(vdc=round(properties.vdc, 2)),
                                             publish=force)
                 self.core.update_properties('system', 'power', dict(battery=round(properties.battery, 2)),

@@ -86,7 +86,10 @@ class ClientConnection():
 
         while True:
             try:
-                data = await self.client_reader.read(1000)
+                data = await asyncio.wait_for(self.client_reader.read(1000), cfg.KEEP_ALIVE_INTERVAL * 1.5)
+            except asyncio.TimeoutError:
+                logger.info("Timeout. Client may have disconnected")
+                break
             except:
                 logger.info("Client disconnected")
                 break

@@ -30,11 +30,10 @@ def checksum(data, min_message_length):
 
 
 class SerialConnectionProtocol(ConnectionProtocol):
-    def __init__(self, on_port_open, on_port_closed):
-        super(SerialConnectionProtocol, self).__init__()
+    def __init__(self, on_port_open, on_con_lost):
+        super(SerialConnectionProtocol, self).__init__(on_con_lost=on_con_lost)
         self.buffer = b''
         self.on_port_open = on_port_open
-        self.on_port_closed = on_port_closed
         self.loop = asyncio.get_event_loop()
 
     def connection_made(self, transport):

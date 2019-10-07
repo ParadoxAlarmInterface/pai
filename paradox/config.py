@@ -59,8 +59,7 @@ class Config:
         "MQTT_RETAIN": True,                         # Publish messages with Retain
         "MQTT_BIND_ADDRESS": '127.0.0.1',
         "MQTT_REPUBLISH_INTERVAL": (60 * 60 * 12, int, (60, 0xFFFFFFFF)),    # Interval for republishing all data
-        "MQTT_HOMEBRIDGE_ENABLE": False,
-        "MQTT_HOMEASSISTANT_ENABLE": False,
+        "MQTT_HOMEASSISTANT_AUTODISCOVERY_ENABLE": False,
 
         # MQTT Topics
         "MQTT_BASE_TOPIC": 'paradox',             # Root of all topics
@@ -78,30 +77,6 @@ class Config:
         "MQTT_KEYPAD_TOPIC": 'keypads',
         "MQTT_STATES_TOPIC": 'states',
         "MQTT_RAW_TOPIC": 'raw',
-        "MQTT_HOMEBRIDGE_SUMMARY_TOPIC": 'current',
-        "MQTT_PARTITION_HOMEBRIDGE_COMMANDS": {
-            'STAY_ARM': 'arm_stay',
-            'AWAY_ARM': 'arm',
-            'NIGHT_ARM': 'arm_sleep',
-            'DISARM': 'disarm'},
-        "MQTT_PARTITION_HOMEBRIDGE_STATES": {
-            'alarm': 'ALARM_TRIGGERED',
-            'arm_stay': 'STAY_ARM',
-            'arm': 'AWAY_ARM',
-            'arm_sleep': 'NIGHT_ARM',
-            'disarm': 'DISARMED'},
-        "MQTT_HOMEASSISTANT_SUMMARY_TOPIC": 'current_hass',
-        "MQTT_PARTITION_HOMEASSISTANT_STATES": {
-            'alarm': 'triggered', 
-            'arm_stay': 'armed_home',
-            'arm': 'armed_away',
-            'arm_sleep': 'armed_night',
-            'disarm': 'disarmed'},
-        "MQTT_PARTITION_HOMEASSISTANT_COMMANDS": {
-            'ARM_HOME': 'arm_stay',
-            'ARM_AWAY': 'arm',
-            'ARM_NIGHT': 'arm_sleep',
-            'DISARM': 'disarm'},
         "MQTT_NOTIFICATIONS_TOPIC": 'notifications',
         "MQTT_PUBLISH_RAW_EVENTS": True,
         "MQTT_INTERFACE_TOPIC": 'interface',
