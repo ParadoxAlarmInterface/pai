@@ -1,7 +1,10 @@
+from mock import MagicMock
+
 from paradox.paradox import Paradox
 
 from paradox.lib.ps import sendMessage
 from paradox.models.element_type_container import ElementTypeContainer
+
 
 def send_initial_status(alarm):
     sendMessage("labels_loaded", data=dict(
@@ -25,9 +28,9 @@ def send_initial_status(alarm):
     alarm.update_properties.assert_called_with('partition', 'Partition_1', {'current_state': 'disarmed'})
 
 
-def test_current_state_armed_away(mocker):
+def test_current_state_armed_away():
     alarm = Paradox(None)
-    mocker.patch.object(alarm, 'update_properties', autospec=True)
+    alarm.update_properties = MagicMock()
 
     send_initial_status(alarm)
 
@@ -41,9 +44,9 @@ def test_current_state_armed_away(mocker):
     alarm.update_properties.assert_called_with('partition', 'Partition_1', {'current_state': 'armed_away'})
 
 
-def test_current_state_pending(mocker):
+def test_current_state_pending():
     alarm = Paradox(None)
-    mocker.patch.object(alarm, 'update_properties', autospec=True)
+    alarm.update_properties = MagicMock()
 
     send_initial_status(alarm)
 
@@ -58,9 +61,9 @@ def test_current_state_pending(mocker):
     alarm.update_properties.assert_called_with('partition', 'Partition_1', {'current_state': 'pending'})
 
 
-def test_current_arm_stay(mocker):
+def test_current_arm_stay():
     alarm = Paradox(None)
-    mocker.patch.object(alarm, 'update_properties', autospec=True)
+    alarm.update_properties = MagicMock()
 
     send_initial_status(alarm)
 
@@ -77,7 +80,7 @@ def test_current_arm_stay(mocker):
 
 def test_current_alarm(mocker):
     alarm = Paradox(None)
-    mocker.patch.object(alarm, 'update_properties', autospec=True)
+    alarm.update_properties = MagicMock()
 
     send_initial_status(alarm)
 

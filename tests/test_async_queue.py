@@ -47,7 +47,7 @@ def test_event_handler_failure(mocker):
         '524700009f0041133e001e0e0400000000060a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000121510010705004e85')
 
     eh = EventMessageHandler(lambda m: "beer")
-    mocker.patch.object(eh, 'handle')
+    eh.handle = mock.MagicMock()
 
     loop = asyncio.get_event_loop()
     mh = AsyncMessageManager(loop)

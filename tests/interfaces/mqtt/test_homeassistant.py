@@ -1,15 +1,15 @@
 import pytest
-
-from pytest_mock import mocker
+from mock import MagicMock
 
 from paradox.interfaces.mqtt.homeassistant import HomeAssistantMQTTInterface
 from paradox.lib.ps import sendMessage
 import json
 
+
 @pytest.mark.asyncio
-async def test_hass(mocker):
+async def test_hass():
     interface = HomeAssistantMQTTInterface()
-    mocker.patch.object(interface, "mqtt")
+    interface.mqtt = MagicMock()
     interface.start()
 
     await interface._started.wait()
