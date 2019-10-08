@@ -1,0 +1,9 @@
+#sudo nano /etc/systemd/system/pai.service
+[Unit]
+Description=ParadoxAilarmInterface
+
+[Service]
+ExecStart=/home/ha/pai/run.py
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=pai
