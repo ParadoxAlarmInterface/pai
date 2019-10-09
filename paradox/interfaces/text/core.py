@@ -92,13 +92,13 @@ class AbstractTextInterface(ThreadQueueInterface):
         if allow:
             self._send_message(event.message)
 
-    def _handle_command(self, message):
-        message = cfg.COMMAND_ALIAS.get(message, message)
+    def _handle_command(self, message_raw):
+        message = cfg.COMMAND_ALIAS.get(message_raw, message_raw)
 
         tokens = message.split(" ")
 
         if len(tokens) != 3:
-            m = "Invalid command"
+            m = "Invalid command: {}".format(message_raw)
             logger.warning(m)
             return m
 
