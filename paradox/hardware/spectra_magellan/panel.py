@@ -196,6 +196,8 @@ class Panel(PanelBase):
         :param str command: textual command
         :return: True if we have at least one success
         """
+        command = command.lower() # Normalize case
+        
         if command not in ZONE_ACTIONS:
             return False
 
@@ -217,6 +219,8 @@ class Panel(PanelBase):
         :param str command: textual command
         :return: True if we have at least one success
         """
+        command = command.lower() # Normalize case
+
         if command not in PARTITION_ACTIONS:
             return False
 
@@ -238,6 +242,8 @@ class Panel(PanelBase):
         :param str command: textual command
         :return: True if we have at least one success
         """
+        command = command.lower() # Normalize case
+        
         if command not in PGM_ACTIONS:
             return False
 
