@@ -26,8 +26,7 @@ class AbstractTextInterface(ThreadQueueInterface):
             self.alarm.disconnect()
 
     def run(self):
-
-        logger.info("Starting Text Interface")
+        logger.info("Starting Interface")
 
         ps.subscribe(self._handle_panel_event, "events")
         ps.subscribe(self._handle_notify, "notifications")

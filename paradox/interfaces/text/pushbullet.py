@@ -17,6 +17,7 @@ from paradox.config import config as cfg
 logger = logging.getLogger('PAI').getChild(__name__)
 
 class PushBulletWSClient(WebSocketBaseClient):
+    name = "pushbullet"
 
     def __init__(self, interface, url):
         """ Initializes the PB WS Client"""
@@ -107,7 +108,6 @@ class PushBulletWSClient(WebSocketBaseClient):
 
 class PushbulletTextInterface(AbstractTextInterface):
     """Interface Class using Pushbullet"""
-    name = 'pushbullet'
 
     def __init__(self):
         super().__init__(cfg.PUSHBULLET_ALLOW_EVENTS, cfg.PUSHBULLET_IGNORE_EVENTS)
