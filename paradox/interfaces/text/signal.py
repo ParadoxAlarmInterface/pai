@@ -27,12 +27,13 @@ class SignalTextInterface(AbstractTextInterface):
         self.loop = None
 
     def stop(self):
-        super().stop()
 
         """ Stops the Signal Interface Thread"""
         logger.debug("Stopping Signal Interface")
         if self.loop is not None:
             self.loop.quit()
+
+        super().stop()
 
         logger.debug("Signal Stopped")
 
