@@ -77,7 +77,7 @@ class PushBulletWSClient(WebSocketBaseClient):
 
                 ps.sendMessage("notifications",
                                message=dict(source=self.name,
-                                            payload=message,
+                                            payload=m,
                                             level=EventLevel.INFO))
 
     def unhandled_error(self, error):
