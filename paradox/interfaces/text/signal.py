@@ -68,14 +68,14 @@ class SignalTextInterface(AbstractTextInterface):
         if source in cfg.SIGNAL_CONTACTS:
             ret = self.send_command(message)
 
-            m = "FROM {}: {}".format(source, ret)
+            m = "Signal {} : {}".format(source, ret)
             logger.info(m)
         else:
-            m = "INVALID SENDER: {}".format(message)
+            m = "Signal {} (UNK): {}".format(source, message)
             logger.warning(m)
 
-
+        self.send_message(m)
         ps.sendMessage("notifications",
                        message=dict(source=self.name,
-                                    payload=message,
+                                    payload=m,
                                     level=EventLevel.INFO))

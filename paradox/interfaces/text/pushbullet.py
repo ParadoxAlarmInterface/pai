@@ -69,12 +69,13 @@ class PushBulletWSClient(WebSocketBaseClient):
                 if p.get('sender_email_normalized') in cfg.PUSHBULLET_CONTACTS:
                     ret = self.interface._handle_command(p.get('body'))
 
-                    m = "From {}: {}".format(p.get('sender_email_normalized'), ret)
+                    m = "PB {}: {}".format(p.get('sender_email_normalized'), ret)
                     logger.info(m)
                 else:
-                    m = "INVALID SENDER {}: {}".format(p.get('sender_email_normalized'), p.get('body'))
+                    m = "PB {} (UNK): {}".format(p.get('sender_email_normalized'), p.get('body'))
                     logger.warning(m)
 
+                self.send_message(m)
                 ps.sendMessage("notifications",
                                message=dict(source=self.name,
                                             payload=m,
