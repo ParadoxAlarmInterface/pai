@@ -74,7 +74,7 @@ class SignalTextInterface(AbstractTextInterface):
             m = "Signal {} (UNK): {}".format(source, message)
             logger.warning(m)
 
-        self.send_message(m)
+        self._send_message(m)
         ps.sendMessage("notifications",
                        message=dict(source=self.name,
                                     payload=m,
