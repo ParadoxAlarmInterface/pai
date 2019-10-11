@@ -26,9 +26,6 @@ evo_status = {
                      safety_mismatch_trouble=False, bus_global_fail=False, bus_overload_trouble=False,
                      mdl_com_error=False),
     '_time': datetime.datetime(2019, 9, 12, 11, 37, 5),
-    'vdc': 16.890588235294118,
-    'battery': 13.411764705882353,
-    'dc': 13.858823529411765,
     'zone_open': {1: False, 2: False},
     'zone_tamper': {1: False, 2: False},
     'zone_low_battery': {1: False, 2: False},
@@ -105,7 +102,7 @@ evo_status = {
         'report': {'arm_disarm_delay_timer': 0},
         'power': {'battery': 13.411764705882353, 'dc': 13.501176470588236, 'vdc': 16.52},
         'panel_status': {'installer_lock_active': False},
-        'event': {'event_pointer': 13312, 'event_pointer_bus': 41741},
+        'event': {'_event_pointer': 13312, '_event_pointer_bus': 41741},
         'date': {'time': datetime.datetime(2019, 10, 11, 21, 12, 2), 'weekday': 6}
     }
 }

@@ -137,8 +137,8 @@ RAMDataParserMap = {
                 "_free" / Padding(7)
             ),
             "event" / Struct(
-                "event_pointer" / Int16ub,
-                "event_pointer_bus" / Int16ub,
+                "_event_pointer" / Int16ub,
+                "_event_pointer_bus" / Int16ub,
             ),
             "_recycle_system" / Array(8, Int8ub),
             "report" / Struct(
