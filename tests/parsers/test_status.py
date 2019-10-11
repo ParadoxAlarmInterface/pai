@@ -5,7 +5,7 @@ from paradox.paradox import Paradox
 from paradox.parsers.status import convert_raw_status
 
 evo_status = {
-    'weekday': 5,
+    '_weekday': 5,
     'pgm_flags': dict(chime_zone_partition={1: False, 2: False},
                       power_smoke=False,
                                   ground_start=False, kiss_off=False, line_ring=False,
@@ -25,7 +25,7 @@ evo_status = {
                      module_aux_trouble=False, missing_keypad_trouble=False, missing_module_trouble=False,
                      safety_mismatch_trouble=False, bus_global_fail=False, bus_overload_trouble=False,
                      mdl_com_error=False),
-    'time': datetime.datetime(2019, 9, 12, 11, 37, 5),
+    '_time': datetime.datetime(2019, 9, 12, 11, 37, 5),
     'vdc': 16.890588235294118,
     'battery': 13.411764705882353,
     'dc': 13.858823529411765,
@@ -100,7 +100,14 @@ evo_status = {
     '_recycle_system': [58, 11, 0, 0, 0, 0, 0, 0],
     'arm_disarm_report_delay_timer': 0,
     '_free': None,
-    'bus-module_trouble': {1: False, 2: False}
+    'bus-module_trouble': {1: False, 2: False},
+    'system': {
+        'report': {'arm_disarm_delay_timer': 0},
+        'power': {'battery': 13.411764705882353, 'dc': 13.501176470588236, 'vdc': 16.52},
+        'panel_status': {'installer_lock_active': False},
+        'event': {'event_pointer': 13312, 'event_pointer_bus': 41741},
+        'date': {'time': datetime.datetime(2019, 10, 11, 21, 12, 2), 'weekday': 6}
+    }
 }
 
 
@@ -129,15 +136,13 @@ def test_convert_raw_status(mocker):
     assert status["troubles"] == evo_status["troubles"]
     assert status["door"] == {1: dict(open=False), 2: dict(open=False)}
     assert status["bus-module"] == {1: dict(trouble=False), 2: dict(trouble=False)}
-    assert status["system"] == {
-        "power": {
-            "vdc": 16.890588235294118,
-            "battery": 13.411764705882353,
-            "dc": 13.858823529411765
-        },
-        "date": {
-            "weekday": 5,
-            'time': datetime.datetime(2019, 9, 12, 11, 37, 5)
-        }
+    assert status["system"]["power"] == {
+        "vdc": 16.52,
+        "battery": 13.411764705882353,
+        "dc": 13.501176470588236
+    }
+    assert status["system"]["date"] == {
+        'time': datetime.datetime(2019, 10, 11, 21, 12, 2),
+        'weekday': 6
     }
     # TODO: Think out a PGM format
