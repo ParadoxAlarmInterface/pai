@@ -4,7 +4,6 @@ import asyncio
 import logging
 import time
 from binascii import hexlify
-from collections import defaultdict
 from enum import Enum
 from threading import Lock
 from typing import Optional, Sequence, Iterable, Callable, Awaitable
@@ -19,7 +18,7 @@ from paradox.hardware import create_panel
 from paradox.lib import ps
 from paradox.lib.async_message_manager import AsyncMessageManager, EventMessageHandler, ErrorMessageHandler
 from paradox.lib.utils import deep_merge
-from paradox.models.element_type_container import ElementTypeContainer
+from paradox.data.memory_storage import MemoryStorage as Storage
 from paradox.parsers.status import convert_raw_status
 
 logger = logging.getLogger('PAI').getChild(__name__)
@@ -57,10 +56,7 @@ class Paradox:
         self.message_manager.register_handler(EventMessageHandler(self.handle_event))
         self.message_manager.register_handler(ErrorMessageHandler(self.handle_error))
 
-        self.data = defaultdict(ElementTypeContainer)  # dictionary of Type
-        self.data['system'] = dict(power=dict(label='power', key='power', id=0),
-                                   rf=dict(label='rf', key='rf', id=1),
-                                   troubles=dict(label='troubles', key='troubles', id=2))
+        self.storage = Storage()
 
         self.run = State.STOP
         self.request_lock = asyncio.Lock()
@@ -354,35 +350,10 @@ class Paradox:
 
         return None  # Probably it needs to throw an exception instead of returning None
 
-    @staticmethod
-    def _select(haystack, needle) -> Sequence[int]:
-        """
-        Helper function to select objects from provided dictionary
-
-        :param haystack: dictionary
-        :param needle:
-        :return: Sequence[int] list of object indexes
-        """
-        selected = []  # type: Sequence[int]
-        if needle == 'all' or needle == '0':
-            selected = list(haystack)
-        else:
-            if needle.isdigit() and 0 < int(needle) < len(haystack):
-                el = haystack.get(int(needle))
-            else:
-                el = haystack.get(needle)
-
-            if el:
-                if "id" not in el:
-                    raise Exception("Invalid dictionary of elements provided")
-                selected = [el["id"]]
-
-        return selected
-
     def control_zone(self, zone: str, command: str) -> bool:
         logger.debug("Control Zone: {} - {}".format(zone, command))
 
-        zones_selected = self._select(self.data['zone'], zone)  # type: Sequence[int]
+        zones_selected = self.storage.get_container('zone').select(zone)  # type: Sequence[int]
 
         # Not Found
         if len(zones_selected) == 0:
@@ -408,7 +379,7 @@ class Paradox:
     def control_partition(self, partition: str, command: str) -> bool:
         logger.debug("Control Partition: {} - {}".format(partition, command))
 
-        partitions_selected = self._select(self.data['partition'], partition)  # type: Sequence[int]
+        partitions_selected = self.storage.get_container('partition').select(partition) # type: Sequence[int]
 
         # Not Found
         if len(partitions_selected) == 0:
@@ -426,8 +397,6 @@ class Paradox:
             logger.error('control_partitions timeout')
             future.cancel()
 
-        # TODO: Re-request status
-
         # Refresh status
         self.request_status_refresh()  # Trigger status update
 
@@ -436,7 +405,7 @@ class Paradox:
     def control_output(self, output, command) -> bool:
         logger.debug("Control Output: {} - {}".format(output, command))
 
-        outputs_selected = self._select(self.data['pgm'], output)
+        outputs_selected = self.storage.get_container('pgm').select(output)
 
         # Not Found
         if len(outputs_selected) == 0:
@@ -461,10 +430,9 @@ class Paradox:
         return accepted
 
     def get_label(self, label_type: str, label_id) -> Optional[str]:
-        if label_type in self.data:
-            el = self.data[label_type].get(label_id)
-            if el:
-                return el.get("label")
+        el = self.storage.get_container_object(label_type, label_id)
+        if el:
+            return el.get("label")
 
     def handle_event(self, message: Container=None):
         """Process cfg.Live Event Message and dispatch it to the interface module"""
@@ -481,48 +449,48 @@ class Paradox:
 
             if cfg.LOGGING_DUMP_EVENTS:
                 logger.debug("Event: {}".format(evt))
-                
+
+            element = self.storage.get_container_object(evt.type, evt.id)
+
             # Temporary to catch labels/properties in wrong places
             # TODO: REMOVE
             if message is not None:
-                if evt.type in self.data:
-                    if not evt.id:
-                        logger.warning("Missing element ID in {}/{}, m/m: {}/{}, message: {}".format(evt.type, evt.label or '?', evt.major, evt.minor, evt.message))
-                    else:
-                        el = self.data[evt.type].get(evt.id)
-                        if not el:
-                            logger.warning("Missing element with ID {} in {}/{}".format(evt.id, evt.type, evt.label))
-                        else:
-                            for k in evt.change:
-                                if k not in el:
-                                    logger.warning("Missing property {} in {}/{}".format(k, evt.type, evt.label))
-                            if evt.label != el.get("label"):
-                                logger.warning(
-                                    "Labels differ {} != {} in {}/{}".format(el.get("label"), evt.label, evt.type, evt.label))
+                if not evt.id:
+                    logger.warning("Missing element ID in {}/{}, m/m: {}/{}, message: {}".format(evt.type, evt.label or '?', evt.major, evt.minor, evt.message))
                 else:
-                    logger.warning("Missing type {} for event: {}.{} {}".format(evt.type, evt.major, evt.minor, evt.message))
+                    if not element:
+                        logger.warning("Missing element with ID {} in {}/{}".format(evt.id, evt.type, evt.label))
+                    else:
+                        for k in evt.change:
+                            if k not in element:
+                                logger.warning("Missing property {} in {}/{}".format(k, evt.type, evt.label))
+                        if evt.label != element.get("label"):
+                            logger.warning(
+                                "Labels differ {} != {} in {}/{}".format(element.get("label"), evt.label, evt.type, evt.label))
             # Temporary end
             
             # The event has changes. Update the state
-            if len(evt.change) > 0 and evt.type in self.data and evt.id in self.data[evt.type]:
+            if len(evt.change) > 0 and element:
                 self.update_properties(evt.type, evt.id, evt.change)
 
         except Exception as e:
             logger.exception("Handle event")
 
     def update_properties(self, element_type: str, type_key: str, change: dict, publish=PublishPropertyChange.DEFAULT):
-        try:
-            elements = self.data[element_type]
-        except KeyError:
-            logger.debug('Error: "%s" key is missing from data' % element_type)
-            return
+        assert element_type is not None
+        assert type_key is not None
+        assert isinstance(change, dict)
+        assert change  # Has at least one element
 
-      # Panel doesn't have this element
-        if type_key not in elements:
-            # Some panels have less elements than the ones reported in the status messages.
-            # This is not an error but the logging can be useful when adding new panels.
-            logger.debug('Notice: {} not found in type {} with content {}'.format(type_key, element_type, list(elements)))
-            return
+        logger.debug('update_properties %s/%s=%s', element_type, type_key, change)
+        element = self.storage.get_container_object(element_type, type_key, create_if_missing=True)
+
+        # Panel doesn't have this element
+        # if type_key not in elements:
+        #     # Some panels have less elements than the ones reported in the status messages.
+        #     # This is not an error but the logging can be useful when adding new panels.
+        #     logger.debug('Notice: {} not found in type {} with content {}'.format(type_key, element_type, list(elements)))
+        #     return
 
         # Publish changes and update state
         for property_name, property_value in change.items():
@@ -530,31 +498,18 @@ class Paradox:
             if property_name.startswith('_'):  # skip private properties
                 continue
 
-            key = elements[type_key]['key']
-            old = elements[type_key].get(property_name)
+            key = element['key']
+            old = element.get(property_name)
 
-            if isinstance(property_value, Callable):
+            if isinstance(property_value, Callable):  # function to make new value from the old one
                 try:
                     property_value = property_value(old)
                 except Exception:
                     logger.exception('Exception caught during property "%s" convert. Ignoring', property_name)
                     continue
 
-            # Virtual property "Trouble"
-            # True if element has ANY type of alarm
-            if 'trouble' in property_name and property_name !='trouble':
-                if property_value:
-                    self.update_properties(element_type, type_key, dict(trouble=True), publish=publish)
-                else:
-                    r = False
-                    for kk, vv in elements[type_key].items():
-                        if 'trouble' in kk:
-                            r = r or elements[type_key][kk]
-
-                    self.update_properties(element_type, type_key, dict(trouble=r), publish=publish)
-
             # Standard processing of changes
-            if property_name in elements[type_key]:
+            if property_name in element:
                 if old != property_value \
                         or publish == PublishPropertyChange.YES \
                         or cfg.PUSH_UPDATE_WITHOUT_CHANGE:
@@ -563,7 +518,7 @@ class Paradox:
                                                                         property_name,
                                                                         old,
                                                                         property_value))
-                    elements[type_key][property_name] = property_value
+                    element[property_name] = property_value
                     
                     ps.sendChange(element_type, key, property_name, property_value)
 
@@ -585,7 +540,7 @@ class Paradox:
                             logger.warning("Could not create event from change")
 
             else:
-                elements[type_key][property_name] = property_value  # Initial value, do not notify
+                element[property_name] = property_value  # Initial value, do not notify
                 suppress = 'trouble' not in property_name
 
                 ps.sendChange(element_type, key, property_name, property_value, initial=suppress)
@@ -637,24 +592,49 @@ class Paradox:
 
     def _on_labels_load(self, data):
         for k, d in data.items():
-            self.data[k].update(d)
+            self.storage.get_container(k).update(d)
 
     def _on_status_update(self, status):
-        self._process_partition_statuses(status['partition'])
+        """
+        Calls update_properties
+        :param status:
+        :return:
+        """
+        if 'troubles' in status:
+            self._process_trouble_statuses(status['troubles'])
+        if 'partition' in status:
+            self._update_partition_current_state(status['partition'])
         # self._process_zone_statuses(status['zone'])
 
         for element_type, element_items in status.items():
+            if element_type in ['troubles']:  # troubles was already parsed
+                continue
             for element_item_key, element_item_status in element_items.items():
-                if isinstance(element_item_status, (dict, list,)) and element_type in self.data:  # TODO: who cares if it is in self.data?
+                if isinstance(element_item_status, (dict, list,)):
                     self.update_properties(element_type, element_item_key, element_item_status)
+                else:
+                    logger.debug("%s/%s:%s ignored", element_type, element_item_key, element_item_status)
 
         self.first_status = False
 
-    def _process_partition_statuses(self, partition_statuses):
-        for p_key, p_status in partition_statuses.items():
-            if p_key not in self.data['partition']:
+    def _process_trouble_statuses(self, trouble_statuses):
+        global_trouble = False
+        for t_key, t_status in trouble_statuses.items():
+            if not isinstance(t_status, bool):
+                logger.error("Trouble %s has not boolean state: %s", t_key, t_status)
                 continue
-            partition = self.data['partition'][p_key]
+
+            self.update_properties('system', 'troubles', {t_key: global_trouble})
+
+            global_trouble = global_trouble or t_status
+
+        self.update_properties('system', 'troubles', {'trouble': global_trouble})
+
+    def _update_partition_current_state(self, partition_statuses):
+        for p_key, p_status in partition_statuses.items():
+            partition = self.storage.get_container_object('partition', p_key)
+            if not partition:
+                continue
 
             if any([
                 p_status.get('fire_alarm'),

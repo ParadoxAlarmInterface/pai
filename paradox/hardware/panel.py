@@ -9,7 +9,6 @@ from construct import Construct, Struct, BitStruct, Const, Nibble, Checksum, Pad
     Default, Enum, Flag, BitsInteger, Int16ub, Container, EnumIntegerString, Rebuild
 
 from paradox.config import config as cfg
-from paradox.models.element_type_container import ElementTypeContainer
 from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum, HexInt
 
 logger = logging.getLogger('PAI').getChild(__name__)

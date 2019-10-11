@@ -167,6 +167,7 @@ class Panel(PanelBase):
             return
 
         if mvars.address == 0:
+            # TODO: This should not be handled on the panel level
             if time.time() - self.last_power_update >= cfg.POWER_UPDATE_INTERVAL:
                 force = PublishPropertyChange.YES if cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE else PublishPropertyChange.NO
 
@@ -180,12 +181,6 @@ class Panel(PanelBase):
                 self.core.update_properties('system', 'rf',
                                             dict(rf_noise_floor=round(properties.rf_noise_floor, 2)),
                                             publish=force)
-
-            for k in properties.troubles:
-                if k.startswith('_'):
-                    continue
-
-                self.core.update_properties('system', 'troubles', {k: properties.troubles[k]})
 
         return properties
 

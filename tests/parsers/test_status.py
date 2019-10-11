@@ -130,10 +130,14 @@ def test_convert_raw_status(mocker):
     assert status["door"] == {1: dict(open=False), 2: dict(open=False)}
     assert status["bus-module"] == {1: dict(trouble=False), 2: dict(trouble=False)}
     assert status["system"] == {
-        "weekday": 5,
-        "vdc": 16.890588235294118,
-        "battery": 13.411764705882353,
-        "dc": 13.858823529411765,
-        'time': datetime.datetime(2019, 9, 12, 11, 37, 5)
+        "power": {
+            "vdc": 16.890588235294118,
+            "battery": 13.411764705882353,
+            "dc": 13.858823529411765
+        },
+        "date": {
+            "weekday": 5,
+            'time': datetime.datetime(2019, 9, 12, 11, 37, 5)
+        }
     }
     # TODO: Think out a PGM format

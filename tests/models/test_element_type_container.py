@@ -1,5 +1,5 @@
 import pytest
-from paradox.models.element_type_container import ElementTypeContainer
+from paradox.data.element_type_container import ElementTypeContainer
 
 def test_get_by_key():
     a = ElementTypeContainer({1: {'key': 'Living_room', 'val': 25}})

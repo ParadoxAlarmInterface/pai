@@ -21,7 +21,10 @@ re_topic_dirty = re.compile(r'\W')
 
 
 def sanitize_topic_part(name):
-    return re_topic_dirty.sub('_', name).strip('_')
+    if isinstance(name, int):
+        return str(name)
+    else:
+        return re_topic_dirty.sub('_', name).strip('_')
 
 
 class MQTTConnection(Client):

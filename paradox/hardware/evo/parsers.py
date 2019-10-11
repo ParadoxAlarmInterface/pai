@@ -56,7 +56,7 @@ InitializeCommunication = Struct("fields" / RawCopy(
 
 RAMDataParserMap = {
     1: Struct(
-        "weekday" / Int8ub,
+        "_weekday" / Int8ub,
         "pgm_flags" / PGMFlags(),
         "key-switch_triggered" / StatusAdapter(Bytes(4)),  # TODO: Implement key-switch
         "door_open" / StatusAdapter(Bytes(4)),
@@ -106,10 +106,18 @@ RAMDataParserMap = {
             "bus_overload_trouble" / Flag,
             "mdl_com_error" / Flag
         ),
-        "time" / DateAdapter(Bytes(7)),
-        "vdc" / ExprAdapter(Byte, obj_ * (20.3 - 1.4) / 255.0 + 1.4, 0),
-        "battery" / ExprAdapter(Byte, obj_ * 22.8 / 255.0, 0),
-        "dc" / ExprAdapter(Byte, obj_ * 22.8 / 255.0, 0),
+        "_time" / DateAdapter(Bytes(7)),
+        "system" / Struct(
+            "date" / Computed(lambda ctx: {
+                "weekday": ctx._._weekday,
+                "time": ctx._._time
+            }),
+            "power" / Struct(
+                "vdc" / ExprAdapter(Byte, obj_ * (20.3 - 1.4) / 255.0 + 1.4, 0),
+                "battery" / ExprAdapter(Byte, obj_ * 22.8 / 255.0, 0),
+                "dc" / ExprAdapter(Byte, obj_ * 22.8 / 255.0, 0),
+            )
+        ),
         "zone_open" / StatusAdapter(Bytes(12)),
         "zone_tamper" / StatusAdapter(Bytes(12)),
         "zone_low_battery" / StatusAdapter(Bytes(12))
@@ -123,14 +131,20 @@ RAMDataParserMap = {
     ),
     4: Struct(
         "partition_status" / PartitionStatus(Bytes(16)),
-        "panel_status" / BitStruct(
-            "installer_lock_active" / Flag,
-            "_free" / Padding(7)
+        "system" / Struct(
+            "panel_status" / BitStruct(
+                "installer_lock_active" / Flag,
+                "_free" / Padding(7)
+            ),
+            "event" / Struct(
+                "event_pointer" / Int16ub,
+                "event_pointer_bus" / Int16ub,
+            ),
+            "_recycle_system" / Array(8, Int8ub),
+            "report" / Struct(
+                "arm_disarm_delay_timer" / Int8ub,
+            )
         ),
-        "event_pointer" / Int16ub,
-        "event_pointer_bus" / Int16ub,
-        "_recycle_system" / Array(8, Int8ub),
-        "arm_disarm_report_delay_timer" / Int8ub,
         "_free" / Padding(34)
     ),
     5: Struct(

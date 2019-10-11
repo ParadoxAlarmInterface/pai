@@ -1,5 +1,5 @@
 from collections import MutableMapping
-from typing import Mapping
+from typing import Mapping, Sequence
 
 from paradox.lib.utils import deep_merge
 
@@ -28,8 +28,35 @@ class ElementTypeContainer(MutableMapping):
     def __len__(self):
         return len(self.store)
 
+    def __str__(self):
+        return self.store.__str__()
+
     def filter(self, id_arr):
         self.store = dict((i, v) for i, v in self.store.items() if i in id_arr)
+
+    def select(self, needle) -> Sequence[int]:
+        """
+        Helper function to select objects from provided dictionary
+
+        :param haystack: dictionary
+        :param needle:
+        :return: Sequence[int] list of object indexes
+        """
+        selected = []  # type: Sequence[int]
+        if needle == 'all' or needle == '0':
+            selected = list(self.store)
+        else:
+            if needle.isdigit() and 0 < int(needle) < len(self.store):
+                el = self.store.get(int(needle))
+            else:
+                el = self.store.get(needle)
+
+            if el:
+                if "id" not in el:
+                    raise Exception("Invalid dictionary of elements provided")
+                selected = [el["id"]]
+
+        return selected
 
     def deep_merge(self, *dicts):
         self.store = deep_merge(self.store, *dicts)

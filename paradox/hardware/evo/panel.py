@@ -199,17 +199,7 @@ class Panel_EVOBase(PanelBase):
 
         parser = RAMDataParserMap[mvars.address]
 
-        properties = parser.parse(mvars.data)
-
-        if mvars.address == 1:
-            for k in properties.troubles:
-                if k.startswith("_"):  # ignore private properties
-                    continue
-
-                self.core.update_properties('system', 'troubles',
-                                            {k: properties.troubles[k]})
-
-        return properties
+        return parser.parse(mvars.data)
 
     async def control_partitions(self, partitions: list, command: str) -> bool:
         """

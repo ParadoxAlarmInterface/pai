@@ -5,8 +5,7 @@ from typing import Dict
 from construct import Container
 
 from paradox.config import config as cfg
-from paradox.lib.utils import deep_merge
-from paradox.models.element_type_container import ElementTypeContainer
+from paradox.data.element_type_container import ElementTypeContainer
 
 logger = logging.getLogger('PAI').getChild(__name__)
 

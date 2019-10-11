@@ -89,7 +89,9 @@ def test_property(property, type, value, partition, label):
 #     assert false_ == Panel_EVO192.property_map[property]["message"]["False"]
 
 def test_property_map_keys():
+    synthetic_props = ['current_state']
     expected_keys = set(k.values[0] for k in generate_property_test_parameters())
+    expected_keys.update(synthetic_props)
     actual_keys = set(Panel_EVO192.property_map.keys())
     property_map = Panel_EVO192.property_map
 

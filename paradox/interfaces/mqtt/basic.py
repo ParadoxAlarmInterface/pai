@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import re
 import time
 import typing
 from collections import namedtuple
@@ -190,7 +189,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                          json.dumps(event.props, ensure_ascii=False, cls=JSONByteEncoder), 0, cfg.MQTT_RETAIN)
 
     def _handle_panel_change(self, change):
-        logger.debug(change)
+        logger.debug("Change: %s", change)
 
         attribute = change['property']
         label = change['label']
@@ -200,6 +199,8 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
         """Handle Property Change"""
 
+        # Dash stuff START
+        # TODO: move to a separate component
         # Keep track of ARM state
         if element == 'partition':
             if label not in self.partitions:
@@ -210,6 +211,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                     self._publish_dash(cfg.MQTT_DASH_TEMPLATE, list(self.partitions.keys()))
 
             self.partitions[label][attribute] = value
+        # Dash stuff END
 
         if element in ELEMENT_TOPIC_MAP:
             element_topic = ELEMENT_TOPIC_MAP[element]
@@ -234,6 +236,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             self.mqtt.publish(k, v['value'], v['qos'], v['retain'])
 
     def _publish_dash(self, fname, partitions):
+        # TODO: move to a separate component
         if len(partitions) < 2:
             return
 
