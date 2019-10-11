@@ -8,9 +8,11 @@ from typing import Optional
 
 from construct import Construct, Container, MappingError, ChecksumError
 
+from paradox.exceptions import StatusRequestException
 from .event import event_map
 from .parsers import CloseConnection, ErrorMessage, InitializeCommunication, LoginConfirmationResponse, SetTimeDate, \
-    SetTimeDateResponse, PerformPartitionAction, PerformPartitionActionResponse, PerformZoneAction, PerformZoneActionResponse, ReadEEPROMResponse, LiveEvent, \
+    SetTimeDateResponse, PerformPartitionAction, PerformPartitionActionResponse, PerformZoneAction, \
+    PerformZoneActionResponse, ReadEEPROMResponse, LiveEvent, \
     ReadEEPROM, RAMDataParserMap, RequestedEvent
 from .property import property_map
 from ..panel import Panel as PanelBase
@@ -182,24 +184,11 @@ class Panel_EVOBase(PanelBase):
     async def request_status(self, i: int) -> Optional[Container]:
         args = dict(address=i, length=64, control=dict(ram_access=True))
         reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, args['address']))
-
-        return reply
-
-    def handle_status(self, message: Container):
-        """Handle MessageStatus"""
-
-        mvars = message.fields.value
-        # Check message
-
-        if mvars.address not in RAMDataParserMap:
-            logger.error(
-                "Parser for memory address ({}) is not implemented. Please review your STATUS_REQUESTS setting. Skipping.".format(mvars.address))
-            return
-        assert len(mvars.data) == 64
-
-        parser = RAMDataParserMap[mvars.address]
-
-        return parser.parse(mvars.data)
+        if reply is not None:
+            logger.debug("Received status response: %d" % i)
+            return self.handle_status(reply, RAMDataParserMap)
+        else:
+            raise StatusRequestException("No reply to status request: %d" % i)
 
     async def control_partitions(self, partitions: list, command: str) -> bool:
         """

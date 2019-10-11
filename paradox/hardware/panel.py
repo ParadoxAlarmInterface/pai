@@ -205,8 +205,20 @@ class Panel:
     def request_status(self, nr):
         raise NotImplementedError("override request_status in a subclass")
 
-    def handle_status(self, reply):
-        raise NotImplementedError("override handle_status in a subclass")
+    def handle_status(self, message: Container, parser_map):
+        """Handle MessageStatus"""
+        mvars = message.fields.value
+
+        if mvars.address not in parser_map:
+            logger.error("Parser for memory address ({}) is not implemented. Please review your STATUS_REQUESTS setting. Skipping.".format(mvars.address))
+            return
+
+        parser = parser_map[mvars.address]
+        try:
+            return parser.parse(mvars.data)
+        except Exception:
+            logger.exception("Unable to parse RAM Status Block ({})".format(mvars.address))
+            return
 
     def control_zones(self, zones, command) -> bool:
         raise NotImplementedError("override control_zones in a subclass")

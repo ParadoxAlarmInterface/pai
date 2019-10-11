@@ -219,12 +219,7 @@ class Paradox:
 
     async def _status_request(self, i):
         logger.debug("Scheduling status request: %d" % i)
-        reply = await self.panel.request_status(i)
-        if reply is not None:
-            logger.debug("Received status response: %d" % i)
-            return self.panel.handle_status(reply)
-        else:
-            raise StatusRequestException("No reply to status request: %d" % i)
+        return await self.panel.request_status(i)
 
     def _process_status(self, raw_status: Container):
         status = convert_raw_status(raw_status)
@@ -234,6 +229,10 @@ class Paradox:
                 continue
 
             status[limit_key].filter(limit_arr)
+
+        #     # TODO: throttle power update messages
+        #     if time.time() - self.last_power_update >= cfg.POWER_UPDATE_INTERVAL:
+        #         force = PublishPropertyChange.YES if cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE else PublishPropertyChange.NO
 
         ps.sendMessage('status_update', status=status)
 
