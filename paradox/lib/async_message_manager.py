@@ -112,7 +112,6 @@ class AsyncMessageManager:
 
         self.handlers = list(filter(lambda x: not (isinstance(x, asyncio.Future) and x.cancelled()),
                                     self.handlers))  # remove timeouted futures
-        # TODO: improve performance
 
         for h in self.handlers:
             try:

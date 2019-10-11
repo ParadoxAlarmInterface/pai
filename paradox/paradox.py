@@ -479,7 +479,8 @@ class Paradox:
         assert element_type is not None
         assert type_key is not None
         assert isinstance(change, dict)
-        assert change  # Has at least one element
+        if not change: # Has at least one element
+            return
 
         logger.debug('update_properties %s/%s=%s', element_type, type_key, change)
         element = self.storage.get_container_object(element_type, type_key, create_if_missing=True)

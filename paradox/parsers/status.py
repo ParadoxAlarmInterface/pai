@@ -30,8 +30,6 @@ def convert_raw_status(raw_status: Container) -> Dict[str, ElementTypeContainer]
 
         if not prop_name:
             prop_name = element_type
-            if element_type != 'troubles':  # TODO: why system["troubles"] is not OK?
-                element_type = 'system'
 
         out[element_type].deep_merge(_parse_raw_status(prop_name, value))
 
