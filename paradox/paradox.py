@@ -350,6 +350,7 @@ class Paradox:
         return None  # Probably it needs to throw an exception instead of returning None
 
     def control_zone(self, zone: str, command: str) -> bool:
+        command = command.lower()
         logger.debug("Control Zone: {} - {}".format(zone, command))
 
         zones_selected = self.storage.get_container('zone').select(zone)  # type: Sequence[int]
@@ -376,6 +377,7 @@ class Paradox:
         return accepted
 
     def control_partition(self, partition: str, command: str) -> bool:
+        command = command.lower()
         logger.debug("Control Partition: {} - {}".format(partition, command))
 
         partitions_selected = self.storage.get_container('partition').select(partition) # type: Sequence[int]
@@ -402,6 +404,7 @@ class Paradox:
         return accepted
 
     def control_output(self, output, command) -> bool:
+        command = command.lower()
         logger.debug("Control Output: {} - {}".format(output, command))
 
         outputs_selected = self.storage.get_container('pgm').select(output)
