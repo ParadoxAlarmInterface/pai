@@ -249,6 +249,9 @@ class Paradox:
                 else:
                     await self.receive()
                     await asyncio.sleep(0.1)  # we need this until we use fully async receive. This lets other loop events to continue their work
+        except ConnectionError as e:
+            logger.error(str(e))
+            self.disconnect()
         except asyncio.CancelledError:
             logger.debug("Receive worker canceled")
 
