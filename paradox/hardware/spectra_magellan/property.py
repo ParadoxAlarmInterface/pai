@@ -150,7 +150,7 @@ property_map = {
     "rf_low_battery_trouble": dict(level=EventLevel.CRITICAL, tags=['trouble', 'rf', 'battery'],
         message={"True":"{Type} {label} RF battery low",
                  "False": "{Type} {label} RF battery OK"}),
-    'rf_noise_floor': dict(level=EventLevel.DEBUG, tags=['rf', 'interference'],
+    'noise_floor': dict(level=EventLevel.DEBUG, tags=['rf', 'interference'],
         message="RF Noise floor is {value}"),
     "rf_supervision_trouble": dict(level=EventLevel.CRITICAL, tags=['rf', 'supervision', 'trouble'],
         message={"True": "{Type} {label} has supervision trouble",
@@ -227,6 +227,9 @@ property_map = {
     "zone_tamper_trouble": dict(level=EventLevel.CRITICAL, tags=['tamper', 'trouble'],
         message={"True": "Zone tampered",
                  "False": "No Zone is tampered"}),
+    "time": dict(level=EventLevel.DEBUG, tags=['system', 'time'],
+        message="Panel time is {value}"),
+
     # ---------------------
     # Synthetic properties
     # ---------------------
