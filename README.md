@@ -19,8 +19,8 @@ On Android, if you install [MQTT Dash](https://play.google.com/store/apps/detail
 ![mqtt_dash](https://user-images.githubusercontent.com/497717/52603920-d4984d80-2e60-11e9-9772-578b10576b3c.jpg)
 
 ## Branch build statuses
-- [master](https://github.com/jpbarraca/pai/tree/master) [![Build Status Master](https://travis-ci.org/jpbarraca/pai.svg?branch=master)](https://travis-ci.org/jpbarraca/pai)
-- [dev](https://github.com/jpbarraca/pai/tree/dev) [![Build Status Dev](https://travis-ci.org/jpbarraca/pai.svg?branch=dev)](https://travis-ci.org/jpbarraca/pai)
+- [master](https://github.com/ParadoxAlarmInterface/pai/tree/master) [![Build Status Master](https://travis-ci.org/ParadoxAlarmInterface/pai.svg?branch=master)](https://travis-ci.org/ParadoxAlarmInterface/pai)
+- [dev](https://github.com/ParadoxAlarmInterface/pai/tree/dev) [![Build Status Dev](https://travis-ci.org/ParadoxAlarmInterface/pai.svg?branch=dev)](https://travis-ci.org/ParadoxAlarmInterface/pai)
 
 ## Things you need to have to be able to connect
 We support two connection options: via Serial and via IP150 Module
