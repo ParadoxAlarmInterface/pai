@@ -186,7 +186,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             self.publish('{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                         cfg.MQTT_EVENTS_TOPIC,
                                         cfg.MQTT_RAW_TOPIC),
-                         json.dumps(event.props, ensure_ascii=False, cls=JSONByteEncoder), 0, cfg.MQTT_RETAIN)
+                         json.dumps(event.props, ensure_ascii=False, cls=JSONByteEncoder, default=str), 0, cfg.MQTT_RETAIN)
 
     def _handle_panel_change(self, change):
         logger.debug("Change: %s", change)
