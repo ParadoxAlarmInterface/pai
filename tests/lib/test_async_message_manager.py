@@ -51,7 +51,7 @@ async def test_wait_for_raw_message(mocker):
     mm = AsyncMessageManager()
 
     task1 = loop.create_task(mm.wait_for_message(raw=True))
-    loop.create_task(mm.schedule_raw_message_handling(msg))
+    mm.schedule_raw_message_handling(msg)
 
     assert await task1 == msg
 
@@ -66,7 +66,7 @@ async def test_wait_for_message(mocker):
     mm = AsyncMessageManager()
 
     task1 = loop.create_task(mm.wait_for_message())
-    loop.create_task(mm.schedule_message_handling(msg))
+    mm.schedule_message_handling(msg)
 
     assert await task1 == msg
 
