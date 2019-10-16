@@ -47,9 +47,9 @@ class ElementTypeContainer(MutableMapping):
             selected = list(self.store)
         else:
             if needle.isdigit() and 0 < int(needle) < len(self.store):
-                el = self.store.get(int(needle))
+                el = self.get(int(needle))
             else:
-                el = self.store.get(needle)
+                el = self.get(needle)
 
             if el:
                 if "id" not in el:
