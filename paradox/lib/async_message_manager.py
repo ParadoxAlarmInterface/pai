@@ -132,7 +132,7 @@ class AsyncMessageManager:
             if not handler.persistent:
                 self.handlers = list(filter(lambda x: x != handler, self.handlers))
 
-            await self._handle(handler, message)
+            return await self._handle(handler, message)
         else:
             logger.error("No handler for message {}\nDetail: {}".format(message.fields.value.po.command, message))
 
