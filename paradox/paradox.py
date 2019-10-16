@@ -456,7 +456,7 @@ class Paradox:
         assert element_type is not None
         assert type_key is not None
         assert isinstance(change, dict)
-        if not change: # Has at least one element
+        if not change:  # Has at least one element
             return
 
         logger.debug('update_properties %s/%s=%s', element_type, type_key, change)
@@ -469,13 +469,17 @@ class Paradox:
         #     logger.debug('Notice: {} not found in type {} with content {}'.format(type_key, element_type, list(elements)))
         #     return
 
+        key = element['key']
+
         # Publish changes and update state
         for property_name, property_value in change.items():
 
+            if not isinstance(property_name, str):
+                logger.debug('Invalid property name ({}/{}/{}) type: {}'.format(type(property_name), element_type, key, property_name))
+                continue
             if property_name.startswith('_'):  # skip private properties
                 continue
 
-            key = element['key']
             old = element.get(property_name)
 
             if isinstance(property_value, Callable):  # function to make new value from the old one
