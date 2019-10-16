@@ -475,7 +475,7 @@ class Paradox:
         for property_name, property_value in change.items():
 
             if not isinstance(property_name, str):
-                logger.debug('Invalid property name ({}/{}/{}) type: {}'.format(type(property_name), element_type, key, property_name))
+                logger.debug('Invalid property name ({}/{}/{}) type: {}'.format(element_type, key, property_name, type(property_name)))
                 continue
             if property_name.startswith('_'):  # skip private properties
                 continue
