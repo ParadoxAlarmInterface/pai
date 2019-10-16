@@ -31,6 +31,9 @@ class ElementTypeContainer(MutableMapping):
     def __str__(self):
         return self.store.__str__()
 
+    def __repr__(self):
+        return self.store.__str__()
+
     def filter(self, id_arr):
         self.store = dict((i, v) for i, v in self.store.items() if i in id_arr)
 

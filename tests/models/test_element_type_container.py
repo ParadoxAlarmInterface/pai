@@ -33,3 +33,9 @@ def test_hole():
 
     assert 1 in a
     assert 3 in a
+
+def test_repr():
+    a = ElementTypeContainer({1: {'key': 'Living_room'}, 3: {'key': 'Kids_room'}})
+
+    assert a.__repr__() == "{1: {'key': 'Living_room'}, 3: {'key': 'Kids_room'}}"
+    assert a.__str__() == "{1: {'key': 'Living_room'}, 3: {'key': 'Kids_room'}}"
