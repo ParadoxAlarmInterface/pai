@@ -74,25 +74,10 @@ def main(args):
 
     time.sleep(1)
 
-    # Load a connection to the alarm
-    if cfg.CONNECTION_TYPE == "Serial":
-        logger.info("Using Serial Connection")
-        from paradox.connections.serial_connection import SerialCommunication
-
-        connection = SerialCommunication(port=cfg.SERIAL_PORT, baud=cfg.SERIAL_BAUD)
-    elif cfg.CONNECTION_TYPE == 'IP':
-        logger.info("Using IP Connection")
-        from paradox.connections.ip_connection import IPConnection
-
-        connection = IPConnection(host=cfg.IP_CONNECTION_HOST, port=cfg.IP_CONNECTION_PORT, password=cfg.IP_CONNECTION_PASSWORD)
-    else:
-        logger.error("Invalid connection type: {}".format(cfg.CONNECTION_TYPE))
-        sys.exit(-1)
-
     signal.signal(signal.SIGINT, exit_handler)
 
     # Start interacting with the alarm
-    alarm = Paradox(connection=connection)
+    alarm = Paradox()
     interface_manager.set_alarm(alarm)
     retry = 1
     while True:

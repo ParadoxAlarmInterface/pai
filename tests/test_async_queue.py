@@ -71,7 +71,7 @@ def test_handler_two_messages():
         return "event"
 
     async def get_eeprom_result(mhm):
-        return await mhm.wait_for(lambda m: m.fields.value.po.command == 0x5)
+        return await mhm.wait_for_message(lambda m: m.fields.value.po.command == 0x5)
 
     event_response_bin = b'\xe2\xff\xad\x06\x14\x13\x01\x04\x0e\x10\x00\x01\x05\x00\x00\x00\x00\x00\x02Living room     \x00\xcc'
 
@@ -109,7 +109,10 @@ def test_handler_timeout():
         return "event"
 
     async def get_eeprom_result(mhm):
-        return await mhm.wait_for(lambda m: m.fields.value.po.command == 0x5, timeout=0.1)
+        try:
+            return await mhm.wait_for_message(lambda m: m.fields.value.po.command == 0x5, timeout=0.1)
+        except asyncio.TimeoutError:
+            return None
 
     async def post_eeprom_message(mhm):
         await asyncio.sleep(0.2)

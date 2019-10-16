@@ -5,6 +5,7 @@ import binascii
 import json
 import logging
 import time
+import typing
 
 import requests
 
@@ -12,15 +13,14 @@ from paradox.config import config as cfg
 from paradox.lib import stun
 from paradox.lib.crypto import encrypt, decrypt
 from paradox.parsers.paradox_ip_messages import *
-
 from .connection import Connection, ConnectionProtocol
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
 
 class IPConnectionProtocol(ConnectionProtocol):
-    def __init__(self, on_con_lost, key):
-        super(IPConnectionProtocol, self).__init__(on_con_lost=on_con_lost)
+    def __init__(self, on_message: typing.Callable[[bytes], None], on_con_lost, key):
+        super(IPConnectionProtocol, self).__init__(on_message=on_message, on_con_lost=on_con_lost)
         self.buffer = b''
         self.key = key
 
@@ -40,9 +40,6 @@ class IPConnectionProtocol(ConnectionProtocol):
             logger.debug("IPC -> Mod {}".format(binascii.hexlify(msg)))
         self.transport.write(msg)
 
-    async def read_message(self, timeout=5):
-        return await asyncio.wait_for(self.read_queue.get(), timeout=timeout)
-
     def _get_message_payload(self, data):
         message = ip_message.parse(data)
 
@@ -54,7 +51,7 @@ class IPConnectionProtocol(ConnectionProtocol):
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("IPC -> PAI {}".format(binascii.hexlify(message_payload)))
 
-        return message, message_payload
+        return message_payload
 
     def data_received(self, recv_data):
         self.buffer += recv_data
@@ -74,13 +71,13 @@ class IPConnectionProtocol(ConnectionProtocol):
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("Mod -> IPC {}".format(binascii.hexlify(self.buffer)))
 
-        self.read_queue.put_nowait(self._get_message_payload(self.buffer))
+        self.on_message(self._get_message_payload(self.buffer))
         self.buffer = b''
 
 
 class IPConnection(Connection):
-    def __init__(self, host='127.0.0.1', port=10000, password=None, timeout=5.0):
-        super(IPConnection, self).__init__(timeout=timeout)
+    def __init__(self, on_message: typing.Callable[[bytes], None], host='127.0.0.1', port=10000, password=None):
+        super(IPConnection, self).__init__(on_message=on_message)
         self.password = password
         self.key = password
         self.host = host
@@ -123,7 +120,7 @@ class IPConnection(Connection):
             self.connection = None
 
     def make_protocol(self):
-        return IPConnectionProtocol(self.on_connection_lost, self.key)
+        return IPConnectionProtocol(self.on_message, self.on_connection_lost, self.key)
 
     async def connect(self):
         loop = asyncio.get_event_loop()
@@ -259,7 +256,7 @@ class IPConnection(Connection):
                 dict(header=dict(length=len(self.key), unknown0=0x03, flags=0x09, command=0xf0, unknown1=0, encrypt=1),
                      payload=payload))
             self.connection.send_raw(msg)
-            message_payload = await self.read()
+            message_payload = await self.wait_for_message(raw=True)
 
             response = ip_payload_connect_response.parse(message_payload)
 
@@ -282,14 +279,14 @@ class IPConnection(Connection):
                 dict(header=dict(length=0, unknown0=0x03, flags=0x09, command=0xf2, unknown1=0, encrypt=1),
                      payload=encrypt(b'', self.key)))
             self.connection.send_raw(msg)
-            message_payload = await self.read()
+            message_payload = await self.wait_for_message(raw=True)
             logger.debug("F2 answer: {}".format(binascii.hexlify(message_payload)))
 
             # # F4
             # logger.debug("Sending F4")
             # msg = binascii.unhexlify('aa00000309f400000001eeeeeeee0000')
             # self.connection.send_raw(msg)
-            # message_payload = await self.read()
+            # message_payload = await self.wait_for_message(raw=True)
             #
             # logger.debug("F4 answer: {}".format(binascii.hexlify(message_payload)))
 
@@ -299,7 +296,7 @@ class IPConnection(Connection):
                 dict(header=dict(length=0, unknown0=0x03, flags=0x09, command=0xf3, unknown1=0, encrypt=1),
                      payload=encrypt(b'', self.key)))
             self.connection.send_raw(msg)
-            message_payload = await self.read()
+            message_payload = await self.wait_for_message(raw=True)
 
             #logger.debug("F3 answer: {}".format(binascii.hexlify(message_payload)))
 
@@ -312,7 +309,7 @@ class IPConnection(Connection):
                 dict(header=dict(length=payload_len, unknown0=0x03, flags=0x09, command=0xf8, unknown1=0, encrypt=1),
                      payload=payload))
             self.connection.send_raw(msg)
-            message_payload = await self.read()
+            message_payload = await self.wait_for_message(raw=True)
             logger.debug("F8 answer: {}".format(binascii.hexlify(message_payload)))
 
             logger.info("Session Established with IP Module")
@@ -321,7 +318,7 @@ class IPConnection(Connection):
         except asyncio.TimeoutError:
             self.connected = False
             logger.error("Unable to establish session with IP Module. Timeout. Only one connection at a time is allowed.")
-        except Exception:
+        except Exception as e:
             self.connected = False
             logger.exception("Unable to establish session with IP Module")
 
@@ -334,18 +331,6 @@ class IPConnection(Connection):
             raise ConnectionError('Failed to refresh STUN')
 
         return super(IPConnection, self).write(data)
-
-    async def read(self, timeout=None):
-        """Read data from the IP Port, if available, until the timeout is exceeded"""
-
-        if not self.refresh_stun():
-            raise ConnectionError("Failed to refresh stun")
-
-        result = await super().read(timeout)
-        if result:
-            message, payload = result
-            return payload
-        return None
 
     @staticmethod
     def get_site_info(email, siteid):

@@ -6,19 +6,20 @@ import time
 from binascii import hexlify
 from enum import Enum
 from threading import Lock
-from typing import Optional, Sequence, Iterable, Callable, Awaitable
+from typing import Optional, Sequence, Iterable, Callable
 
 from construct import Container
 
 from paradox import event
 from paradox.config import config as cfg
-from paradox.connections.connection import Connection
+from paradox.connections.ip_connection import IPConnection
+from paradox.connections.serial_connection import SerialCommunication
+from paradox.data.memory_storage import MemoryStorage as Storage
 from paradox.exceptions import StatusRequestException
 from paradox.hardware import create_panel
 from paradox.lib import ps
-from paradox.lib.async_message_manager import AsyncMessageManager, EventMessageHandler, ErrorMessageHandler
+from paradox.lib.async_message_manager import EventMessageHandler, ErrorMessageHandler
 from paradox.lib.utils import deep_merge
-from paradox.data.memory_storage import MemoryStorage as Storage
 from paradox.parsers.status import convert_raw_status
 
 logger = logging.getLogger('PAI').getChild(__name__)
@@ -41,20 +42,12 @@ class PublishPropertyChange(Enum):
 
 
 class Paradox:
-
-    def __init__(self,
-                 connection: Connection,
-                 retries=3):
-
+    def __init__(self, retries=3):
         self.panel = None  # type: Panel
-        self.connection = connection
+        self._connection = None
         self.retries = retries
-        self.message_manager = AsyncMessageManager()
         self.work_loop = asyncio.get_event_loop() # type: asyncio.AbstractEventLoop
         self.receive_worker_task = None
-
-        self.message_manager.register_handler(EventMessageHandler(self.handle_event))
-        self.message_manager.register_handler(ErrorMessageHandler(self.handle_error))
 
         self.storage = Storage()
 
@@ -64,6 +57,32 @@ class Paradox:
 
         ps.subscribe(self._on_labels_load, "labels_loaded")
         ps.subscribe(self._on_status_update, "status_update")
+
+    @property
+    def connection(self):
+        if not self._connection:
+            # Load a connection to the alarm
+            if cfg.CONNECTION_TYPE == "Serial":
+                logger.info("Using Serial Connection")
+
+                self._connection = SerialCommunication(self.on_connection_message, port=cfg.SERIAL_PORT,
+                                                      baud=cfg.SERIAL_BAUD)
+            elif cfg.CONNECTION_TYPE == 'IP':
+                logger.info("Using IP Connection")
+
+                self._connection = IPConnection(self.on_connection_message, host=cfg.IP_CONNECTION_HOST,
+                                               port=cfg.IP_CONNECTION_PORT,
+                                               password=cfg.IP_CONNECTION_PASSWORD)
+            else:
+                raise AssertionError("Invalid connection type: {}".format(cfg.CONNECTION_TYPE))
+
+            self.register_connection_handlers()
+
+        return self._connection
+
+    def register_connection_handlers(self):
+        self.connection.register_handler(EventMessageHandler(self.handle_event))
+        self.connection.register_handler(ErrorMessageHandler(self.handle_error))
 
     def reset(self):
         pass
@@ -75,6 +94,7 @@ class Paradox:
 
     async def connect_async(self):
         self.disconnect()  # socket needs to be also closed
+        self.panel = None
 
         logger.info("Connecting to interface")
         if not await self.connection.connect():
@@ -129,9 +149,6 @@ class Paradox:
             if not result:
                 raise ConnectionError("Failed to initialize communication")
 
-            # Now we need to start async message reading worker
-            self.receive_worker_task = self.work_loop.create_task(self.receive_worker())
-
             if cfg.SYNC_TIME:
                 await self.sync_time()
 
@@ -154,6 +171,8 @@ class Paradox:
 
             ps.sendMessage('connected')
             return True
+        except asyncio.TimeoutError as e:
+            logger.error("Timeout while connecting to panel: %s" % str(e))
         except ConnectionError as e:
             logger.error("Failed to connect: %s" % str(e))
         except Exception:
@@ -239,76 +258,26 @@ class Paradox:
     def request_status_refresh(self):
         self.loop_wait_event.set()
 
-    async def receive_worker(self):
-        logger.debug("Receive worker started")
-        async_supported = asyncio.iscoroutinefunction(self.connection.read)
+    def on_connection_message(self, message: bytes):
+        self.connection.schedule_raw_message_handling(message)
+
+        if not self.panel:
+            return
         try:
-            while True:
-                if async_supported:
-                    await self.receive()
-                else:
-                    await self.receive()
-                    await asyncio.sleep(0.1)  # we need this until we use fully async receive. This lets other loop events to continue their work
-        except ConnectionError as e:
-            logger.error(str(e))
-            self.disconnect()
-        except asyncio.CancelledError:
-            logger.debug("Receive worker canceled")
-
-        logger.debug("Receive worker stopped")
-
-    async def receive(self, timeout=5.0):
-        # TODO: Get rid of receive worker
-        data = self.connection.read(timeout=timeout)
-        if isinstance(data, Awaitable):
-            try:
-                data = await data
-            except asyncio.TimeoutError:
-                return None
-
-        # Retry if no data was available
-        if data is None or len(data) == 0:
-            return None
-
-        self.message_manager.schedule_raw_message_handling(data)
-
-
-        try:
-            recv_message = self.panel.parse_message(data, direction='frompanel')
+            recv_message = self.panel.parse_message(message, direction='frompanel')
 
             if cfg.LOGGING_DUMP_MESSAGES:
                 logger.debug(recv_message)
 
             # No message
             if recv_message is None:
-                logger.debug("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in data)))
-                return None
+                logger.debug("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
+                return
 
             if self.run != State.PAUSE:
-                self.message_manager.schedule_message_handling(recv_message)  # schedule handling in the loop
-        except Exception:
+                self.connection.schedule_message_handling(recv_message)  # schedule handling in the loop
+        except Exception as e:
             logging.exception("Error parsing message")
-            return None
-
-    def send_wait_simple(self, message=None, timeout=5.0, wait=True) -> Optional[bytes]:
-        with serial_lock:
-            if message is not None:
-                self.connection.timeout(timeout)
-                self.connection.write(message)
-
-            if not wait:
-                return None
-            
-            data = self.connection.read(timeout=timeout)
-            
-            if isinstance(data, Awaitable):
-                future = asyncio.run_coroutine_threadsafe(data, self.work_loop)
-                try:
-                    data = future.result(5)
-                except asyncio.TimeoutError:
-                    data = None
-
-        return data
 
     async def send_wait(self,
                   message_type=None,
@@ -332,23 +301,25 @@ class Paradox:
                 logger.debug('Request retry (%d/%d)', retry, retries)
             retry += 1
 
-            async with self.request_lock:
-                if message is not None:
-                    self.connection.timeout(timeout)
-                    self.connection.write(message)
+            try:
+                async with self.request_lock:
+                    if message is not None:
+                        self.connection.timeout(timeout)
+                        self.connection.write(message)
 
-                if reply_expected is not None:
-                    self.work_loop.create_task(self.receive(timeout))
-                    if isinstance(reply_expected, Callable):
-                        reply = await self.message_manager.wait_for(reply_expected, timeout=timeout*2)
-                    elif isinstance(reply_expected, Iterable):
-                        reply = await self.message_manager.wait_for(
-                            lambda m: any(m.fields.value.po.command == expected for expected in reply_expected), timeout=timeout*2)
-                    else:
-                        reply = await self.message_manager.wait_for(lambda m: m.fields.value.po.command == reply_expected, timeout=timeout*2)
+                    if reply_expected is not None:
+                        if isinstance(reply_expected, Callable):
+                            reply = await self.connection.wait_for_message(reply_expected, timeout=timeout * 2)
+                        elif isinstance(reply_expected, Iterable):
+                            reply = await self.connection.wait_for_message(
+                                lambda m: any(m.fields.value.po.command == expected for expected in reply_expected), timeout=timeout*2)
+                        else:
+                            reply = await self.connection.wait_for_message(lambda m: m.fields.value.po.command == reply_expected, timeout=timeout * 2)
 
-                    if reply:
-                        return reply
+                        if reply:
+                            return reply
+            except asyncio.TimeoutError:
+                pass
 
         return None  # Probably it needs to throw an exception instead of returning None
 
@@ -543,7 +514,7 @@ class Paradox:
                             logger.debug("Event: {}".format(evt))
                             ps.sendEvent(evt)
                         else:
-                            logger.warning("Could not create event from change")
+                            logger.debug("Could not create event from change")
 
             else:
                 element[property_name] = property_value  # Initial value, do not notify
