@@ -34,7 +34,7 @@ def test_event_handler():
 
     message = LiveEvent.parse(payload)
 
-    coro = asyncio.ensure_future(mh.handle_message(message))
+    coro = asyncio.ensure_future(mh._handle_message(message))
     loop.run_until_complete(coro)
     assert "beer" == coro.result()
 
@@ -57,7 +57,7 @@ def test_event_handler_failure():
 
     message = ReadEEPROMResponse.parse(eeprom_response_bin)
 
-    coro = asyncio.ensure_future(mh.handle_message(message))
+    coro = asyncio.ensure_future(mh._handle_message(message))
     loop.run_until_complete(coro)
     assert coro.result() is None  # failed to parse response message return None. Maybe needs to throw something.
 
@@ -87,9 +87,9 @@ def test_handler_two_messages():
     # running
     task_handle_wait = loop.create_task(asyncio.sleep(0.1))
     task_get_eeprom = loop.create_task(get_eeprom_result(mh))
-    task_handle_event1 = loop.create_task(mh.handle_message(LiveEvent.parse(event_response_bin)))
-    loop.create_task(mh.handle_message(ReadEEPROMResponse.parse(eeprom_response_bin)))
-    task_handle_event2 = loop.create_task(mh.handle_message(LiveEvent.parse(event_response_bin)))
+    task_handle_event1 = loop.create_task(mh._handle_message(LiveEvent.parse(event_response_bin)))
+    loop.create_task(mh._handle_message(ReadEEPROMResponse.parse(eeprom_response_bin)))
+    task_handle_event2 = loop.create_task(mh._handle_message(LiveEvent.parse(event_response_bin)))
 
     # assert 2 == len(mh.handlers)
 
@@ -120,7 +120,7 @@ def test_handler_timeout():
         eeprom_response_bin = binascii.unhexlify(
             '524700009f0041133e001e0e0400000000060a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000121510010705004e85')
 
-        return await mhm.handle_message(ReadEEPROMResponse.parse(eeprom_response_bin))
+        return await mhm._handle_message(ReadEEPROMResponse.parse(eeprom_response_bin))
 
     loop = asyncio.get_event_loop()
     mh = AsyncMessageManager(loop)
