@@ -75,7 +75,7 @@ class InterfaceManager:
         # Load Dummy Interface
         if self.conf.DUMMY_INTERFACE_ENABLE:
             try:
-                logger.info("Using IP Interface")
+                logger.info("Using Dummy Interface")
                 from paradox.interfaces.dummy_interface import DummyInterface
                 self.register(DummyInterface())
             except Exception:
