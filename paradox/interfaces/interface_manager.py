@@ -91,7 +91,7 @@ class InterfaceManager:
         logger.debug("Stopping all interfaces")
         for interface in self.interfaces:
             try:
-                logger.debug("\t{}".format(interface.name))
+                logger.debug("Stopping {}".format(interface.name))
                 interface.stop()
             except Exception:
                 logger.exception(

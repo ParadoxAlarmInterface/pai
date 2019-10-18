@@ -14,7 +14,14 @@ alarm = None
 interface_manager = None
 
 logger = logging.getLogger('PAI')
-FORMAT = '%(asctime)s - %(levelname)-8s - %(name)s - %(message)s'
+
+
+def get_format(level):
+    if level <= logging.DEBUG:
+        return '%(asctime)s - %(levelname)-8s - %(threadName)-10s - %(name)s - %(message)s'
+    else:
+        return '%(asctime)s - %(levelname)-8s - %(name)s - %(message)s'
+
 
 def config_logger(logger):
     logger_level = cfg.LOGGING_LEVEL_CONSOLE
@@ -26,13 +33,13 @@ def config_logger(logger):
                             encoding=None, delay=0)
 
         logfile_handler.setLevel(cfg.LOGGING_LEVEL_FILE)
-        logfile_handler.setFormatter(logging.Formatter(FORMAT))
+        logfile_handler.setFormatter(logging.Formatter(get_format(logger_level)))
         logger.addHandler(logfile_handler)
         logger_level = min(logger_level, cfg.LOGGING_LEVEL_FILE)
 
     logconsole_handler = logging.StreamHandler()
     logconsole_handler.setLevel(cfg.LOGGING_LEVEL_CONSOLE)
-    logconsole_handler.setFormatter(logging.Formatter(FORMAT))
+    logconsole_handler.setFormatter(logging.Formatter(get_format(logger_level)))
     logger.addHandler(logconsole_handler)
 
     logger.setLevel(logger_level)
