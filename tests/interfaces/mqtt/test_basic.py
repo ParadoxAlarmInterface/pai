@@ -25,5 +25,5 @@ async def test_handle_panel_event(mocker):
                                                                "level": "NOTSET", "major": 0, "message": "", "minor": 0,
                                                                "name": "[system:0]", "partition": None, "tags": [],
                                                                "time": "2019-10-18T17:15:00", "timestamp": 0,
-                                                               "type": "system"}),
+                                                               "type": "system"}, sort_keys=True),
                                                    0, True)
