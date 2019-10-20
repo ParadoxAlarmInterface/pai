@@ -2,10 +2,8 @@
 
 import datetime
 import logging
-import re
 import time
-
-import serial
+from concurrent import futures
 
 from paradox.event import EventLevel
 # GSM interface.
@@ -32,6 +30,7 @@ class SerialConnectionProtocol(ConnectionProtocol):
         self.on_port_open()
 
     async def _send_message(self, message):
+        logger.debug("I->M: {}".format(message))
         await self.transport.write(message)
 
     def send_message(self, message):
@@ -40,16 +39,15 @@ class SerialConnectionProtocol(ConnectionProtocol):
     async def read_message(self, timeout=5):
         return await asyncio.wait_for(self.read_queue.get(), timeout=timeout)
 
-    def on_frame(self, frame):
-        self.read_queue.put_nowait(frame)
-
     def data_received(self, recv_data):
+        logger.debug("M->I: Data: {}".format(recv_data))
         self.buffer += recv_data
-        r = self.buffer.index(b'\r\n')
+        r = self.buffer.find(b'\r\n')
         if r > 0:
             frame = self.buffer[:r]
             self.buffer[r:]
-            self.on_frame(frame)
+            logger.debug("M->I: Frame: {}".format(frame))
+            self.read_queue.put_nowait(frame)
 
     def connection_lost(self, exc):
         logger.error('The serial port was closed')
@@ -96,12 +94,10 @@ class SerialCommunication(Connection):
                                                                            self.make_protocol,
                                                                            self.port_path,
                                                                            self.baud)
-
         return await self.connected_future
 
 
-
-class GSMInterface(AbstractTextInterface):
+class GSMTextInterface(AbstractTextInterface):
     """Interface Class using GSM"""
     name = 'gsm'
 
@@ -110,9 +106,10 @@ class GSMInterface(AbstractTextInterface):
 
         self.port = None
         self.modem_connected = False
+        self.loop = None
+        self.loop = asyncio.get_event_loop()
 
     def stop(self):
-        super().stop()
         """ Stops the GSM Interface Thread"""
         logger.debug("Stopping GSM Interface")
         self.stop_running.set()
@@ -120,44 +117,87 @@ class GSMInterface(AbstractTextInterface):
         if self.port is not None:
             self.port.close()
 
+        super().stop()
         logger.debug("GSM Stopped")
 
-    def write(self, message):
-        data = b''
+    def connect(self):
+        logger.info("Using {} at {} baud".format(
+            cfg.GSM_MODEM_PORT, cfg.GSM_MODEM_BAUDRATE))
 
+        commands = [b'AT', b'ATE0', b'AT+CMGF=1',
+                    b'AT+CNMI=1,2,0,0,0', b'AT+CUSD=1,"*111#"']
+        try:
+            self.port = SerialCommunication(cfg.GSM_MODEM_PORT, cfg.GSM_MODEM_BAUDRATE)
+        except:
+            logger.exception("Could not open port")
+            return False
+
+
+            result = self.loop.run_until_complete(self.port.connect())
+
+            if not result:
+                logger.error("Could not open modem port")
+                return False
+
+            for command in commands:
+                if self.port.write(command) == 0:
+                    logger.error("Unable to initialize modem")
+                    return False
+                else:
+                    message = self.loop.run_until_complete(self.port.read())
+                    logger.info(message)
+        except futures.TimeoutError as e:
+            logger.error("No reply from modem")
+            return False
+        except Exception:
+            logger.exception("Modem connect error")
+            return False
+
+        self.modem_connected = True
+        return True
+
+
+
+
+
+
+
+
+
+    def write(self, message):
         if not self.connected():
-            return data
+            return None
 
         try:
+            logger.debug("I->M: {}".format(message))
             self.port.write((message + '\r\n').encode('latin-1'))
-            time.sleep(0.1)
-            s
-            while self.port.in_waiting > 0:
-                data += self.port.read()
 
+            data = self.port.read_message()
             data = data.strip().decode('latin-1')
+            logger.debug("M->I: {}".format(data))
+            return data
+
         except Exception:
             logger.exception("Modem write")
             self.modem_connected = False
 
-        return data
+        return None
 
-    def run(self):
+    def _run(self):
         logger.info("Starting GSM Interface")
 
-
-
         while not self.stop_running.isSet():
-            time.sleep(1)
+            while not self.modem_connected:
+                if not self.connect():
+                    logging.warning("Could not connect to modem")
 
-            while not self.connected():
+                time.sleep(5)
+                continue
 
-                logging.warning("Could not connect to modem")
-                time.sleep(10)
-
+    def handle_message(self, message):
             try:
-
                 data = self.port.read(200)
+
                 if len(data) > 0:
                     tokens = data.decode('latin-1').strip().split('"')
                     for i in range(len(tokens)):
@@ -180,33 +220,11 @@ class GSMInterface(AbstractTextInterface):
 
             except Exception:
                 self.modem_connected = False
-                # logger.exception("")
+                logger.exception("")
 
         return True
 
-    def connected(self):
-        if not self.modem_connected:
-            logger.info("Using {} at {} baud".format(
-                cfg.GSM_MODEM_PORT, cfg.GSM_MODEM_BAUDRATE))
-            commands = [b'AT', b'ATE0', b'AT+CMGF=1',
-                        b'AT+CNMI=1,2,0,0,0', b'AT+CUSD=1,"*111#"']
-            try:
 
-                self.port = SerialCommunication(cfg.GSM_MODEM_PORT, cfg.GSM_MODEM_BAUDRATE)
-                self.port.connect()
-
-                for command in commands:
-                    if self.port.write(command) == 0:
-                        logger.error("Unable to initialize modem")
-                        return False
-            except Exception:
-                logger.exception("Modem connect error")
-                return False
-
-            self.modem_connected = True
-            logger.info("Started GSM Interface")
-
-        return True
 
     def send_sms(self, dst, message):
         self.write('AT+CMGS="{}"'.format(dst))
