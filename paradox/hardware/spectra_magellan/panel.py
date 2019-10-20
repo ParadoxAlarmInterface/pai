@@ -52,6 +52,39 @@ class Panel(PanelBase):
 
         self.last_power_update = 0
 
+    async def dump_memory(self):
+        """
+        Dumps EEPROM and RAM memory to files
+        :return:
+        """
+        await self.dump_memory_to_file('eeprom.bin', range(0, 0x0fff, 32))
+        await self.dump_memory_to_file('ram.bin', range(0, 9), ram=True)
+
+    async def dump_memory_to_file(self, file, range_, ram=False):
+        mem_type = "RAM" if ram else "EEPROM"
+        logger.info("Dump " + mem_type)
+
+        with open(file, 'wb') as fh:
+            for address in range_:
+                if ram:
+                    args = dict(address=address + self.mem_map['status_base1'])
+                else:
+                    args = dict(address=address)
+
+                logger.info("Dumping %s: address %x" % (mem_type, address))
+
+                reply = await self.core.send_wait(
+                    self.get_message('ReadEEPROM'), args,
+                        reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address)
+
+                if reply is None:
+                    logger.error("Could not read %s: address %x" % (mem_type, address))
+                    return
+
+                data = reply.fields.value.data
+
+                fh.write(data)
+
     def get_message(self, name: str) -> Construct:
         try:
             clsmembers = dict(inspect.getmembers(sys.modules[__name__]))
