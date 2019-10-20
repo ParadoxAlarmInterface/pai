@@ -64,7 +64,7 @@ class Event:
         self._key = None
         self._event_map = None
         self._property_map = None
-        self.label_provider = lambda type, id: "[{}:{}]".format(type, id)
+        self.label_provider = lambda type, value: "[{}:{}]".format(type, value)
 
     def __repr__(self):
         lvars = {}
@@ -183,6 +183,12 @@ class Event:
         self.type = event_map.get('type', self.type)
         self._message_tpl = event_map.get('message', self._message_tpl)
         self.change = event_map.get('change', self.change)
+
+        ## Support parsing change values as messages
+        for k in self.change:
+            if isinstance(self.change[k], str):
+                self.change[k] = EventMessageFormatter().format(self.change[k], self)
+
         self.tags = event_map.get('tags', [])
 
         self.additional_data = {k: v for k, v in event_map.items() if k not in ['message'] and not hasattr(self, k)}

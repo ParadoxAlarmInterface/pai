@@ -55,3 +55,25 @@ def test_disarm_partition1():
     print(event)
 
     assert event.message == "Partition Partition 2: Disarm partition Partition 2"
+
+def test_button_pressed():
+    event = b'e214130a14103708040000000000000000000000000000000000000000000000000000007a'
+    payload = binascii.unhexlify(event)
+
+    raw = LiveEvent.parse(payload)
+
+    def label_provider(type, id):
+        print(type, id)
+        if type == 'user':
+            assert id == 4
+            return 'UserA'
+        if type == 'timestamp':
+            return 'PROC_TIMESTAMP'
+
+    event = Event.from_live_event(event_map, raw, label_provider=label_provider)
+
+    print(event)
+    assert isinstance(event.change.get('button_b', None), str)
+    assert event.change.get('button_b', None) == 'PROC_TIMESTAMP'
+
+    assert "Button B pressed on remote of UserA" == event.message
