@@ -14,8 +14,8 @@ class InterfaceManager:
         if self.conf.GSM_ENABLE:
             try:
                 logger.info("Using GSM Interface")
-                from paradox.interfaces.gsm_interface import GSMInterface
-                self.register(GSMInterface())
+                from paradox.interfaces.text.gsm import GSMTextInterface
+                self.register(GSMTextInterface())
             except Exception:
                 logger.exception("Unable to start GSM Interface")
 
@@ -23,8 +23,8 @@ class InterfaceManager:
         if self.conf.SIGNAL_ENABLE:
             try:
                 logger.info("Using Signal Interface")
-                from paradox.interfaces.signal_interface import SignalInterface
-                self.register(SignalInterface())
+                from paradox.interfaces.text.signal import SignalTextInterface
+                self.register(SignalTextInterface())
             except Exception:
                 logger.exception("Unable to start Signal Interface")
 
@@ -49,8 +49,8 @@ class InterfaceManager:
         if self.conf.PUSHBULLET_ENABLE:
             try:
                 logger.info("Using Pushbullet Interface")
-                from paradox.interfaces.pushbullet_interface import PushBulletInterface
-                self.register(PushBulletInterface())
+                from paradox.interfaces.text.pushbullet import PushbulletTextInterface
+                self.register(PushbulletTextInterface())
             except Exception:
                 logger.exception("Unable to start Pushbullet Interface")
 
@@ -58,8 +58,8 @@ class InterfaceManager:
         if self.conf.PUSHOVER_ENABLE:
             try:
                 logger.info("Using Pushover Interface")
-                from paradox.interfaces.pushover_interface import PushoverInterface
-                self.register(PushoverInterface())
+                from paradox.interfaces.text.pushover import PushoverTextInterface
+                self.register(PushoverTextInterface())
             except Exception:
                 logger.exception("Unable to start Pushover Interface")
 
