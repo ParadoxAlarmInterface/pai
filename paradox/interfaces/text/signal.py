@@ -43,14 +43,14 @@ class SignalTextInterface(AbstractTextInterface):
         bus = SystemBus()
 
         self.signal = bus.get('org.asamk.Signal')
-        self.signal.onMessageReceived = self._handle_message
+        self.signal.onMessageReceived = self.handle_message
         self.loop = GLib.MainLoop()
 
         logger.debug("Signal Interface Running")
 
         self.loop.run()
 
-    def _send_message(self, message):
+    def send_message(self, message):
         if self.signal is None:
             logger.warning("Signal not available when sending message")
             return
@@ -60,14 +60,14 @@ class SignalTextInterface(AbstractTextInterface):
         except Exception:
             logger.exception("Signal send message")
 
-    def _handle_message(self, timestamp, source, groupID, message, attachments):
+    def handle_message(self, timestamp, source, groupID, message, attachments):
         """ Handle Signal message. It should be a command """
 
         logger.debug("Received Message {} {} {} {} {}".format(
             timestamp, message, groupID, message, attachments))
 
         if source in cfg.SIGNAL_CONTACTS:
-            ret = self.send_command(message)
+            ret = self.handle_command(message)
 
             m = "Signal {} : {}".format(source, ret)
             logger.info(m)
@@ -75,7 +75,7 @@ class SignalTextInterface(AbstractTextInterface):
             m = "Signal {} (UNK): {}".format(source, message)
             logger.warning(m)
 
-        self._send_message(m)
+        self.send_message(m)
         ps.sendMessage("notifications",
                        message=dict(source=self.name,
                                     payload=m,

@@ -67,7 +67,7 @@ class PushBulletWSClient(WebSocketBaseClient):
                     continue
 
                 if p.get('sender_email_normalized') in cfg.PUSHBULLET_CONTACTS:
-                    ret = self.interface._handle_command(p.get('body'))
+                    ret = self._handle_command(p.get('body'))
 
                     m = "PB {}: {}".format(p.get('sender_email_normalized'), ret)
                     logger.info(m)

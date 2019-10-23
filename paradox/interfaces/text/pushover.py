@@ -28,7 +28,7 @@ class PushoverInterface(AbstractTextInterface):
             raise Exception('Failed to authenticate with Pushover. Please check PUSHOVER_APPLICATION_KEY')
 
 
-    def _send_message(self, message):
+    def send_message(self, message):
 
         for user_key, devices_raw in cfg.PUSHOVER_BROADCAST_KEYS.items():
             user = self.users.get(user_key)

@@ -15,39 +15,45 @@ import serial_asyncio
 from paradox.config import config as cfg
 from paradox.connections.connection import Connection, ConnectionProtocol
 from paradox.lib import ps
+import os
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
+INIT_COMMANDS = [b'AT',
+                 b'ATE0',
+                 b'AT+CMGF=1',
+                 b'AT+CNMI=1,2,0,0,0',
+                 b'AT+CUSD=1,"*111#"'
+                 ]
+
+
 class SerialConnectionProtocol(ConnectionProtocol):
-    def __init__(self, on_port_open, on_con_lost):
+    def __init__(self, on_port_open, on_con_lost, on_recv_data):
         super(SerialConnectionProtocol, self).__init__(on_con_lost=on_con_lost)
         self.buffer = b''
         self.on_port_open = on_port_open
+        self.on_recv_data = on_recv_data
         self.loop = asyncio.get_event_loop()
 
     def connection_made(self, transport):
         super(SerialConnectionProtocol, self).connection_made(transport)
         self.on_port_open()
 
-    async def _send_message(self, message):
-        logger.debug("I->M: {}".format(message))
-        await self.transport.write(message)
-
-    def send_message(self, message):
-        asyncio.run_coroutine_threadsafe(self._send_message(message), self.loop)
-
-    async def read_message(self, timeout=5):
-        return await asyncio.wait_for(self.read_queue.get(), timeout=timeout)
+    async def send_message(self, message):
+        self.transport.write(message + b'\r\n')
 
     def data_received(self, recv_data):
-        logger.debug("M->I: Data: {}".format(recv_data))
         self.buffer += recv_data
-        r = self.buffer.find(b'\r\n')
-        if r > 0:
-            frame = self.buffer[:r]
-            self.buffer[r:]
-            logger.debug("M->I: Frame: {}".format(frame))
-            self.read_queue.put_nowait(frame)
+
+        while True:
+            self.buffer = self.buffer.lstrip()
+            r = self.buffer.find(b'\n')  # \r\n
+            if r <= 0:
+                break
+
+            frame = self.buffer[:r].strip()
+            self.buffer = self.buffer[r:]
+            self.loop.create_task(self.on_recv_data(frame))  # Callback
 
     def connection_lost(self, exc):
         logger.error('The serial port was closed')
@@ -56,11 +62,18 @@ class SerialConnectionProtocol(ConnectionProtocol):
 
 
 class SerialCommunication(Connection):
-    def __init__(self, port, baud=9600, timeout=5):
+    def __init__(self, loop, port, baud=9600, timeout=5, recv_callback=None):
         super(SerialCommunication, self).__init__(timeout=timeout)
         self.port_path = port
         self.baud = baud
         self.connected_future = None
+        self.recv_callback = recv_callback
+        self.loop = loop
+        asyncio.set_event_loop(loop)
+        self.queue = asyncio.Queue()
+
+    def clear(self):
+        self.queue = asyncio.Queue()
 
     def on_port_closed(self):
         logger.error('Connection was lost')
@@ -72,6 +85,20 @@ class SerialCommunication(Connection):
         self.connected_future.set_result(True)
         self.connected = True
 
+    async def on_data_received(self, message):
+        logger.debug("M->I: {}".format(message))
+
+        if self.recv_callback is not None:
+            self.loop.create_task(self.recv_callback(message))  # Callback
+        else:
+            asyncio.ensure_future(self.queue.put(message))
+
+        if self.recv_callback is not None:
+            return await self.recv_callback(message)
+
+    def set_recv_callback(self, callback):
+        self.recv_callback = callback
+
     def open_timeout(self):
         if self.connected_future.done():
             return
@@ -81,19 +108,28 @@ class SerialCommunication(Connection):
         self.connected = False
 
     def make_protocol(self):
-        return SerialConnectionProtocol(self.on_port_open, self.on_port_closed)
+        return SerialConnectionProtocol(self.on_port_open, self.on_port_closed, self.on_data_received)
+
+    async def write(self, message):
+        logger.debug("I->M: {}".format(message))
+        if self.connection is not None:
+            return await self.connection.send_message(message)
+
+    async def read(self, timeout=5):
+        if self.connection is not None:
+            return await asyncio.wait_for(self.queue.get(), timeout=timeout)
 
     async def connect(self):
         logger.info("Connecting to serial port {}".format(self.port_path))
-        loop = asyncio.get_event_loop()
 
-        self.connected_future = loop.create_future()
-        loop.call_later(5, self.open_timeout)
+        self.connected_future = self.loop.create_future()
+        self.loop.call_later(5, self.open_timeout)
 
-        _, self.connection = await serial_asyncio.create_serial_connection(loop,
+        _, self.connection = await serial_asyncio.create_serial_connection(self.loop,
                                                                            self.make_protocol,
                                                                            self.port_path,
                                                                            self.baud)
+
         return await self.connected_future
 
 
@@ -107,146 +143,122 @@ class GSMTextInterface(AbstractTextInterface):
         self.port = None
         self.modem_connected = False
         self.loop = None
-        self.loop = asyncio.get_event_loop()
+        self.loop = asyncio.new_event_loop()
 
     def stop(self):
         """ Stops the GSM Interface Thread"""
-        logger.debug("Stopping GSM Interface")
+        logger.info("Stopping GSM Interface")
         self.stop_running.set()
 
         if self.port is not None:
             self.port.close()
 
+        self.loop.stop()
         super().stop()
+
         logger.debug("GSM Stopped")
 
     def connect(self):
-        logger.info("Using {} at {} baud".format(
-            cfg.GSM_MODEM_PORT, cfg.GSM_MODEM_BAUDRATE))
+        logger.info("Using {} at {} baud".format(cfg.GSM_MODEM_PORT, cfg.GSM_MODEM_BAUDRATE))
 
-        commands = [b'AT', b'ATE0', b'AT+CMGF=1',
-                    b'AT+CNMI=1,2,0,0,0', b'AT+CUSD=1,"*111#"']
         try:
-            self.port = SerialCommunication(cfg.GSM_MODEM_PORT, cfg.GSM_MODEM_BAUDRATE)
-        except:
-            logger.exception("Could not open port")
-            return False
-
-
-            result = self.loop.run_until_complete(self.port.connect())
-
-            if not result:
-                logger.error("Could not open modem port")
+            if not os.path.exists(cfg.GSM_MODEM_PORT):
+                logger.error("Modem port ({}) not found".format(cfg.GSM_MODEM_PORT))
                 return False
 
-            for command in commands:
-                if self.port.write(command) == 0:
-                    logger.error("Unable to initialize modem")
-                    return False
-                else:
-                    message = self.loop.run_until_complete(self.port.read())
-                    logger.info(message)
+            self.port = SerialCommunication(self.loop, cfg.GSM_MODEM_PORT, cfg.GSM_MODEM_BAUDRATE, 5)
+
+        except:
+            logger.exception("Could not open port {} for GSM modem".format(cfg.GSM_MODEM_PORT))
+            return False
+
+        result = self.loop.run_until_complete(self.port.connect())
+
+        if not result:
+            logger.exception("Could not connect to GSM modem")
+            return False
+
+        try:
+            for command in INIT_COMMANDS:
+                self.loop.run_until_complete(self.port.write(command))
+                self.loop.run_until_complete(self.port.read())
+
         except futures.TimeoutError as e:
             logger.error("No reply from modem")
             return False
+
         except Exception:
             logger.exception("Modem connect error")
             return False
 
+        self.port.set_recv_callback(self.data_received)  # Set recv callback to handle future messages
+
         self.modem_connected = True
         return True
-
-
-
-
-
-
-
-
-
-    def write(self, message):
-        if not self.connected():
-            return None
-
-        try:
-            logger.debug("I->M: {}".format(message))
-            self.port.write((message + '\r\n').encode('latin-1'))
-
-            data = self.port.read_message()
-            data = data.strip().decode('latin-1')
-            logger.debug("M->I: {}".format(data))
-            return data
-
-        except Exception:
-            logger.exception("Modem write")
-            self.modem_connected = False
-
-        return None
 
     def _run(self):
         logger.info("Starting GSM Interface")
 
-        while not self.stop_running.isSet():
-            while not self.modem_connected:
-                if not self.connect():
-                    logging.warning("Could not connect to modem")
+        while not self.modem_connected and not self.stop_running.isSet():
+            if not self.connect():
+                logging.warning("Could not connect to modem")
 
-                time.sleep(5)
-                continue
+            self.stop_running.wait(5)
 
-    def handle_message(self, message):
-            try:
-                data = self.port.read(200)
+        self.loop.run_forever()
 
-                if len(data) > 0:
-                    tokens = data.decode('latin-1').strip().split('"')
-                    for i in range(len(tokens)):
-                        tokens[i] = tokens[i].strip()
+        self.stop_running.wait()
 
-                    if len(tokens) > 0:
-                        if tokens[0] == '+CMT:':
-                            source = tokens[1]
-                            timestamp = datetime.datetime.strptime(
-                                tokens[5].split('+')[0], '%y/%m/%d,%H:%M:%S')
-                            message = tokens[6]
-                            self.handle_message(timestamp, source, message)
-                        elif tokens[0].startswith('+CUSD:'):
-                            ps.sendMessage("notifications",
-                                           message=dict(source=self.name,
-                                                        message=tokens[1],
-                                                        level=logging.INFO))
-                else:
-                    self.run_loop()
+    async def data_received(self, data):
 
-            except Exception:
-                self.modem_connected = False
-                logger.exception("")
-
-        return True
-
-
-
-    def send_sms(self, dst, message):
-        self.write('AT+CMGS="{}"'.format(dst))
-        self.write(message)
-        self.write('\x1A\r\n')
-
-    def send_message(self, message):
-        if self.port is None:
-            logger.warning("GSM not available when sending message")
+        if len(data) == 0:
             return
 
-        for dst in cfg.GSM_CONTACTS:
-            self.send_sms(dst, message)
+        if not self.modem_connected:
+            return
+
+        logger.debug("Data received: {}".format(data))
+
+        data = data.decode().strip()
+
+        # Ignore this as it is a status message of a successful operation
+        if data == 'OK':
+            return
+
+        # Ups... log
+        if data.startswith('ERROR'):
+            logger.warning("Got error from Modem: {}".format(data))
+            return
+
+        # Process message from modem
+        tokens = data.split('"')
+        for i in range(len(tokens)):
+            tokens[i] = tokens[i].strip()
+
+        if len(tokens) <= 0:
+            return
+
+        if tokens[0] == '+CMT:':
+            source = tokens[1]
+            timestamp = datetime.datetime.strptime(
+                tokens[5].split('+')[0], '%y/%m/%d,%H:%M:%S')
+            message = tokens[6]
+            self.handle_message(timestamp, source, message)
+        elif tokens[0].startswith('+CUSD:'):
+            ps.sendMessage("notifications",
+                           message=dict(source=self.name,
+                                        message=tokens[1],
+                                        level=logging.INFO))
+        return True
 
     def handle_message(self, timestamp, source, message):
         """ Handle GSM message. It should be a command """
 
-        logger.debug("Received Message {} {} {}".format(
+        logger.debug("Received message: {} {} {}".format(
             timestamp, source, message))
 
         if source in cfg.GSM_CONTACTS:
-            ret = self.send_command(message)
+            ret = self.handle_command(message)
 
             m = "FROM {}: {}".format(source, ret)
             logger.info(m)
@@ -258,3 +270,12 @@ class GSMTextInterface(AbstractTextInterface):
                        message=dict(source=self.name,
                                     payload=message,
                                     level=EventLevel.INFO))
+
+    def send_message(self, message):
+        if self.port is None:
+            logger.warning("GSM not available when sending message")
+            return
+
+        for dst in cfg.GSM_CONTACTS:
+            message = 'AT+CMGS="{}"{}\x1A'.format(dst, message)
+            self.loop.run_until_complete(self.port.write(message.encode()))

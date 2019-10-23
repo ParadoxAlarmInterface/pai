@@ -28,8 +28,8 @@ class AbstractTextInterface(ThreadQueueInterface):
     def run(self):
         logger.info("Starting Interface")
 
-        ps.subscribe(self._handle_panel_event, "events")
-        ps.subscribe(self._handle_notify, "notifications")
+        ps.subscribe(self.handle_panel_event, "events")
+        ps.subscribe(self.handle_notify, "notifications")
 
         try:
             self._run()
@@ -47,18 +47,18 @@ class AbstractTextInterface(ThreadQueueInterface):
     def set_alarm(self, alarm):
         self.alarm = alarm
 
-    def _send_message(self, message):
+    def send_message(self, message):
         pass
 
-    def _handle_notify(self, message):
+    def handle_notify(self, message):
 
         if message['level'] < self.filter_events_level:
             return
 
         if message['source'] != self.name:
-            self._send_message(message['payload'])
+            self.send_message(message['payload'])
 
-    def _handle_panel_event(self, event):
+    def handle_panel_event(self, event):
 
         if event.level < self.filter_events_level:
             return
@@ -90,9 +90,9 @@ class AbstractTextInterface(ThreadQueueInterface):
                     break
 
         if allow:
-            self._send_message(event.message)
+            self.send_message(event.message)
 
-    def _handle_command(self, message_raw):
+    def handle_command(self, message_raw):
         message = cfg.COMMAND_ALIAS.get(message_raw, message_raw)
 
         tokens = message.split(" ")
@@ -109,7 +109,7 @@ class AbstractTextInterface(ThreadQueueInterface):
 
         element_type = tokens[0].lower()
         element = tokens[1]
-        command = self._normalize_payload(tokens[2].lower())
+        command = self.normalize_payload(tokens[2].lower())
 
         # Process a Zone Command
         if element_type == 'zone':
@@ -141,7 +141,7 @@ class AbstractTextInterface(ThreadQueueInterface):
 
     #TODO: Remove this (to panels?)
     @staticmethod
-    def _normalize_payload(message):
+    def normalize_payload(message):
         message = message.strip().lower()
 
         if message in ['true', 'on', '1', 'enable']:
