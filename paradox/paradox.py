@@ -612,6 +612,9 @@ class Paradox:
         self.update_properties('system', 'troubles', {'trouble': global_trouble})
 
     def _update_partition_current_state(self, partition_statuses):
+        """
+        current_state is fully HomeAssistant compatible. Check HASS manual before making any changes.
+        """
         for p_key, p_status in partition_statuses.items():
             partition = self.storage.get_container_object('partition', p_key)
             if not partition:
@@ -629,6 +632,8 @@ class Paradox:
                     new_status = 'pending'
                 elif p_status.get('arm_stay'):
                     new_status = 'armed_home'
+                elif p_status.get('arm_sleep'):
+                    new_status = 'armed_night'
                 elif p_status.get('arm_away'):
                     new_status = 'armed_away'
                 else:
