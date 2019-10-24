@@ -76,13 +76,13 @@ class Paradox:
             else:
                 raise AssertionError("Invalid connection type: {}".format(cfg.CONNECTION_TYPE))
 
-            self.register_connection_handlers()
+            self._register_connection_handlers()
 
         return self._connection
 
-    def register_connection_handlers(self):
-        self.connection.register_handler(EventMessageHandler(self.handle_event))
-        self.connection.register_handler(ErrorMessageHandler(self.handle_error))
+    def _register_connection_handlers(self):
+        self.connection.register_handler(EventMessageHandler(self.handle_event_message))
+        self.connection.register_handler(ErrorMessageHandler(self.handle_error_message))
 
     def reset(self):
         pass
@@ -231,7 +231,7 @@ class Paradox:
             try:
                 await asyncio.wait_for(self.loop_wait_event.wait(), max_wait_time)
             except asyncio.TimeoutError:
-                logger.debug("Loop timeout")  # TODO: Remove
+                # It is fine to timeout to go to the next loop
                 pass
             finally:
                 self.loop_wait_event.clear()
@@ -410,7 +410,7 @@ class Paradox:
         if el:
             return el.get("label")
 
-    def handle_event(self, message: Container=None):
+    def handle_event_message(self, message: Container=None):
         """Process cfg.Live Event Message and dispatch it to the interface module"""
         try:
             logger.debug("Handle event from panel message: {}".format(message))
@@ -526,7 +526,7 @@ class Paradox:
 
                 ps.sendChange(element_type, key, property_name, property_value, initial=suppress)
 
-    def handle_error(self, message):
+    def handle_error_message(self, message):
         """Handle ErrorMessage"""
         error_enum = message.fields.value.message
 
@@ -540,7 +540,7 @@ class Paradox:
         logger.info("Disconnecting from the Alarm Panel")
         self.run = State.STOP
 
-        self.clean_session()
+        self._clean_session()
         if self.connection.connected:
             self.connection.close()
             logger.info("Disconnected from the Alarm Panel")
@@ -558,7 +558,7 @@ class Paradox:
         if self.run == State.PAUSE:
             await self.connect_async()
 
-    def clean_session(self):
+    def _clean_session(self):
         logger.info("Clean Session")
         if self.connection.connected:
             if not self.panel:

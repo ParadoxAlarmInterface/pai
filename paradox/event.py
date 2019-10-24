@@ -81,9 +81,7 @@ class Event:
             evt.label_provider = label_provider
 
         evt._event_map = event_map
-        evt.parse_event(event)
-
-        evt._parse_event_map()
+        evt._parse_live_event(event)
 
         return evt
 
@@ -110,7 +108,7 @@ class Event:
         if r:
             return evt
 
-    def _parse_property_map(self):
+    def _parse_property_map(self) -> bool:
         if (self.raw['property']) not in self._property_map:
             return False
 
@@ -132,9 +130,9 @@ class Event:
 
         return True
 
-    def parse_event(self, message: Container):
+    def _parse_live_event(self, message: Container) -> None:
         if message.fields.value.po.command != 0x0e:
-            return False
+            raise AssertionError("Message is not an event")
 
         self.raw = copy(message.fields.value)  # Event raw data
         self.timestamp = self.raw.time  # Event timestamp
@@ -146,11 +144,7 @@ class Event:
         self.major = self.raw.event.major  # Event major code
         self.minor = self.raw.event.minor  # Event minor code
 
-        self._parse_event_map()
-
-        return True
-
-    def _parse_event_map(self):
+        # parse event map
         if self.major not in self._event_map:
             raise (Exception("Unknown event major: {}".format(self.raw)))
 
@@ -199,7 +193,7 @@ class Event:
             self.id = self.partition
 
     @property
-    def key(self):
+    def key(self) -> str:
         if not self._key:
             self._key = "{},{},{}".format(self.type, self.label,
                                           ','.join("=".join([key, str(val)]) for key, val in self.change.items()))

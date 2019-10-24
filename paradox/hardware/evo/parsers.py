@@ -58,7 +58,7 @@ RAMDataParserMap = {
     1: Struct(
         "_weekday" / Int8ub,
         "pgm_flags" / PGMFlags(),
-        "key-switch_triggered" / StatusAdapter(Bytes(4)),  # TODO: Implement key-switch
+        "key-switch_triggered" / StatusAdapter(Bytes(4)),
         "door_open" / StatusAdapter(Bytes(4)),
         "system" / Struct(
             "troubles" / BitStruct(
