@@ -126,12 +126,11 @@ class SerialCommunication(Connection):
 
     async def connect(self):
         logger.info("Connecting to serial port {}".format(self.port_path))
-        loop = asyncio.get_event_loop()
 
-        self.connected_future = loop.create_future()
-        loop.call_later(5, self.open_timeout)
+        self.connected_future = self.loop.create_future()
+        self.loop.call_later(5, self.open_timeout)
 
-        _, self.connection = await serial_asyncio.create_serial_connection(loop,
+        _, self.connection = await serial_asyncio.create_serial_connection(self.loop,
                                         self.make_protocol, 
                                         self.port_path, 
                                         self.baud)

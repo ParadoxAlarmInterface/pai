@@ -123,7 +123,6 @@ class IPConnection(Connection):
         return IPConnectionProtocol(self.on_message, self.on_connection_lost, self.key)
 
     async def connect(self):
-        loop = asyncio.get_event_loop()
         tries = 1
         max_tries = 3
 
@@ -142,7 +141,7 @@ class IPConnection(Connection):
                 try:
                     logger.info("Connecting to IP module. Try %d/%d"% (tries, max_tries))
 
-                    _, self.connection = await loop.create_connection(self.make_protocol,
+                    _, self.connection = await self.loop.create_connection(self.make_protocol,
                                                                                    host=self.host, port=self.port)
                     if cfg.IP_CONNECTION_BARE:
                         return True
@@ -159,7 +158,6 @@ class IPConnection(Connection):
         return False
 
     async def connect_to_site(self):
-        loop = asyncio.get_event_loop()
         self.connection_timestamp = 0
         logger.info("Connecting to Site: {}".format(cfg.IP_CONNECTION_SITEID))
         if self.site_info is None:
@@ -235,7 +233,7 @@ class IPConnection(Connection):
                 logger.error(stun.get_error(stun_r))
                 return False
 
-            _, self.connection = await loop.create_connection(self.make_protocol, sock=self.stun_tunnel.sock)
+            _, self.connection = await self.loop.create_connection(self.make_protocol, sock=self.stun_tunnel.sock)
             logger.info("Connected to Site: {}".format(cfg.IP_CONNECTION_SITEID))
         except Exception:
             logger.exception("Unable to negotiate connection to site")

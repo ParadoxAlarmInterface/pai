@@ -41,12 +41,17 @@ class PublishPropertyChange(Enum):
     YES = 2
 
 
+def async_loop_unhandled_exception_handler(loop, context):
+    logger.error("Unhandled exception in async loop(%s): %s", loop, context)
+
+
 class Paradox:
     def __init__(self, retries=3):
         self.panel = None  # type: Panel
         self._connection = None
         self.retries = retries
         self.work_loop = asyncio.get_event_loop() # type: asyncio.AbstractEventLoop
+        self.work_loop.set_exception_handler(async_loop_unhandled_exception_handler)
         self.receive_worker_task = None
 
         self.storage = Storage()
