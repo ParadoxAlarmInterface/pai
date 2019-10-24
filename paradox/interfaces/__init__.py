@@ -31,7 +31,7 @@ class AsyncInterface(Interface):
         self._running_task = None  # type: asyncio.Task
 
     def start(self):
-        self._running_task = asyncio.get_event_loop().create_task(self.run())
+        self._running_task = self._loop.create_task(self.run())
 
     def stop(self):
         if self._running_task and not self._running_task.done():
