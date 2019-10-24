@@ -1,5 +1,6 @@
-import functools
+import time
 import logging
+import asyncio
 import os
 import typing
 import re
@@ -8,7 +9,7 @@ from enum import Enum
 from paho.mqtt.client import Client, MQTT_ERR_SUCCESS
 
 from paradox.config import config as cfg
-from paradox.interfaces import AsyncQueueInterface
+from paradox.interfaces import AsyncInterface
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -120,7 +121,7 @@ class MQTTConnection(Client):
         super(MQTTConnection, self).disconnect()
 
 
-class AbstractMQTTInterface(AsyncQueueInterface):
+class AbstractMQTTInterface(AsyncInterface):
     """Interface Class using MQTT"""
     name = 'abstract_mqtt'
 
@@ -131,12 +132,11 @@ class AbstractMQTTInterface(AsyncQueueInterface):
         self.mqtt.register(self)
         logger.debug("Registars: %d", len(self.mqtt.registrars))
 
-    async def run(self):
+        self.republish_cache = {}
+
+    def start(self):
+        super().start()
         self.mqtt.start()
-
-        await super().run()
-
-        self.mqtt.stop()
 
     def stop(self):
         """ Stops the MQTT Interface Thread"""
@@ -144,15 +144,28 @@ class AbstractMQTTInterface(AsyncQueueInterface):
         self.mqtt.stop()
         super().stop()
 
-    def on_disconnect(self, client, userdata, rc):
-        pass
+    async def run(self):
+        while True:
+            await asyncio.sleep(cfg.MQTT_REPUBLISH_INTERVAL)
 
-    def on_connect(self, client, userdata, flags, result):
-        pass
+            trigger = time.time() - cfg.MQTT_REPUBLISH_INTERVAL
+
+            for k, v in filter(lambda f: f[1].get("last_publish") <= trigger, self.republish_cache.items()):
+                self.publish(k, v['value'], v['qos'], v['retain'])
 
     def publish(self, topic, value, qos, retain):
+        self.republish_cache[topic] = {'value': value, 'qos': qos, 'retain': retain, 'last_publish': time.time()}
         self.mqtt.publish(topic, value, qos, retain)
+        logger.debug("MQTT: {}={}".format(topic, value))
 
     def subscribe_callback(self, sub, callback: typing.Callable):
         self.mqtt.message_callback_add(sub, callback)
         self.mqtt.subscribe(sub)
+
+    def on_disconnect(self, client, userdata, rc):
+        """ Called from MQTT connection """
+        pass
+
+    def on_connect(self, client, userdata, flags, result):
+        """ Called from MQTT connection """
+        pass

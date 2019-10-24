@@ -22,16 +22,11 @@ class BasicMQTTInterface(AbstractMQTTInterface):
     def __init__(self):
         super().__init__()
 
-        self.cache = dict()
-        self.armed = dict()
         self.partitions = {}
-        self.last_republish = time.time()
 
     async def run(self):
         ps.subscribe(self._handle_panel_change, "changes")
         ps.subscribe(self._handle_panel_event, "events")
-
-        self.last_republish = time.time()
 
         await super().run()
 
@@ -53,15 +48,6 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_NOTIFICATIONS_TOPIC, "#"),
             self._mqtt_handle_notifications
         )
-
-    def run_loop(self, queue_item):
-        if time.time() - self.last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
-            self.republish()
-            self.last_republish = time.time()
-
-    def publish(self, topic, value, qos, retain):
-        self.cache[topic] = {'value': value, 'qos': qos, 'retain': retain}
-        super().publish(topic, value, qos, retain)
 
     def _preparse_message(self, message) -> typing.Optional[PreparseResponse]:
         logger.info("message topic={}, payload={}".format(
@@ -229,11 +215,6 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                                              sanitize_topic_part(label),
                                              attribute),
                      "{}".format(publish_value), 0, cfg.MQTT_RETAIN)
-
-    def republish(self):
-        for k in list(self.cache.keys()):
-            v = self.cache[k]
-            self.mqtt.publish(k, v['value'], v['qos'], v['retain'])
 
     def _publish_dash(self, fname, partitions):
         # TODO: move to a separate component
