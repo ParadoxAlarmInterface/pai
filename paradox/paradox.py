@@ -258,6 +258,9 @@ class Paradox:
         #     if time.time() - self.last_power_update >= cfg.POWER_UPDATE_INTERVAL:
         #         force = PublishPropertyChange.YES if cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE else PublishPropertyChange.NO
 
+        if cfg.LOGGING_DUMP_STATUS:
+            logger.debug("properties: %s", status)
+
         ps.sendMessage('status_update', status=status)
 
     def request_status_refresh(self):

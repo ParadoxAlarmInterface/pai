@@ -130,7 +130,7 @@ def test_evo_eeprom_reading():
     on_message.assert_called_with(payload)
 
 
-def test_evo_eeprom_reading_in_chunks(mocker):
+def test_evo_eeprom_reading_in_chunks():
     on_message = MagicMock()
     cp = SerialConnectionProtocol(on_message, None, None)
 
@@ -146,7 +146,7 @@ def test_evo_eeprom_reading_in_chunks(mocker):
     on_message.assert_called_with(payload)
 
 
-def test_evo_ram_reading(mocker):
+def test_evo_ram_reading():
     on_message = MagicMock()
     cp = SerialConnectionProtocol(on_message, None, None)
 
