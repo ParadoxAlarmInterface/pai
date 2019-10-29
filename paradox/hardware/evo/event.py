@@ -1,5 +1,14 @@
 from paradox.event import EventLevel
 
+
+def _toggle_provider(old):
+    return not old
+
+
+def _minor2_provider(x, *_):
+    return x.minor2
+
+
 event_map = {
     0: dict(level=EventLevel.DEBUG, change=dict(open=False), type='zone', message='Zone {label} OK'),
     1: dict(level=EventLevel.DEBUG, change=dict(open=True), type='zone', message='Zone {label} open'),
@@ -14,7 +23,7 @@ event_map = {
                 4: dict(level=EventLevel.INFO, type='partition', change=dict(arm_away=True, arm=True), message='Arm in Away mode'),
                 5: dict(level=EventLevel.INFO, type='partition', change=dict(arm_stay=True, arm=True), message='Full arm when in Stay mode'),
                 6: dict(type='system', message='Voice module access'),
-                7: dict(type='system', message='Remote control access by {@user}', user=lambda x, *_ : x.raw.event.minor2),
+                7: dict(type='system', message='Remote control access by {@user}', user=_minor2_provider),
                 8: dict(type='system', message='PC fail to communicate'),
                 9: dict(type='system', message='Midnight'),
                 10: dict(type='system', message='Neware user login'),
@@ -26,15 +35,15 @@ event_map = {
                 16: dict(type='system', message='Auxiliary output manually activated'),
                 17: dict(type='system', message='Auxiliary output manually deactivated'),
                 18: dict(type='system', message='Voice reporting failed'),
-                19: dict(type='system', message='Fail to communicate restore', telephone=lambda x, *_ : x.raw.event.minor2),
+                19: dict(type='system', message='Fail to communicate restore', telephone=_minor2_provider),
                 20: dict(type='system', message='Software access (VDMP3, Ip100, Neware, WinLoad)'),  # minor2 has sub events
                 21: dict(type='system', message='IPR512 1 registration status'),
                 22: dict(type='system', message='IPR512 2 registration status'),
                 23: dict(type='system', message='IPR512 3 registration status'),
                 24: dict(type='system', message='IPR512 4 registration status')
     }),
-    5: dict(level=EventLevel.INFO, type='user', message='User {label} code entered on keypad', keypad=lambda x, *_ : x.raw.event.minor2),
-    6: dict(level=EventLevel.INFO, type='door', message='User/card access on door {label}', user=lambda x, *_ : x.raw.event.minor2),
+    5: dict(level=EventLevel.INFO, type='user', message='User {label} code entered on keypad', keypad=_minor2_provider),
+    6: dict(level=EventLevel.INFO, type='door', message='User/card access on door {label}', user=_minor2_provider),
     7: dict(level=EventLevel.WARN, type='user', message='Bypass programming access'),
     8: dict(level=EventLevel.WARN, type='zone', message='TX delay zone {label} alarm'),
     9: dict(level=EventLevel.INFO, change=dict(arm=True), type='partition', message='{label} Arming with master'),
@@ -42,7 +51,7 @@ event_map = {
     11: dict(level=EventLevel.INFO, change=dict(arm=True), type='partition', message='Arming with keyswitch {label}'),
     12: dict(level=EventLevel.INFO, change=dict(arm=True), type='partition', message='Special arming', sub={  # no label passed
         0: dict(type='partition', message='Auto arming'),
-        1: dict(type='partition', message='Arming with Winload by {@user}', user=lambda x, *_ : x.raw.event.minor2),
+        1: dict(type='partition', message='Arming with Winload by {@user}', user=_minor2_provider),
         2: dict(type='partition', message='Late to close'),
         3: dict(type='partition', message='No movement arming'),
         4: dict(type='partition', message='Partial arming'),
@@ -65,16 +74,16 @@ event_map = {
     22: dict(level=EventLevel.INFO, change=dict(arm=False), type='partition', message='{label} Special disarming', sub={  # no label passed
         0: dict(type='partition', message='Auto arm cancelled'),
         1: dict(type='partition', message='One-touch stay/instant disarm'),
-        2: dict(type='partition', message='Disarming with Winload by {@user}', user=lambda x, *_ : x.raw.event.minor2),
-        3: dict(type='partition', message='Disarmining with Winload after alarm by {@user}', user=lambda x, *_ : x.raw.event.minor2),
-        4: dict(type='partition', message='Winload cancelled alarm by {@user}', user=lambda x, *_ : x.raw.event.minor2),
+        2: dict(type='partition', message='Disarming with Winload by {@user}', user=_minor2_provider),
+        3: dict(type='partition', message='Disarmining with Winload after alarm by {@user}', user=_minor2_provider),
+        4: dict(type='partition', message='Winload cancelled alarm by {@user}', user=_minor2_provider),
         5: dict(type='partition', message='Future use'),
         6: dict(type='partition', message='Future use'),
         7: dict(type='partition', message='Future use'),
         8: dict(type='partition', message='(InTouch) voice module disarming'),
         9: dict(type='partition', message='Future use')
     }),
-    23: dict(level=EventLevel.INFO, type='zone', change=dict(bypassed=lambda old: not old), message='Zone {label} bypass toggled'),
+    23: dict(level=EventLevel.INFO, type='zone', change=dict(bypassed=_toggle_provider), message='Zone {label} bypass toggled'),
     24: dict(level=EventLevel.CRITICAL, type='zone', change=dict(alarm=True), tags=['alarm'], message='Zone {label} in alarm'),
     25: dict(level=EventLevel.CRITICAL, type='zone', change=dict(fire_alarm=True), tags=['alarm', 'fire'], message='Fire alarm {label}'),
     26: dict(level=EventLevel.CRITICAL, type='zone', change=dict(alarm=False), tags=['alarm'], message='Zone {label} alarm restore'),
@@ -165,7 +174,7 @@ event_map = {
         7: dict(message='Battery failure'),
         8: dict(message='Auxiliary failure'),
         9: dict(message='Future use'),
-    }, module=lambda x, *_ : x.raw.event.minor2),
+    }, module=_minor2_provider),
     39: dict(level=EventLevel.WARN, type='system', message='Module trouble restore', tags=['trouble', 'restore'],sub={
         0: dict(message='Combus fault restored'),
         1: dict(message='Module tamper restored'),
@@ -177,9 +186,9 @@ event_map = {
         7: dict(message='Battery failure restored'),
         8: dict(message='Auxiliary failure restored'),
         9: dict(message='Future use'),
-    }, module=lambda x, *_ : x.raw.event.minor2),
+    }, module=_minor2_provider),
     40: dict(level=EventLevel.WARN, type='system', message='Fail to communicate on telephone number',
-        telephone=lambda x, *_ : x.raw.event.minor2),
+        telephone=_minor2_provider),
     41: dict(level=EventLevel.WARN, type='zone', changes=dict(zone_low_battery_trouble=True), tags=['trouble'], message='Low battery on zone {label}'),
     42: dict(level=EventLevel.WARN, type='zone', changes=dict(zone_supervision_trouble=True), message='Zone {label} supervision trouble', tags=['trouble']),
     43: dict(level=EventLevel.WARN, type='zone', changes=dict(zone_low_battery_trouble=False), message='Low battery on zone {label} restored', tags=['trouble', 'restore']),

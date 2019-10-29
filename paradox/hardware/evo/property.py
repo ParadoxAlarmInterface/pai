@@ -266,18 +266,20 @@ property_map = {
     "tx_delay": dict(level=EventLevel.INFO, tags=[],
         message={"True": "{Type} {label} tx delay active",
                  "False": "{Type} {label} tx delay inactive"}),
-        # ---------------------
-        # Synthetic properties
-        # ---------------------
-        "current_state": dict(
-            level=EventLevel.INFO,
-            tags=[],
-            message={
-                "triggered": "{Type} {label} triggered alarm",
-                "pending": "{Type} {label} arming pending",
-                "armed_home": "{Type} {label} armed stay",
-                "armed_away": "{Type} {label} armed away",
-                "disarmed": "{Type} {label} disarmed"
-            }
-        )
+    "time": dict(level=EventLevel.DEBUG, tags=['system', 'time'],
+                 message="Panel time is {value}"),
+    # ---------------------
+    # Synthetic properties
+    # ---------------------
+    "current_state": dict(
+        level=EventLevel.INFO,
+        tags=[],
+        message={
+            "triggered": "{Type} {label} triggered alarm",
+            "pending": "{Type} {label} arming pending",
+            "armed_home": "{Type} {label} armed stay",
+            "armed_away": "{Type} {label} armed away",
+            "disarmed": "{Type} {label} disarmed"
+        }
+    )
 }

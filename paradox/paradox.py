@@ -10,7 +10,7 @@ from typing import Optional, Sequence, Iterable, Callable
 
 from construct import Container
 
-from paradox import event
+from paradox.event import LiveEvent, ChangeEvent, Change
 from paradox.config import config as cfg
 from paradox.connections.ip_connection import IPConnection
 from paradox.connections.serial_connection import SerialCommunication
@@ -35,15 +35,12 @@ class State(Enum):
     ERROR = 4
 
 
-class PublishPropertyChange(Enum):
-    NO = 0
-    DEFAULT = 1
-    YES = 2
-
-
 def async_loop_unhandled_exception_handler(loop, context):
     logger.error("Unhandled exception in async loop(%s): %s", loop, context)
 
+    loop.default_exception_handler(context)
+    # exception = context.get('exception')
+    logger.exception("Unhandled exception in async loop")
 
 class Paradox:
     def __init__(self, retries=3):
@@ -62,6 +59,7 @@ class Paradox:
 
         ps.subscribe(self._on_labels_load, "labels_loaded")
         ps.subscribe(self._on_status_update, "status_update")
+        ps.subscribe(self._on_property_change, "changes")
 
     @property
     def connection(self):
@@ -214,7 +212,7 @@ class Paradox:
             if self.run == State.RUN:
                 try:
                     result = await asyncio.gather(*[self._status_request(i) for i in cfg.STATUS_REQUESTS])
-                    merged = deep_merge(*result, extend_lists=True)
+                    merged = deep_merge(*result, extend_lists=True, initializer={})
                     self.work_loop.call_soon(self._process_status, merged)
                     replies_missing = max(0, replies_missing - 1)
                 except ConnectionError:
@@ -422,12 +420,9 @@ class Paradox:
         """Process cfg.Live Event Message and dispatch it to the interface module"""
         try:
             logger.debug("Handle event from panel message: {}".format(message))
-            evt = event.Event.from_live_event(self.panel.event_map, event=message, label_provider=self.get_label)
-            if evt:
-                if len(evt.change) == 0:
-                    # Publish event
-                    ps.sendEvent(evt)
-            else:
+            try:
+                evt = LiveEvent(event=message, event_map=self.panel.event_map, label_provider=self.get_label)
+            except AssertionError as e:
                 logger.debug("Error creating event")
                 return
 
@@ -455,84 +450,12 @@ class Paradox:
             
             # The event has changes. Update the state
             if len(evt.change) > 0 and element:
-                self.update_properties(evt.type, evt.id, evt.change)
+                self.storage.update_container_object(evt.type, evt.id, evt.change)
+
+            ps.sendEvent(evt)
 
         except Exception as e:
             logger.exception("Handle event")
-
-    def update_properties(self, element_type: str, type_key: str, change: dict, publish=PublishPropertyChange.DEFAULT):
-        assert element_type is not None
-        assert type_key is not None
-        assert isinstance(change, dict)
-        if not change:  # Has at least one element
-            return
-
-        logger.debug('update_properties %s/%s=%s', element_type, type_key, change)
-        element = self.storage.get_container_object(element_type, type_key, create_if_missing=True)
-
-        # Panel doesn't have this element
-        # if type_key not in elements:
-        #     # Some panels have less elements than the ones reported in the status messages.
-        #     # This is not an error but the logging can be useful when adding new panels.
-        #     logger.debug('Notice: {} not found in type {} with content {}'.format(type_key, element_type, list(elements)))
-        #     return
-
-        key = element['key']
-
-        # Publish changes and update state
-        for property_name, property_value in change.items():
-
-            if not isinstance(property_name, str):
-                logger.debug('Invalid property name ({}/{}/{}) type: {}'.format(element_type, key, property_name, type(property_name)))
-                continue
-            if property_name.startswith('_'):  # skip private properties
-                continue
-
-            old = element.get(property_name)
-
-            if isinstance(property_value, Callable):  # function to make new value from the old one
-                try:
-                    property_value = property_value(old)
-                except Exception:
-                    logger.exception('Exception caught during property "%s" convert. Ignoring', property_name)
-                    continue
-
-            # Standard processing of changes
-            if property_name in element:
-                if old != property_value \
-                        or publish == PublishPropertyChange.YES \
-                        or cfg.PUSH_UPDATE_WITHOUT_CHANGE:
-                    logger.debug("Change {}/{}/{} from {} to {}".format(element_type,
-                                                                        key,
-                                                                        property_name,
-                                                                        old,
-                                                                        property_value))
-                    element[property_name] = property_value
-                    
-                    ps.sendChange(element_type, key, property_name, property_value)
-
-                    # Ignore change if is a generic trouble. 
-                    if not (property_name == 'trouble' and element_type == 'system'):
-                        if element_type == 'partition':
-                            partition = key
-                        else:
-                            partition = ""
-
-                        evt_change = {'property': property_name, 'value': property_value, 'type': element_type, 
-                                      'partition': partition, 'label': key, 'time': int(time.time())}
-
-                        evt = event.Event.from_change(property_map=self.panel.property_map, change=evt_change)
-                        if evt:
-                            logger.debug("Event: {}".format(evt))
-                            ps.sendEvent(evt)
-                        else:
-                            logger.debug("Could not create event from change")
-
-            else:
-                element[property_name] = property_value  # Initial value, do not notify
-                suppress = 'trouble' not in property_name
-
-                ps.sendChange(element_type, key, property_name, property_value, initial=suppress)
 
     def handle_error_message(self, message):
         """Handle ErrorMessage"""
@@ -581,7 +504,7 @@ class Paradox:
 
     def _on_labels_load(self, data):
         for k, d in data.items():
-            self.storage.get_container(k).update(d)
+            self.storage.get_container(k).deep_merge(d)
 
     def _on_status_update(self, status):
         """
@@ -600,7 +523,7 @@ class Paradox:
                 continue
             for element_item_key, element_item_status in element_items.items():
                 if isinstance(element_item_status, (dict, list,)):
-                    self.update_properties(element_type, element_item_key, element_item_status)
+                    self.storage.update_container_object(element_type, element_item_key, element_item_status)
                 else:
                     logger.debug("%s/%s:%s ignored", element_type, element_item_key, element_item_status)
 
@@ -613,11 +536,11 @@ class Paradox:
                 logger.error("Trouble %s has not boolean state: %s", t_key, t_status)
                 continue
 
-            self.update_properties('system', 'troubles', {t_key: global_trouble})
+            self.storage.update_container_object('system', 'troubles', {t_key: global_trouble})
 
             global_trouble = global_trouble or t_status
 
-        self.update_properties('system', 'troubles', {'trouble': global_trouble})
+        self.storage.update_container_object('system', 'troubles', {'trouble': global_trouble})
 
     def _update_partition_current_state(self, partition_statuses):
         """
@@ -649,5 +572,15 @@ class Paradox:
             else:
                 new_status = 'disarmed'
 
-            if new_status and partition.get('current_state') != new_status:
-                self.update_properties('partition', partition['key'], {"current_state": new_status})
+            self.storage.update_container_object('partition', partition['key'], {"current_state": new_status})
+
+    def _on_property_change(self, change: Change):
+        if change.initial:
+            return
+
+        try:
+            evt = ChangeEvent(change_object=change, property_map=self.panel.property_map, label_provider=self.get_label)
+            logger.debug("Event: {}".format(evt))
+            ps.sendEvent(evt)
+        except AssertionError:
+            logger.debug("Could not create event from change")

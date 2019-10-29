@@ -1,14 +1,13 @@
 import json
 import logging
 import os
-import time
 import typing
 from collections import namedtuple
 
 from paradox.config import config as cfg
+from paradox.event import EventLevel, Event, Change
 from paradox.lib import ps
 from paradox.lib.utils import JSONByteEncoder
-from paradox.event import EventLevel
 from .core import AbstractMQTTInterface, sanitize_topic_part, ELEMENT_TOPIC_MAP
 
 logger = logging.getLogger('PAI').getChild(__name__)
@@ -160,7 +159,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                 logger.warning(
                     "Output command refused: {}={}".format(element, command))
 
-    def _handle_panel_event(self, event):
+    def _handle_panel_event(self, event: Event):
         """
         Handle Live Event
 
@@ -174,21 +173,18 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                                         cfg.MQTT_RAW_TOPIC),
                          json.dumps(event.props, ensure_ascii=False, cls=JSONByteEncoder, default=str, sort_keys=True), 0, cfg.MQTT_RETAIN)
 
-    def _handle_panel_change(self, change):
-        logger.debug("Change: %s", change)
-
-        attribute = change['property']
-        label = change['label']
-        value = change['value']
-        initial = change['initial']
-        element = change['type']
+    def _handle_panel_change(self, change: Change):
+        attribute = change.property
+        label = change.key
+        value = change.new_value
+        element_type = change.type
 
         """Handle Property Change"""
 
         # Dash stuff START
         # TODO: move to a separate component
         # Keep track of ARM state
-        if element == 'partition':
+        if element_type == 'partition':
             if label not in self.partitions:
                 self.partitions[label] = dict()
 
@@ -199,10 +195,10 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             self.partitions[label][attribute] = value
         # Dash stuff END
 
-        if element in ELEMENT_TOPIC_MAP:
-            element_topic = ELEMENT_TOPIC_MAP[element]
+        if element_type in ELEMENT_TOPIC_MAP:
+            element_topic = ELEMENT_TOPIC_MAP[element_type]
         else:
-            element_topic = element
+            element_topic = element_type
 
         if cfg.MQTT_USE_NUMERIC_STATES:
             publish_value = int(value)

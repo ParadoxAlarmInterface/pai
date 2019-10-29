@@ -2,7 +2,7 @@ import logging
 import re
 
 from paradox.lib import ps
-from paradox.event import EventLevel
+from paradox.event import EventLevel, Event
 from paradox.config import config as cfg
 from paradox.interfaces import ThreadQueueInterface
 
@@ -58,7 +58,7 @@ class AbstractTextInterface(ThreadQueueInterface):
         if message['source'] != self.name:
             self.send_message(message['payload'])
 
-    def handle_panel_event(self, event):
+    def handle_panel_event(self, event: Event):
 
         if event.level < self.filter_events_level:
             return

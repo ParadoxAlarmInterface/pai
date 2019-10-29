@@ -20,10 +20,10 @@ async def test_handle_panel_event(mocker):
 
     interface._handle_panel_event(event)
     interface.mqtt.publish.assert_called_once_with('paradox/events',
-                                                   json.dumps({"additional_data": {}, "change": {}, "id": None,
-                                                               "key": "system,Test,", "label": "Test",
-                                                               "level": "NOTSET", "major": 0, "message": "", "minor": 0,
-                                                               "name": "[system:0]", "partition": None, "tags": [],
+                                                   json.dumps({"additional_data": {}, "change": {},
+                                                               "key": "None,Test,", "label": "Test",
+                                                               "level": "NOTSET", "major": 0, "message": "",
+                                                               "minor": 0, "tags": [],
                                                                "time": "2019-10-18T17:15:00", "timestamp": 0,
-                                                               "type": "system"}, sort_keys=True),
+                                                               "type": None}, sort_keys=True),
                                                    0, True)

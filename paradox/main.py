@@ -87,7 +87,7 @@ def main(args):
     alarm = Paradox()
     interface_manager.set_alarm(alarm)
     retry = 1
-    while True:
+    while alarm is not None:
         logger.info("Starting...")
         retry_time_wait = 2 ^ retry
         retry_time_wait = 30 if retry_time_wait > 30 else retry_time_wait

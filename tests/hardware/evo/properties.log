@@ -46,6 +46,7 @@ partitions/PARTITION_NAME/zone_low_battery_trouble False
 partitions/PARTITION_NAME/zone_supervision_trouble False
 partitions/PARTITION_NAME/zone_tamper_trouble False
 system/troubles/ac_trouble False
+system/date/time 2019-10-28 15:54:52
 system/troubles/aux_limit_trouble False
 system/troubles/battery_failure_trouble False
 system/troubles/bell_absent_trouble False

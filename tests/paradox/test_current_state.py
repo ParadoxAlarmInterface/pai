@@ -23,12 +23,13 @@ def send_initial_status(alarm):
         }
     ))
 
-    alarm.update_properties.assert_any_call('partition', 'Partition_1', {'current_state': 'disarmed'})
+    alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {'current_state': 'disarmed'})
 
 
 def test_current_state_armed_away():
     alarm = Paradox(None)
-    alarm.update_properties = MagicMock()
+    alarm.storage.update_container_object = MagicMock()
+    alarm.panel = MagicMock()
 
     send_initial_status(alarm)
 
@@ -39,12 +40,13 @@ def test_current_state_armed_away():
             )
         }
     ))
-    alarm.update_properties.assert_any_call('partition', 'Partition_1', {'current_state': 'armed_away'})
+    alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {'current_state': 'armed_away'})
 
 
 def test_current_state_pending():
     alarm = Paradox(None)
-    alarm.update_properties = MagicMock()
+    alarm.storage.update_container_object = MagicMock()
+    alarm.panel = MagicMock()
 
     send_initial_status(alarm)
 
@@ -56,12 +58,13 @@ def test_current_state_pending():
             )
         }
     ))
-    alarm.update_properties.assert_any_call('partition', 'Partition_1', {'current_state': 'pending'})
+    alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {'current_state': 'pending'})
 
 
 def test_current_arm_stay():
     alarm = Paradox(None)
-    alarm.update_properties = MagicMock()
+    alarm.storage.update_container_object = MagicMock()
+    alarm.panel = MagicMock()
 
     send_initial_status(alarm)
 
@@ -73,12 +76,13 @@ def test_current_arm_stay():
             )
         }
     ))
-    alarm.update_properties.assert_any_call('partition', 'Partition_1', {'current_state': 'armed_home'})
+    alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {'current_state': 'armed_home'})
 
 
 def test_current_alarm(mocker):
     alarm = Paradox(None)
-    alarm.update_properties = MagicMock()
+    alarm.storage.update_container_object = MagicMock()
+    alarm.panel = MagicMock()
 
     send_initial_status(alarm)
 
@@ -89,4 +93,4 @@ def test_current_alarm(mocker):
             )
         }
     ))
-    alarm.update_properties.assert_any_call('partition', 'Partition_1', {'current_state': 'triggered'})
+    alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {'current_state': 'triggered'})
