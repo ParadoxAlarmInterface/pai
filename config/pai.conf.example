@@ -55,7 +55,7 @@ OUTPUT_PULSE_DURATION = 1               # Duration of a PGM pulse in seconds
 PARTITIONS_CHANGE_NOTIFICATION_IGNORE = ['arm_full', 'exit_delay'] # Do not send notifications for these notifications
 STATUS_REQUESTS = [0, 1, 2, 3, 4, 5]
 SYNC_TIME = True    			# Update panel time
-PASSWORD = b'0000'   			# PC Password. Set to None if Panel has no Password.
+PASSWORD = '0000'   			# PC Password. Set to None if Panel has no Password.
                                 # In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) ->
                                 # PC Communication (Babyware) Tab.
 

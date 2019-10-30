@@ -97,8 +97,11 @@ class Panel:
     def encode_password(password) -> bytes:
         res = [0] * 2
 
-        if password is None:
+        if password is None or password in [b'0000', '0000', 0]:
             return b'\x00\x00'
+
+        if isinstance(password, int):
+            password = str(password).zfill(4)
 
         if len(password) != 4:
             raise(Exception("Password length must be equal to 4. Got {}".format(len(password))))
