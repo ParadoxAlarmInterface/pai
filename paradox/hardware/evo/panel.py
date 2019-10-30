@@ -160,7 +160,9 @@ class Panel_EVOBase(PanelBase):
             return False
 
         if reply.fields.value.po.command == 0x0:
-            logger.error("Authentication Failed. Wrong Password or User Type is not FullMaster?")
+            logger.error("Authentication Failed. Wrong PASSWORD. Make sure you use correct PC Password. In Babyware: "
+                         "Right click on your panel -> Properties -> PC Communication (Babyware) -> PC Communication "
+                         "(Babyware) Tab.")
             return False
         else:  # command == 0x1
             if reply.fields.value.po.status.Winload_connected:
