@@ -117,6 +117,20 @@ def test_requested_event():
     assert values.po.command == 0xe and (not hasattr(values, "event_source") or values.event_source == 0xff)
     print(raw)
 
+def test_zone_generated_alarm():
+    payload = binascii.unhexlify('e2ff1cc414130b010f2c1801030000000000024f66666963652020202020202020202000d9')
+    raw = LiveEvent.parse(payload)
+    event_ = event.LiveEvent(raw, event_map)
+    assert "Zone Office in alarm" == event_.message
+    print(event_)
+
+def test_zone_alarm_restored():
+    payload = binascii.unhexlify('e2ff1cd914130b010f2f1a0102000000000002456e7472616e636520202020202020200096')
+    raw = LiveEvent.parse(payload)
+    event_ = event.LiveEvent(raw, event_map)
+    assert "Zone Entrance alarm restore" == event_.message
+    print(event_)
+
 def test_c2():
     payload = binascii.unhexlify('c2001903000b00000001a96c7106152c00200132010000000b')
 

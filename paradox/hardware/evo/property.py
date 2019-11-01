@@ -8,7 +8,7 @@ property_map = {
     "aux_limit_trouble": dict(level=EventLevel.CRITICAL, tags=['trouble'],
         message={"True": "{Type} {label} AUX Limit reached",
                  "False": "{Type} {label} AUX Limit is OK"}),
-    "generated_alarm": dict(level=EventLevel.CRITICAL,
+    "generated_alarm": dict(level=EventLevel.CRITICAL,  # Flag is set when alarm is triggered and unset when armed next time
         message={"True": "{Type} {label} in alarm",
                  "False": "{Type} {label} not in alarm"}),
     "fire_alarm": dict(level=EventLevel.CRITICAL,
@@ -257,9 +257,9 @@ property_map = {
     "low_battery": dict(level=EventLevel.INFO, tags=[],
         message={"True": "{Type} {label} low battery",
                  "False": "{Type} {label} battery OK"}),
-    "presently_in_alarm": dict(level=EventLevel.INFO, tags=[],
-        message={"True": "{Type} {label} presently in alarm active",
-                 "False": "{Type} {label} presently in alarm inactive"}),
+    "presently_in_alarm": dict(level=EventLevel.INFO, tags=[],  # Flag is set when zone is in alarm
+        message={"True": "{Type} {label} triggered alarm",
+                 "False": "{Type} {label} alarm restored"}),
     "shut_down": dict(level=EventLevel.INFO, tags=[],
         message={"True": "{Type} {label} shut down active",
                  "False": "{Type} {label} shut down inactive"}),

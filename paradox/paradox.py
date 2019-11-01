@@ -273,7 +273,7 @@ class Paradox:
             recv_message = self.panel.parse_message(message, direction='frompanel')
 
             if cfg.LOGGING_DUMP_MESSAGES:
-                logger.debug(recv_message)
+                logger.debug('Message received: %s', recv_message)
 
             # No message
             if recv_message is None:
