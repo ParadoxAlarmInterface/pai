@@ -8,7 +8,8 @@ property_map = {
     "aux_limit_trouble": dict(level=EventLevel.CRITICAL, tags=['trouble'],
         message={"True": "{Type} {label} AUX Limit reached",
                  "False": "{Type} {label} AUX Limit is OK"}),
-    "generated_alarm": dict(level=EventLevel.CRITICAL,  # Flag is set when alarm is triggered and unset when armed next time
+    "generated_alarm": dict(level=EventLevel.CRITICAL,  # Flag is set when alarm is triggered and unset when armed
+                            # next time
         message={"True": "{Type} {label} in alarm",
                  "False": "{Type} {label} not in alarm"}),
     "fire_alarm": dict(level=EventLevel.CRITICAL,
@@ -35,7 +36,8 @@ property_map = {
     "all_zone_closed": dict(level=EventLevel.INFO,
         message={"True": "{Type} {label} all zones closed",
                  "False": "{Type} {label} not all zones closed"}),
-    "audible_alarm": dict(level=EventLevel.CRITICAL,
+    "audible_alarm": dict(level=EventLevel.CRITICAL,  # Flag is set when partition is in alarm. Does not mean it
+                          # produces any sound at that moment. Unset when disarmed.
         message={"True": "{Type} {label} alarm is audible",
                  "False": "{Type} {label} alarm is silent"}),
     "auto_arm_reach": dict(level=EventLevel.CRITICAL,
@@ -152,7 +154,7 @@ property_map = {
     "voice_arming": dict(level=EventLevel.DEBUG,
         message={"True": "{Type} {label} voice arming active",
                  "False": "{Type} {label} voice arming inactive"}),
-    "was_in_alarm": dict(level=EventLevel.INFO,
+    "was_in_alarm": dict(level=EventLevel.INFO,  # Flag is set when partition is in alarm, unset when disarmed
         message={"True": "{Type} {label} was in alarm",
                  "False": "{Type} {label} was not in alarm"}),
     "zone_bypassed": dict(level=EventLevel.INFO,
