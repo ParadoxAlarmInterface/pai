@@ -175,13 +175,15 @@ class Panel_EVOBase(PanelBase):
     def _request_status_reply_check(self, message: Container, address: int):
         mvars = message.fields.value
 
-        assert mvars.po.command == 0x5
-        assert mvars.control.ram_access is True
-        assert mvars.control.eeprom_address_bits == 0x0
-        assert mvars.bus_address == 0x00  # panel
-        assert mvars.address == address
+        if (mvars.po.command == 0x5
+            and mvars.control.ram_access is True
+            and mvars.control.eeprom_address_bits == 0x0
+            and mvars.bus_address == 0x00  # panel
+            and mvars.address == address
+        ):
+            return True
 
-        return True
+        return False
 
     async def request_status(self, i: int) -> Optional[Container]:
         args = dict(address=i, length=64, control=dict(ram_access=True))

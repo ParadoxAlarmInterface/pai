@@ -172,10 +172,13 @@ class Panel(PanelBase):
     def _request_status_reply_check(self, message: Container, address: int):
         mvars = message.fields.value
 
-        assert mvars.po.command == 0x05
-        assert mvars.address == address
+        if (
+                mvars.po.command == 0x05
+                and mvars.address == address
+        ):
+            return True
 
-        return True
+        return False
 
     async def request_status(self, i: int):
         args = dict(address=self.mem_map['status_base1'] + i)
