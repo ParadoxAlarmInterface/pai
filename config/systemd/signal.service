@@ -1,0 +1,22 @@
+[Unit]
+Description=Signal CLI Service
+Requires=network-online.target dbus.service
+After=network-online.target dbus.service
+
+[Service]
+Type=dbus
+Environment="SIGNAL_CLI_OPTS=-Xms4m"
+ExecStart=/opt/signal-cli/signal-cli -u PHONE_NUMBER --config SIGNAL_CONFIG_DIR daemon --system
+User=root
+BusName=org.asamk.Signal
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=signal
+Restart=always
+KillMode=process
+TimeoutSec=infinity
+
+[Install]
+Alias=dbus-org.asamk.Signal.service
+WantedBy=multi-user.target
+

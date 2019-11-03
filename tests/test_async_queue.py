@@ -1,13 +1,12 @@
-import pytest
 import asyncio
 import binascii
-import mock
-from pytest_mock import mocker
 
+import mock
 from construct import Container
 
-from paradox.lib.async_message_manager import AsyncMessageManager, MessageHandler, FutureMessageHandler
-from paradox.hardware.evo.parsers import LiveEvent, ReadEEPROM, ReadEEPROMResponse
+from paradox.hardware.evo.parsers import LiveEvent, ReadEEPROMResponse
+from paradox.lib.async_message_manager import AsyncMessageManager, MessageHandler
+
 
 class EventMessageHandler(MessageHandler):
     def __init__(self, callback):
@@ -35,19 +34,19 @@ def test_event_handler():
 
     message = LiveEvent.parse(payload)
 
-    coro = asyncio.ensure_future(mh.handle_message(message))
+    coro = asyncio.ensure_future(mh._handle_message(message))
     loop.run_until_complete(coro)
     assert "beer" == coro.result()
 
     assert 1 == len(mh.handlers)
 
-def test_event_handler_failure(mocker):
+def test_event_handler_failure():
     # eeprom_request_bin = binascii.unhexlify('500800009f004037')
     eeprom_response_bin = binascii.unhexlify(
         '524700009f0041133e001e0e0400000000060a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000121510010705004e85')
 
     eh = EventMessageHandler(lambda m: "beer")
-    mocker.patch.object(eh, 'handle')
+    eh.handle = mock.MagicMock()
 
     loop = asyncio.get_event_loop()
     mh = AsyncMessageManager(loop)
@@ -58,7 +57,7 @@ def test_event_handler_failure(mocker):
 
     message = ReadEEPROMResponse.parse(eeprom_response_bin)
 
-    coro = asyncio.ensure_future(mh.handle_message(message))
+    coro = asyncio.ensure_future(mh._handle_message(message))
     loop.run_until_complete(coro)
     assert coro.result() is None  # failed to parse response message return None. Maybe needs to throw something.
 
@@ -66,13 +65,13 @@ def test_event_handler_failure(mocker):
     eh.handle.assert_not_called()
 
 
-def test_handler_two_messages(mocker):
+def test_handler_two_messages():
     def event_handler(message):
         print("event")
         return "event"
 
     async def get_eeprom_result(mhm):
-        return await mhm.wait_for(lambda m: m.fields.value.po.command == 0x5)
+        return await mhm.wait_for_message(lambda m: m.fields.value.po.command == 0x5)
 
     event_response_bin = b'\xe2\xff\xad\x06\x14\x13\x01\x04\x0e\x10\x00\x01\x05\x00\x00\x00\x00\x00\x02Living room     \x00\xcc'
 
@@ -88,9 +87,9 @@ def test_handler_two_messages(mocker):
     # running
     task_handle_wait = loop.create_task(asyncio.sleep(0.1))
     task_get_eeprom = loop.create_task(get_eeprom_result(mh))
-    task_handle_event1 = loop.create_task(mh.handle_message(LiveEvent.parse(event_response_bin)))
-    loop.create_task(mh.handle_message(ReadEEPROMResponse.parse(eeprom_response_bin)))
-    task_handle_event2 = loop.create_task(mh.handle_message(LiveEvent.parse(event_response_bin)))
+    task_handle_event1 = loop.create_task(mh._handle_message(LiveEvent.parse(event_response_bin)))
+    loop.create_task(mh._handle_message(ReadEEPROMResponse.parse(eeprom_response_bin)))
+    task_handle_event2 = loop.create_task(mh._handle_message(LiveEvent.parse(event_response_bin)))
 
     # assert 2 == len(mh.handlers)
 
@@ -104,13 +103,16 @@ def test_handler_two_messages(mocker):
 
     assert 1 == len(mh.handlers)
 
-def test_handler_timeout(mocker):
+def test_handler_timeout():
     def event_handler(message):
         print("event")
         return "event"
 
     async def get_eeprom_result(mhm):
-        return await mhm.wait_for(lambda m: m.fields.value.po.command == 0x5, timeout=0.1)
+        try:
+            return await mhm.wait_for_message(lambda m: m.fields.value.po.command == 0x5, timeout=0.1)
+        except asyncio.TimeoutError:
+            return None
 
     async def post_eeprom_message(mhm):
         await asyncio.sleep(0.2)
@@ -118,7 +120,7 @@ def test_handler_timeout(mocker):
         eeprom_response_bin = binascii.unhexlify(
             '524700009f0041133e001e0e0400000000060a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000121510010705004e85')
 
-        return await mhm.handle_message(ReadEEPROMResponse.parse(eeprom_response_bin))
+        return await mhm._handle_message(ReadEEPROMResponse.parse(eeprom_response_bin))
 
     loop = asyncio.get_event_loop()
     mh = AsyncMessageManager(loop)

@@ -29,8 +29,10 @@ class SortableTuple(tuple):
         return self[0] >= rhs[0]
 
 
-def deep_merge(*dicts, extend_lists=False):
+def deep_merge(*dicts, extend_lists=False, initializer=None):
     def merge_into(d1, d2):
+        if d1 is None:
+            return d2
         for key in d2:
             if key not in d1:  # key is missing
                 d1[key] = deepcopy(d2[key])
@@ -42,4 +44,4 @@ def deep_merge(*dicts, extend_lists=False):
                 d1[key] = merge_into(d1[key], d2[key])
         return d1
 
-    return reduce(merge_into, dicts, {})
+    return reduce(merge_into, dicts, initializer)

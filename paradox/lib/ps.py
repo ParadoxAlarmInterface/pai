@@ -1,6 +1,6 @@
 from pubsub import pub
 
-from paradox.event import Event
+from paradox.event import Event, Change
 
 PREFIX="pai_"
 
@@ -17,9 +17,5 @@ def sendEvent(event: Event):
     pub.sendMessage(PREFIX + "events", event=event)
 
 
-def sendChange(etype: str, label: str, property: str, value: str, initial: bool=False):
-    payload = dict(type=etype, label=label, property=property, value=value, initial=initial)
-    pub.sendMessage(PREFIX + "changes", change=payload)
-
-def sendInternal(message: str):
-    pub.sendMessage(PREFIX + "internal", message=message)
+def sendChange(change: Change):
+    pub.sendMessage(PREFIX + "changes", change=change)
