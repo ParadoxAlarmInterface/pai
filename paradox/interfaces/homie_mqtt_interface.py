@@ -532,37 +532,34 @@ class HomieMQTTInterface(AsyncQueueInterface):
                 for item, itemdata in data[element].items():
                     
                     #Add node filter on item here
-
                     #self.nodes[entry['label']].setProperty(entry['property']).send(entry['value'])
                     #element = 'zone' label = 'front_door_reed'
                     #element = system label = 'vdc'
                     label = itemdata['label']
                     key = itemdata['key']
                     id = itemdata['id']
-                    
-                    
+                    if label in self.node_filter[element] or label == 'all':
+                        label_sanitised = key.replace('_','').lower()
+                        zone_node = Node_Base(self.alarm_Device,name=label,id=label_sanitised,type_=element)
+                        
+                        #update the self.cache, with the index and key map, so it can be used to resolve
+                        # a status update on zone[1] = node["front_door_rood"]
+                        nodes[id] = label_sanitised
 
-                    label_sanitised = key.replace('_','').lower()
-                    zone_node = Node_Base(self.alarm_Device,name=label,id=label_sanitised,type_=element)
-                    
-                    #update the self.cache, with the index and key map, so it can be used to resolve
-                    # a status update on zone[1] = node["front_door_rood"]
-                    nodes[id] = label_sanitised
-
-                    #could add the properties here from the node_filter...but need to work out how to add all
-                    #when at this point they are not known
-                    #maybe if node filter has open, alarm, add those as properties.
-                    #if node_filter has "all", don't add properties.
-                    #then under update status, if node has no properties, add everything
-                    node_filter_attributes = self.node_filter[element]
-                    if len(node_filter_attributes) > 1 or node_filter_attributes[0] != 'all':
-                        for attribute in node_filter_attributes:
-                            #TODO: need to fix this, it's assuming all properties are boolean
-                            newProperty = Property_Boolean(zone_node,id=attribute.lower(),data_type='boolean',name=attribute.lower())
-                            zone_node.add_property(newProperty)
-                    
-                    #add teh zone to the alarm device.
-                    self.alarm_Device.add_node(zone_node)
+                        #could add the properties here from the node_filter...but need to work out how to add all
+                        #when at this point they are not known
+                        #maybe if node filter has open, alarm, add those as properties.
+                        #if node_filter has "all", don't add properties.
+                        #then under update status, if node has no properties, add everything
+                        node_filter_attributes = self.node_filter[element][label]
+                        if len(node_filter_attributes) > 1 or node_filter_attributes[0] != 'all':
+                            for attribute in node_filter_attributes:
+                                #TODO: need to fix this, it's assuming all properties are boolean
+                                newProperty = Property_Boolean(zone_node,id=attribute.lower(),data_type='boolean',name=attribute.lower())
+                                zone_node.add_property(newProperty)
+                        
+                        #add teh zone to the alarm device.
+                        self.alarm_Device.add_node(zone_node)
                     
                     #if value not in self.node_filter[element]:
                     #    break

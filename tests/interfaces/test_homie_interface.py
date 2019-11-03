@@ -146,8 +146,8 @@ async def test_homie_initial_setup_filtered(mocker):
     #mocker.patch.object(interface,"run")
     interface.start()
     interface.node_filter = {
-                        'zone'      :['open', 'alarm'],
-                        'system'    :['vdc', 'dc','battery']
+                        'zone'      :{'all':['open', 'alarm']},
+                        'system'    :{'power':['vdc', 'dc','battery']}
                     }
 
     await interface._started.wait()
@@ -159,7 +159,7 @@ async def test_homie_initial_setup_all(mocker):
     #mocker.patch.object(interface,"run")
     interface.start()
     interface.node_filter = {
-                        'zone'      :['open', 'alarm'],
+                        'zone'      :['all',['all']],
                         'system'    :['all']
                     }
 
