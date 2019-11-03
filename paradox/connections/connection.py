@@ -1,33 +1,47 @@
 import asyncio
 import logging
+import typing
+
+from paradox.lib.async_message_manager import AsyncMessageManager
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
+
 class ConnectionProtocol(asyncio.Protocol):
-    def __init__(self):
+    def __init__(self, on_message: typing.Callable[[bytes], None], on_con_lost):
         self.transport = None
-        self.read_queue = asyncio.Queue()
         self.use_variable_message_length = True
+        self.on_message = on_message
+        self.on_con_lost = on_con_lost
 
     def connection_made(self, transport):
         self.transport = transport
 
     def close(self):
         if self.transport:
-            self.transport.close()
+            try:
+                self.transport.close()
+            except Exception:
+                logger.exception("Connection transport close raised Exception")
             self.transport = None
 
+    def send_message(self, message):
+        raise NotImplementedError('This function needs to be overridden in a subclass')
+
     def connection_lost(self, exc):
-        self.read_queue = asyncio.Queue()
+        self.close()
+        self.on_con_lost()
 
     def variable_message_length(self, mode):
         self.use_variable_message_length = mode
 
-class Connection:
-    def __init__(self, timeout=5.0):
+
+class Connection(AsyncMessageManager):
+    def __init__(self, on_message: typing.Callable[[bytes], None]):
+        super().__init__()
         self.connected = False
-        self.connection = None
-        self.default_timeout = timeout
+        self.connection = None  # type: ConnectionProtocol
+        self.on_message = on_message
 
     async def connect(self):
         raise NotImplementedError("Implement in subclass")
@@ -38,23 +52,12 @@ class Connection:
         else:
             raise ConnectionError("Failed to write data to connection")
 
-    async def read(self, timeout=None):
-        """Read data from the IP Port, if available, until the timeout is exceeded"""
-
-        if not timeout:
-            timeout = self.default_timeout
-
-        if self.connected:
-            result = await self.connection.read_message(timeout=timeout)
-        else:
-            raise ConnectionError("Unable to read data. Not connected")
-
-        return result
-
     def timeout(self, timeout=5.0):
         self.default_timeout = timeout
 
     def close(self):
+        logger.info('Closing connection')
+
         if self.connection:
             self.connection.close()
             self.connection = None

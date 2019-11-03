@@ -14,8 +14,8 @@ class InterfaceManager:
         if self.conf.GSM_ENABLE:
             try:
                 logger.info("Using GSM Interface")
-                from paradox.interfaces.gsm_interface import GSMInterface
-                self.register(GSMInterface())
+                from paradox.interfaces.text.gsm import GSMTextInterface
+                self.register(GSMTextInterface())
             except Exception:
                 logger.exception("Unable to start GSM Interface")
 
@@ -23,8 +23,8 @@ class InterfaceManager:
         if self.conf.SIGNAL_ENABLE:
             try:
                 logger.info("Using Signal Interface")
-                from paradox.interfaces.signal_interface import SignalInterface
-                self.register(SignalInterface())
+                from paradox.interfaces.text.signal import SignalTextInterface
+                self.register(SignalTextInterface())
             except Exception:
                 logger.exception("Unable to start Signal Interface")
 
@@ -37,7 +37,7 @@ class InterfaceManager:
             except Exception:
                 logger.exception("Unable to start MQTT Interface")
 
-        if self.conf.MQTT_HOMEASSISTANT_ENABLE:
+        if self.conf.MQTT_HOMEASSISTANT_AUTODISCOVERY_ENABLE:
             try:
                 logger.info("Using HomeAssistant MQTT Interface")
                 from paradox.interfaces.mqtt.homeassistant import HomeAssistantMQTTInterface
@@ -59,8 +59,8 @@ class InterfaceManager:
         if self.conf.PUSHBULLET_ENABLE:
             try:
                 logger.info("Using Pushbullet Interface")
-                from paradox.interfaces.pushbullet_interface import PushBulletInterface
-                self.register(PushBulletInterface())
+                from paradox.interfaces.text.pushbullet import PushbulletTextInterface
+                self.register(PushbulletTextInterface())
             except Exception:
                 logger.exception("Unable to start Pushbullet Interface")
 
@@ -68,8 +68,8 @@ class InterfaceManager:
         if self.conf.PUSHOVER_ENABLE:
             try:
                 logger.info("Using Pushover Interface")
-                from paradox.interfaces.pushover_interface import PushoverInterface
-                self.register(PushoverInterface())
+                from paradox.interfaces.text.pushover import PushoverTextInterface
+                self.register(PushoverTextInterface())
             except Exception:
                 logger.exception("Unable to start Pushover Interface")
 
@@ -85,7 +85,7 @@ class InterfaceManager:
         # Load Dummy Interface
         if self.conf.DUMMY_INTERFACE_ENABLE:
             try:
-                logger.info("Using IP Interface")
+                logger.info("Using Dummy Interface")
                 from paradox.interfaces.dummy_interface import DummyInterface
                 self.register(DummyInterface())
             except Exception:
@@ -103,11 +103,11 @@ class InterfaceManager:
         logger.debug("Stopping all interfaces")
         for interface in self.interfaces:
             try:
-                logger.debug("\t{}".format(interface.name))
+                logger.debug("Stopping {}".format(interface.name))
                 interface.stop()
             except Exception:
                 logger.exception(
-                    "Error stoping interface {}".format(interface.name))
+                    "Error stopping interface {}".format(interface.name))
         logger.debug("All Interfaces stopped")
 
     def set_alarm(self, alarm):

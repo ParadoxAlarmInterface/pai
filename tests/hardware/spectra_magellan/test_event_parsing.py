@@ -1,7 +1,8 @@
 import binascii
+import typing
 from paradox.hardware.spectra_magellan.parsers import LiveEvent
 from paradox.hardware.spectra_magellan.event import event_map
-from paradox.event import Event
+from paradox import event
 
 events = [
 	b'e2141301040b08300200000000000000000000000000000000000000000000020000000055', # Software Log on
@@ -32,11 +33,10 @@ def test_disarm_partition0():
     payload = binascii.unhexlify(hex)
 
     raw = LiveEvent.parse(payload)
-    event = Event()
-    event.from_live_event(event_map, raw, None)
+    event_ = event.LiveEvent(raw, event_map)
 
-    assert event.message == "Partition [partition:2]: Disarmed"
-    print(event)
+    assert event_.message == "Partition [partition:2]: Disarmed"
+    print(event_)
 
 def test_disarm_partition1():
     hex = b'e2141301040b09020b0100000000025858585858585858585858202020202001000000009b' # {'type': 'Partition', 'minor': (11, 'Disarm partition'), 'major': (2, 'Partition status')}
@@ -51,9 +51,27 @@ def test_disarm_partition1():
         return 'Partition 2'
 
     raw = LiveEvent.parse(payload)
-    event = Event()
-    event.from_live_event(event_map, raw, label_provider)
+    event_ = event.LiveEvent(raw, event_map, label_provider)
 
-    print(event)
+    print(event_)
 
-    assert event.message == "Partition Partition 2: Disarm partition Partition 2"
+    assert event_.message == "Partition Partition 2: Disarm partition Partition 2"
+
+def test_button_pressed():
+    event_ = b'e214130a14103708040000000000000000000000000000000000000000000000000000007a'
+    payload = binascii.unhexlify(event_)
+
+    raw = LiveEvent.parse(payload)
+
+    def label_provider(type, id):
+        print(type, id)
+        if type == 'user':
+            assert id == 4
+            return 'UserA'
+
+    event_ = event.LiveEvent(raw, event_map, label_provider=label_provider)
+
+    print(event_)
+    assert isinstance(event_.change.get('button_b', None), typing.Callable)
+
+    assert "Button B pressed on remote of UserA" == event_.message

@@ -1,28 +1,17 @@
 import inspect
 import logging
 import sys
+import typing
 from itertools import chain
-from typing import Optional
+from collections import defaultdict
 
 from construct import Construct, Struct, BitStruct, Const, Nibble, Checksum, Padding, Bytes, this, RawCopy, Int8ub, \
     Default, Enum, Flag, BitsInteger, Int16ub, Container, EnumIntegerString, Rebuild
 
 from paradox.config import config as cfg
-from paradox.lib import ps
 from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum, HexInt
 
 logger = logging.getLogger('PAI').getChild(__name__)
-
-
-def iterate_properties(data):
-    if isinstance(data, list):
-        for key, value in enumerate(data):
-            yield (key, value)
-    elif isinstance(data, dict):
-        for key, value in data.items():
-            if type(key) == str and key.startswith('_'):  # ignore private properties
-                continue
-            yield (key, value)
 
 
 class Panel:
@@ -35,7 +24,7 @@ class Panel:
         self.product_id = product_id
         self.variable_message_length = variable_message_length
 
-    def parse_message(self, message, direction='topanel') -> Optional[Container]:
+    def parse_message(self, message, direction='topanel') -> typing.Optional[Container]:
         if message is None or len(message) == 0:
             return None
 
@@ -108,8 +97,11 @@ class Panel:
     def encode_password(password) -> bytes:
         res = [0] * 2
 
-        if password is None:
+        if password is None or password in [b'0000', '0000', 0]:
             return b'\x00\x00'
+
+        if isinstance(password, int):
+            password = str(password).zfill(4)
 
         if len(password) != 4:
             raise(Exception("Password length must be equal to 4. Got {}".format(len(password))))
@@ -138,37 +130,45 @@ class Panel:
 
         return bytes(res)
 
-    async def update_labels(self):
+    async def load_labels(self):
         logger.info("Updating Labels from Panel")
+
+        data = defaultdict(dict)
 
         for elem_type in self.mem_map['elements']:
             elem_def = self.mem_map['elements'][elem_type]
 
-            addresses = list(chain.from_iterable(elem_def['addresses']))
+            addresses = enumerate(chain.from_iterable(elem_def['addresses']), start=1)
             limits = cfg.LIMITS.get(elem_type)
             if limits is not None:
-                addresses = [a for i, a in enumerate(addresses) if i + 1 in limits]
+                addresses = [(i, a) for i, a in addresses if i in limits]
 
-            await self.load_labels(self.core.data[elem_type],
-                             addresses,
-                             label_offset=elem_def['label_offset'])
+            await self._load_labels(data[elem_type], addresses, label_offset=elem_def['label_offset'])
 
-            logger.info("{}: {}".format(elem_type.title(), ', '.join([v["label"] for v in self.core.data[elem_type].values()])))
+            logger.info("{}: {}".format(elem_type.title(), ', '.join([v["label"] for v in data[elem_type].values()])))
 
-        ps.sendMessage('labels_loaded', data=self.core.data)
+        return data
 
-    async def load_labels(self,
-                    data_dict,
-                    addresses,
-                    field_length=16,
-                    label_offset=0,
-                    template=None):
-        """Load labels from panel"""
-        index = 1
+    async def _load_labels(self,
+                           data_dict: dict,
+                           addresses: typing.List[typing.Tuple[int, int]],
+                           field_length=16,
+                           label_offset=0,
+                           template=None):
+        """
+        Load labels from panel
+
+        :param data_dict: Dict to fill
+        :param addresses: Addresses list with indexes
+        :param field_length: Text field length
+        :param label_offset: Label offset
+        :param template: Default template
+        :return:
+        """
         if template is None:
             template = {}
 
-        for address in list(addresses):
+        for index, address in addresses:
             args = dict(address=address, length=field_length)
             reply = await self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address)
 
@@ -189,7 +189,7 @@ class Panel:
                 key = key.decode(cfg.LABEL_ENCODING)
                 label = label.decode(cfg.LABEL_ENCODING)
             except UnicodeDecodeError:
-                logger.warn('Unable to properly decode label {} using the {} encoding.\n \
+                logger.warning('Unable to properly decode label {} using the {} encoding.\n \
                     Specify a different encoding using the LABEL_ENCODING configuration option.'.format(b_label, cfg.LABEL_ENCODING))
                 key = key.decode('utf-8', errors='ignore')
                 label = label.decode('utf-8', errors='ignore')
@@ -202,44 +202,26 @@ class Panel:
                 data_dict[index] = {}
             data_dict[index].update(properties)
 
-            index += 1
-
-    def process_properties_bulk(self, properties):
-        if cfg.LOGGING_DUMP_STATUS:
-            logger.debug("properties: %s", properties)
-
-        for key, value in iterate_properties(properties):
-
-            if not isinstance(value, (list, dict)):
-                continue
-
-            element_type = key.split('_')[0]
-            limit_list = cfg.LIMITS.get(element_type)
-
-            if key in self.core.status_cache and self.core.status_cache[key] == value:
-                continue
-
-            self.core.status_cache[key] = value
-            prop_name = '_'.join(key.split('_')[1:])
-
-            if not prop_name:
-                continue
-
-            for i, status in iterate_properties(value):
-                if limit_list is None or i in limit_list:
-                    if prop_name == 'status':
-                        self.core.update_properties(element_type, i, status)
-                    else:
-                        self.core.update_properties(element_type, i, {prop_name: status})
-
     def initialize_communication(self, reply, password):
         raise NotImplementedError("override initialize_communication in a subclass")
 
     def request_status(self, nr):
         raise NotImplementedError("override request_status in a subclass")
 
-    def handle_status(self, reply):
-        raise NotImplementedError("override handle_status in a subclass")
+    def handle_status(self, message: Container, parser_map):
+        """Handle MessageStatus"""
+        mvars = message.fields.value
+
+        if mvars.address not in parser_map:
+            logger.error("Parser for memory address ({}) is not implemented. Please review your STATUS_REQUESTS setting. Skipping.".format(mvars.address))
+            return
+
+        parser = parser_map[mvars.address]
+        try:
+            return parser.parse(mvars.data)
+        except Exception:
+            logger.exception("Unable to parse RAM Status Block ({})".format(mvars.address))
+            return
 
     def control_zones(self, zones, command) -> bool:
         raise NotImplementedError("override control_zones in a subclass")

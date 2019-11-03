@@ -5,16 +5,15 @@ import binascii
 import inspect
 import logging
 import sys
-import time
 from typing import Optional
 
 from paradox.config import config as cfg
-from paradox.paradox import PublishPropertyChange
+from paradox.exceptions import StatusRequestException
 from .event import event_map
-from .property import property_map
 from .parsers import Construct, CloseConnection, ErrorMessage, InitializeCommunication, InitializeCommunicationResponse, \
     SetTimeDate, SetTimeDateResponse, PerformAction, PerformActionResponse, ReadStatusResponse, ReadEEPROM, \
     ReadEEPROMResponse, LiveEvent, RAMDataParserMap, Container, ChecksumError
+from .property import property_map
 from ..panel import Panel as PanelBase
 
 logger = logging.getLogger('PAI').getChild(__name__)
@@ -47,6 +46,44 @@ class Panel(PanelBase):
             "siren": {"label_offset": 0, "addresses": [range(0x6d0, 0x700, 0x10)]}
         }
     }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.last_power_update = 0
+
+    async def dump_memory(self):
+        """
+        Dumps EEPROM and RAM memory to files
+        :return:
+        """
+        await self.dump_memory_to_file('eeprom.bin', range(0, 0x0fff, 32))
+        await self.dump_memory_to_file('ram.bin', range(0, 9), ram=True)
+
+    async def dump_memory_to_file(self, file, range_, ram=False):
+        mem_type = "RAM" if ram else "EEPROM"
+        logger.info("Dump " + mem_type)
+
+        with open(file, 'wb') as fh:
+            for address in range_:
+                if ram:
+                    args = dict(address=address + self.mem_map['status_base1'])
+                else:
+                    args = dict(address=address)
+
+                logger.info("Dumping %s: address %x" % (mem_type, address))
+
+                reply = await self.core.send_wait(
+                    self.get_message('ReadEEPROM'), args,
+                        reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address)
+
+                if reply is None:
+                    logger.error("Could not read %s: address %x" % (mem_type, address))
+                    return
+
+                data = reply.fields.value.data
+
+                fh.write(data)
 
     def get_message(self, name: str) -> Construct:
         try:
@@ -135,54 +172,22 @@ class Panel(PanelBase):
     def _request_status_reply_check(self, message: Container, address: int):
         mvars = message.fields.value
 
-        assert mvars.po.command == 0x05
-        assert mvars.address == address
+        if (
+                mvars.po.command == 0x05
+                and mvars.address == address
+        ):
+            return True
 
-        return True
+        return False
 
     async def request_status(self, i: int):
         args = dict(address=self.mem_map['status_base1'] + i)
-        reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, args['address']))
-
-        return reply
-
-    def handle_status(self, message: Container):
-        """Handle MessageStatus"""
-        mvars = message.fields.value
-
-        if mvars.address not in RAMDataParserMap:
-            logger.warn("Unknown memory address {}".format(mvars.address))
-            return
-
-        parser = RAMDataParserMap[mvars.address]
-        try:
-            properties = parser.parse(mvars.data)
-        except Exception:
-            logger.exception("Unable to parse RAM Status Block")
-            return
-
-        if mvars.address == 0:
-            if time.time() - self.core.last_power_update >= cfg.POWER_UPDATE_INTERVAL:
-                force = PublishPropertyChange.YES if cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE else PublishPropertyChange.NO
-
-                self.core.last_power_update = time.time()
-                self.core.update_properties('system', 'power', dict(vdc=round(properties.vdc, 2)),
-                                            publish=force)
-                self.core.update_properties('system', 'power', dict(battery=round(properties.battery, 2)),
-                                            publish=force)
-                self.core.update_properties('system', 'power', dict(dc=round(properties.dc, 2)),
-                                            publish=force)
-                self.core.update_properties('system', 'rf',
-                                            dict(rf_noise_floor=round(properties.rf_noise_floor, 2)),
-                                            publish=force)
-
-            for k in properties.troubles:
-                if k.startswith('_'):
-                    continue
-
-                self.core.update_properties('system', 'troubles', {k: properties.troubles[k]})
-
-        return properties
+        reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, i))
+        if reply is not None:
+            logger.debug("Received status response: %d" % i)
+            return self.handle_status(reply, RAMDataParserMap)
+        else:
+            raise StatusRequestException("No reply to status request: %d" % i)
 
     async def control_zones(self, zones: list, command: str) -> bool:
         """

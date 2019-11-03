@@ -2,9 +2,9 @@ import collections
 
 from construct import Struct, RawCopy, BitStruct, Const, Nibble, Flag, Rebuild, Int8ub, BitsInteger, Int16ub, Checksum, \
     Bytes, this, Default, Padding, Enum, Int24ub, ExprAdapter, Byte, obj_, Array, Computed, Subconstruct, \
-    ValidationError, ExprSymmetricAdapter
+    ValidationError, ExprSymmetricAdapter, Bitwise, BitsSwapped
 
-from .adapters import PGMFlags, StatusAdapter, DateAdapter, ZoneFlags, PartitionStatus, EventAdapter
+from .adapters import PGMFlags, StatusAdapter, DateAdapter, ZoneFlags, PartitionStatus, EventAdapter, ZoneFlagBitStruct
 from ..common import CommunicationSourceIDEnum, ProductIdEnum, calculate_checksum
 
 LoginConfirmationResponse = Struct("fields" / RawCopy(
@@ -56,60 +56,67 @@ InitializeCommunication = Struct("fields" / RawCopy(
 
 RAMDataParserMap = {
     1: Struct(
-        "weekday" / Int8ub,
+        "_weekday" / Int8ub,
         "pgm_flags" / PGMFlags(),
-        "_key-switch_triggered" / StatusAdapter(Bytes(4)), # TODO: Implement key-switch
+        "key-switch_triggered" / StatusAdapter(Bytes(4)),
         "door_open" / StatusAdapter(Bytes(4)),
-        "troubles" / BitStruct(
-            "system_trouble" / Flag,
-            "dialer_trouble" / Flag,
-            "module_trouble" / Flag,
-            "bus_com_trouble" / Flag, # BusCom
-            "zone_tamper_trouble" / Flag,
-            "zone_low_battery_trouble" / Flag,
-            "zone_fault_trouble" / Flag,
-            "time_lost_trouble" / Flag,
+        "system" / Struct(
+            "troubles" / BitStruct(
+                "system_trouble" / Flag,
+                "dialer_trouble" / Flag,
+                "module_trouble" / Flag,
+                "bus_com_trouble" / Flag,  # BusCom
+                "zone_tamper_trouble" / Flag,
+                "zone_low_battery_trouble" / Flag,
+                "zone_fault_trouble" / Flag,
+                "time_lost_trouble" / Flag,
 
-            "ac_trouble" / Flag,
-            "battery_failure_trouble" / Flag,
-            "aux_limit_trouble" / Flag,
-            "bell_limit_trouble" / Flag,
-            "bell_absent_trouble" / Flag,
-            "rom_error_trouble" / Flag,
-            "_future_use_0" / Flag,
-            "_future_use_1" / Flag,
+                "ac_trouble" / Flag,
+                "battery_failure_trouble" / Flag,
+                "aux_limit_trouble" / Flag,
+                "bell_limit_trouble" / Flag,
+                "bell_absent_trouble" / Flag,
+                "rom_error_trouble" / Flag,
+                "_future_use_0" / Flag,
+                "_future_use_1" / Flag,
 
-            "tlm_trouble" / Flag,
-            "fail_tel_1_trouble" / Flag,
-            "fail_tel_2_trouble" / Flag,
-            "fail_tel_3_trouble" / Flag,
-            "fail_tel_4_trouble" / Flag,
-            "com_pc_trouble" / Flag,
-            "_future_use_2" / Flag,
-            "_future_use_3" / Flag,
+                "tlm_trouble" / Flag,
+                "fail_tel_1_trouble" / Flag,
+                "fail_tel_2_trouble" / Flag,
+                "fail_tel_3_trouble" / Flag,
+                "fail_tel_4_trouble" / Flag,
+                "com_pc_trouble" / Flag,
+                "_future_use_2" / Flag,
+                "_future_use_3" / Flag,
 
-            "module_tamper_trouble" / Flag,
-            "module_rom_error_trouble" / Flag,
-            "module_tlm_trouble" / Flag,
-            "module_fail_to_com_trouble" / Flag,
-            "module_printer_trouble" / Flag,
-            "module_ac_trouble" / Flag,
-            "module_battery_fail" / Flag,
-            "module_aux_trouble" / Flag,
+                "module_tamper_trouble" / Flag,
+                "module_rom_error_trouble" / Flag,
+                "module_tlm_trouble" / Flag,
+                "module_fail_to_com_trouble" / Flag,
+                "module_printer_trouble" / Flag,
+                "module_ac_trouble" / Flag,
+                "module_battery_fail" / Flag,
+                "module_aux_trouble" / Flag,
 
-            "missing_keypad_trouble" / Flag,
-            "missing_module_trouble" / Flag,
-            "_future_use_4" / Flag,
-            "_future_use_5" / Flag,
-            "safety_mismatch_trouble" / Flag,
-            "bus_global_fail" / Flag,
-            "bus_overload_trouble" / Flag,
-            "mdl_com_error" / Flag
+                "missing_keypad_trouble" / Flag,
+                "missing_module_trouble" / Flag,
+                "_future_use_4" / Flag,
+                "_future_use_5" / Flag,
+                "safety_mismatch_trouble" / Flag,
+                "bus_global_fail" / Flag,
+                "bus_overload_trouble" / Flag,
+                "mdl_com_error" / Flag
+            ),
+            "date" / Struct(
+                "weekday" / Computed(lambda ctx: ctx._._._weekday),
+                "time" / DateAdapter(Bytes(7))
+            ),
+            "power" / Struct(
+                "vdc" / ExprAdapter(Byte, lambda obj, ctx: round(obj * (20.3 - 1.4) / 255.0 + 1.4, 1), 0),
+                "battery" / ExprAdapter(Byte, lambda obj, ctx: round(obj * 22.8 / 255.0, 1), 0),
+                "dc" / ExprAdapter(Byte, lambda obj, ctx: round(obj * 22.8 / 255.0, 1), 0),
+            )
         ),
-        "time" / DateAdapter(Bytes(7)),
-        "vdc" / ExprAdapter(Byte, obj_ * (20.3 - 1.4) / 255.0 + 1.4, 0),
-        "battery" / ExprAdapter(Byte, obj_ * 22.8 / 255.0, 0),
-        "dc" / ExprAdapter(Byte, obj_ * 22.8 / 255.0, 0),
         "zone_open" / StatusAdapter(Bytes(12)),
         "zone_tamper" / StatusAdapter(Bytes(12)),
         "zone_low_battery" / StatusAdapter(Bytes(12))
@@ -123,14 +130,20 @@ RAMDataParserMap = {
     ),
     4: Struct(
         "partition_status" / PartitionStatus(Bytes(16)),
-        "_panel_status" / BitStruct(
-            "installer_lock_active" / Flag,
-            "_free" / Padding(7)
+        "system" / Struct(
+            "panel_status" / BitStruct(
+                "installer_lock_active" / Flag,
+                "_free" / Padding(7)
+            ),
+            "event" / Struct(
+                "_event_pointer" / Int16ub,
+                "_event_pointer_bus" / Int16ub,
+            ),
+            "_recycle_system" / Array(8, Int8ub),
+            "report" / Struct(
+                "arm_disarm_delay_timer" / Int8ub,
+            )
         ),
-        "event_pointer" / Int16ub,
-        "event_pointer_bus" / Int16ub,
-        "_recycle_system" / Array(8, Int8ub),
-        "arm_disarm_report_delay_timer" / Int8ub,
         "_free" / Padding(34)
     ),
     5: Struct(
@@ -415,7 +428,7 @@ PerformPartitionAction = Struct("fields" / RawCopy(Struct(
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
-PerformActionResponse = Struct("fields" / RawCopy(
+PerformPartitionActionResponse = Struct("fields" / RawCopy(
     Struct(
         "po" / BitStruct(
             "command" / Const(0x4, Nibble),
@@ -426,6 +439,44 @@ PerformActionResponse = Struct("fields" / RawCopy(
                 "NeWare_connected" / Flag)),
         "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
         "_not_used0" / Padding(4),
+    )),
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
+ZoneActionBitOperation = Enum(Int8ub,
+    set=0x08,
+    clear=0x00
+)
+
+class ZoneAdapter(Subconstruct):
+    def _build(self, obj, stream, context, path):
+        zones = list([i in obj for i in range(1, 193)])
+
+        return self.subcon._build(zones, stream, context, path)
+
+PerformZoneAction = Struct("fields" / RawCopy(Struct(
+        "po" / Struct(
+            "command" / Const(0xd0, Int8ub)),
+        "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+        "flags" / ZoneFlagBitStruct,
+        "operation" / ZoneActionBitOperation,
+        "_not_used" / Padding(2),
+        "zones" / ZoneAdapter(BitsSwapped(Bitwise(Array(192, Flag)))),
+    )),
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
+PerformZoneActionResponse = Struct("fields" / RawCopy(
+    Struct(
+        "po" / BitStruct(
+            "command" / Const(0xd, Nibble),
+            "status" / Struct(
+                "reserved" / Flag,
+                "alarm_reporting_pending" / Flag,
+                "Winload_connected" / Flag,
+                "NeWare_connected" / Flag)),
+        "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+        "flags" / ZoneFlagBitStruct,
+        "operation" / ZoneActionBitOperation,
+        "_not_used" / Padding(2),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 

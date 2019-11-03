@@ -13,6 +13,7 @@ class Config:
         "LOGGING_DUMP_PACKETS": False,          # Dump RAW Packets to log
         "LOGGING_DUMP_MESSAGES": False,         # Dump Messages to log
         "LOGGING_DUMP_STATUS": False,           # Dump Status to log
+        "LOGGING_DUMP_EVENTS": False,           # Dump Event details to log
 
         # Development
         "DEVELOPMENT_DUMP_MEMORY": False,
@@ -41,8 +42,8 @@ class Config:
         "LABEL_REFRESH_INTERVAL": (15 * 60, int, (0, 0xFFFFFFFF)),            # Interval between refresh of labels
         "OUTPUT_PULSE_DURATION": (1, float, (0, 0xFFFFFFFF)),                 # Duration of a PGM pulse in seconds
         "STATUS_REQUESTS": [0, 1, 2, 3, 4, 5],
-        "SYNC_TIME": True,                                       # Update panel time
-        "PASSWORD": (None, [bytes, type(None)]),                 # PC Password. Set to None if Panel has no Password. In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) -> PC Communication (Babyware) Tab.
+        "SYNC_TIME": True,                                                    # Update panel time
+        "PASSWORD": (None, [int, str, bytes, type(None)]),                    # PC Password. Set to None if Panel has no Password. In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) -> PC Communication (Babyware) Tab.
 
         "POWER_UPDATE_INTERVAL": (60, int, (0, 0xFFFFFFFF)),     # Interval between updates of the Power voltages
         "PUSH_POWER_UPDATE_WITHOUT_CHANGE": True,  # Always notify interfaces of power changes
@@ -58,8 +59,7 @@ class Config:
         "MQTT_RETAIN": True,                         # Publish messages with Retain
         "MQTT_BIND_ADDRESS": '127.0.0.1',
         "MQTT_REPUBLISH_INTERVAL": (60 * 60 * 12, int, (60, 0xFFFFFFFF)),    # Interval for republishing all data
-        "MQTT_HOMEBRIDGE_ENABLE": False,
-        "MQTT_HOMEASSISTANT_ENABLE": False,
+        "MQTT_HOMEASSISTANT_AUTODISCOVERY_ENABLE": False,
 
         # MQTT Topics
         "MQTT_BASE_TOPIC": 'paradox',             # Root of all topics
@@ -72,34 +72,11 @@ class Config:
         "MQTT_EVENTS_TOPIC": 'events',            # Base for events
         "MQTT_CONTROL_TOPIC": 'control',          # Base for control of othe elements (ROOT/CONTROL/TYPE)
         "MQTT_HOMEASSISTANT_CONTROL_TOPIC": 'hass_control',
+        "MQTT_HOMEASSISTANT_DISCOVERY_PREFIX": 'homeassistant',
         "MQTT_OUTPUT_TOPIC": 'outputs',
         "MQTT_KEYPAD_TOPIC": 'keypads',
         "MQTT_STATES_TOPIC": 'states',
         "MQTT_RAW_TOPIC": 'raw',
-        "MQTT_HOMEBRIDGE_SUMMARY_TOPIC": 'current',
-        "MQTT_PARTITION_HOMEBRIDGE_COMMANDS": {
-            'STAY_ARM': 'arm_stay',
-            'AWAY_ARM': 'arm',
-            'NIGHT_ARM': 'arm_sleep',
-            'DISARM': 'disarm'},
-        "MQTT_PARTITION_HOMEBRIDGE_STATES": {
-            'alarm': 'ALARM_TRIGGERED',
-            'arm_stay': 'STAY_ARM',
-            'arm': 'AWAY_ARM',
-            'arm_sleep': 'NIGHT_ARM',
-            'disarm': 'DISARMED'},
-        "MQTT_HOMEASSISTANT_SUMMARY_TOPIC": 'current_hass',
-        "MQTT_PARTITION_HOMEASSISTANT_STATES": {
-            'alarm': 'triggered', 
-            'arm_stay': 'armed_home',
-            'arm': 'armed_away',
-            'arm_sleep': 'armed_night',
-            'disarm': 'disarmed'},
-        "MQTT_PARTITION_HOMEASSISTANT_COMMANDS": {
-            'ARM_HOME': 'arm_stay',
-            'ARM_AWAY': 'arm',
-            'ARM_NIGHT': 'arm_sleep',
-            'DISARM': 'disarm'},
         "MQTT_NOTIFICATIONS_TOPIC": 'notifications',
         "MQTT_PUBLISH_RAW_EVENTS": True,
         "MQTT_INTERFACE_TOPIC": 'interface',
@@ -157,7 +134,7 @@ class Config:
         "IP_INTERFACE_ENABLE": False,
         "IP_INTERFACE_BIND_ADDRESS": '0.0.0.0',
         "IP_INTERFACE_BIND_PORT": (10000, int, (1, 65535)),
-        "IP_INTERFACE_PASSWORD": (b'0000', [bytes, type(None)]),
+        "IP_INTERFACE_PASSWORD": (b'paradox', [bytes, type(None)]),
 
         # Dummy Interface for testing
         "DUMMY_INTERFACE_ENABLE": False,

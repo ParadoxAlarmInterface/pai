@@ -2,7 +2,7 @@
 
 import binascii
 import logging
-import time
+import typing
 
 import asyncio
 import serial_asyncio
@@ -30,11 +30,10 @@ def checksum(data, min_message_length):
 
 
 class SerialConnectionProtocol(ConnectionProtocol):
-    def __init__(self, on_port_open, on_port_closed):
-        super(SerialConnectionProtocol, self).__init__()
+    def __init__(self, on_message: typing.Callable[[bytes], None], on_port_open, on_con_lost):
+        super(SerialConnectionProtocol, self).__init__(on_message=on_message, on_con_lost=on_con_lost)
         self.buffer = b''
         self.on_port_open = on_port_open
-        self.on_port_closed = on_port_closed
         self.loop = asyncio.get_event_loop()
 
     def connection_made(self, transport):
@@ -50,15 +49,6 @@ class SerialConnectionProtocol(ConnectionProtocol):
 
     def send_message(self, message):
         asyncio.run_coroutine_threadsafe(self._send_message(message), self.loop)
-
-    async def read_message(self, timeout=5):
-        return await asyncio.wait_for(self.read_queue.get(), timeout=timeout)
-
-    def on_frame(self, frame):
-        if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("SER -> PAI {}".format(binascii.hexlify(frame)))
-
-        self.read_queue.put_nowait(frame)
 
     def data_received(self, recv_data):
         self.buffer += recv_data
@@ -93,7 +83,10 @@ class SerialConnectionProtocol(ConnectionProtocol):
 
             if checksum(frame, min_length):
                 self.buffer = self.buffer[len(frame):]  # Remove message
-                self.on_frame(frame)
+                if cfg.LOGGING_DUMP_PACKETS:
+                    logger.debug("SER -> PAI {}".format(binascii.hexlify(frame)))
+
+                self.on_message(frame)
             else:
                 self.buffer = self.buffer[1:]
 
@@ -102,9 +95,10 @@ class SerialConnectionProtocol(ConnectionProtocol):
         self.buffer = b''
         super(SerialConnectionProtocol, self).connection_lost(exc)
 
+
 class SerialCommunication(Connection):
-    def __init__(self, port, baud=9600, timeout=5):
-        super(SerialCommunication, self).__init__(timeout=timeout)
+    def __init__(self, on_message: typing.Callable[[bytes], None], port, baud=9600):
+        super().__init__(on_message=on_message)
         self.port_path = port
         self.baud = baud
         self.connected_future = None
@@ -128,16 +122,15 @@ class SerialCommunication(Connection):
         self.connected = False
 
     def make_protocol(self):
-        return SerialConnectionProtocol(self.on_port_open, self.on_port_closed)
+        return SerialConnectionProtocol(self.on_message, self.on_port_open, self.on_port_closed)
 
     async def connect(self):
         logger.info("Connecting to serial port {}".format(self.port_path))
-        loop = asyncio.get_event_loop()
 
-        self.connected_future = loop.create_future()
-        loop.call_later(5, self.open_timeout)
+        self.connected_future = self.loop.create_future()
+        self.loop.call_later(5, self.open_timeout)
 
-        _, self.connection = await serial_asyncio.create_serial_connection(loop,
+        _, self.connection = await serial_asyncio.create_serial_connection(self.loop,
                                         self.make_protocol, 
                                         self.port_path, 
                                         self.baud)

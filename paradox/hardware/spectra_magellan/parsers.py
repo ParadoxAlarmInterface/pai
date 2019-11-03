@@ -86,11 +86,18 @@ RAMDataParserMap = {
             "central_2_reporting_ftc_indicator_trouble" / Flag,
             "central_1_reporting_ftc_indicator_trouble" / Flag,
             "telephone_line" / Flag),
-        "time" / DateAdapter(Bytes(6)),
-        "vdc" / ExprAdapter(Byte, obj_ * (20.3 - 1.4) / 255.0 + 1.4, 0),
-        "dc" / ExprAdapter(Byte, obj_ * 22.8 / 255.0, 0),
-        "battery" / ExprAdapter(Byte, obj_ * 22.8 / 255.0, 0),
-        "rf_noise_floor" / Int8ub,
+
+        "system" / Struct(
+            "date" / Struct("time" / DateAdapter(Bytes(6))),
+            "power" / Struct(
+                "vdc" / ExprAdapter(Byte, lambda obj, ctx: round(obj * (20.3 - 1.4) / 255.0 + 1.4, 1), 0),
+                "battery" / ExprAdapter(Byte, lambda obj, ctx: round(obj * 22.8 / 255.0, 1), 0),
+                "dc" / ExprAdapter(Byte, lambda obj, ctx: round(obj * 22.8 / 255.0, 1), 0),
+            ),
+            "rf" / Struct(
+                "noise_floor" / Int8ub,
+            )
+        ),
         "zone_open" / StatusAdapter(Bytes(4)),
         "zone_tamper" / StatusAdapter(Bytes(4)),
         "pgm_tamper" / StatusAdapter(Bytes(2)),
