@@ -1,15 +1,13 @@
 import json
 import logging
 import os
-import re
-import time
 import typing
 from collections import namedtuple
 
 from paradox.config import config as cfg
+from paradox.event import EventLevel, Event, Change
 from paradox.lib import ps
 from paradox.lib.utils import JSONByteEncoder
-from paradox.event import EventLevel
 from .core import AbstractMQTTInterface, sanitize_topic_part, ELEMENT_TOPIC_MAP
 
 logger = logging.getLogger('PAI').getChild(__name__)
@@ -23,16 +21,11 @@ class BasicMQTTInterface(AbstractMQTTInterface):
     def __init__(self):
         super().__init__()
 
-        self.cache = dict()
-        self.armed = dict()
         self.partitions = {}
-        self.last_republish = time.time()
 
     async def run(self):
         ps.subscribe(self._handle_panel_change, "changes")
         ps.subscribe(self._handle_panel_event, "events")
-
-        self.last_republish = time.time()
 
         await super().run()
 
@@ -54,15 +47,6 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_NOTIFICATIONS_TOPIC, "#"),
             self._mqtt_handle_notifications
         )
-
-    def run_loop(self, queue_item):
-        if time.time() - self.last_republish > cfg.MQTT_REPUBLISH_INTERVAL:
-            self.republish()
-            self.last_republish = time.time()
-
-    def publish(self, topic, value, qos, retain):
-        self.cache[topic] = {'value': value, 'qos': qos, 'retain': retain}
-        super().publish(topic, value, qos, retain)
 
     def _preparse_message(self, message) -> typing.Optional[PreparseResponse]:
         logger.info("message topic={}, payload={}".format(
@@ -114,53 +98,56 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                     "Zone command refused: {}={}".format(element, command))
 
     def _mqtt_handle_partition_control(self, client, userdata, message):
-        prep = self._preparse_message(message)
-        if prep:
-            topics, element, command = prep
+        try:
+            prep = self._preparse_message(message)
+            if prep:
+                topics, element, command = prep
 
-            if command.startswith('code_toggle-'):
-                tokens = command.split('-')
-                if len(tokens) < 2:
-                    return
+                if command.startswith('code_toggle-'):
+                    tokens = command.split('-')
+                    if len(tokens) < 2:
+                        return
 
-                if tokens[1] not in cfg.MQTT_TOGGLE_CODES:
-                    logger.warning("Invalid toggle code {}".format(tokens[1]))
-                    return
+                    if tokens[1] not in cfg.MQTT_TOGGLE_CODES:
+                        logger.warning("Invalid toggle code {}".format(tokens[1]))
+                        return
 
-                if element.lower() == 'all':
-                    command = 'arm'
+                    if element.lower() == 'all':
+                        command = 'arm'
 
-                    for k, v in self.partitions.items():
-                        # If "all" and a single partition is armed, default is
-                        # to disarm
-                        for k1, v1 in self.partitions[k].items():
-                            if (k1 == 'arm' or k1 == 'exit_delay' or k1 == 'entry_delay') and v1:
-                                command = 'disarm'
+                        for k, v in self.partitions.items():
+                            # If "all" and a single partition is armed, default is
+                            # to disarm
+                            for k1, v1 in self.partitions[k].items():
+                                if (k1 == 'arm' or k1 == 'exit_delay' or k1 == 'entry_delay') and v1:
+                                    command = 'disarm'
+                                    break
+
+                            if command == 'disarm':
                                 break
 
-                        if command == 'disarm':
-                            break
-
-                elif element in self.partitions:
-                    if ('arm' in self.partitions[element] and self.partitions[element]['arm']) \
-                            or ('exit_delay' in self.partitions[element] and self.partitions[element]['exit_delay']):
-                        command = 'disarm'
+                    elif element in self.partitions:
+                        if ('arm' in self.partitions[element] and self.partitions[element]['arm']) \
+                                or ('exit_delay' in self.partitions[element] and self.partitions[element]['exit_delay']):
+                            command = 'disarm'
+                        else:
+                            command = 'arm'
                     else:
-                        command = 'arm'
-                else:
-                    logger.debug("Element {} not found".format(element))
-                    return
+                        logger.debug("Element {} not found".format(element))
+                        return
 
-                ps.sendMessage('notifications', message=dict(
-                    source="mqtt",
-                    message="Command by {}: {}".format(
-                        cfg.MQTT_TOGGLE_CODES[tokens[1]], command),
-                    level=logging.INFO))
+                    ps.sendMessage('notifications', message=dict(
+                        source="mqtt",
+                        payload="Command by {}: {}".format(
+                            cfg.MQTT_TOGGLE_CODES[tokens[1]], command),
+                        level=logging.INFO))
 
-            logger.debug("Partition command: {} = {}".format(element, command))
-            if not self.alarm.control_partition(element, command):
-                logger.warning(
-                    "Partition command refused: {}={}".format(element, command))
+                logger.debug("Partition command: {} = {}".format(element, command))
+                if not self.alarm.control_partition(element, command):
+                    logger.warning(
+                        "Partition command refused: {}={}".format(element, command))
+        except:
+            logger.exception("Handle Partition Control")
 
     def _mqtt_handle_output_control(self, client, userdata, message):
         prep = self._preparse_message(message)
@@ -172,7 +159,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                 logger.warning(
                     "Output command refused: {}={}".format(element, command))
 
-    def _handle_panel_event(self, event):
+    def _handle_panel_event(self, event: Event):
         """
         Handle Live Event
 
@@ -184,21 +171,20 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             self.publish('{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                         cfg.MQTT_EVENTS_TOPIC,
                                         cfg.MQTT_RAW_TOPIC),
-                         json.dumps(event.props, ensure_ascii=False, cls=JSONByteEncoder), 0, cfg.MQTT_RETAIN)
+                         json.dumps(event.props, ensure_ascii=False, cls=JSONByteEncoder, default=str, sort_keys=True), 0, cfg.MQTT_RETAIN)
 
-    def _handle_panel_change(self, change):
-        logger.debug(change)
-
-        attribute = change['property']
-        label = change['label']
-        value = change['value']
-        initial = change['initial']
-        element = change['type']
+    def _handle_panel_change(self, change: Change):
+        attribute = change.property
+        label = change.key
+        value = change.new_value
+        element_type = change.type
 
         """Handle Property Change"""
 
+        # Dash stuff START
+        # TODO: move to a separate component
         # Keep track of ARM state
-        if element == 'partition':
+        if element_type == 'partition':
             if label not in self.partitions:
                 self.partitions[label] = dict()
 
@@ -207,11 +193,12 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                     self._publish_dash(cfg.MQTT_DASH_TEMPLATE, list(self.partitions.keys()))
 
             self.partitions[label][attribute] = value
+        # Dash stuff END
 
-        if element in ELEMENT_TOPIC_MAP:
-            element_topic = ELEMENT_TOPIC_MAP[element]
+        if element_type in ELEMENT_TOPIC_MAP:
+            element_topic = ELEMENT_TOPIC_MAP[element_type]
         else:
-            element_topic = element
+            element_topic = element_type
 
         if cfg.MQTT_USE_NUMERIC_STATES:
             publish_value = int(value)
@@ -225,12 +212,8 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                                              attribute),
                      "{}".format(publish_value), 0, cfg.MQTT_RETAIN)
 
-    def republish(self):
-        for k in list(self.cache.keys()):
-            v = self.cache[k]
-            self.mqtt.publish(k, v['value'], v['qos'], v['retain'])
-
     def _publish_dash(self, fname, partitions):
+        # TODO: move to a separate component
         if len(partitions) < 2:
             return
 
@@ -241,4 +224,4 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                 self.mqtt.publish(cfg.MQTT_DASH_TOPIC, data, 2, True)
                 logger.info("MQTT Dash panel published to {}".format(cfg.MQTT_DASH_TOPIC))
         else:
-            logger.warn("MQTT DASH Template not found: {}".format(fname))
+            logger.warning("MQTT DASH Template not found: {}".format(fname))

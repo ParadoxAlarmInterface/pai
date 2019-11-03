@@ -5,8 +5,7 @@ from typing import Dict
 from construct import Container
 
 from paradox.config import config as cfg
-from paradox.lib.utils import deep_merge
-from paradox.models.element_type_container import ElementTypeContainer
+from paradox.data.element_type_container import ElementTypeContainer
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -31,13 +30,8 @@ def convert_raw_status(raw_status: Container) -> Dict[str, ElementTypeContainer]
 
         if not prop_name:
             prop_name = element_type
-            if element_type != 'troubles':  # TODO: why system["troubles"] is not OK?
-                element_type = 'system'
 
         out[element_type].deep_merge(_parse_raw_status(prop_name, value))
-
-    if cfg.LOGGING_DUMP_STATUS:
-        logger.debug("properties: %s", raw_status)
 
     return out
 

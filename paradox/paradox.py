@@ -3,69 +3,92 @@
 import asyncio
 import logging
 import time
-from collections import defaultdict
+from binascii import hexlify
 from enum import Enum
 from threading import Lock
-from typing import Optional, Sequence, Iterable, Callable, Awaitable
+from typing import Optional, Sequence, Iterable, Callable
 
 from construct import Container
 
-from paradox import event
+from paradox.event import LiveEvent, ChangeEvent, Change
 from paradox.config import config as cfg
-from paradox.connections.connection import Connection
+from paradox.connections.ip_connection import IPConnection
+from paradox.connections.serial_connection import SerialCommunication
+from paradox.data.memory_storage import MemoryStorage as Storage
 from paradox.exceptions import StatusRequestException
 from paradox.hardware import create_panel
 from paradox.lib import ps
-from paradox.lib.async_message_manager import AsyncMessageManager, EventMessageHandler, ErrorMessageHandler
+from paradox.lib.async_message_manager import EventMessageHandler, ErrorMessageHandler
 from paradox.lib.utils import deep_merge
-from paradox.models.element_type_container import ElementTypeContainer
 from paradox.parsers.status import convert_raw_status
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
 serial_lock = Lock()
 
-STATE_STOP = 0
-STATE_RUN = 1
-STATE_PAUSE = 2
-STATE_ERROR = 3
+
+class State(Enum):
+    STOP = 0
+    INIT = 1
+    RUN = 2
+    PAUSE = 3
+    ERROR = 4
 
 
-class PublishPropertyChange(Enum):
-    NO = 0
-    DEFAULT = 1
-    YES = 2
+def async_loop_unhandled_exception_handler(loop, context):
+    logger.error("Unhandled exception in async loop(%s): %s", loop, context)
 
+    loop.default_exception_handler(context)
+    # exception = context.get('exception')
+    logger.exception("Unhandled exception in async loop")
 
 class Paradox:
-
-    def __init__(self,
-                 connection: Connection,
-                 retries=3):
-
+    def __init__(self, retries=3):
         self.panel = None  # type: Panel
-        self.connection = connection
+        self._connection = None
         self.retries = retries
-        self.message_manager = AsyncMessageManager()
         self.work_loop = asyncio.get_event_loop() # type: asyncio.AbstractEventLoop
+        self.work_loop.set_exception_handler(async_loop_unhandled_exception_handler)
         self.receive_worker_task = None
 
-        self.message_manager.register_handler(EventMessageHandler(self.handle_event))
-        self.message_manager.register_handler(ErrorMessageHandler(self.handle_error))
+        self.storage = Storage()
 
-        self.data = defaultdict(ElementTypeContainer)  # dictionary of Type
-        self.reset()
+        self.run = State.STOP
+        self.request_lock = asyncio.Lock()
+        self.loop_wait_event = asyncio.Event()
+
+        ps.subscribe(self._on_labels_load, "labels_loaded")
+        ps.subscribe(self._on_status_update, "status_update")
+        ps.subscribe(self._on_property_change, "changes")
+
+    @property
+    def connection(self):
+        if not self._connection:
+            # Load a connection to the alarm
+            if cfg.CONNECTION_TYPE == "Serial":
+                logger.info("Using Serial Connection")
+
+                self._connection = SerialCommunication(self.on_connection_message, port=cfg.SERIAL_PORT,
+                                                      baud=cfg.SERIAL_BAUD)
+            elif cfg.CONNECTION_TYPE == 'IP':
+                logger.info("Using IP Connection")
+
+                self._connection = IPConnection(self.on_connection_message, host=cfg.IP_CONNECTION_HOST,
+                                               port=cfg.IP_CONNECTION_PORT,
+                                               password=cfg.IP_CONNECTION_PASSWORD)
+            else:
+                raise AssertionError("Invalid connection type: {}".format(cfg.CONNECTION_TYPE))
+
+            self._register_connection_handlers()
+
+        return self._connection
+
+    def _register_connection_handlers(self):
+        self.connection.register_handler(EventMessageHandler(self.handle_event_message))
+        self.connection.register_handler(ErrorMessageHandler(self.handle_error_message))
 
     def reset(self):
-        # Keep track of alarm state
-        self.data['system'] = dict(power=dict(label='power', key='power', id=0),
-                                   rf=dict(label='rf', key='rf', id=1),
-                                   troubles=dict(label='troubles', key='troubles', id=2))
-
-        self.last_power_update = 0
-        self.run = STATE_STOP
-        self.loop_wait = True
-        self.status_cache = dict()
+        pass
 
     def connect(self) -> bool:
         task = self.work_loop.create_task(self.connect_async())
@@ -73,25 +96,22 @@ class Paradox:
         return task.result()
 
     async def connect_async(self):
-        try:
-            self.disconnect()  # socket needs to be also closed
-        except:
-            pass
+        self.disconnect()  # socket needs to be also closed
+        self.panel = None
 
         logger.info("Connecting to interface")
         if not await self.connection.connect():
             logger.error('Failed to connect to interface')
-            self.run = STATE_STOP
+            self.run = State.ERROR
             return False
-
-        self.run = STATE_STOP
-
-        self.connection.timeout(0.5)
 
         logger.info("Connecting to panel")
 
         # Reset all states
         self.reset()
+        self.run = State.INIT
+
+        self.connection.timeout(0.5)
 
         if not self.panel:
             self.panel = create_panel(self)
@@ -100,14 +120,18 @@ class Paradox:
         try:
             logger.info("Initiating communication")
 
-            reply = await self.send_wait(self.panel.get_message('InitiateCommunication'), None, reply_expected=0x07)
+            initiate_reply = await self.send_wait(self.panel.get_message('InitiateCommunication'), None, reply_expected=0x07)
 
-            if reply:
-                logger.info("Found Panel {} version {}.{} build {}".format(
-                    (reply.fields.value.label.strip(b'\0 ').decode(cfg.LABEL_ENCODING)),
-                    reply.fields.value.application.version,
-                    reply.fields.value.application.revision,
-                    reply.fields.value.application.build))
+            if initiate_reply:
+                model = initiate_reply.fields.value.label.strip(b'\0 ').decode(cfg.LABEL_ENCODING)
+                firmware_version = "{}.{} build {}".format(
+                    initiate_reply.fields.value.application.version,
+                    initiate_reply.fields.value.application.revision,
+                    initiate_reply.fields.value.application.build
+                )
+                serial_number = hexlify(initiate_reply.fields.value.serial_number).decode()
+
+                logger.info("Found Panel {} version {}".format(model, firmware_version))
             else:
                 raise ConnectionError("Panel did not replied to InitiateCommunication")
 
@@ -121,65 +145,44 @@ class Paradox:
 
             if reply.fields.value.product_id is not None:
                 self.panel = create_panel(self, reply.fields.value.product_id)  # Now we know what panel it is. Let's
-                ps.sendMessage('panel_detected', product_id=reply.fields.value.product_id)
-            # recreate panel object.
+                # recreate panel object.
+                ps.sendMessage('panel_detected', panel=dict(product_id=reply.fields.value.product_id, model=model, firmware_version=firmware_version, serial_number=serial_number))
 
             result = await self.panel.initialize_communication(reply, cfg.PASSWORD)
             if not result:
                 raise ConnectionError("Failed to initialize communication")
-
-            # Now we need to start async message reading worker
-            self.run = STATE_RUN
-
-            self.receive_worker_task = self.work_loop.create_task(self.receive_worker())
 
             if cfg.SYNC_TIME:
                 await self.sync_time()
 
             if cfg.DEVELOPMENT_DUMP_MEMORY:
                 if hasattr(self.panel, 'dump_memory') and callable(self.panel.dump_memory):
-                    logger.warn("Requested memory dump. Dumping...")
+                    logger.warning("Requested memory dump. Dumping...")
 
                     await self.panel.dump_memory()
-                    logger.warn("Memory dump completed. Exiting pai.")
+                    logger.warning("Memory dump completed. Exiting pai.")
                     raise SystemExit()
                 else:
-                    logger.warn("Requested memory dump, but current panel type does not support it yet.")
+                    logger.warning("Requested memory dump, but current panel type does not support it yet.")
 
-            await self.panel.update_labels()
-
-            # Update the interface with all of the items (implemented for homie, which will advertise all 
-            # of the available items as nodes)
-            #self.interface.change(element_type, elements[type_key]['key'],
-            #                              property_name, property_value, initial=False)
-            # try:
-                
-            #     for element_type in self.data:
-            #         print(element_type)
-            #         if element_type == 'zone':
-            #             elements = self.data[element_type]
-            #             for type_key in elements:
-            #                 print (type_key)
-            #                 for property_name in elements[type_key]: # 1 2 3
-            #                     print (property_name)
-            #                     print ("%s-%s=%s" % (type_key,property_name,elements[type_key][property_name]))
-            #                     #self.interface.change(element_type, self.data[element_type]['key'],
-            #                     #                property_name, False, initial=True)
-            # except:
-            #     pass
-
+            labels = await self.panel.load_labels()
+            ps.sendMessage('labels_loaded', data=labels)
 
             logger.info("Connection OK")
-            self.loop_wait = False
+            self.run = State.RUN
+            self.request_status_refresh()  # Trigger status update
 
             ps.sendMessage('connected')
             return True
+        except asyncio.TimeoutError as e:
+            logger.error("Timeout while connecting to panel: %s" % str(e))
         except ConnectionError as e:
             logger.error("Failed to connect: %s" % str(e))
         except Exception:
             logger.exception("Connect error")
 
-        self.run = STATE_STOP
+        self.run = State.ERROR
+
         return False
 
     async def sync_time(self):
@@ -191,7 +194,7 @@ class Paradox:
 
         reply = await self.send_wait(self.panel.get_message('SetTimeDate'), args, reply_expected=0x03, timeout=10)
         if reply is None:
-            logger.warn("Could not set panel time")
+            logger.warning("Could not set panel time")
         else:
             logger.info("Panel time synchronized")
 
@@ -199,15 +202,48 @@ class Paradox:
         task = self.work_loop.create_task(self.async_loop())
         self.work_loop.run_until_complete(task)
 
+    async def async_loop(self):
+        logger.debug("Loop start")
+        
+        first_loop = True
+
+        replies_missing = 0
+
+        while self.run not in(State.STOP, State.ERROR):
+            tstart = time.time()
+            if self.run == State.RUN:
+                try:
+                    result = await asyncio.gather(*[self._status_request(i) for i in cfg.STATUS_REQUESTS])
+                    merged = deep_merge(*result, extend_lists=True, initializer={})
+                    self.work_loop.call_soon(self._process_status, merged)
+                    replies_missing = max(0, replies_missing - 1)
+                except ConnectionError:
+                    raise
+                except StatusRequestException:
+                    replies_missing += 1
+                    if replies_missing > 3:
+                        logger.error("Lost communication with panel")
+                        self.disconnect()
+                except Exception:
+                    logger.exception("Loop")
+
+                if replies_missing > 0:
+                    logger.debug("Loop: Replies missing: {}".format(replies_missing))
+
+            # cfg.Listen for events
+
+            max_wait_time = max((tstart + cfg.KEEP_ALIVE_INTERVAL) - time.time(), 0)
+            try:
+                await asyncio.wait_for(self.loop_wait_event.wait(), max_wait_time)
+            except asyncio.TimeoutError:
+                # It is fine to timeout to go to the next loop
+                pass
+            finally:
+                self.loop_wait_event.clear()
+
     async def _status_request(self, i):
-        logger.debug("Requesting status: %d" % i)
-        reply = await self.panel.request_status(i)
-        if reply is not None:
-            logger.debug("Received status response: %d" % i)
-            status = self.panel.handle_status(reply)
-            return self._process_status(status)
-        else:
-            raise StatusRequestException("No reply to status request: %d" % i)
+        logger.debug("Scheduling status request: %d" % i)
+        return await self.panel.request_status(i)
 
     def _process_status(self, raw_status: Container):
         status = convert_raw_status(raw_status)
@@ -218,126 +254,38 @@ class Paradox:
 
             status[limit_key].filter(limit_arr)
 
+        #     # TODO: throttle power update messages
+        #     if time.time() - self.last_power_update >= cfg.POWER_UPDATE_INTERVAL:
+        #         force = PublishPropertyChange.YES if cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE else PublishPropertyChange.NO
+
+        if cfg.LOGGING_DUMP_STATUS:
+            logger.debug("properties: %s", status)
+
         ps.sendMessage('status_update', status=status)
 
-        for element_type, element_items in status.items():
-            for element_item_key, element_item_status in element_items.items():
-                if isinstance(element_item_status, (dict, list,)) and element_type in self.data:  # TODO: who cares if it is in self.data?
-                    self.update_properties(element_type, element_item_key, element_item_status)
+    def request_status_refresh(self):
+        self.loop_wait_event.set()
 
-    async def async_loop(self):
-        logger.debug("Loop start")
-        
-        first_loop = True
+    def on_connection_message(self, message: bytes):
+        self.connection.schedule_raw_message_handling(message)
 
-        replies_missing = 0
-        while self.run != STATE_STOP:
-            while self.run == STATE_PAUSE:
-                await asyncio.sleep(5)
-
-            # May happen when out of sleep
-            if self.run == STATE_STOP:
-                break
-
-            self.loop_wait = True
-
-            tstart = time.time()
-            try:
-
-                for i in cfg.STATUS_REQUESTS:
-                    result = await self._status_request(i)
-                    
-                replies_missing = max(0, replies_missing - 1)
-            except ConnectionError:
-                raise
-            except StatusRequestException:
-                replies_missing += 1
-                if replies_missing > 3:
-                    logger.error("Lost communication with panel")
-                    self.disconnect()
-            except Exception:
-                logger.exception("Loop")
-            
-            logger.debug("Loop: Replies missing: {}".format(replies_missing))
-
-            # cfg.Listen for events
-            while time.time() - tstart < cfg.KEEP_ALIVE_INTERVAL and self.run == STATE_RUN and self.loop_wait:
-                wait_time = max((tstart + cfg.KEEP_ALIVE_INTERVAL) - time.time(), 0)
-                await asyncio.sleep(wait_time)
-
-    async def receive_worker(self):
-        logger.debug("Receive worker started")
-        async_supported = asyncio.iscoroutinefunction(self.connection.read)
+        if not self.panel:
+            return
         try:
-            while True:
-                if async_supported:
-                    await self.receive()
-                else:
-                    await self.receive()
-                    await asyncio.sleep(0.1)  # we need this until we use fully async receive. This lets other loop events to continue their work
-        except asyncio.CancelledError:
-            logger.debug("Receive worker canceled")
-
-        logger.debug("Receive worker stopped")
-
-    async def receive(self, timeout=5.0):
-        # TODO: Get rid of receive worker
-        # with serial_lock:
-        
-        data = self.connection.read(timeout=timeout)
-        if isinstance(data, Awaitable):
-            try:
-                data = await data
-            except asyncio.TimeoutError:
-                return None
-
-        # Retry if no data was available
-        if data is None or len(data) == 0:
-            return None
-
-        self.message_manager.schedule_raw_message_handling(data)
-
-
-        try:
-            recv_message = self.panel.parse_message(data, direction='frompanel')
+            recv_message = self.panel.parse_message(message, direction='frompanel')
 
             if cfg.LOGGING_DUMP_MESSAGES:
-                logger.debug(recv_message)
+                logger.debug('Message received: %s', recv_message)
 
             # No message
             if recv_message is None:
-                logger.debug("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in data)))
-                return None
+                logger.debug("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
+                return
 
-            if self.run != STATE_PAUSE:
-                self.message_manager.schedule_message_handling(recv_message)  # schedule handling in the loop
-        except Exception:
+            if self.run != State.PAUSE:
+                self.connection.schedule_message_handling(recv_message)  # schedule handling in the loop
+        except Exception as e:
             logging.exception("Error parsing message")
-            return None
-
-    def send_wait_simple(self, message=None, timeout=5.0, wait=True) -> Optional[bytes]:
-        # Connection closed
-        if not self.connection.connected:
-            raise ConnectionError('Not connected')
-
-        with serial_lock:
-            if message is not None:
-                self.connection.timeout(timeout)
-                self.connection.write(message)
-
-            if not wait:
-                return None
-            
-            data = self.connection.read(timeout=timeout)
-            
-            if isinstance(data, Awaitable):
-                future = asyncio.run_coroutine_threadsafe(data, self.work_loop)
-                try:
-                    data = future.result(5)
-                except asyncio.TimeoutError:
-                    data = None
-
-        return data
 
     async def send_wait(self,
                   message_type=None,
@@ -354,58 +302,40 @@ class Paradox:
         if message is None and message_type is not None:
             message = message_type.build(dict(fields=dict(value=args)))
 
-        while retries >= 0:
-            retries -= 1
+        retry = 0
 
-            with serial_lock:
-                if message is not None:
-                    self.connection.timeout(timeout)
-                    self.connection.write(message)
+        while retry <= retries:
+            if retry > 0:
+                logger.debug('Request retry (%d/%d)', retry, retries)
+            retry += 1
 
-            if reply_expected is not None:
-                self.work_loop.create_task(self.receive(timeout))
-                if isinstance(reply_expected, Callable):
-                    reply = await self.message_manager.wait_for(reply_expected, timeout=timeout*2)
-                elif isinstance(reply_expected, Iterable):
-                    reply = await self.message_manager.wait_for(
-                        lambda m: any(m.fields.value.po.command == expected for expected in reply_expected), timeout=timeout*2)
-                else:
-                    reply = await self.message_manager.wait_for(lambda m: m.fields.value.po.command == reply_expected, timeout=timeout*2)
+            try:
+                async with self.request_lock:
+                    if message is not None:
+                        self.connection.timeout(timeout)
+                        self.connection.write(message)
 
-                if reply:
-                    return reply
+                    if reply_expected is not None:
+                        if isinstance(reply_expected, Callable):
+                            reply = await self.connection.wait_for_message(reply_expected, timeout=timeout * 2)
+                        elif isinstance(reply_expected, Iterable):
+                            reply = await self.connection.wait_for_message(
+                                lambda m: any(m.fields.value.po.command == expected for expected in reply_expected), timeout=timeout*2)
+                        else:
+                            reply = await self.connection.wait_for_message(lambda m: m.fields.value.po.command == reply_expected, timeout=timeout * 2)
+
+                        if reply:
+                            return reply
+            except asyncio.TimeoutError:
+                pass
 
         return None  # Probably it needs to throw an exception instead of returning None
 
-    @staticmethod
-    def _select(haystack, needle) -> Sequence[int]:
-        """
-        Helper function to select objects from provided dictionary
-
-        :param haystack: dictionary
-        :param needle:
-        :return: Sequence[int] list of object indexes
-        """
-        selected = []  # type: Sequence[int]
-        if needle == 'all' or needle == '0':
-            selected = list(haystack)
-        else:
-            if needle.isdigit() and 0 < int(needle) < len(haystack):
-                el = haystack.get(int(needle))
-            else:
-                el = haystack.get(needle)
-
-            if el:
-                if "id" not in el:
-                    raise Exception("Invalid dictionary of elements provided")
-                selected = [el["id"]]
-
-        return selected
-
     def control_zone(self, zone: str, command: str) -> bool:
+        command = command.lower()
         logger.debug("Control Zone: {} - {}".format(zone, command))
 
-        zones_selected = self._select(self.data['zone'], zone)  # type: Sequence[int]
+        zones_selected = self.storage.get_container('zone').select(zone)  # type: Sequence[int]
 
         # Not Found
         if len(zones_selected) == 0:
@@ -424,14 +354,15 @@ class Paradox:
             future.cancel()
 
         # Refresh status
-        self.loop_wait = False
+        self.request_status_refresh()  # Trigger status update
 
         return accepted
 
     def control_partition(self, partition: str, command: str) -> bool:
+        command = command.lower()
         logger.debug("Control Partition: {} - {}".format(partition, command))
 
-        partitions_selected = self._select(self.data['partition'], partition)  # type: Sequence[int]
+        partitions_selected = self.storage.get_container('partition').select(partition) # type: Sequence[int]
 
         # Not Found
         if len(partitions_selected) == 0:
@@ -449,17 +380,16 @@ class Paradox:
             logger.error('control_partitions timeout')
             future.cancel()
 
-        # Apply state changes
-
         # Refresh status
-        self.loop_wait = False
+        self.request_status_refresh()  # Trigger status update
 
         return accepted
 
     def control_output(self, output, command) -> bool:
+        command = command.lower()
         logger.debug("Control Output: {} - {}".format(output, command))
 
-        outputs_selected = self._select(self.data['pgm'], output)
+        outputs_selected = self.storage.get_container('pgm').select(output)
 
         # Not Found
         if len(outputs_selected) == 0:
@@ -479,135 +409,57 @@ class Paradox:
         # Apply state changes
 
         # Refresh status
-        self.loop_wait = False
+        self.request_status_refresh()  # Trigger status update
 
         return accepted
 
     def get_label(self, label_type: str, label_id) -> Optional[str]:
-        if label_type in self.data:
-            el = self.data[label_type].get(label_id)
-            if el:
-                return el.get("label")
+        el = self.storage.get_container_object(label_type, label_id)
+        if el:
+            return el.get("label")
 
-    def handle_event(self, message: Container=None):
+    def handle_event_message(self, message: Container=None):
         """Process cfg.Live Event Message and dispatch it to the interface module"""
         try:
             logger.debug("Handle event from panel message: {}".format(message))
-            evt = event.Event.from_live_event(self.panel.event_map, event=message, label_provider=self.get_label)
-            if evt:
-                if len(evt.change) == 0:
-                    # Publish event
-                    ps.sendEvent(evt)
-            else:
+            try:
+                evt = LiveEvent(event=message, event_map=self.panel.event_map, label_provider=self.get_label)
+            except AssertionError as e:
                 logger.debug("Error creating event")
                 return
 
             if cfg.LOGGING_DUMP_EVENTS:
                 logger.debug("Event: {}".format(evt))
-                
+
+            element = self.storage.get_container_object(evt.type, evt.id)
+
             # Temporary to catch labels/properties in wrong places
             # TODO: REMOVE
             if message is not None:
-                if evt.type in self.data:
-                    if not evt.id:
-                        logger.warn("Missing element ID in {}/{}, m/m: {}/{}, message: {}".format(evt.type, evt.label or '?', evt.major, evt.minor, evt.message))
-                    else:
-                        el = self.data[evt.type].get(evt.id)
-                        if not el:
-                            logger.warn("Missing element with ID {} in {}/{}".format(evt.id, evt.type, evt.label))
-                        else:
-                            for k in evt.change:
-                                if k not in el:
-                                    logger.warn("Missing property {} in {}/{}".format(k, evt.type, evt.label))
-                            if evt.label != el.get("label"):
-                                logger.warn(
-                                    "Labels differ {} != {} in {}/{}".format(el.get("label"), evt.label, evt.type, evt.label))
+                if not evt.id:
+                    logger.warning("Missing element ID in {}/{}, m/m: {}/{}, message: {}".format(evt.type, evt.label or '?', evt.major, evt.minor, evt.message))
                 else:
-                    logger.warn("Missing type {} for event: {}.{} {}".format(evt.type, evt.major, evt.minor, evt.message))
+                    if not element:
+                        logger.warning("Missing element with ID {} in {}/{}".format(evt.id, evt.type, evt.label))
+                    else:
+                        for k in evt.change:
+                            if k not in element:
+                                logger.warning("Missing property {} in {}/{}".format(k, evt.type, evt.label))
+                        if evt.label != element.get("label"):
+                            logger.warning(
+                                "Labels differ {} != {} in {}/{}".format(element.get("label"), evt.label, evt.type, evt.label))
             # Temporary end
             
             # The event has changes. Update the state
-            if len(evt.change) > 0 and evt.type in self.data and evt.id in self.data[evt.type]:
-                self.update_properties(evt.type, evt.id, evt.change)
+            if len(evt.change) > 0 and element:
+                self.storage.update_container_object(evt.type, evt.id, evt.change)
+
+            ps.sendEvent(evt)
 
         except Exception as e:
             logger.exception("Handle event")
 
-    def update_properties(self, element_type: str, type_key: str, change: dict, publish=PublishPropertyChange.DEFAULT):
-        try:
-            elements = self.data[element_type]
-        except KeyError:
-            logger.debug('Error: "%s" key is missing from data' % element_type)
-            return
-
-      # Panel doesn't have this element
-        if type_key not in elements:
-            # Some panels have less elements than the ones reported in the status messages.
-            # This is not an error but the logging can be useful when adding new panels.
-            logger.debug('Notice: {} not found in type {} with content {}'.format(type_key, element_type, list(elements)))
-            return
-
-        # Publish changes and update state
-        for property_name, property_value in change.items():
-
-            if property_name.startswith('_'):  # skip private properties
-                continue
-
-            # Virtual property "Trouble"
-            # True if element has ANY type of alarm
-            if 'trouble' in property_name and property_name !='trouble':
-                if property_value:
-                    self.update_properties(element_type, type_key, dict(trouble=True), publish=publish)
-                else:
-                    r = False
-                    for kk, vv in elements[type_key].items():
-                        if 'trouble' in kk:
-                            r = r or elements[type_key][kk]
-
-                    self.update_properties(element_type, type_key, dict(trouble=r), publish=publish)
-
-            # Standard processing of changes
-            if property_name in elements[type_key]:
-                old = elements[type_key][property_name]
-
-                if old != change[property_name] \
-                        or publish == PublishPropertyChange.YES \
-                        or cfg.PUSH_UPDATE_WITHOUT_CHANGE:
-                    logger.debug("Change {}/{}/{} from {} to {}".format(element_type,
-                                                                        elements[type_key]['key'],
-                                                                        property_name,
-                                                                        old,
-                                                                        property_value))
-                    elements[type_key][property_name] = property_value
-                    
-                    ps.sendChange(element_type, elements[type_key]['key'],
-                                      property_name, property_value)
-
-                    # Ignore change if is a generic trouble. 
-                    if not (property_name == 'trouble' and element_type == 'system'):
-                        if element_type == 'partition':
-                            partition = elements[type_key]['key']
-                        else:
-                            partition = ""
-
-                        evt_change = {'property': property_name, 'value': property_value, 'type': element_type, 
-                                      'partition': partition, 'label': elements[type_key]['key'], 'time': int(time.time())}
-
-                        evt = event.Event.from_change(property_map=self.panel.property_map, change=evt_change)
-                        if evt:
-                            logger.debug("Event: {}".format(evt))
-                            ps.sendEvent(evt)
-                        else:
-                            logger.warn("Could not create event from change")
-
-            else:
-                elements[type_key][property_name] = property_value  # Initial value, do not notify
-                suppress = 'trouble' not in property_name
-
-                ps.sendChange(element_type, elements[type_key]['key'],
-                                      property_name, property_value, initial=suppress)
-
-    def handle_error(self, message):
+    def handle_error_message(self, message):
         """Handle ErrorMessage"""
         error_enum = message.fields.value.message
 
@@ -619,29 +471,27 @@ class Paradox:
 
     def disconnect(self):
         logger.info("Disconnecting from the Alarm Panel")
-        self.run = STATE_STOP
-        self.loop_wait = False
+        self.run = State.STOP
 
-        self.clean_session()
+        self._clean_session()
         if self.connection.connected:
             self.connection.close()
             logger.info("Disconnected from the Alarm Panel")
 
     async def pause(self):
         logger.info("Pausing PAI")
-        if self.run == STATE_RUN:
+        if self.run == State.RUN:
             logger.info("Pausing from the Alarm Panel")
-            self.run = STATE_PAUSE
-            self.loop_wait = False
+            self.run = State.PAUSE
             # EVO IP150 IP Interface does not work if we send this
             # await self.send_wait(self.panel.get_message('CloseConnection'), None)
 
     async def resume(self):
         logger.info("Resuming PAI")
-        if self.run == STATE_PAUSE:
+        if self.run == State.PAUSE:
             await self.connect_async()
 
-    def clean_session(self):
+    def _clean_session(self):
         logger.info("Clean Session")
         if self.connection.connected:
             if not self.panel:
@@ -653,3 +503,86 @@ class Paradox:
             # Write directly as this can be called from other contexts
 
             self.connection.write(panel.get_message('CloseConnection').build(dict()))
+
+    def _on_labels_load(self, data):
+        for k, d in data.items():
+            self.storage.get_container(k).deep_merge(d)
+
+    def _on_status_update(self, status):
+        """
+        Calls update_properties
+        :param status:
+        :return:
+        """
+        if 'troubles' in status:
+            self._process_trouble_statuses(status['troubles'])
+        if 'partition' in status:
+            self._update_partition_current_state(status['partition'])
+        # self._process_zone_statuses(status['zone'])
+
+        for element_type, element_items in status.items():
+            if element_type in ['troubles']:  # troubles was already parsed
+                continue
+            for element_item_key, element_item_status in element_items.items():
+                if isinstance(element_item_status, (dict, list,)):
+                    self.storage.update_container_object(element_type, element_item_key, element_item_status)
+                else:
+                    logger.debug("%s/%s:%s ignored", element_type, element_item_key, element_item_status)
+
+        self.first_status = False
+
+    def _process_trouble_statuses(self, trouble_statuses):
+        global_trouble = False
+        for t_key, t_status in trouble_statuses.items():
+            if not isinstance(t_status, bool):
+                logger.error("Trouble %s has not boolean state: %s", t_key, t_status)
+                continue
+
+            self.storage.update_container_object('system', 'troubles', {t_key: global_trouble})
+
+            global_trouble = global_trouble or t_status
+
+        self.storage.update_container_object('system', 'troubles', {'trouble': global_trouble})
+
+    def _update_partition_current_state(self, partition_statuses):
+        """
+        current_state is fully HomeAssistant compatible. Check HASS manual before making any changes.
+        """
+        for p_key, p_status in partition_statuses.items():
+            partition = self.storage.get_container_object('partition', p_key)
+            if not partition:
+                continue
+
+            if any([
+                p_status.get('fire_alarm'),
+                p_status.get('audible_alarm'),
+                p_status.get('silent_alarm'),
+                p_status.get('panic_alarm')
+            ]):
+                new_status = 'triggered'
+            elif p_status.get('arm'):
+                if p_status.get('exit_delay'):
+                    new_status = 'pending'
+                elif p_status.get('arm_stay'):
+                    new_status = 'armed_home'
+                elif p_status.get('arm_sleep'):
+                    new_status = 'armed_night'
+                elif p_status.get('arm_away'):
+                    new_status = 'armed_away'
+                else:
+                    new_status = 'armed_away'
+            else:
+                new_status = 'disarmed'
+
+            self.storage.update_container_object('partition', partition['key'], {"current_state": new_status})
+
+    def _on_property_change(self, change: Change):
+        if change.initial:
+            return
+
+        try:
+            evt = ChangeEvent(change_object=change, property_map=self.panel.property_map, label_provider=self.get_label)
+            logger.debug("Event: {}".format(evt))
+            ps.sendEvent(evt)
+        except AssertionError:
+            logger.debug("Could not create event from change")

@@ -8,9 +8,11 @@ from typing import Optional
 
 from construct import Construct, Container, MappingError, ChecksumError
 
+from paradox.exceptions import StatusRequestException
 from .event import event_map
 from .parsers import CloseConnection, ErrorMessage, InitializeCommunication, LoginConfirmationResponse, SetTimeDate, \
-    SetTimeDateResponse, PerformPartitionAction, PerformPartitionActionResponse, PerformZoneAction, PerformZoneActionResponse, ReadEEPROMResponse, LiveEvent, \
+    SetTimeDateResponse, PerformPartitionAction, PerformPartitionActionResponse, PerformZoneAction, \
+    PerformZoneActionResponse, ReadEEPROMResponse, LiveEvent, \
     ReadEEPROM, RAMDataParserMap, RequestedEvent
 from .property import property_map
 from ..panel import Panel as PanelBase
@@ -158,7 +160,9 @@ class Panel_EVOBase(PanelBase):
             return False
 
         if reply.fields.value.po.command == 0x0:
-            logger.error("Authentication Failed. Wrong Password or User Type is not FullMaster?")
+            logger.error("Authentication Failed. Wrong PASSWORD. Make sure you use correct PC Password. In Babyware: "
+                         "Right click on your panel -> Properties -> PC Communication (Babyware) -> PC Communication "
+                         "(Babyware) Tab.")
             return False
         else:  # command == 0x1
             if reply.fields.value.po.status.Winload_connected:
@@ -171,45 +175,24 @@ class Panel_EVOBase(PanelBase):
     def _request_status_reply_check(self, message: Container, address: int):
         mvars = message.fields.value
 
-        assert mvars.po.command == 0x5
-        assert mvars.control.ram_access is True
-        assert mvars.control.eeprom_address_bits == 0x0
-        assert mvars.bus_address == 0x00  # panel
-        assert mvars.address == address
+        if (mvars.po.command == 0x5
+            and mvars.control.ram_access is True
+            and mvars.control.eeprom_address_bits == 0x0
+            and mvars.bus_address == 0x00  # panel
+            and mvars.address == address
+        ):
+            return True
 
-        return True
+        return False
 
     async def request_status(self, i: int) -> Optional[Container]:
         args = dict(address=i, length=64, control=dict(ram_access=True))
         reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, args['address']))
-
-        return reply
-
-    def handle_status(self, message: Container):
-        """Handle MessageStatus"""
-
-        mvars = message.fields.value
-        # Check message
-
-        if mvars.address not in RAMDataParserMap:
-            logger.error(
-                "Parser for memory address ({}) is not implemented. Please review your STATUS_REQUESTS setting. Skipping.".format(mvars.address))
-            return
-        assert len(mvars.data) == 64
-
-        parser = RAMDataParserMap[mvars.address]
-
-        properties = parser.parse(mvars.data)
-
-        if mvars.address == 1:
-            for k in properties.troubles:
-                if k.startswith("_"):  # ignore private properties
-                    continue
-
-                self.core.update_properties('system', 'troubles',
-                                            {k: properties.troubles[k]})
-
-        return properties
+        if reply is not None:
+            logger.debug("Received status response: %d" % i)
+            return self.handle_status(reply, RAMDataParserMap)
+        else:
+            raise StatusRequestException("No reply to status request: %d" % i)
 
     async def control_partitions(self, partitions: list, command: str) -> bool:
         """

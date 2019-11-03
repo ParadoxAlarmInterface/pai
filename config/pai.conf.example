@@ -24,7 +24,7 @@ CONNECTION_TYPE = 'Serial'  		# Serial or IP
 
 # Serial Connection Details
 SERIAL_PORT = '/dev/ttyS1' 		# Pathname of the Serial Port
-SERIAL_BAUD = 9600              # Use 38400(default setting) or 57600 for EVO
+SERIAL_BAUD = 9600              # 9600 for SP/MG. For EVO: Use 38400(default setting) or 57600
 
 # IP Connection Details
 IP_CONNECTION_HOST = '127.0.0.1'	# IP Module address when using direct IP Connection
@@ -55,7 +55,7 @@ OUTPUT_PULSE_DURATION = 1               # Duration of a PGM pulse in seconds
 PARTITIONS_CHANGE_NOTIFICATION_IGNORE = ['arm_full', 'exit_delay'] # Do not send notifications for these notifications
 STATUS_REQUESTS = [0, 1, 2, 3, 4, 5]
 SYNC_TIME = True    			# Update panel time
-PASSWORD = b'0000'   			# PC Password. Set to None if Panel has no Password.
+PASSWORD = '0000'   			# PC Password. Set to None if Panel has no Password.
                                 # In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) ->
                                 # PC Communication (Babyware) Tab.
 
@@ -84,7 +84,7 @@ MQTT_REPEATER_TOPIC = 'repeaters'       # Base for repeater states
 MQTT_USER_TOPIC = 'users'               # Base for user states
 MQTT_EVENTS_TOPIC = 'events'            # Base for events
 MQTT_CONTROL_TOPIC = 'control'          # Base for control of other elements (ROOT/CONTROL/TYPE)
-MQTT_HOMEASSISTANT_CONTROL_TOPIC = 'hass_control'
+MQTT_HOMEASSISTANT_DISCOVERY_PREFIX = 'homeassistant'
 MQTT_OUTPUT_TOPIC = 'outputs'
 MQTT_KEYPAD_TOPIC = 'keypads'
 MQTT_STATES_TOPIC = 'states'
@@ -96,55 +96,8 @@ MQTT_INTERFACE_TOPIC = 'interface'
 MQTT_TOGGLE_CODES = {}
 MQTT_USE_NUMERIC_STATES = False         # use 0 and 1 instead of True and False
 
-# MQTT Homebridge
-MQTT_HOMEBRIDGE_ENABLE = False
-
-# Topic to use
-# Defaults to paradox/states/partitions/PARTITION/current
-MQTT_HOMEBRIDGE_SUMMARY_TOPIC = 'current'
-
-# Homebridge states map
-# Key = Paradox State
-# Value = State propagated to Homebridge
-MQTT_PARTITION_HOMEBRIDGE_STATES = dict(
-    alarm='ALARM_TRIGGERED',
-    arm_stay='STAY_ARM',
-    arm='AWAY_ARM',
-    arm_sleep='NIGHT_ARM',
-    disarm='DISARMED')
-# Homebridge control map
-# Key = Command from Homebridge
-# Value = Command sent to Panel
-MQTT_PARTITION_HOMEBRIDGE_COMMANDS = dict(
-    STAY_ARM='arm_stay',
-    AWAY_ARM='arm',
-    NIGHT_ARM='arm_sleep',
-    DISARM='disarm')
-
-# MQTT Homeassistant
-MQTT_HOMEASSISTANT_ENABLE = False
-
-# Topic to use
-# Defaults to paradox/states/partitions/PARTITION/current_hass
-MQTT_HOMEASSISTANT_SUMMARY_TOPIC = 'current_hass'
-
-# Homeassistant states map
-# Key = Paradox State
-# Value = State propagated to Homeassistant
-MQTT_PARTITION_HOMEASSISTANT_STATES = dict(
-                             alarm='triggered', 
-                             arm_stay='armed_home',
-                             arm='armed_away',
-                             arm_sleep='armed_night',
-                             disarm='disarmed')
-# Homeassistant control map
-# Key = Command from Homeassistant
-# Value = Command sent to Panel
-MQTT_PARTITION_HOMEASSISTANT_COMMANDS = dict(
-                                ARM_HOME='arm_stay',
-                                ARM_AWAY='arm',
-                                ARM_NIGHT='arm_sleep',
-                                DISARM='disarm')
+# MQTT Homeassistant Auto Discovery
+MQTT_HOMEASSISTANT_AUTODISCOVERY_ENABLE = False
 
 # Dash App
 MQTT_DASH_PUBLISH = False
@@ -188,7 +141,7 @@ GSM_IGNORE_EVENTS = []                  # List of tuples [(major, minor), ...]
 IP_INTERFACE_ENABLE = False
 IP_INTERFACE_BIND_ADDRESS = '0.0.0.0'
 IP_INTERFACE_BIND_PORT = 10000
-IP_INTERFACE_PASSWORD = b'0000'
+IP_INTERFACE_PASSWORD = b'paradox'
 
 # Dummy Interface for testing
 DUMMY_INTERFACE_ENABLE = False

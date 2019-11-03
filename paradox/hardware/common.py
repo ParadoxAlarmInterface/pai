@@ -8,7 +8,15 @@ def calculate_checksum(message):
     r = (r % 256)
     return bytes([r])
 
-HexInt = ExprAdapter(Int8ub, lambda obj, path: int(hex(obj)[2:], 16), lambda obj, path: int(str(obj), 16))
+
+def _hex_to_int(obj, path):
+    try:
+        return int(hex(obj)[2:], 10)
+    except ValueError:
+        return -1
+
+
+HexInt = ExprAdapter(Int8ub, _hex_to_int, lambda obj, path: int(str(obj), 16))
 
 ProductIdEnum = Enum(Int8ub,
                      DIGIPLEX_v13=0,
