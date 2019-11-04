@@ -1,12 +1,25 @@
-from paradox.event import EventLevel
-
+from paradox.event import EventLevel, LiveEvent
 
 def _toggle_provider(old):
     return not old
 
 
-def _minor2_provider(x, *_):
-    return x.minor2
+def _minor2_provider(event, *_):
+    return event.minor2
+
+
+def _request_status_refresh(alarm, *_, **__):
+    alarm.request_status_refresh()
+
+
+def _zone_generated_alarm(event, storage, *_, **__):
+    assert isinstance(event, LiveEvent)
+    storage.update_container_object('partition', event.partition, {
+        "current_state": "triggered",
+        "alarm_in_memory": True,
+        "was_in_alarm": True,
+        "audible_alarm": True
+    })
 
 
 event_map = {
@@ -84,10 +97,10 @@ event_map = {
         9: dict(type='partition', message='Future use')
     }),
     23: dict(level=EventLevel.INFO, type='zone', change=dict(bypassed=_toggle_provider), message='Zone {label} bypass toggled'),
-    24: dict(level=EventLevel.CRITICAL, tags=['alarm'], type='zone', change=dict(generated_alarm=True, presently_in_alarm=True), message='Zone {label} in alarm'),
-    25: dict(level=EventLevel.CRITICAL, tags=['alarm', 'fire'], type='zone', change=dict(fire_alarm=True), message='Fire alarm {label}'),
-    26: dict(level=EventLevel.CRITICAL, tags=['alarm', 'restore'], type='zone', change=dict(presently_in_alarm=False), message='Zone {label} alarm restore'),
-    27: dict(level=EventLevel.CRITICAL, tags=['alarm', 'fire', 'restore'], type='zone', change=dict(fire_alarm=False), message='Fire alarm {label} restore'),
+    24: dict(level=EventLevel.CRITICAL, tags=['alarm'], type='zone', change=dict(generated_alarm=True, presently_in_alarm=True), message='Zone {label} in alarm', hook_fn=_zone_generated_alarm),
+    25: dict(level=EventLevel.CRITICAL, tags=['alarm', 'fire'], type='zone', change=dict(fire_alarm=True), message='Fire alarm {label}', hook_fn=_request_status_refresh),
+    26: dict(level=EventLevel.CRITICAL, tags=['alarm', 'restore'], type='zone', change=dict(presently_in_alarm=False), message='Zone {label} alarm restore', hook_fn=_request_status_refresh),
+    27: dict(level=EventLevel.CRITICAL, tags=['alarm', 'fire', 'restore'], type='zone', change=dict(fire_alarm=False), message='Fire alarm {label} restore', hook_fn=_request_status_refresh),
     28: dict(level=EventLevel.INFO, type='user', message='{label} Early to disarm by user'),
     29: dict(level=EventLevel.INFO, type='user', message='{label} Late to disarm by user'),
     30: dict(level=EventLevel.CRITICAL, type='special', message='Special alarm', tags=['alarm'], sub={
@@ -107,8 +120,8 @@ event_map = {
         13: dict(message='Missing IP module alarm'),
         14: dict(message='IP no service alarm'),
         15: dict(message='Missing voice module alarm'),
-    }),
-    31: dict(level=EventLevel.CRITICAL, type='user', tags=['alarm'], message='Duress alarm by user {label}'),
+    }, hook_fn=_request_status_refresh),
+    31: dict(level=EventLevel.CRITICAL, type='user', tags=['alarm'], message='Duress alarm by user {label}', hook_fn=_request_status_refresh),
     32: dict(level=EventLevel.INFO, type='zone', change=dict(shutdown=True), message='Zone {label} shutdown'),
     33: dict(level=EventLevel.INFO, tags=['tamper'], type='zone', change=dict(zone_tamper_trouble=True), message='Zone {label} tamper'),
     34: dict(level=EventLevel.INFO, tags=['tamper', 'restore'], type='zone', change=dict(zone_tamper_trouble=True), message='Zone {label} tamper restore'),

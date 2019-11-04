@@ -10,7 +10,7 @@ from typing import Optional, Sequence, Iterable, Callable
 
 from construct import Container
 
-from paradox.event import LiveEvent, ChangeEvent, Change
+from paradox.event import Event, LiveEvent, ChangeEvent, Change
 from paradox.config import config as cfg
 from paradox.connections.ip_connection import IPConnection
 from paradox.connections.serial_connection import SerialCommunication
@@ -59,6 +59,7 @@ class Paradox:
 
         ps.subscribe(self._on_labels_load, "labels_loaded")
         ps.subscribe(self._on_status_update, "status_update")
+        ps.subscribe(self._on_event, "events")
         ps.subscribe(self._on_property_change, "changes")
 
     @property
@@ -573,6 +574,9 @@ class Paradox:
                 new_status = 'disarmed'
 
             self.storage.update_container_object('partition', partition['key'], {"current_state": new_status})
+
+    def _on_event(self, event: Event):
+        event.call_hook(storage=self.storage, alarm=self)
 
     def _on_property_change(self, change: Change):
         if change.initial:

@@ -87,6 +87,7 @@ class Event:
         self.change = {}
         self.tags = []
         self.additional_data = {}
+        self.hook_fn = None
 
         self._key = None
 
@@ -131,6 +132,14 @@ class Event:
                 else:
                     dp[key] = value
         return dp
+
+    def call_hook(self, *args, **kwargs):
+        if isinstance(self.hook_fn, typing.Callable):
+            kwargs["event"] = self
+            try:
+                self.hook_fn(*args, **kwargs)
+            except Exception:
+                logger.exception("Failed to call event hook")
 
 
 class LiveEvent(Event):
@@ -182,7 +191,7 @@ class LiveEvent(Event):
         else:
             self.id = self.minor
 
-        callables = (k for k in event_map if isinstance(event_map[k], typing.Callable))
+        callables = (k for k in event_map if isinstance(event_map[k], typing.Callable) and k != 'hook_fn')
         for k in callables:
             event_map[k] = event_map[k](self, self.label_provider)
 
@@ -197,6 +206,7 @@ class LiveEvent(Event):
         #         self.change[k] = EventMessageFormatter().format(self.change[k], self)
 
         self.tags = event_map.get('tags', [])
+        self.hook_fn = event_map.get('hook_fn', self.change)
 
         self.additional_data = {k: v for k, v in event_map.items() if k not in ['message'] and not hasattr(self, k)}
 
