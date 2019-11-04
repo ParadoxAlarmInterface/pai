@@ -120,7 +120,7 @@ class Event:
     def props(self) -> dict:
         dp = {}
         for key in dir(self):
-            if key in ['props', 'raw']:
+            if key in ['props', 'raw', 'hook_fn']:
                 continue
 
             value = getattr(self, key)
