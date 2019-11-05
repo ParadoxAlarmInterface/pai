@@ -206,7 +206,7 @@ class LiveEvent(Event):
         #         self.change[k] = EventMessageFormatter().format(self.change[k], self)
 
         self.tags = event_map.get('tags', [])
-        self.hook_fn = event_map.get('hook_fn', self.change)
+        self.hook_fn = event_map.get('hook_fn')
 
         self.additional_data = {k: v for k, v in event_map.items() if k not in ['message'] and not hasattr(self, k)}
 
