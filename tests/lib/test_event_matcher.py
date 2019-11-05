@@ -41,6 +41,7 @@ def test_zone_generated_alarm_match(mocker):
 
     # Live event label
     assert tag_match(event_, ['zone,alarm,"Office"']) is True
+    assert tag_match(event_, ['zone,alarm,-"Office"']) is False
     assert tag_match(event_, ['zone,alarm,Office']) is True
     assert tag_match(event_, ['zone,alarm,-Office']) is False
     assert tag_match(event_, ['zone,alarm,Offic']) is False
