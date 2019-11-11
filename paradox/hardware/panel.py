@@ -2,13 +2,14 @@ import inspect
 import logging
 import sys
 import typing
-from itertools import chain
 from collections import defaultdict
+from itertools import chain
 
 from construct import Construct, Struct, BitStruct, Const, Nibble, Checksum, Padding, Bytes, this, RawCopy, Int8ub, \
     Default, Enum, Flag, BitsInteger, Int16ub, Container, EnumIntegerString, Rebuild
 
 from paradox.config import config as cfg
+from paradox.lib.utils import sanitize_key
 from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum, HexInt
 
 logger = logging.getLogger('PAI').getChild(__name__)
@@ -107,7 +108,7 @@ class Panel:
             raise(Exception("Password length must be equal to 4. Got {}".format(len(password))))
 
         if not password.isdigit():
-            return password
+            raise (Exception("Not supported password {}".format(password)))
 
         int_password = int(password)
         i = min(4, len(password))
@@ -179,28 +180,20 @@ class Panel:
             data = reply.fields.value.data
             b_label = data[label_offset:label_offset + field_length].strip(b'\0 ')
 
-            key = b_label \
-                .replace(b'\0', b'_') \
-                .replace(b' ', b'_')
-
             label = b_label.replace(b'\0', b' ')
 
             try:
-                key = key.decode(cfg.LABEL_ENCODING)
                 label = label.decode(cfg.LABEL_ENCODING)
             except UnicodeDecodeError:
                 logger.warning('Unable to properly decode label {} using the {} encoding.\n \
                     Specify a different encoding using the LABEL_ENCODING configuration option.'.format(b_label, cfg.LABEL_ENCODING))
-                key = key.decode('utf-8', errors='ignore')
                 label = label.decode('utf-8', errors='ignore')
 
             properties = template.copy()
             properties['id'] = index
-            properties['key'] = key
+            properties['key'] = sanitize_key(label)
             properties['label'] = label
-            if index not in data_dict:
-                data_dict[index] = {}
-            data_dict[index].update(properties)
+            data_dict[index] = properties
 
     def initialize_communication(self, reply, password):
         raise NotImplementedError("override initialize_communication in a subclass")

@@ -1,9 +1,8 @@
-import time
-import logging
 import asyncio
+import logging
 import os
+import time
 import typing
-import re
 from enum import Enum
 
 from paho.mqtt.client import Client, MQTT_ERR_SUCCESS
@@ -17,16 +16,6 @@ ELEMENT_TOPIC_MAP = dict(partition=cfg.MQTT_PARTITION_TOPIC, zone=cfg.MQTT_ZONE_
                          output=cfg.MQTT_OUTPUT_TOPIC, repeater=cfg.MQTT_REPEATER_TOPIC,
                          bus=cfg.MQTT_BUS_TOPIC, keypad=cfg.MQTT_KEYPAD_TOPIC,
                          system=cfg.MQTT_SYSTEM_TOPIC, user=cfg.MQTT_USER_TOPIC)
-
-# re_topic_dirty = re.compile(r'[+#/]')
-re_topic_dirty = re.compile(r'\W')
-
-
-def sanitize_topic_part(name):
-    if isinstance(name, int):
-        return str(name)
-    else:
-        return re_topic_dirty.sub('_', name).strip('_')
 
 
 class ConnectionState(Enum):

@@ -1,6 +1,6 @@
 import binascii
 import pytest
-from paradox.hardware.evo import Panel_EVO192
+from paradox.hardware import Panel
 
 @pytest.mark.parametrize(
     "input,expected",
@@ -22,7 +22,7 @@ from paradox.hardware.evo import Panel_EVO192
     ],
 )
 def test_encode_password(input, expected, mocker):
-    panel = Panel_EVO192(mocker.MagicMock(), None, None)
+    panel = Panel(mocker.MagicMock(), None, None)
 
     enc_password = panel.encode_password(input)
     assert binascii.hexlify(enc_password) == expected

@@ -4,11 +4,13 @@ import os
 import typing
 from collections import namedtuple
 
+from paho.mqtt.client import MQTTMessage, Client
+
 from paradox.config import config as cfg
 from paradox.event import EventLevel, Event, Change
 from paradox.lib import ps
-from paradox.lib.utils import JSONByteEncoder
-from .core import AbstractMQTTInterface, sanitize_topic_part, ELEMENT_TOPIC_MAP
+from paradox.lib.utils import JSONByteEncoder, sanitize_key
+from .core import AbstractMQTTInterface, ELEMENT_TOPIC_MAP
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -48,7 +50,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             self._mqtt_handle_notifications
         )
 
-    def _preparse_message(self, message) -> typing.Optional[PreparseResponse]:
+    def _preparse_message(self, message: MQTTMessage) -> typing.Optional[PreparseResponse]:
         logger.info("message topic={}, payload={}".format(
             message.topic, str(message.payload.decode("utf-8"))))
 
@@ -77,7 +79,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
         return PreparseResponse(topics, element, content)
 
-    def _mqtt_handle_notifications(self, client, userdata, message):
+    def _mqtt_handle_notifications(self, client: Client, userdata, message: MQTTMessage):
         prep = self._preparse_message(message)
         if prep:
             topics = prep.topics
@@ -89,7 +91,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
             ps.sendMessage("notifications", message=dict(source=self.name, payload=prep.content, level=level))
 
-    def _mqtt_handle_zone_control(self, client, userdata, message):
+    def _mqtt_handle_zone_control(self, client: Client, userdata, message: MQTTMessage):
         prep = self._preparse_message(message)
         if prep:
             topics, element, command = prep
@@ -97,7 +99,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                 logger.warning(
                     "Zone command refused: {}={}".format(element, command))
 
-    def _mqtt_handle_partition_control(self, client, userdata, message):
+    def _mqtt_handle_partition_control(self, client: Client, userdata, message: MQTTMessage):
         try:
             prep = self._preparse_message(message)
             if prep:
@@ -149,7 +151,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         except:
             logger.exception("Handle Partition Control")
 
-    def _mqtt_handle_output_control(self, client, userdata, message):
+    def _mqtt_handle_output_control(self, client: Client, userdata, message: MQTTMessage):
         prep = self._preparse_message(message)
         if prep:
             topics, element, command = prep
@@ -208,7 +210,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         self.publish('{}/{}/{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                              cfg.MQTT_STATES_TOPIC,
                                              element_topic,
-                                             sanitize_topic_part(label),
+                                             sanitize_key(label),
                                              attribute),
                      "{}".format(publish_value), 0, cfg.MQTT_RETAIN)
 

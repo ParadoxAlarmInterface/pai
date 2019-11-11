@@ -1,6 +1,6 @@
 from construct import Container
 
-from paradox.lib.utils import deep_merge
+from paradox.lib.utils import deep_merge, sanitize_key
 
 
 def test_deep_merge():
@@ -38,3 +38,10 @@ def test_deep_merge_extend_lists():
 
     result = deep_merge(*cs, extend_lists=True)
     assert dict(a=[1, 2, 3]) == result
+
+def test_sanitize_key():
+    assert sanitize_key('Előtér') == 'Előtér'
+
+    assert sanitize_key('Living room') == 'Living_room'
+
+    assert sanitize_key(1) == '1'

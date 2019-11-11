@@ -1,12 +1,12 @@
+import json
 import logging
 import typing
-import json
 from collections import namedtuple
-
-from .core import AbstractMQTTInterface, sanitize_topic_part, ELEMENT_TOPIC_MAP
 
 from paradox.config import config as cfg
 from paradox.lib import ps
+from paradox.lib.utils import sanitize_key
+from .core import AbstractMQTTInterface
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -73,7 +73,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 cfg.MQTT_BASE_TOPIC,
                  cfg.MQTT_STATES_TOPIC,
                  cfg.MQTT_PARTITION_TOPIC,
-                 sanitize_topic_part(partition['key']),
+                 sanitize_key(partition['key']),
                  'current_state'
             )
 
@@ -81,13 +81,13 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 configuration_topic = '{}/alarm_control_panel/{}/{}/config'.format(
                     cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
                     self.detected_panel.get('serial_number', 'pai'),
-                    sanitize_topic_part(partition['key'])
+                    sanitize_key(partition['key'])
                 )
                 command_topic = '{}/{}/{}/{}'.format(
                     cfg.MQTT_BASE_TOPIC,
                     cfg.MQTT_CONTROL_TOPIC,
                     cfg.MQTT_PARTITION_TOPIC,
-                    sanitize_topic_part(partition['key'])
+                    sanitize_key(partition['key'])
                 )
                 config = dict(
                     name=partition['label'],
@@ -116,7 +116,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                     cfg.MQTT_BASE_TOPIC,
                     cfg.MQTT_STATES_TOPIC,
                     cfg.MQTT_ZONE_TOPIC,
-                    sanitize_topic_part(zone['key']),
+                    sanitize_key(zone['key']),
                     'open'
                 )
 
@@ -134,7 +134,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 configuration_topic = '{}/binary_sensor/{}/{}/config'.format(
                     cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
                     self.detected_panel.get('serial_number', 'pai'),
-                    sanitize_topic_part(zone['key'])
+                    sanitize_key(zone['key'])
                 )
 
                 self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
