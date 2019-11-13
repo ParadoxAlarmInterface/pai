@@ -47,8 +47,9 @@ def test_partitions(mocker):
     assert isinstance(alarm.panel, mocker.MagicMock)
 
     ps.sendChange.assert_any_call(Change('partition', 'Partition_1', 'current_state', 'disarmed', initial=True))
+    ps.sendChange.assert_any_call(Change('partition', 'Partition_1', 'target_state', 'disarmed', initial=True))
     ps.sendChange.assert_any_call(Change('partition', 'Partition_1', 'arm', False, initial=False))
-    assert ps.sendChange.call_count == 2
+    assert ps.sendChange.call_count == 3
 
     assert ps.sendEvent.call_count == 0
 

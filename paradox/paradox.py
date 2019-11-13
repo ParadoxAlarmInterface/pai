@@ -516,7 +516,7 @@ class Paradox:
         if 'troubles' in status:
             self._process_trouble_statuses(status['troubles'])
         if 'partition' in status:
-            self._update_partition_current_state(status['partition'])
+            self._update_partition_states(status['partition'])
         # self._process_zone_statuses(status['zone'])
 
         for element_type, element_items in status.items():
@@ -543,7 +543,7 @@ class Paradox:
 
         self.storage.update_container_object('system', 'troubles', {'trouble': global_trouble})
 
-    def _update_partition_current_state(self, partition_statuses):
+    def _update_partition_states(self, partition_statuses):
         """
         current_state is fully HomeAssistant compatible. Check HASS manual before making any changes.
         """
@@ -552,28 +552,32 @@ class Paradox:
             if not partition:
                 continue
 
+            change = {}
             if any([
                 p_status.get('fire_alarm'),
                 p_status.get('audible_alarm'),
                 p_status.get('silent_alarm'),
                 p_status.get('panic_alarm')
             ]):
-                new_status = 'triggered'
+                change["current_state"] = 'triggered'
             elif p_status.get('arm'):
-                if p_status.get('exit_delay'):
-                    new_status = 'pending'
-                elif p_status.get('arm_stay'):
-                    new_status = 'armed_home'
+                if p_status.get('arm_stay'):
+                    change["current_state"] = 'armed_home'
                 elif p_status.get('arm_sleep'):
-                    new_status = 'armed_night'
+                    change["current_state"] = 'armed_night'
                 elif p_status.get('arm_away'):
-                    new_status = 'armed_away'
+                    change["current_state"] = 'armed_away'
                 else:
-                    new_status = 'armed_away'
-            else:
-                new_status = 'disarmed'
+                    change["current_state"] = 'armed_away'
 
-            self.storage.update_container_object('partition', partition['key'], {"current_state": new_status})
+                change["target_state"] = change["current_state"]
+
+                if p_status.get('exit_delay'):  # Redefine if pending
+                    change["current_state"] = 'pending'
+            else:
+                change["current_state"] = change["target_state"] = 'disarmed'
+
+            self.storage.update_container_object('partition', partition['key'], change)
 
     def _on_event(self, event: Event):
         event.call_hook(storage=self.storage, alarm=self)

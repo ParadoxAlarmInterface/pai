@@ -23,7 +23,10 @@ def send_initial_status(alarm):
         }
     ))
 
-    alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {'current_state': 'disarmed'})
+    alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {
+        'current_state': 'disarmed',
+        'target_state': 'disarmed'
+    })
 
 
 def test_current_state_armed_away():
@@ -40,7 +43,10 @@ def test_current_state_armed_away():
             )
         }
     ))
-    alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {'current_state': 'armed_away'})
+    alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {
+        'current_state': 'armed_away',
+        'target_state': 'armed_away'
+    })
 
 
 def test_current_state_pending():
@@ -58,7 +64,10 @@ def test_current_state_pending():
             )
         }
     ))
-    alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {'current_state': 'pending'})
+    alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {
+        'current_state': 'pending',
+        'target_state': 'armed_away'
+    })
 
 
 def test_current_arm_stay():
@@ -76,7 +85,10 @@ def test_current_arm_stay():
             )
         }
     ))
-    alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {'current_state': 'armed_home'})
+    alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {
+        'current_state': 'armed_home',
+        'target_state': 'armed_home'
+    })
 
 
 def test_current_alarm(mocker):
@@ -93,4 +105,6 @@ def test_current_alarm(mocker):
             )
         }
     ))
-    alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {'current_state': 'triggered'})
+    alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {
+        'current_state': 'triggered'
+    })

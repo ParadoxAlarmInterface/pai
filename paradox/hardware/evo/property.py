@@ -281,7 +281,18 @@ property_map = {
             "pending": "{Type} {label} arming pending",
             "armed_home": "{Type} {label} armed stay",
             "armed_away": "{Type} {label} armed away",
+            "armed_night": "{Type} {label} armed night",
             "disarmed": "{Type} {label} disarmed"
+        }
+    ),
+    "target_state": dict(
+        level=EventLevel.INFO,
+        tags=[],
+        message={
+            "armed_home": "{Type} {label} arm stay",
+            "armed_away": "{Type} {label} arm away",
+            "armed_night": "{Type} {label} arm night",
+            "disarmed": "{Type} {label} disarm"
         }
     )
 }
