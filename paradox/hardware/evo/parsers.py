@@ -224,51 +224,6 @@ RequestedEvent = Struct("fields" / RawCopy(
     )), "checksum" / Checksum(
     Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
-Action = Struct("fields" / RawCopy(
-    Struct(
-        "po" / Struct(
-            "command" / Const(0x40, Int8ub),
-        ),
-        "_not_used0" / Default(Int8ub, 0),
-        "action" / Enum(Int8ub,
-                        Stay_Arm=0x1,
-                        Stay_Arm1=0x2,
-                        Sleep_Arm=0x3,
-                        Full_Arm=0x4,
-                        Disarm=0x5,
-                        Stay_Arm_D_Enabled=0x6,
-                        Stay_Arm_Sleep_D_Enabled=0x7,
-                        Disarm_Both=0x8,
-                        Bypass=0x10,
-                        Beep=0x20,
-                        PGM_On_Override=0x30,
-                        PGM_Off_Override=0x31,
-                        PGM_On=0x32,
-                        PGM_Off=0x33,
-                        Reload_RAM=0x80),
-        "argument" / ExprAdapter(Byte, obj_ + 1, obj_ - 1),
-        "_not_used0" / Padding(29),
-        "source_id" / Default(CommunicationSourceIDEnum, 1),
-        "user_high" / Default(Int8ub, 0),
-        "user_low" / Default(Int8ub, 0),
-    )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-
-ActionResponse = Struct("fields" / RawCopy(
-    Struct(
-        "po" / BitStruct(
-            "command" / Const(0x4, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Winload_connected" / Flag,
-                "NeWare_connected" / Flag)),
-        "length" / Rebuild(Int8ub, lambda
-            this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
-        "data" / Bytes(lambda this: this.packet_length - 3)
-    )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-
 CloseConnection = Struct("fields" / RawCopy(
     Struct(
         "po" / Struct(

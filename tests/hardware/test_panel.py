@@ -26,3 +26,4 @@ def test_encode_password(input, expected, mocker):
 
     enc_password = panel.encode_password(input)
     assert binascii.hexlify(enc_password) == expected
+

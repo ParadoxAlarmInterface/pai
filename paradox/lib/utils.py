@@ -51,5 +51,4 @@ def sanitize_key(key):
     if isinstance(key, int):
         return str(key)
     else:
-
         return re_sanitize_key.sub('_', key).strip('_')
