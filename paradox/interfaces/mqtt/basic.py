@@ -170,7 +170,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         """
 
         if cfg.MQTT_PUBLISH_RAW_EVENTS:
-            self.publish('{}/{}'.format(cfg.MQTT_BASE_TOPIC,
+            self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
                                         cfg.MQTT_EVENTS_TOPIC,
                                         cfg.MQTT_RAW_TOPIC),
                          json.dumps(event.props, ensure_ascii=False, cls=JSONByteEncoder, default=str, sort_keys=True), 0, cfg.MQTT_RETAIN)
