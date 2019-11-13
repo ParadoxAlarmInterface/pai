@@ -10,7 +10,7 @@ from paradox.interfaces.text.core import AbstractTextInterface
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
-class PushoverInterface(AbstractTextInterface):
+class PushoverTextInterface(AbstractTextInterface):
     """Interface Class using Pushover"""
     name = 'pushover'
 
