@@ -20,7 +20,7 @@ async def test_handle_panel_event(mocker):
     event.time = datetime.datetime(2019, 10, 18, 17, 15)
 
     interface._handle_panel_event(event)
-    interface.mqtt.publish.assert_called_once_with('paradox/events',
+    interface.mqtt.publish.assert_called_once_with('paradox/events/raw',
                                                    json.dumps({"additional_data": {}, "change": {},
                                                                "key": "None,Test,", "label": "Test",
                                                                "level": "NOTSET", "major": 0, "message": "",
