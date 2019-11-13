@@ -29,10 +29,9 @@ INIT_COMMANDS = [b'AT',
 
 class SerialConnectionProtocol(ConnectionProtocol):
     def __init__(self, on_port_open, on_con_lost, on_recv_data):
-        super(SerialConnectionProtocol, self).__init__(on_con_lost=on_con_lost)
+        super(SerialConnectionProtocol, self).__init__(on_message=on_recv_data, on_con_lost=on_con_lost)
         self.buffer = b''
         self.on_port_open = on_port_open
-        self.on_recv_data = on_recv_data
         self.loop = asyncio.get_event_loop()
 
     def connection_made(self, transport):
@@ -53,7 +52,7 @@ class SerialConnectionProtocol(ConnectionProtocol):
 
             frame = self.buffer[:r].strip()
             self.buffer = self.buffer[r:]
-            self.loop.create_task(self.on_recv_data(frame))  # Callback
+            self.loop.create_task(self.on_message(frame))  # Callback
 
     def connection_lost(self, exc):
         logger.error('The serial port was closed')
@@ -61,9 +60,8 @@ class SerialConnectionProtocol(ConnectionProtocol):
         super(SerialConnectionProtocol, self).connection_lost(exc)
 
 
-class SerialCommunication(Connection):
+class SerialCommunication:
     def __init__(self, loop, port, baud=9600, timeout=5, recv_callback=None):
-        super(SerialCommunication, self).__init__(timeout=timeout)
         self.port_path = port
         self.baud = baud
         self.connected_future = None
