@@ -575,7 +575,7 @@ class Paradox:
         event.call_hook(storage=self.storage, alarm=self)
 
         if isinstance(event, LiveEvent):
-            self.work_loop.call_soon(self._update_partition_states)
+            self._update_partition_states()
 
     def _on_property_change(self, change: Change):
         if change.initial:

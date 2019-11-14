@@ -131,6 +131,15 @@ def test_zone_alarm_restored():
     assert "Zone Entrance alarm restore" == event_.message
     print(event_)
 
+def test_partition_armed_by_pai():
+    payload = binascii.unhexlify('e2ff187914130b0e0e3b0c0101000000000000000000000000000000000000000000000009')
+    raw = LiveEvent.parse(payload)
+    event_ = event.LiveEvent(raw, event_map)
+    assert "Special arming: [partition:1] arming with Winload by [user:0]" == event_.message
+    print(event_)
+
+
+
 def test_c2():
     payload = binascii.unhexlify('c2001903000b00000001a96c7106152c00200132010000000b')
 

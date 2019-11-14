@@ -1,5 +1,9 @@
+import binascii
+
 from mock import MagicMock
 
+from paradox.hardware.evo import Panel_EVO192
+from paradox.hardware.evo.parsers import LiveEvent
 from paradox.lib.ps import sendMessage
 from paradox.paradox import Paradox
 
@@ -18,7 +22,11 @@ def send_initial_status(alarm):
     sendMessage("status_update", status=dict(
         partition={
             1: dict(
-                arm=False
+                arm=False,
+                alarm_in_memory=False,
+                audible_alarm=False,
+                exit_delay=False,
+                was_in_alarm=False
             )
         }
     ))
@@ -94,17 +102,14 @@ def test_current_arm_stay(mocker):
 def test_current_alarm(mocker):
     alarm = Paradox(None)
     mocker.spy(alarm.storage, 'update_container_object')
-    alarm.panel = MagicMock()
+    alarm.panel = Panel_EVO192(alarm, 5)
 
     send_initial_status(alarm)
 
-    sendMessage("status_update", status=dict(
-        partition={
-            1: dict(
-                audible_alarm=True
-            )
-        }
-    ))
+    payload = binascii.unhexlify('e2ff1cc414130b010f2c1801030000000000024f66666963652020202020202020202000d9')
+    raw = LiveEvent.parse(payload)
+    alarm.handle_event_message(raw)
+
     alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {
         'current_state': 'triggered'
     })

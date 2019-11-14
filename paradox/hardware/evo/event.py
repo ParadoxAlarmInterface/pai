@@ -18,7 +18,8 @@ def _zone_generated_alarm(event, storage, *_, **__):
         "current_state": "triggered",
         "alarm_in_memory": True,
         "was_in_alarm": True,
-        "audible_alarm": True
+        "audible_alarm": True,
+        "exit_delay": False
     })
 
 
