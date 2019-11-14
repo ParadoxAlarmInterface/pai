@@ -104,6 +104,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             prep = self._preparse_message(message)
             if prep:
                 topics, element, command = prep
+                command = cfg.MQTT_COMMAND_ALIAS.get(command, command)
 
                 if command.startswith('code_toggle-'):
                     tokens = command.split('-')

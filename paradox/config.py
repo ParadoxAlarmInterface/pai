@@ -86,10 +86,19 @@ class Config:
         "MQTT_DASH_TOPIC": "metrics/exchange/pai",
         "MQTT_DASH_TEMPLATE": "/etc/pai/mqtt_dash.txt",
 
-        # Interfaces
+        # Interfaces text command alias
         "COMMAND_ALIAS": {                       # alias for commands through text based interfaces
             'arm': 'partition all arm',
             'disarm': 'partition all disarm'
+        },
+
+        # MQTT command aliases
+        "MQTT_COMMAND_ALIAS": {
+            # For homebridge
+            'armed_home': 'arm_stay',
+            'armed_night': 'arm_sleep',
+            'armed_away': 'arm',
+            'disarmed': 'disarm'
         },
 
         # Pushbullet

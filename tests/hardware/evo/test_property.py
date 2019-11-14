@@ -24,7 +24,7 @@ def generate_property_test_parameters():
                 property = aux[2]
                 label = aux[1]
                 type = aux[0]
-                yield pytest.param(type, property, value, partition, label)
+                yield pytest.param(property, type, value, partition, label)
 
 def test_property_map_value():
     change = Change(property='arm', new_value=True, old_value=None, type='partition', key='Fridge')
@@ -37,7 +37,7 @@ def test_property_map_bad():
     with pytest.raises(AssertionError):
         ChangeEvent(change_object=change, property_map=Panel_EVO192.property_map)
 
-@pytest.mark.parametrize("type,property,value,partition,label", generate_property_test_parameters())
+@pytest.mark.parametrize("property,type,value,partition,label", generate_property_test_parameters())
 def test_property(property, type, value, partition, label):
     change = Change(property=property, new_value=value, old_value=None, type=type, key=label)
     evt = ChangeEvent(change_object=change, property_map=Panel_EVO192.property_map)
@@ -90,7 +90,7 @@ def test_property(property, type, value, partition, label):
 
 def test_property_map_keys():
     synthetic_props = ['current_state', 'target_state']
-    expected_keys = set(k.values[1] for k in generate_property_test_parameters())
+    expected_keys = set(k.values[0] for k in generate_property_test_parameters())
     expected_keys.update(synthetic_props)
     actual_keys = set(Panel_EVO192.property_map.keys())
     # property_map = Panel_EVO192.property_map

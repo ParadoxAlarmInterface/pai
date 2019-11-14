@@ -29,6 +29,32 @@ async def test_handle_panel_event(mocker):
                                                                "type": None}, sort_keys=True),
                                                    0, True)
 
+@pytest.mark.parametrize("command,expected", [
+    pytest.param(b'arm', 'arm'),
+    pytest.param(b'arm_stay', 'arm_stay'),
+    pytest.param(b'arm_sleep', 'arm_sleep'),
+    pytest.param(b'disarm', 'disarm'),
+
+    # Homeassistant
+    pytest.param(b'armed_home', 'arm_stay'),
+    pytest.param(b'armed_night', 'arm_sleep'),
+    pytest.param(b'armed_away', 'arm'),
+    pytest.param(b'disarmed', 'disarm')
+])
+def test_mqtt_handle_partition_control(command, expected, mocker):
+    interface = BasicMQTTInterface()
+    interface.alarm = mocker.MagicMock()
+
+    message = MQTTMessage(topic=b'paradox/control/partition/First_floor')
+    message.payload = command
+
+    interface._mqtt_handle_partition_control(None, None, message)
+
+    interface.alarm.control_partition.assert_called_once_with(
+        "First_floor",
+        expected
+    )
+
 def test_mqtt_handle_zone_control(mocker):
     interface = BasicMQTTInterface()
     interface.alarm = mocker.MagicMock()
