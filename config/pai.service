@@ -1,0 +1,14 @@
+# sudo cp /lib/systemd/system/
+# systemctl enable pai
+# systemctl restart pai
+[Unit]
+Description=Paradox Alarm Interface Service
+After=network-online.target
+
+[Service]
+Restart=on-failure
+WorkingDirectory=/home/pi/pai
+ExecStart=/home/pi/pai/run.py
+
+[Install]
+WantedBy=multi-user.target
