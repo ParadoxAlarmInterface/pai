@@ -420,15 +420,13 @@ class Paradox:
     def handle_event_message(self, message: Container=None):
         """Process cfg.Live Event Message and dispatch it to the interface module"""
         try:
-            logger.debug("Handle event from panel message: {}".format(message))
+            if cfg.LOGGING_DUMP_MESSAGES:
+                logger.debug("Handle live event message: {}".format(message))
             try:
                 evt = LiveEvent(event=message, event_map=self.panel.event_map, label_provider=self.get_label)
             except AssertionError as e:
                 logger.debug("Error creating event")
                 return
-
-            if cfg.LOGGING_DUMP_EVENTS:
-                logger.debug("Event: {}".format(evt))
 
             element = self.storage.get_container_object(evt.type, evt.id)
 
@@ -456,7 +454,7 @@ class Paradox:
             ps.sendEvent(evt)
 
         except Exception as e:
-            logger.exception("Handle event")
+            logger.exception("Handle live event")
 
     def handle_error_message(self, message):
         """Handle ErrorMessage"""
@@ -564,27 +562,31 @@ class Paradox:
                     change["current_state"] = 'armed_away'
 
                 change["target_state"] = change["current_state"]
-
-                if properties.get('exit_delay'):  # Redefine if pending
-                    change["current_state"] = 'pending'
             else:
-                change["current_state"] = change["target_state"] = 'disarmed'
+                change["target_state"] = change["current_state"] = 'disarmed'
+
+            if properties.get('exit_delay'):  # Redefine if pending
+                change["current_state"] = 'pending'
 
             self.storage.update_container_object('partition', properties['key'], change)
 
     def _on_event(self, event: Event):
+        if cfg.LOGGING_DUMP_EVENTS:
+            logger.debug("LiveEvent: {}".format(event))
+
         event.call_hook(storage=self.storage, alarm=self)
 
         if isinstance(event, LiveEvent):
-            self._update_partition_states()
+            self.work_loop.call_soon(self._update_partition_states)
 
     def _on_property_change(self, change: Change):
         if change.initial:
             return
 
         try:
-            evt = ChangeEvent(change_object=change, property_map=self.panel.property_map, label_provider=self.get_label)
-            logger.debug("Event: {}".format(evt))
-            ps.sendEvent(evt)
+            event = ChangeEvent(change_object=change, property_map=self.panel.property_map, label_provider=self.get_label)
+            if cfg.LOGGING_DUMP_EVENTS:
+                logger.debug("ChangeEvent: {}".format(event))
+            ps.sendEvent(event)
         except AssertionError:
             logger.debug("Could not create event from change")

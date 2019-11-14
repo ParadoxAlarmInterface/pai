@@ -4,7 +4,7 @@ import logging
 
 from paradox.interfaces import ThreadQueueInterface
 from paradox.lib import ps
-from paradox.event import Event
+from paradox.event import Event, LiveEvent, ChangeEvent
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -27,5 +27,10 @@ class DummyInterface(ThreadQueueInterface):
 
     def _handle_panel_event(self, event: Event):
         level = event.level
-        logger.log(level.value, event)
-        logger.log(level.value, "message: %s" % event.message)
+        # logger.log(level.value, event)
+        if isinstance(event, LiveEvent):
+            logger.log(level.value, "LiveEvent message: %s" % event.message)
+        elif isinstance(event, ChangeEvent):
+            logger.log(level.value, "ChangeEvent message: %s" % event.message)
+        else:
+            logger.log(level.value, "%s message: %s" % (event.__class__.__name__, event.message))
