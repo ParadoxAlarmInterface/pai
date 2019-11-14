@@ -1,6 +1,7 @@
 # sudo cp /lib/systemd/system/
 # systemctl enable pai
 # systemctl restart pai
+# by https://github.com/cybertza
 [Unit]
 Description=Paradox Alarm Interface Service
 After=network-online.target
