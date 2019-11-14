@@ -515,9 +515,6 @@ class Paradox:
         """
         if 'troubles' in status:
             self._process_trouble_statuses(status['troubles'])
-        if 'partition' in status:
-            self._update_partition_states(status['partition'])
-        # self._process_zone_statuses(status['zone'])
 
         for element_type, element_items in status.items():
             if element_type in ['troubles']:  # troubles was already parsed
@@ -528,7 +525,7 @@ class Paradox:
                 else:
                     logger.debug("%s/%s:%s ignored", element_type, element_item_key, element_item_status)
 
-        self.first_status = False
+        self._update_partition_states()
 
     def _process_trouble_statuses(self, trouble_statuses):
         global_trouble = False
@@ -543,44 +540,43 @@ class Paradox:
 
         self.storage.update_container_object('system', 'troubles', {'trouble': global_trouble})
 
-    def _update_partition_states(self, partition_statuses):
+    def _update_partition_states(self):
         """
         current_state is fully HomeAssistant compatible. Check HASS manual before making any changes.
         """
-        for p_key, p_status in partition_statuses.items():
-            partition = self.storage.get_container_object('partition', p_key)
-            if not partition:
-                continue
-
+        for _, properties in self.storage.get_container('partition').items():
             change = {}
             if any([
-                p_status.get('fire_alarm'),
-                p_status.get('audible_alarm'),
-                p_status.get('silent_alarm'),
-                p_status.get('panic_alarm')
+                properties.get('fire_alarm'),
+                properties.get('audible_alarm'),
+                properties.get('silent_alarm'),
+                properties.get('panic_alarm')
             ]):
                 change["current_state"] = 'triggered'
-            elif p_status.get('arm'):
-                if p_status.get('arm_stay'):
+            elif properties.get('arm'):
+                if properties.get('arm_stay'):
                     change["current_state"] = 'armed_home'
-                elif p_status.get('arm_sleep'):
+                elif properties.get('arm_sleep'):
                     change["current_state"] = 'armed_night'
-                elif p_status.get('arm_away'):
+                elif properties.get('arm_away'):
                     change["current_state"] = 'armed_away'
                 else:
                     change["current_state"] = 'armed_away'
 
                 change["target_state"] = change["current_state"]
 
-                if p_status.get('exit_delay'):  # Redefine if pending
+                if properties.get('exit_delay'):  # Redefine if pending
                     change["current_state"] = 'pending'
             else:
                 change["current_state"] = change["target_state"] = 'disarmed'
 
-            self.storage.update_container_object('partition', partition['key'], change)
+            self.storage.update_container_object('partition', properties['key'], change)
 
     def _on_event(self, event: Event):
         event.call_hook(storage=self.storage, alarm=self)
+
+        if isinstance(event, LiveEvent):
+            self._update_partition_states()
 
     def _on_property_change(self, change: Change):
         if change.initial:

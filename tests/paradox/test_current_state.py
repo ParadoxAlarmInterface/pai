@@ -29,9 +29,9 @@ def send_initial_status(alarm):
     })
 
 
-def test_current_state_armed_away():
+def test_current_state_armed_away(mocker):
     alarm = Paradox(None)
-    alarm.storage.update_container_object = MagicMock()
+    mocker.spy(alarm.storage, 'update_container_object')
     alarm.panel = MagicMock()
 
     send_initial_status(alarm)
@@ -49,9 +49,9 @@ def test_current_state_armed_away():
     })
 
 
-def test_current_state_pending():
+def test_current_state_pending(mocker):
     alarm = Paradox(None)
-    alarm.storage.update_container_object = MagicMock()
+    mocker.spy(alarm.storage, 'update_container_object')
     alarm.panel = MagicMock()
 
     send_initial_status(alarm)
@@ -70,9 +70,9 @@ def test_current_state_pending():
     })
 
 
-def test_current_arm_stay():
+def test_current_arm_stay(mocker):
     alarm = Paradox(None)
-    alarm.storage.update_container_object = MagicMock()
+    mocker.spy(alarm.storage, 'update_container_object')
     alarm.panel = MagicMock()
 
     send_initial_status(alarm)
@@ -93,7 +93,7 @@ def test_current_arm_stay():
 
 def test_current_alarm(mocker):
     alarm = Paradox(None)
-    alarm.storage.update_container_object = MagicMock()
+    mocker.spy(alarm.storage, 'update_container_object')
     alarm.panel = MagicMock()
 
     send_initial_status(alarm)
