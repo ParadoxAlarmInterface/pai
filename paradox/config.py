@@ -116,12 +116,11 @@ class Config:
         "PUSHOVER_KEY": '',                       # Application token for Pushover
         "PUSHOVER_BROADCAST_KEYS": {              # Pushover user or group keys to broadcast notifications to
             #    '<user_key>': '*'                # value can be '*' or comma separated list of device names
+        },
         "PUSHOVER_IGNORE_EVENTS": [
             r"zone,[\w]+,no_delay=True",
             r"zone,[\w]+,exit_delay=.*"],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
         "PUSHOVER_ALLOW_EVENTS": [r".*"],          # Same as before but as a white list. Default is allow all
-
-        },
 
         # Signal
         "SIGNAL_ENABLE": False,
