@@ -420,8 +420,6 @@ class Paradox:
     def handle_event_message(self, message: Container=None):
         """Process cfg.Live Event Message and dispatch it to the interface module"""
         try:
-            if cfg.LOGGING_DUMP_MESSAGES:
-                logger.debug("Handle live event message: {}".format(message))
             try:
                 evt = LiveEvent(event=message, event_map=self.panel.event_map, label_provider=self.get_label)
             except AssertionError as e:
