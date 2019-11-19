@@ -23,7 +23,7 @@ class PushoverTextInterface(AbstractTextInterface):
     def _run(self):
         logger.info("Starting Pushover Interface")
 
-        self.app = Application(cfg.PUSHOVER_APPLICATION_KEY)
+        self.app = Application(cfg.PUSHOVER_KEY)
         if not self.app.is_authenticated:
             raise Exception('Failed to authenticate with Pushover. Please check PUSHOVER_APPLICATION_KEY')
 
