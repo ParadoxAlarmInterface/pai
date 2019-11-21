@@ -1,3 +1,4 @@
+import pytest
 import binascii
 
 from paradox.event import Event, LiveEvent, EventLevel
@@ -53,3 +54,33 @@ def test_zone_generated_alarm_match(mocker):
     # returned from label_provider
     assert EventTagFilter(['zone,alarm,Beer']).match(event_) is True
     assert EventTagFilter(['zone,alarm,-Beer']).match(event_) is False
+
+
+def test_zone_generated_alarm_changes_match(mocker):
+    label_provider = mocker.MagicMock(return_value="Beer")
+
+    payload = binascii.unhexlify('e2ff1cc414130b010f2c1801030000000000024f66666963652020202020202020202000d9')
+    raw = LiveEventMessage.parse(payload)
+    event_ = LiveEvent(raw, event_map, label_provider=label_provider)
+
+    assert EventTagFilter(['generated_alarm=True']).match(event_) is True
+    assert EventTagFilter(['generated_alarm=False']).match(event_) is False
+    assert EventTagFilter(['generated_alarm=']).match(event_) is True
+
+    assert EventTagFilter(['-generated_alarm=']).match(event_) is False
+    assert EventTagFilter(['-generated_alarm=True']).match(event_) is False
+    assert EventTagFilter(['-generated_alarm=False']).match(event_) is True
+
+    assert EventTagFilter(['zone-generated_alarm=beer']).match(event_) is True
+    assert EventTagFilter(['zone+generated_alarm=beer']).match(event_) is False
+
+    assert EventTagFilter(['generated_alarm=True+presently_in_alarm=True']).match(event_) is True
+    assert EventTagFilter(['generated_alarm=True-presently_in_alarm=True']).match(event_) is False
+
+    assert EventTagFilter(['-generated_alarm=False']).match(event_) is True
+
+    with pytest.raises(AssertionError):
+        EventTagFilter(['-=False'])
+
+    with pytest.raises(AssertionError):
+        EventTagFilter(['-""=False'])

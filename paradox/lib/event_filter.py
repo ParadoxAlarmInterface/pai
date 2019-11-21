@@ -4,7 +4,7 @@ from collections import namedtuple
 
 from paradox.event import Event, LiveEvent, EventLevel
 
-re_match = re.compile(r"[+-]?(?P<quote>['\"])?(?(quote).+?|[a-z_A-Z]+)(?(quote)(?P=quote))")
+re_match = re.compile(r"[+-]?(?P<quote>['\"])?(?(quote).+?|[a-z_A-Z=]+)(?(quote)(?P=quote))")
 re_unquote = re.compile(r"^(?P<quote>['\"])(.*)(?P=quote)$")
 
 logger = logging.getLogger('PAI').getChild(__name__)
@@ -12,29 +12,6 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 def _unquote(s:str):
     return re_unquote.sub(r'\2', s)
-
-
-def tag_match(event: Event, queries:list):
-    tags = [event.type] + event.tags
-    if isinstance(event, LiveEvent):
-        tags += [event.name, event.label]
-
-    for query in queries:
-        include = set()
-        exclude = set()
-        for m in re_match.finditer(query):
-            token = m.group()
-            if token[0] == '+':
-                include.add(_unquote(token[1:]))
-            elif token[0] == '-':
-                exclude.add(_unquote(token[1:]))
-            else:
-                include.add(_unquote(token))
-
-        if all(t in tags for t in include) and all(t not in tags for t in exclude):
-            return True
-
-    return False
 
 
 class EventFilter:
@@ -50,8 +27,13 @@ class LiveEventFilter(EventFilter):
         return super().match(event) and isinstance(event, LiveEvent)
 
 
-TagQuery = namedtuple('TagQuery', ['include', 'exclude'])
-
+TagQuery = namedtuple('TagQuery', ['include', 'exclude', 'changes_include', 'changes_exclude'])
+KeyValue = namedtuple('KeyValue', ['key', 'value'])
+lowercase_value_mapping = {
+    '': None,
+    'true': True,
+    'false': False
+}
 
 class EventTagFilter(EventFilter):
     def __init__(self, queries: list, *args, **kwargs):
@@ -60,16 +42,35 @@ class EventTagFilter(EventFilter):
         for query in queries:
             include = set()
             exclude = set()
+            changes_include = set()
+            changes_exclude = set()
             for m in re_match.finditer(query):
                 token = m.group()
-                if token[0] == '+':
+                if '=' in token:
+                    changes = changes_include
+                    if token[0] == '+':
+                        token = token[1:]
+                    elif token[0] == '-':
+                        changes = changes_exclude
+                        token = token[1:]
+
+                    k, v = token.split('=', 1)
+                    k = _unquote(k)
+                    v = _unquote(v)
+                    if not k:
+                        raise AssertionError('Invalid filter query "%s", token: "%s"' % (query, token))
+
+                    v = lowercase_value_mapping.get(v.lower(), v)
+
+                    changes.add(KeyValue(k, v))
+                elif token[0] == '+':
                     include.add(_unquote(token[1:]))
                 elif token[0] == '-':
                     exclude.add(_unquote(token[1:]))
                 else:
                     include.add(_unquote(token))
 
-            self.queries.append(TagQuery(include, exclude))
+            self.queries.append(TagQuery(include, exclude, changes_include, changes_exclude))
         
         super().__init__(*args, **kwargs)
 
@@ -78,7 +79,13 @@ class EventTagFilter(EventFilter):
         if isinstance(event, LiveEvent):
             tags += [event.name, event.label]
 
-        return super().match(event) and any(all(t in tags for t in query.include) and all(t not in tags for t in query.exclude) for query in self.queries)
+        return super().match(event) and any(
+            all(i in tags for i in query.include)
+            and all(e not in tags for e in query.exclude)
+            and all((ci.key in event.change and (ci.value is None or event.change.get(ci.key) == ci.value)) for ci in query.changes_include)
+            and all((ce.key not in event.change or (ce.value is not None and event.change.get(ce.key) != ce.value)) for ce in query.changes_exclude)
+            for query in self.queries
+        )
 
 
 class LiveEventRegexpFilter(LiveEventFilter):
