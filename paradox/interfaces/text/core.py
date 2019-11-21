@@ -1,8 +1,7 @@
 import logging
-import re
 
-from paradox.lib import ps
-from paradox.event import EventLevel, Event, LiveEvent
+from paradox.lib import ps, event_filter
+from paradox.event import EventLevel, Event
 from paradox.config import config as cfg
 from paradox.interfaces import ThreadQueueInterface
 
@@ -15,9 +14,8 @@ class AbstractTextInterface(ThreadQueueInterface):
     def __init__(self, events_allow, events_ignore, min_level=EventLevel.INFO):
         super().__init__()
 
-        self.filter_events_allow = events_allow
-        self.filter_events_ignore = events_ignore
-        self.filter_events_level = min_level
+        self.event_filter = event_filter.LiveEventRegexpFilter(events_allow, events_ignore, min_level)
+        self.notification_filter = lambda message: message['level'] < min_level and message['source'] != self.name
         self.alarm = None
 
     def stop(self):
@@ -51,47 +49,11 @@ class AbstractTextInterface(ThreadQueueInterface):
         pass
 
     def handle_notify(self, message):
-
-        if message['level'] < self.filter_events_level:
-            return
-
-        if message['source'] != self.name:
+        if self.notification_filter(message):
             self.send_message(message['payload'])
 
     def handle_panel_event(self, event: Event):
-        if not isinstance(event, LiveEvent):
-            return
-
-        if event.level < self.filter_events_level:
-            return
-
-        major_code = event.major
-        minor_code = event.minor
-
-        # Only let some elements pass
-        allow = False
-        for ev in self.filter_events_allow:
-            if isinstance(ev, tuple):
-                if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
-                    allow = True
-                    break
-            elif isinstance(ev, str):
-                if re.match(ev, event.key):
-                    allow = True
-                    break
-
-        # Ignore some events
-        for ev in self.filter_events_ignore:
-            if isinstance(ev, tuple):
-                if major_code == ev[0] and (minor_code == ev[1] or ev[1] == -1):
-                    allow = False
-                    break
-            elif isinstance(ev, str):
-                if re.match(ev, event.key):
-                    allow = False
-                    break
-
-        if allow:
+        if self.event_filter.match(event):
             self.send_message(event.message)
 
     def handle_command(self, message_raw):

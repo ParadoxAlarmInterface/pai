@@ -46,6 +46,24 @@ class EventLevel(Enum):
 
         return NotImplemented
 
+    def __le__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value <= other.value
+
+        if other.__class__ is int:
+            return self.value <= other
+
+        return NotImplemented
+
+    def __ge__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value >= other.value
+
+        if other.__class__ is int:
+            return self.value >= other
+
+        return NotImplemented
+
     def __str__(self):
         return self.name
 
