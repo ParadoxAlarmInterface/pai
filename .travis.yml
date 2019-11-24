@@ -1,9 +1,9 @@
-language: python
 sudo: required
 dist: xenial
 jobs:
   include:
     - stage: test
+      language: python
       python:
         - '3.5'
         - '3.6'
@@ -20,9 +20,12 @@ jobs:
               key_url: 'https://download.docker.com/linux/ubuntu/gpg'
           packages:
             - qemu-user
+            - qemu-user-binfmt            
             - docker-ce
             - docker-ce-cli
             - containerd.io
+      language: python
+      python: '3.6'
       script:
         - export DOCKER_CLI_EXPERIMENTAL=enabled
         - docker buildx create --use
