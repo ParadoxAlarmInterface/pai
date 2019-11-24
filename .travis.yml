@@ -19,6 +19,7 @@ jobs:
             - sourceline: 'deb https://download.docker.com/linux/ubuntu/ xenial stable'
               key_url: 'https://download.docker.com/linux/ubuntu/gpg'
           packages:
+            - qemu-user
             - docker-ce
             - docker-ce-cli
             - containerd.io
