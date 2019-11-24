@@ -4,7 +4,7 @@ dist: xenial
 addons:
   apt:
     sources:
-    - sourceline: 'deb https://download.docker.com/linux/ubuntu/xenial stable'
+    - sourceline: 'deb https://download.docker.com/linux/ubuntu/ xenial stable'
       key_url: 'https://download.docker.com/linux/ubuntu/gpg'
     packages:
     - docker-ce
