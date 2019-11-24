@@ -1,11 +1,25 @@
 language: python
 sudo: required
 dist: xenial
-python:
-- '3.5'
-- '3.6'
-- '3.7'
-install:
-- pip install .
-- pip install -r requirements.txt
-script: python setup.py test
+addons:
+  apt:
+    sources:
+    - sourceline: 'deb https://download.docker.com/linux/ubuntu/xenial stable'
+      key_url: 'https://download.docker.com/linux/ubuntu/gpg'
+    packages:
+    - docker-ce
+    - docker-ce-cli
+    - containerd.io
+jobs:
+  include:
+    - stage: Test
+      python:
+        - '3.5'
+        - '3.6'
+        - '3.7'
+      install:
+        - pip install .
+        - pip install -r requirements.txt
+      script: python setup.py test
+    - stage: Docker Image
+      script: export DOCKER_CLI_EXPERIMENTAL=enabled&&docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 -t batvanyovanistia/pai .
