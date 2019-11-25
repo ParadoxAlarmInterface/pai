@@ -5,12 +5,12 @@ jobs:
     - stage: test
       language: python
       python:
-        - '3.5'
-        - '3.6'
-        - '3.7'
+      - '3.5'
+      - '3.6'
+      - '3.7'
       install:
-        - pip install .
-        - pip install -r requirements.txt
+      - pip install .
+      - pip install -r requirements.txt
       script: python setup.py test
     - stage: docker
       addons:
@@ -19,8 +19,6 @@ jobs:
             - sourceline: 'deb https://download.docker.com/linux/ubuntu/ xenial stable'
               key_url: 'https://download.docker.com/linux/ubuntu/gpg'
           packages:
-            - qemu-user
-            - qemu-user-binfmt            
             - docker-ce
             - docker-ce-cli
             - containerd.io
@@ -30,7 +28,7 @@ jobs:
         - export DOCKER_CLI_EXPERIMENTAL=enabled
         - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
         - docker buildx create --use
-        - docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 -t batvanyovanistia/pai .
+        - docker buildx build --progress tty --platform linux/amd64,linux/arm64,linux/arm/v7 -t batvanyovanistia/pai .
   stages:
     - test
     - docker
