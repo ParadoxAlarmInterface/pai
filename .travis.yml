@@ -12,6 +12,7 @@ script: python setup.py test
 jobs:
   include:
     - stage: deploy
+      if: type != pull_request
       addons:
         apt:
           sources:
