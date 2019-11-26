@@ -23,7 +23,7 @@ class PushBulletWSClient(WebSocketBaseClient):
         """ Initializes the PB WS Client"""
         super().__init__(url)
 
-        self.pb = Pushbullet(cfg.PUSHBULLET_KEY, cfg.PUSHBULLET_SECRET)
+        self.pb = Pushbullet(cfg.PUSHBULLET_KEY)
         self.manager = WebSocketManager()
         self.interface = interface
 

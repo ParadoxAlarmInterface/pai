@@ -104,7 +104,6 @@ class Config:
         # Pushbullet
         "PUSHBULLET_ENABLE": False,
         "PUSHBULLET_KEY": '',                     # Authentication key used for Pushbullet
-        "PUSHBULLET_SECRET": '',                  # Authentication secret used for Pushbullet
         "PUSHBULLET_CONTACTS": [],                # Pushbullet user identifiers for notifications and interaction
         "PUSHBULLET_IGNORE_EVENTS": [
             r"zone,[\w]+,no_delay=True",
