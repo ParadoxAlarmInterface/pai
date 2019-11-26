@@ -2,11 +2,19 @@
 
 set -e
 
-echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-BRANCH=$(if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then echo $TRAVIS_BRANCH; else echo $TRAVIS_PULL_REQUEST_BRANCH; fi)
-DOCKER_IMAGE_TAG=$(if [ "$BRANCH" == "master" ]; then echo "latest"; else echo "$BRANCH-latest"; fi)
+if [ "$TRAVIS_PULL_REQUEST" == "true" ]; then
+  echo "We should not deploy pull requests!"
+  exit 1
+fi
 
-export BRANCH
+if [ -z "$TRAVIS_TAG" ]; then
+  DOCKER_IMAGE_TAG=$(if [ "$TRAVIS_BRANCH" == "master" ]; then echo "latest"; else echo "$TRAVIS_BRANCH-latest"; fi)
+else
+  DOCKER_IMAGE_TAG="$TRAVIS_TAG"
+fi
+
+echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+
 export DOCKER_IMAGE_TAG
 export DOCKER_CLI_EXPERIMENTAL=enabled
 
