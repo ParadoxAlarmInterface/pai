@@ -55,7 +55,6 @@ Tested in the following environment:
 * Ion Darie - [@iondarie](https://github.com/iondarie) - Homebridge integration
 * Jevgeni Kiski - [@yozik04](https://github.com/yozik04) - EVO devices
 
-
 ## Acknowledgments
 
 This work is inspired or uses parts from the following projects:
@@ -63,6 +62,8 @@ This work is inspired or uses parts from the following projects:
 * Tertiush at https://github.com/Tertiush/ParadoxIP150v2
 * Spinza at https://github.com/spinza/paradox_mqtt
 
+## Thanks
+* Ivan Markov - [@ivmarkov](https://github.com/ivmarkov) - Multi-platform Docker builds with Travis
 
 ## Disclaimer
 

@@ -9,22 +9,18 @@ install:
   - pip install .
   - pip install -r requirements.txt
 script: python setup.py test
-deploy:
-  provider: script
-  script: ./.travis/deploy.sh
-  if: type != pull_request
-  on:
-    all_branches: true
-    condition: $TRAVIS_BRANCH =~ ^(dev)$
-    addons:
-      apt:
-        sources:
-          - sourceline: 'deb https://download.docker.com/linux/ubuntu/ xenial stable'
-            key_url: 'https://download.docker.com/linux/ubuntu/gpg'
-        packages:
-          - docker-ce
-          - docker-ce-cli
-          - containerd.io
-    language: python
-    python: '3.6'
-    script: ./.travis/deploy.sh
+jobs:
+  include:
+    - stage: deploy
+      python: '3.6'
+      script: ./.travis/deploy.sh
+      if: type != pull_request AND branch IN (dev, master)
+      addons:
+        apt:
+          sources:
+            - sourceline: 'deb https://download.docker.com/linux/ubuntu/ xenial stable'
+              key_url: 'https://download.docker.com/linux/ubuntu/gpg'
+          packages:
+            - docker-ce
+            - docker-ce-cli
+            - containerd.io
