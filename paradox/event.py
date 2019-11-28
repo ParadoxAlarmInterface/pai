@@ -23,6 +23,10 @@ class EventLevel(Enum):
 
     @staticmethod
     def from_name(level="NOTSET"):
+        if isinstance(level, EventLevel):
+            return level
+
+        level = level.upper()
         if level in EventLevel.__members__:
             return EventLevel.__members__[level]
 
