@@ -9,6 +9,10 @@
         <a href="https://travis-ci.org/ParadoxAlarmInterface/pai/branches">
             <img alt="Travis (.org) branch" src="https://img.shields.io/travis/ParadoxAlarmInterface/pai/dev?label=dev">
         </a>
+        <a href="https://travis-ci.org/ParadoxAlarmInterface/pai/branches">
+            <img alt="GitHub top language" src="https://img.shields.io/github/languages/top/ParadoxAlarmInterface/pai">
+        </a>
+        <img alt="GitHub" src="https://img.shields.io/github/license/ParadoxAlarmInterface/pai">
     </div>
 </div>
 
