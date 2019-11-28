@@ -1,4 +1,4 @@
-<div align="center">
+<div align="left">
     <div style="display: flex;">
         <a href="https://gitter.im/paradox-alarm-interface/community">
             <img alt="Gitter" src="https://img.shields.io/gitter/room/paradox-alarm-interface/community">
