@@ -36,7 +36,7 @@ lowercase_value_mapping = {
 }
 
 class EventTagFilter(EventFilter):
-    def __init__(self, queries: list, *args, **kwargs):
+    def __init__(self, queries: list, min_level=EventLevel.INFO):
         self.queries = list()
 
         for query in queries:
@@ -72,7 +72,7 @@ class EventTagFilter(EventFilter):
 
             self.queries.append(TagQuery(include, exclude, changes_include, changes_exclude))
         
-        super().__init__(*args, **kwargs)
+        super().__init__(min_level=min_level)
 
     def match(self, event: Event):
         tags = [event.type] + event.tags
@@ -89,11 +89,11 @@ class EventTagFilter(EventFilter):
 
 
 class LiveEventRegexpFilter(LiveEventFilter):
-    def __init__(self, events_allow, events_ignore, *args, **kwargs):
+    def __init__(self, events_allow, events_ignore, min_level=EventLevel.INFO):
         self.events_allow = events_allow
         self.events_ignore = events_ignore
 
-        super().__init__(*args, **kwargs)
+        super().__init__(min_level=min_level)
 
     def match(self, event: Event):
         allow = False

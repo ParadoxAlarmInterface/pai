@@ -1,7 +1,6 @@
 import os
 import logging
 
-
 class Config:
 
     DEFAULTS = { 
@@ -145,6 +144,8 @@ class Config:
 
         # Dummy Interface for testing
         "DUMMY_INTERFACE_ENABLE": False,
+        "DUMMY_EVENT_FILTERS": [],
+        "DUMMY_MIN_EVENT_LEVEL": ('DEBUG', str, ['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'])
     }
 
     CONFIG_LOADED = False

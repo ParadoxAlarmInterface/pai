@@ -7,6 +7,7 @@ from chump import Application
 
 from paradox.config import config as cfg
 from paradox.interfaces.text.core import AbstractTextInterface
+from paradox.lib.event_filter import LiveEventRegexpFilter
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -15,7 +16,8 @@ class PushoverTextInterface(AbstractTextInterface):
     name = 'pushover'
 
     def __init__(self):
-        super().__init__(cfg.PUSHOVER_ALLOW_EVENTS, cfg.PUSHOVER_IGNORE_EVENTS)
+        event_filter = LiveEventRegexpFilter(cfg.PUSHOVER_ALLOW_EVENTS, cfg.PUSHOVER_IGNORE_EVENTS)
+        super().__init__(event_filter=event_filter)
 
         self.app = None
         self.users = {}

@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 
 import logging
-import re
 
 from gi.repository import GLib
 from pydbus import SystemBus
 
 from paradox.config import config as cfg
+from paradox.event import EventLevel
 # Signal interface.
 # Only exposes critical status changes and accepts commands
 from paradox.interfaces.text.core import AbstractTextInterface
-from paradox.event import EventLevel
 from paradox.lib import ps
+from paradox.lib.event_filter import LiveEventRegexpFilter
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -21,7 +21,8 @@ class SignalTextInterface(AbstractTextInterface):
     name = 'signal'
 
     def __init__(self):
-        super().__init__(cfg.SIGNAL_ALLOW_EVENTS, cfg.SIGNAL_IGNORE_EVENTS)
+        event_filter = LiveEventRegexpFilter(cfg.SIGNAL_ALLOW_EVENTS, cfg.SIGNAL_IGNORE_EVENTS)
+        super().__init__(event_filter=event_filter)
 
         self.signal = None
         self.loop = None

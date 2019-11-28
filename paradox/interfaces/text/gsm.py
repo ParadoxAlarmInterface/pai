@@ -1,21 +1,22 @@
 # -*- coding: utf-8 -*-
 
+import asyncio
 import datetime
 import logging
-import time
+import os
 from concurrent import futures
 
-from paradox.event import EventLevel
-# GSM interface.
-# Only exposes critical status changes and accepts commands
-from paradox.interfaces.text.core import AbstractTextInterface
-import asyncio
 import serial_asyncio
 
 from paradox.config import config as cfg
-from paradox.connections.connection import Connection, ConnectionProtocol
+from paradox.connections.connection import ConnectionProtocol
+from paradox.event import EventLevel
+from paradox.interfaces.text.core import AbstractTextInterface
 from paradox.lib import ps
-import os
+from paradox.lib.event_filter import LiveEventRegexpFilter
+
+# GSM interface.
+# Only exposes critical status changes and accepts commands
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -136,7 +137,8 @@ class GSMTextInterface(AbstractTextInterface):
     name = 'gsm'
 
     def __init__(self):
-        super().__init__(cfg.GSM_ALLOW_EVENTS, cfg.GSM_IGNORE_EVENTS)
+        event_filter = LiveEventRegexpFilter(cfg.GSM_ALLOW_EVENTS, cfg.GSM_IGNORE_EVENTS)
+        super().__init__(event_filter=event_filter)
 
         self.port = None
         self.modem_connected = False

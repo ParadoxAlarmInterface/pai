@@ -154,3 +154,5 @@ import logging
 # 
 ### Dummy Interface for testing
 # DUMMY_INTERFACE_ENABLE = False
+# DUMMY_EVENT_FILTERS = []
+# DUMMY_MIN_EVENT_LEVEL = 'DEBUG'
