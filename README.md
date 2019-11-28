@@ -1,20 +1,20 @@
 <div align="left">
     <div style="display: flex;">
         <a href="https://gitter.im/paradox-alarm-interface/community">
-            <img alt="Gitter" src="https://img.shields.io/gitter/room/paradox-alarm-interface/community">
+            <img alt="Gitter" src="https://img.shields.io/gitter/room/paradox-alarm-interface/community?logo=gitter">
         </a>
         <a href="https://travis-ci.org/ParadoxAlarmInterface/pai">
-            <img alt="Travis (.org) branch" src="https://img.shields.io/travis/ParadoxAlarmInterface/pai/master?label=master">
+            <img alt="Travis (.org) branch" src="https://img.shields.io/travis/ParadoxAlarmInterface/pai/master?label=master&logo=travis">
         </a>
         <a href="https://travis-ci.org/ParadoxAlarmInterface/pai/branches">
-            <img alt="Travis (.org) branch" src="https://img.shields.io/travis/ParadoxAlarmInterface/pai/dev?label=dev">
+            <img alt="Travis (.org) branch" src="https://img.shields.io/travis/ParadoxAlarmInterface/pai/dev?label=dev&logo=travis">
         </a>
         <a href="https://hub.docker.com/r/paradoxalarminterface/pai">
-            <img alt="Docker Arch" src="https://img.shields.io/badge/docker_arch-amd64%7Carmv7%7Carm64-green">
-            <img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/paradoxalarminterface/pai">
+            <img alt="Docker Arch" src="https://img.shields.io/badge/docker_arch-amd64%7Carmv7%7Carm64-green?logo=docker">
+            <img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/paradoxalarminterface/pai?logo=docker">
         </a>
         <a href="https://travis-ci.org/ParadoxAlarmInterface/pai/branches">
-            <img alt="GitHub top language" src="https://img.shields.io/github/languages/top/ParadoxAlarmInterface/pai">
+            <img alt="GitHub top language" src="https://img.shields.io/github/languages/top/ParadoxAlarmInterface/pai?logo=python">
         </a>
         <img alt="GitHub" src="https://img.shields.io/github/license/ParadoxAlarmInterface/pai">
     </div>
