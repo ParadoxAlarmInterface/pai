@@ -1,7 +1,3 @@
-# 
-
-[![Join the chat at https://gitter.im/paradox-alarm-interface/community](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/paradox-alarm-interface/community)
-
 <div align="center">
     <div style="display: flex;">
         <a href="https://gitter.im/paradox-alarm-interface/community">
