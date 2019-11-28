@@ -1,7 +1,22 @@
-# PAI - Paradox Alarm Interface
+# 
 
 [![Join the chat at https://gitter.im/paradox-alarm-interface/community](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/paradox-alarm-interface/community)
 
+<div align="center">
+    <div style="display: flex;">
+        <a href="https://gitter.im/paradox-alarm-interface/community">
+            <img alt="Gitter" src="https://img.shields.io/gitter/room/paradox-alarm-interface/community">
+        </a>
+        <a href="https://travis-ci.org/ParadoxAlarmInterface/pai">
+            <img alt="Travis (.org) branch" src="https://img.shields.io/travis/ParadoxAlarmInterface/pai/master?label=master">
+        </a>
+        <a href="https://travis-ci.org/ParadoxAlarmInterface/pai/branches">
+            <img alt="Travis (.org) branch" src="https://img.shields.io/travis/ParadoxAlarmInterface/pai/dev?label=dev">
+        </a>
+    </div>
+</div>
+
+# PAI - Paradox Alarm Interface
 
 Middleware that aims to connect to a Paradox Alarm panel, exposing the interface for monitoring and control via several technologies.
 With this interface it is possible to integrate Paradox panels with HomeAssistant, OpenHAB, Homebridge or other domotics system that supports MQTT, as well as several IM methods.
@@ -17,10 +32,6 @@ If you are having issues, or wish to discuss new features, join us at our [Gitte
 
 On Android, if you install [MQTT Dash](https://play.google.com/store/apps/details?id=net.routix.mqttdash), and [follow the instructions](https://github.com/ParadoxAlarmInterface/pai/wiki#mqtt-dash) you will automatically get a panel like this:
 ![mqtt_dash](https://user-images.githubusercontent.com/497717/52603920-d4984d80-2e60-11e9-9772-578b10576b3c.jpg)
-
-## Branch build statuses
-- [master](https://github.com/ParadoxAlarmInterface/pai/tree/master) [![Build Status Master](https://travis-ci.org/ParadoxAlarmInterface/pai.svg?branch=master)](https://travis-ci.org/ParadoxAlarmInterface/pai)
-- [dev](https://github.com/ParadoxAlarmInterface/pai/tree/dev) [![Build Status Dev](https://travis-ci.org/ParadoxAlarmInterface/pai.svg?branch=dev)](https://travis-ci.org/ParadoxAlarmInterface/pai)
 
 ## Things you need to have to be able to connect
 We support two connection options: via Serial and via IP150 Module
