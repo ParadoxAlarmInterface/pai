@@ -14,7 +14,7 @@
             <img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/paradoxalarminterface/pai?logo=docker">
         </a>
         <a href="https://travis-ci.org/ParadoxAlarmInterface/pai/branches">
-            <img alt="GitHub top language" src="https://img.shields.io/github/languages/top/ParadoxAlarmInterface/pai?logo=python">
+            <img alt="GitHub top language" src="https://img.shields.io/github/languages/top/ParadoxAlarmInterface/pai?label=python%203.5%2B&logo=python">
         </a>
         <img alt="GitHub" src="https://img.shields.io/github/license/ParadoxAlarmInterface/pai">
     </div>
