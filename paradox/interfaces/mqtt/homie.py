@@ -69,11 +69,12 @@ class HomieMQTTInterface2(AbstractMQTTInterface):
         
         self.alarm_Device = Device_Base(name="paradox",mqtt_settings=self.mqtt_settings,homie_settings=self.homie_settings)
         #self.alarm_Device.topic = 'paradox/homie'
-        self.alarm_Device.start()
+        #self.alarm_Device.start()
 
         ps.subscribe(self.handle_panel_change, "changes")
         #ps.subscribe(self.handle_panel_event, "events")
         ps.subscribe(self.handle_status_update, "status_update")
+        ps.subscribe(self._handle_labels_loaded, "labels_loaded")
 
         await super().run()
 
@@ -83,11 +84,11 @@ class HomieMQTTInterface2(AbstractMQTTInterface):
         
 
     def handle_status_update(self, status):
-        
         for thing in status:
             logger.debug("Status thing:" + thing)
 
-    
+    def handle_labels_loaded(self, data):
+        logger.debug("Status thing:" + data)
 
     def handle_panel_change(self, change):
         logger.debug(change)
