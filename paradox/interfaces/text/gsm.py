@@ -11,9 +11,8 @@ import serial_asyncio
 from paradox.config import config as cfg
 from paradox.connections.connection import ConnectionProtocol
 from paradox.event import EventLevel
-from paradox.interfaces.text.core import AbstractTextInterface
+from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
 from paradox.lib import ps
-from paradox.lib.event_filter import LiveEventRegexpFilter
 
 # GSM interface.
 # Only exposes critical status changes and accepts commands
@@ -132,13 +131,13 @@ class SerialCommunication:
         return await self.connected_future
 
 
-class GSMTextInterface(AbstractTextInterface):
+class GSMTextInterface(ConfiguredAbstractTextInterface):
     """Interface Class using GSM"""
     name = 'gsm'
 
     def __init__(self):
-        event_filter = LiveEventRegexpFilter(cfg.GSM_ALLOW_EVENTS, cfg.GSM_IGNORE_EVENTS)
-        super().__init__(event_filter=event_filter)
+        super().__init__(cfg.GSM_EVENT_FILTERS, cfg.GSM_ALLOW_EVENTS, cfg.GSM_IGNORE_EVENTS,
+                         cfg.GSM_MIN_EVENT_LEVEL)
 
         self.port = None
         self.modem_connected = False

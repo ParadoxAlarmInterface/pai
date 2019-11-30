@@ -16,6 +16,7 @@ def _unquote(s:str):
 
 class EventFilter:
     def __init__(self, min_level=EventLevel.INFO):
+        assert isinstance(min_level, EventLevel)
         self.min_level = min_level
 
     def match(self, event: Event):

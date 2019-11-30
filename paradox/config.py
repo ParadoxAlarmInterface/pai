@@ -104,10 +104,14 @@ class Config:
         "PUSHBULLET_ENABLE": False,
         "PUSHBULLET_KEY": '',                     # Authentication key used for Pushbullet
         "PUSHBULLET_CONTACTS": [],                # Pushbullet user identifiers for notifications and interaction
-        "PUSHBULLET_IGNORE_EVENTS": [
-            r"zone,[\w]+,no_delay=True",
-            r"zone,[\w]+,exit_delay=.*"],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
-        "PUSHBULLET_ALLOW_EVENTS": [r".*"],        # Same as before but as a white list. Default is allow all
+        "PUSHBULLET_IGNORE_EVENTS": [],           # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+        "PUSHBULLET_ALLOW_EVENTS": [],            # Same as before but as a white list. Default is use EVENT_FILTERS
+        "PUSHBULLET_EVENT_FILTERS": [             # list of tags, property changes to include or exclude. See event.py for tag list
+            'alarm,-restore',
+            'trouble,-clock',
+            'tamper'
+        ],
+        "PUSHBULLET_MIN_EVENT_LEVEL": ('INFO', str, ['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL']),
 
         # Pushover
         "PUSHOVER_ENABLE": False,
@@ -115,26 +119,38 @@ class Config:
         "PUSHOVER_BROADCAST_KEYS": {              # Pushover user or group keys to broadcast notifications to
             #    '<user_key>': '*'                # value can be '*' or comma separated list of device names
         },
-        "PUSHOVER_IGNORE_EVENTS": [
-            r"zone,[\w]+,no_delay=True",
-            r"zone,[\w]+,exit_delay=.*"],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
-        "PUSHOVER_ALLOW_EVENTS": [r".*"],          # Same as before but as a white list. Default is allow all
+        "PUSHOVER_IGNORE_EVENTS": [],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+        "PUSHOVER_ALLOW_EVENTS": [],              # Same as before but as a white list. Default is use EVENT_FILTERS
+        "PUSHOVER_EVENT_FILTERS": [               # list of tags, property changes to include or exclude. See event.py for tag list
+            'alarm,-restore',
+            'trouble,-clock',
+            'tamper'
+        ],
+        "PUSHOVER_MIN_EVENT_LEVEL": ('INFO', str, ['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL']),
 
         # Signal
         "SIGNAL_ENABLE": False,
-        "SIGNAL_CONTACTS": [],                    # Contacts that are allowed to control the panel and receive notifications through Signal
-        "SIGNAL_IGNORE_EVENTS": [
-            r"zone,[\w]+,no_delay=True",
-            r"zone,[\w]+,exit_delay=.*"],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
-        "SIGNAL_ALLOW_EVENTS": [r".*"],            # Same as before but as a white list. Default is allow all
+        "SIGNAL_CONTACTS": [],                  # Contacts that are allowed to control the panel and receive notifications through Signal
+        "SIGNAL_IGNORE_EVENTS": [],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+        "SIGNAL_ALLOW_EVENTS": [],              # Same as before but as a white list. Default is use EVENT_FILTERS
+        "SIGNAL_EVENT_FILTERS": [               # list of tags, property changes to include or exclude. See event.py for tag list
+            'alarm,-restore',
+            'trouble,-clock',
+            'tamper'
+        ],
+        "SIGNAL_MIN_EVENT_LEVEL": ('INFO', str, ['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL']),
 
         # GSM
         "GSM_ENABLE": False,
         "GSM_MODEM_BAUDRATE": (115200, int, (9600, 115200)),    # Baudrate of the GSM modem
         "GSM_MODEM_PORT": '',                     # Pathname of the serial port
         "GSM_CONTACTS": [],                       # Contacts that are allowed to control the panel and receive notifications through SMS
-        "GSM_IGNORE_EVENTS": [],                  # List of tuples or regexp matching "type:label:property" eg. [(major, minor), "zone:HOME:entry_delay", ...]
-        "GSM_ALLOW_EVENTS": [r"partition,[\w]+,alarm=True"],# Same as before but as a white list. Default is to only allow alarm
+        "GSM_IGNORE_EVENTS": [],                  # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+        "GSM_ALLOW_EVENTS": [],                   # Same as before but as a white list. Default is use EVENT_FILTERS
+        "GSM_EVENT_FILTERS": [                    # list of tags, property changes to include or exclude. See event.py for tag list
+            'zone,alarm,trigger'
+        ],
+        "GSM_MIN_EVENT_LEVEL": ('CRITICAL', str, ['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL']),
 
         # IP Socket Interface
         "IP_INTERFACE_ENABLE": False,
@@ -144,7 +160,13 @@ class Config:
 
         # Dummy Interface for testing
         "DUMMY_INTERFACE_ENABLE": False,
-        "DUMMY_EVENT_FILTERS": [],
+        "DUMMY_EVENT_FILTERS": [
+            'alarm-restore',
+            'trouble-clock',
+            'tamper'
+            'arm',
+            'disarm'
+        ],
         "DUMMY_MIN_EVENT_LEVEL": ('DEBUG', str, ['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'])
     }
 

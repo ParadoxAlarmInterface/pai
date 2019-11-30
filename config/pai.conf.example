@@ -119,11 +119,26 @@ import logging
 #     'armed_away': 'arm',
 #     'disarmed': 'disarm'
 # }
-# 
+#
+#
 ### Pushbullet
 # PUSHBULLET_ENABLE = False
 # PUSHBULLET_KEY = ''                     # Authentication key used for Pushbullet
 # PUSHBULLET_CONTACTS = []                # Pushbullet user identifiers for notifications and interaction
+# PUSHBULLET_MIN_EVENT_LEVEL = 'INFO'
+## Event filtering by tags:
+# PUSHBULLET_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
+#     'alarm,-restore', # or
+#     'trouble,-clock', # or
+#     'tamper'
+# ]
+## - OR - event filtering using regexp
+# PUSHBULLET_ALLOW_EVENTS = [r".*"] # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+# PUSHBULLET_IGNORE_EVENTS = [ # Same as previous  but to ignore some specific events that matched in _ALLOW_EVENTS
+#     r"zone,[\w]+,no_delay=True",
+#     r"zone,[\w]+,exit_delay=.*"
+# ]
+#
 # 
 ### Pushover
 # PUSHOVER_ENABLE = False
@@ -131,21 +146,59 @@ import logging
 # PUSHOVER_BROADCAST_KEYS = {             # Pushover user or group keys to broadcast notifications to
 ###    '<user_key>': '*'                  # value can be '*' or comma separated list of device names
 # }
-# 
+# PUSHOVER_MIN_EVENT_LEVEL = 'INFO'
+## Event filtering by tags:
+# PUSHOVER_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
+#     'alarm,-restore', # or
+#     'trouble,-clock', # or
+#     'tamper'
+# ]
+## - OR - event filtering using regexp
+# PUSHOVER_ALLOW_EVENTS = [r".*"] # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+# PUSHOVER_IGNORE_EVENTS = [ # Same as previous  but to ignore some specific events that matched in _ALLOW_EVENTS
+#     r"zone,[\w]+,no_delay=True",
+#     r"zone,[\w]+,exit_delay=.*"
+# ]
+#
+#
 ### Signal
 # SIGNAL_ENABLE = False
 # SIGNAL_CONTACTS = []                    # Contacts that are allowed to control the panel and receive notifications
 #                                         # through Signal
-# SIGNAL_IGNORE_EVENTS = []               # List of tuples (major, minor)
-# 
+# SIGNAL_MIN_EVENT_LEVEL = 'INFO'
+## Event filtering by tags:
+# SIGNAL_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
+#     'alarm,-restore', # or
+#     'trouble,-clock', # or
+#     'tamper'
+# ]
+## - OR - event filtering using regexp
+# SIGNAL_ALLOW_EVENTS = [r".*"] # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+# SIGNAL_IGNORE_EVENTS = [ # Same as previous  but to ignore some specific events that matched in _ALLOW_EVENTS
+#     r"zone,[\w]+,no_delay=True",
+#     r"zone,[\w]+,exit_delay=.*"
+# ]
+#
+#
 ### GSM
 # GSM_ENABLE = False
 # GSM_MODEM_BAUDRATE = 115200             # Baudrate of the GSM modem
 # GSM_MODEM_PORT = ''                     # Pathname of the serial port
 # GSM_CONTACTS = []                       # Contacts that are allowed to control the panel and receive notifications
 #                                         # through SMS
-# GSM_IGNORE_EVENTS = []                  # List of tuples [(major, minor), ...]
-# 
+# GSM_MIN_EVENT_LEVEL = 'CRITICAL'
+## Event filtering by tags:
+# GSM_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
+#     'zone,alarm,trigger'
+# ]
+## - OR - event filtering using regexp
+# GSM_ALLOW_EVENTS = [r".*"] # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+# GSM_IGNORE_EVENTS = [ # Same as previous  but to ignore some specific events that matched in _ALLOW_EVENTS
+#     r"zone,[\w]+,no_delay=True",
+#     r"zone,[\w]+,exit_delay=.*"
+# ]
+#
+#
 ### IP Socket Interface
 # IP_INTERFACE_ENABLE = False
 # IP_INTERFACE_BIND_ADDRESS = '0.0.0.0'

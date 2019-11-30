@@ -1,12 +1,13 @@
 import logging
 
 from paradox.lib import ps
-from paradox.lib.event_filter import EventFilter
+from paradox.lib.event_filter import LiveEventRegexpFilter, EventTagFilter, EventFilter
 from paradox.event import EventLevel, Event
 from paradox.config import config as cfg
 from paradox.interfaces import ThreadQueueInterface
 
 logger = logging.getLogger('PAI').getChild(__name__)
+
 
 class AbstractTextInterface(ThreadQueueInterface):
     """Interface Class using any Text interface"""
@@ -117,3 +118,17 @@ class AbstractTextInterface(ThreadQueueInterface):
             return message
 
         return None
+
+
+class ConfiguredAbstractTextInterface(AbstractTextInterface):
+    def __init__(self, EVENT_FILTERS, ALLOW_EVENTS, IGNORE_EVENTS, MIN_EVENT_LEVEL):
+        if EVENT_FILTERS and (ALLOW_EVENTS or IGNORE_EVENTS):
+            raise AssertionError('You can not use *_EVENT_FILTERS and *_ALLOW_EVENTS+*_IGNORE_EVENTS simultaneously')
+
+        min_level = EventLevel.from_name(MIN_EVENT_LEVEL)
+        if EVENT_FILTERS:
+            event_filter = EventTagFilter(EVENT_FILTERS, min_level)
+        else:
+            event_filter = LiveEventRegexpFilter(ALLOW_EVENTS, IGNORE_EVENTS, min_level)
+
+        super().__init__(event_filter=event_filter, min_level=min_level)

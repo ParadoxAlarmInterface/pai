@@ -6,18 +6,18 @@ import re
 from chump import Application
 
 from paradox.config import config as cfg
-from paradox.interfaces.text.core import AbstractTextInterface
-from paradox.lib.event_filter import LiveEventRegexpFilter
+from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
-class PushoverTextInterface(AbstractTextInterface):
+
+class PushoverTextInterface(ConfiguredAbstractTextInterface):
     """Interface Class using Pushover"""
     name = 'pushover'
 
     def __init__(self):
-        event_filter = LiveEventRegexpFilter(cfg.PUSHOVER_ALLOW_EVENTS, cfg.PUSHOVER_IGNORE_EVENTS)
-        super().__init__(event_filter=event_filter)
+        super().__init__(cfg.PUSHOVER_EVENT_FILTERS, cfg.PUSHOVER_ALLOW_EVENTS, cfg.PUSHOVER_IGNORE_EVENTS,
+                         cfg.PUSHOVER_MIN_EVENT_LEVEL)
 
         self.app = None
         self.users = {}

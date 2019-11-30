@@ -10,14 +10,14 @@ from ws4py.manager import WebSocketManager
 
 from paradox.config import config as cfg
 from paradox.event import EventLevel
-from paradox.interfaces.text.core import AbstractTextInterface
+from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
 from paradox.lib import ps
-from paradox.lib.event_filter import LiveEventRegexpFilter
 
 # Pushbullet interface.
 # Only exposes critical status changes and accepts commands
 
 logger = logging.getLogger('PAI').getChild(__name__)
+
 
 class PushBulletWSClient(WebSocketBaseClient):
     name = "pushbullet"
@@ -110,12 +110,13 @@ class PushBulletWSClient(WebSocketBaseClient):
                     time.sleep(5)
 
 
-class PushbulletTextInterface(AbstractTextInterface):
+class PushbulletTextInterface(ConfiguredAbstractTextInterface):
     """Interface Class using Pushbullet"""
 
     def __init__(self):
-        event_filter = LiveEventRegexpFilter(cfg.PUSHBULLET_ALLOW_EVENTS, cfg.PUSHBULLET_IGNORE_EVENTS)
-        super().__init__(event_filter=event_filter)
+        super().__init__(cfg.PUSHBULLET_EVENT_FILTERS, cfg.PUSHBULLET_ALLOW_EVENTS, cfg.PUSHBULLET_IGNORE_EVENTS,
+                         cfg.PUSHBULLET_MIN_EVENT_LEVEL)
+
         self.pb_ws = None
 
     def _run(self):
