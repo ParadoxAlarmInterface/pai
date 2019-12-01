@@ -99,8 +99,10 @@ def test_event_clock_restore():
 
     raw = LiveEvent.parse(payload)
     event_ = event.LiveEvent(raw, event_map)
-    assert "Trouble restore: Clock loss restore" == event_.message
     print(event_)
+
+    assert "Trouble restore: Clock loss restore" == event_.message
+    assert all(t in event_.tags for t in ['trouble', 'clock'])
 
 def test_disconnect_event():
     payload = b'\xe0\xff\xe1\xe8\x14\x13\x02\x11\x0f%-\x00\x05\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00H'

@@ -205,7 +205,7 @@ class LiveEvent(Event):
                     if k == 'message':
                         event_map[k] = '{}: {}'.format(event_map[k], sub[k]) if k in event_map else sub[k]
                     elif isinstance(sub[k], typing.List):  # for tags or other lists
-                        event_map[k] = event_map.get(k, []).extend(sub[k])
+                        event_map[k] = event_map.get(k, []) + sub[k]
                     else:
                         event_map[k] = sub[k]
             del event_map['sub']
