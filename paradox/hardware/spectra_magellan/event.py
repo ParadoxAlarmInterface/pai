@@ -41,7 +41,7 @@ event_opt1 = {1: dict(type='output', id=1),
 
 event_map = {0: dict(level=EventLevel.DEBUG, change=dict(open=False), type='zone', message='Zone {label} OK'),
              1: dict(level=EventLevel.DEBUG, change=dict(open=True), type='zone', message='Zone {label} open'),
-             2: dict(level=EventLevel.CRITICAL, type='partition', message='Partition {label}',
+             2: dict(level=EventLevel.CRITICAL, type='partition',
                      sub={0: dict(message='N/A'),
                           1: dict(message='N/A'),
                           2: dict(change=dict(silent_alarm=True, alarm=True), tags=['alarm', 'silent_alarm'], message='Partition {label} silent alarm active'),

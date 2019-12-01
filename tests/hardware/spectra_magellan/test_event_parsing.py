@@ -35,7 +35,7 @@ def test_disarm_partition0():
     raw = LiveEvent.parse(payload)
     event_ = event.LiveEvent(raw, event_map)
 
-    assert event_.message == "Partition [partition:2]: Disarmed"
+    assert event_.message == "Partition [partition:2] disarmed"
     print(event_)
 
 def test_disarm_partition1():
@@ -55,7 +55,7 @@ def test_disarm_partition1():
 
     print(event_)
 
-    assert event_.message == "Partition Partition 2: Disarm partition Partition 2"
+    assert event_.message == "Disarm partition Partition 2"
 
 def test_button_pressed():
     event_ = b'e214130a14103708040000000000000000000000000000000000000000000000000000007a'
