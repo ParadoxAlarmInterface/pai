@@ -97,7 +97,7 @@ event_map = {
         8: dict(type='partition', message='(InTouch) voice module disarming'),
         9: dict(type='partition', message='Future use')
     }),
-    23: dict(level=EventLevel.INFO, type='zone', change=dict(bypassed=_toggle_provider), message='Zone {label} bypass toggled'),
+    23: dict(level=EventLevel.INFO, type='zone', change=dict(bypassed=_toggle_provider), tags=['bypass'], message='Zone {label} bypass toggled'),
     24: dict(level=EventLevel.CRITICAL, tags=['alarm', 'trigger'], type='zone', change=dict(generated_alarm=True, presently_in_alarm=True), message='Zone {label} in alarm', hook_fn=_zone_generated_alarm),
     25: dict(level=EventLevel.CRITICAL, tags=['alarm', 'fire', 'trigger'], type='zone', change=dict(fire_alarm=True), message='Fire alarm {label}', hook_fn=_request_status_refresh),
     26: dict(level=EventLevel.CRITICAL, tags=['alarm', 'restore'], type='zone', change=dict(presently_in_alarm=False), message='Zone {label} alarm restore', hook_fn=_request_status_refresh),
