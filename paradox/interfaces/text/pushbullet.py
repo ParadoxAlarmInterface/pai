@@ -9,7 +9,7 @@ from ws4py.client import WebSocketBaseClient
 from ws4py.manager import WebSocketManager
 
 from paradox.config import config as cfg
-from paradox.event import EventLevel
+from paradox.event import EventLevel, Notification
 from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
 from paradox.lib import ps
 
@@ -79,10 +79,7 @@ class PushBulletWSClient(WebSocketBaseClient):
                     logger.warning(m)
 
                 self.send_message(m)
-                ps.sendMessage("notifications",
-                               message=dict(source=self.name,
-                                            payload=m,
-                                            level=EventLevel.INFO))
+                ps.sendNotification(Notification(sender=self.name, message=m, level=EventLevel.INFO))
 
     def unhandled_error(self, error):
         logger.error("{}".format(error))

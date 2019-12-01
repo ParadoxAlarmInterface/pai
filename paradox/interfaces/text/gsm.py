@@ -10,7 +10,7 @@ import serial_asyncio
 
 from paradox.config import config as cfg
 from paradox.connections.connection import ConnectionProtocol
-from paradox.event import EventLevel
+from paradox.event import EventLevel, Notification
 from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
 from paradox.lib import ps
 
@@ -244,10 +244,8 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
             message = tokens[6]
             self.handle_message(timestamp, source, message)
         elif tokens[0].startswith('+CUSD:'):
-            ps.sendMessage("notifications",
-                           message=dict(source=self.name,
-                                        message=tokens[1],
-                                        level=logging.INFO))
+            ps.sendNotification(Notification(sender=self.name, message=tokens[1], level=EventLevel.INFO))
+
         return True
 
     def handle_message(self, timestamp, source, message):
@@ -265,10 +263,7 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
             m = "INVALID SENDER: {}".format(message)
             logger.warning(m)
 
-        ps.sendMessage("notifications",
-                       message=dict(source=self.name,
-                                    payload=message,
-                                    level=EventLevel.INFO))
+        ps.sendNotification(Notification(sender=self.name, message=message, level=EventLevel.INFO))
 
     def send_message(self, message):
         if self.port is None:

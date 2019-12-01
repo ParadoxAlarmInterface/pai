@@ -1,6 +1,6 @@
 from pubsub import pub
 
-from paradox.event import Event, Change
+from paradox.event import Event, Change, Notification
 
 PREFIX="pai_"
 
@@ -19,3 +19,7 @@ def sendEvent(event: Event):
 
 def sendChange(change: Change):
     pub.sendMessage(PREFIX + "changes", change=change)
+
+
+def sendNotification(notification: Notification):
+    pub.sendMessage(PREFIX + "notifications", notification=notification)

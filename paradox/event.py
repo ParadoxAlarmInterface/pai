@@ -4,6 +4,7 @@ import time
 import typing
 from copy import copy
 from enum import Enum
+from collections import namedtuple
 
 from construct import Container
 
@@ -12,14 +13,13 @@ from paradox.lib.format import EventMessageFormatter
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
-
 class EventLevel(Enum):
-    NOTSET = 0
-    DEBUG = 10
-    INFO = 20
-    WARN = 30
-    ERROR = 40
-    CRITICAL = 50
+    NOTSET = logging.NOTSET
+    DEBUG = logging.DEBUG
+    INFO = logging.INFO
+    WARN = logging.WARN
+    ERROR = logging.ERROR
+    CRITICAL = logging.CRITICAL
 
     @staticmethod
     def from_name(level="NOTSET"):
@@ -282,3 +282,5 @@ class ChangeEvent(Event):
 
         self.tags = property_map.get('tags', [])
 
+
+Notification = namedtuple('Notification', ['sender', 'message', 'level'])

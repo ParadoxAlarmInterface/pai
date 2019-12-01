@@ -7,7 +7,7 @@ from collections import namedtuple
 from paho.mqtt.client import MQTTMessage, Client
 
 from paradox.config import config as cfg
-from paradox.event import EventLevel, Event, Change
+from paradox.event import EventLevel, Event, Change, Notification
 from paradox.lib import ps
 from paradox.lib.utils import JSONByteEncoder, sanitize_key
 from .core import AbstractMQTTInterface, ELEMENT_TOPIC_MAP
@@ -89,7 +89,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                 logger.error(e)
                 return
 
-            ps.sendMessage("notifications", message=dict(source=self.name, payload=prep.content, level=level))
+            ps.sendNotification(Notification(sender=self.name, message=prep.content, level=level))
 
     def _mqtt_handle_zone_control(self, client: Client, userdata, message: MQTTMessage):
         prep = self._preparse_message(message)
@@ -139,11 +139,8 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                         logger.debug("Element {} not found".format(element))
                         return
 
-                    ps.sendMessage('notifications', message=dict(
-                        source="mqtt",
-                        payload="Command by {}: {}".format(
-                            cfg.MQTT_TOGGLE_CODES[tokens[1]], command),
-                        level=logging.INFO))
+                    ps.sendNotification(Notification(sender="mqtt", message="Command by {}: {}".format(
+                            cfg.MQTT_TOGGLE_CODES[tokens[1]], command), level=EventLevel.INFO))
 
                 logger.debug("Partition command: {} = {}".format(element, command))
                 if not self.alarm.control_partition(element, command):

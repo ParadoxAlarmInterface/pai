@@ -6,7 +6,7 @@ from gi.repository import GLib
 from pydbus import SystemBus
 
 from paradox.config import config as cfg
-from paradox.event import EventLevel
+from paradox.event import EventLevel, Notification
 # Signal interface.
 # Only exposes critical status changes and accepts commands
 from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
@@ -76,7 +76,4 @@ class SignalTextInterface(ConfiguredAbstractTextInterface):
             logger.warning(m)
 
         self.send_message(m)
-        ps.sendMessage("notifications",
-                       message=dict(source=self.name,
-                                    payload=m,
-                                    level=EventLevel.INFO))
+        ps.sendNotification(Notification(sender=self.name, message=m, level=EventLevel.INFO))

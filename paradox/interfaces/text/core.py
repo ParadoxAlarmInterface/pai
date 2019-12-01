@@ -2,11 +2,12 @@ import logging
 
 from paradox.lib import ps
 from paradox.lib.event_filter import LiveEventRegexpFilter, EventTagFilter, EventFilter
-from paradox.event import EventLevel, Event
+from paradox.event import EventLevel, Event, Notification
 from paradox.config import config as cfg
 from paradox.interfaces import ThreadQueueInterface
 
 logger = logging.getLogger('PAI').getChild(__name__)
+
 
 
 class AbstractTextInterface(ThreadQueueInterface):
@@ -17,7 +18,8 @@ class AbstractTextInterface(ThreadQueueInterface):
         super().__init__()
 
         self.event_filter = event_filter
-        self.notification_filter = lambda message: message['level'] < min_level and message['source'] != self.name
+
+        self.min_level = min_level
         self.alarm = None
 
     def stop(self):
@@ -50,9 +52,12 @@ class AbstractTextInterface(ThreadQueueInterface):
     def send_message(self, message:str):
         pass
 
-    def handle_notify(self, message):
-        if self.notification_filter(message):
-            self.send_message(message['payload'])
+    def notification_filter(self, notification: Notification):
+        return notification.level < self.min_level and notification.sender != self.name
+
+    def handle_notify(self, notification: Notification):
+        if self.notification_filter(notification):
+            self.send_message(notification.message)
 
     def handle_panel_event(self, event: Event):
         if self.event_filter.match(event):
