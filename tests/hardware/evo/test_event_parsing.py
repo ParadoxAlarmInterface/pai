@@ -137,7 +137,7 @@ def test_partition_armed_by_pai():
     payload = binascii.unhexlify('e2ff187914130b0e0e3b0c0101000000000000000000000000000000000000000000000009')
     raw = LiveEvent.parse(payload)
     event_ = event.LiveEvent(raw, event_map)
-    assert "Special arming: [partition:1] arming with Winload by [user:0]" == event_.message
+    assert "Special arming [partition:1]: arming with Winload by [user:0]" == event_.message
     print(event_)
 
 
