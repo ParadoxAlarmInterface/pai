@@ -132,6 +132,6 @@ class PushbulletTextInterface(ConfiguredAbstractTextInterface):
         if self.pb_ws is not None:
             self.pb_ws.stop()
 
-    def send_message(self, message):
+    def send_message(self, message: str, level: EventLevel):
         if self.pb_ws is not None:
             self.pb_ws.send_message(message)

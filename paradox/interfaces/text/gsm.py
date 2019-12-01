@@ -265,7 +265,7 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
 
         ps.sendNotification(Notification(sender=self.name, message=message, level=EventLevel.INFO))
 
-    def send_message(self, message):
+    def send_message(self, message: str, level: EventLevel):
         if self.port is None:
             logger.warning("GSM not available when sending message")
             return

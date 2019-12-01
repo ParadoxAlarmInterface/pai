@@ -50,7 +50,7 @@ class SignalTextInterface(ConfiguredAbstractTextInterface):
 
         self.loop.run()
 
-    def send_message(self, message):
+    def send_message(self, message: str, level: EventLevel):
         if self.signal is None:
             logger.warning("Signal not available when sending message")
             return

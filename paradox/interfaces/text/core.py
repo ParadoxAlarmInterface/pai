@@ -49,7 +49,7 @@ class AbstractTextInterface(ThreadQueueInterface):
     def set_alarm(self, alarm):
         self.alarm = alarm
 
-    def send_message(self, message:str):
+    def send_message(self, message: str, level: EventLevel):
         pass
 
     def notification_filter(self, notification: Notification):
@@ -57,11 +57,11 @@ class AbstractTextInterface(ThreadQueueInterface):
 
     def handle_notify(self, notification: Notification):
         if self.notification_filter(notification):
-            self.send_message(notification.message)
+            self.send_message(notification.message, notification.level)
 
     def handle_panel_event(self, event: Event):
         if self.event_filter.match(event):
-            self.send_message(event.message)
+            self.send_message(event.message, event.level)
 
     def handle_command(self, message_raw):
         message = cfg.COMMAND_ALIAS.get(message_raw, message_raw)

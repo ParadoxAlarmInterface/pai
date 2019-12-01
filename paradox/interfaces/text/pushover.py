@@ -3,13 +3,22 @@
 import logging
 import re
 
-from chump import Application
+import chump
 
 from paradox.config import config as cfg
+from paradox.event import EventLevel
 from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
+_level_2_priority = {
+    EventLevel.NOTSET: chump.LOWEST,
+    EventLevel.DEBUG: chump.LOWEST,
+    EventLevel.INFO: chump.LOW,
+    EventLevel.WARN: chump.NORMAL,
+    EventLevel.ERROR: chump.HIGH,
+    EventLevel.CRITICAL: chump.EMERGENCY
+}
 
 class PushoverTextInterface(ConfiguredAbstractTextInterface):
     """Interface Class using Pushover"""
@@ -25,15 +34,13 @@ class PushoverTextInterface(ConfiguredAbstractTextInterface):
     def _run(self):
         logger.info("Starting Pushover Interface")
 
-        self.app = Application(cfg.PUSHOVER_KEY)
+        self.app = chump.Application(cfg.PUSHOVER_KEY)
         if not self.app.is_authenticated:
             raise Exception('Failed to authenticate with Pushover. Please check PUSHOVER_APPLICATION_KEY')
 
-
-    def send_message(self, message):
-
+    def send_message(self, message: str, level: EventLevel):
         for user_key, devices_raw in cfg.PUSHOVER_BROADCAST_KEYS.items():
-            user = self.users.get(user_key)
+            user = self.users.get(user_key)  # type: chump.User
 
             if user is None:
                 user = self.users[user_key] = self.app.get_user(user_key)
@@ -43,7 +50,7 @@ class PushoverTextInterface(ConfiguredAbstractTextInterface):
                     'Failed to check user key with Pushover. Please check PUSHOVER_BROADCAST_KEYS[%s]' % user_key)
 
             if devices_raw == '*' or devices_raw is None:
-                user.send_message(message, title='Alarm')
+                user.send_message(message, title='Alarm', priority=_level_2_priority.get(level, chump.NORMAL))
             else:
                 devices = list(filter(bool, re.split('[\s]*,[\s]*', devices_raw)))
 
@@ -51,6 +58,6 @@ class PushoverTextInterface(ConfiguredAbstractTextInterface):
                     logger.warning('%s is not in the Pushover device list for the user %s' % (elem, user_key))
 
                 for device in devices:
-                    user.send_message(message, title='PAI', device=device)
+                    user.send_message(message, title='PAI', device=device, priority=_level_2_priority.get(level, chump.NORMAL))
 
         # TODO: Missing the message reception
