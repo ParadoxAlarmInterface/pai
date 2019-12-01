@@ -76,7 +76,10 @@ class EventTagFilter(EventFilter):
         super().__init__(min_level=min_level)
 
     def match(self, event: Event):
-        tags = [event.type] + event.tags
+        tags = [event.type]
+        if event.tags:
+            tags += event.tags
+
         if isinstance(event, LiveEvent):
             tags += [event.name, event.label]
 
