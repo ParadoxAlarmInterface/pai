@@ -1,4 +1,4 @@
-import collections
+from collections.abc import Mapping
 
 from construct import Struct, RawCopy, BitStruct, Const, Nibble, Flag, Rebuild, Int8ub, BitsInteger, Int16ub, Checksum, \
     Bytes, this, Default, Padding, Enum, Int24ub, ExprAdapter, Byte, obj_, Array, Computed, Subconstruct, \
@@ -256,7 +256,7 @@ CloseConnection = Struct("fields" / RawCopy(
 class EvoEEPROMAddressAdapter(Subconstruct):
     def deep_update(self, d, u):
         for k, v in u.items():
-            if isinstance(v, collections.Mapping):
+            if isinstance(v, Mapping):
                 d[k] = self.deep_update(d.get(k, {}), v)
             else:
                 d[k] = v
