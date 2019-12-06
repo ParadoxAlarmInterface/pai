@@ -95,6 +95,11 @@ class PushBulletWSClient(WebSocketBaseClient):
         if dstchat is None:
             dstchat = self.pb.chats
 
+        try:
+            self.pb.push_note("pai", msg)
+        except Exception:
+            logger.exception("Sending message to self")
+
         if not isinstance(dstchat, list):
             dstchat = [dstchat]
 

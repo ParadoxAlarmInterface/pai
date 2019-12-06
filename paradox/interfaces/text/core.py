@@ -53,7 +53,7 @@ class AbstractTextInterface(ThreadQueueInterface):
         pass
 
     def notification_filter(self, notification: Notification):
-        return notification.level < self.min_level and notification.sender != self.name
+        return notification.level > self.min_level and notification.sender != self.name
 
     def handle_notify(self, notification: Notification):
         if self.notification_filter(notification):
