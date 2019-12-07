@@ -75,5 +75,5 @@ class SignalTextInterface(ConfiguredAbstractTextInterface):
             m = "Signal {} (UNK): {}".format(source, message)
             logger.warning(m)
 
-        self.send_message(m)
+        self.send_message(m, EventLevel.INFO)
         ps.sendNotification(Notification(sender=self.name, message=m, level=EventLevel.INFO))
