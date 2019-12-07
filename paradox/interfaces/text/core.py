@@ -53,7 +53,7 @@ class AbstractTextInterface(ThreadQueueInterface):
         pass
 
     def notification_filter(self, notification: Notification):
-        return notification.level > self.min_level and notification.sender != self.name
+        return notification.level >= self.min_level and notification.sender != self.name
 
     def handle_notify(self, notification: Notification):
         if self.notification_filter(notification):
@@ -131,9 +131,11 @@ class ConfiguredAbstractTextInterface(AbstractTextInterface):
             raise AssertionError('You can not use *_EVENT_FILTERS and *_ALLOW_EVENTS+*_IGNORE_EVENTS simultaneously')
 
         min_level = EventLevel.from_name(MIN_EVENT_LEVEL)
-        if EVENT_FILTERS:
-            event_filter = EventTagFilter(EVENT_FILTERS, min_level)
-        else:
+        if ALLOW_EVENTS or IGNORE_EVENTS: # Use if defined, else use TAGS as default
+            logger.debug("Using REGEXP Filter")
             event_filter = LiveEventRegexpFilter(ALLOW_EVENTS, IGNORE_EVENTS, min_level)
+        else:
+            logger.debug("Using Tag Filter")
+            event_filter = EventTagFilter(EVENT_FILTERS, min_level)
 
         super().__init__(event_filter=event_filter, min_level=min_level)
