@@ -70,7 +70,7 @@ class PushBulletWSClient(WebSocketBaseClient):
                     continue
 
                 if p.get('sender_email_normalized') in cfg.PUSHBULLET_CONTACTS:
-                    ret = self._handle_command(p.get('body'))
+                    ret = self.interface.handle_command(p.get('body'))
 
                     m = "PB {}: {}".format(p.get('sender_email_normalized'), ret)
                     logger.info(m)
@@ -94,11 +94,6 @@ class PushBulletWSClient(WebSocketBaseClient):
     def send_message(self, msg, dstchat=None):
         if dstchat is None:
             dstchat = self.pb.chats
-
-        try:
-            self.pb.push_note("pai", msg)
-        except Exception:
-            logger.exception("Sending message to self")
 
         if not isinstance(dstchat, list):
             dstchat = [dstchat]
