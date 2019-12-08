@@ -45,7 +45,10 @@ partitions/PARTITION_NAME/zone_fire_loop_trouble False
 partitions/PARTITION_NAME/zone_low_battery_trouble False
 partitions/PARTITION_NAME/zone_supervision_trouble False
 partitions/PARTITION_NAME/zone_tamper_trouble False
+partitions/PARTITION_NAME/current_state disarmed
+partitions/PARTITION_NAME/target_state disarmed
 system/troubles/ac_trouble False
+system/date/time 2019-10-28 15:54:52
 system/troubles/aux_limit_trouble False
 system/troubles/battery_failure_trouble False
 system/troubles/bell_absent_trouble False
@@ -87,7 +90,7 @@ zones/ZONE_NAME/generated_alarm False
 zones/ZONE_NAME/low_battery False
 zones/ZONE_NAME/open False
 zones/ZONE_NAME/presently_in_alarm False
-zones/ZONE_NAME/shutted_down False
+zones/ZONE_NAME/shut_down False
 zones/ZONE_NAME/supervision_trouble False
 zones/ZONE_NAME/tamper False
 zones/ZONE_NAME/trouble False

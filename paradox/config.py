@@ -3,7 +3,6 @@ import logging
 
 
 class Config:
-
     DEFAULTS = { 
         "LOGGING_LEVEL_CONSOLE": logging.INFO,  # See documentation of Logging package
         "LOGGING_LEVEL_FILE": logging.ERROR,
@@ -13,6 +12,7 @@ class Config:
         "LOGGING_DUMP_PACKETS": False,          # Dump RAW Packets to log
         "LOGGING_DUMP_MESSAGES": False,         # Dump Messages to log
         "LOGGING_DUMP_STATUS": False,           # Dump Status to log
+        "LOGGING_DUMP_EVENTS": False,           # Dump Event details to log
 
         # Development
         "DEVELOPMENT_DUMP_MEMORY": False,
@@ -41,8 +41,8 @@ class Config:
         "LABEL_REFRESH_INTERVAL": (15 * 60, int, (0, 0xFFFFFFFF)),            # Interval between refresh of labels
         "OUTPUT_PULSE_DURATION": (1, float, (0, 0xFFFFFFFF)),                 # Duration of a PGM pulse in seconds
         "STATUS_REQUESTS": [0, 1, 2, 3, 4, 5],
-        "SYNC_TIME": True,                                       # Update panel time
-        "PASSWORD": (None, [bytes, type(None)]),                 # PC Password. Set to None if Panel has no Password. In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) -> PC Communication (Babyware) Tab.
+        "SYNC_TIME": True,                                                    # Update panel time
+        "PASSWORD": (None, [int, str, bytes, type(None)]),                    # PC Password. Set to None if Panel has no Password. In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) -> PC Communication (Babyware) Tab.
 
         "POWER_UPDATE_INTERVAL": (60, int, (0, 0xFFFFFFFF)),     # Interval between updates of the Power voltages
         "PUSH_POWER_UPDATE_WITHOUT_CHANGE": True,  # Always notify interfaces of power changes
@@ -58,8 +58,7 @@ class Config:
         "MQTT_RETAIN": True,                         # Publish messages with Retain
         "MQTT_BIND_ADDRESS": '127.0.0.1',
         "MQTT_REPUBLISH_INTERVAL": (60 * 60 * 12, int, (60, 0xFFFFFFFF)),    # Interval for republishing all data
-        "MQTT_HOMEBRIDGE_ENABLE": False,
-        "MQTT_HOMEASSISTANT_ENABLE": False,
+        "MQTT_HOMEASSISTANT_AUTODISCOVERY_ENABLE": False,
 
         # MQTT Topics
         "MQTT_BASE_TOPIC": 'paradox',             # Root of all topics
@@ -71,34 +70,12 @@ class Config:
         "MQTT_USER_TOPIC": 'users',               # Base for user states
         "MQTT_EVENTS_TOPIC": 'events',            # Base for events
         "MQTT_CONTROL_TOPIC": 'control',          # Base for control of othe elements (ROOT/CONTROL/TYPE)
+        "MQTT_HOMEASSISTANT_CONTROL_TOPIC": 'hass_control',
+        "MQTT_HOMEASSISTANT_DISCOVERY_PREFIX": 'homeassistant',
         "MQTT_OUTPUT_TOPIC": 'outputs',
         "MQTT_KEYPAD_TOPIC": 'keypads',
         "MQTT_STATES_TOPIC": 'states',
         "MQTT_RAW_TOPIC": 'raw',
-        "MQTT_HOMEBRIDGE_SUMMARY_TOPIC": 'current',
-        "MQTT_PARTITION_HOMEBRIDGE_COMMANDS": {
-            'STAY_ARM': 'arm_stay',
-            'AWAY_ARM': 'arm',
-            'NIGHT_ARM': 'arm_sleep',
-            'DISARM': 'disarm'},
-        "MQTT_PARTITION_HOMEBRIDGE_STATES": {
-            'alarm': 'ALARM_TRIGGERED',
-            'arm_stay': 'STAY_ARM',
-            'arm': 'AWAY_ARM',
-            'arm_sleep': 'NIGHT_ARM',
-            'disarm': 'DISARMED'},
-        "MQTT_HOMEASSISTANT_SUMMARY_TOPIC": 'current_hass',
-        "MQTT_PARTITION_HOMEASSISTANT_STATES": {
-            'alarm': 'triggered', 
-            'arm_stay': 'armed_home',
-            'arm': 'armed_away',
-            'arm_sleep': 'armed_night',
-            'disarm': 'disarmed'},
-        "MQTT_PARTITION_HOMEASSISTANT_COMMANDS": {
-            'ARM_HOME': 'arm_stay',
-            'ARM_AWAY': 'arm',
-            'ARM_NIGHT': 'arm_sleep',
-            'DISARM': 'disarm'},
         "MQTT_NOTIFICATIONS_TOPIC": 'notifications',
         "MQTT_PUBLISH_RAW_EVENTS": True,
         "MQTT_INTERFACE_TOPIC": 'interface',
@@ -108,58 +85,89 @@ class Config:
         "MQTT_DASH_TOPIC": "metrics/exchange/pai",
         "MQTT_DASH_TEMPLATE": "/etc/pai/mqtt_dash.txt",
 
-        # Interfaces
+        # Interfaces text command alias
         "COMMAND_ALIAS": {                       # alias for commands through text based interfaces
             'arm': 'partition all arm',
             'disarm': 'partition all disarm'
         },
 
+        # MQTT command aliases
+        "MQTT_COMMAND_ALIAS": {
+            # For homebridge
+            'armed_home': 'arm_stay',
+            'armed_night': 'arm_sleep',
+            'armed_away': 'arm',
+            'disarmed': 'disarm'
+        },
+
         # Pushbullet
         "PUSHBULLET_ENABLE": False,
         "PUSHBULLET_KEY": '',                     # Authentication key used for Pushbullet
-        "PUSHBULLET_SECRET": '',                  # Authentication secret used for Pushbullet
         "PUSHBULLET_CONTACTS": [],                # Pushbullet user identifiers for notifications and interaction
-        "PUSHBULLET_IGNORE_EVENTS": [
-            r"zone,[\w]+,no_delay=True",
-            r"zone,[\w]+,exit_delay=.*"],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
-        "PUSHBULLET_ALLOW_EVENTS": [r".*"],        # Same as before but as a white list. Default is allow all
+        "PUSHBULLET_IGNORE_EVENTS": [],           # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+        "PUSHBULLET_ALLOW_EVENTS": [],            # Same as before but as a white list. Default is use EVENT_FILTERS
+        "PUSHBULLET_EVENT_FILTERS": [             # list of tags, property changes to include or exclude. See event.py for tag list
+            'alarm,-restore',
+            'trouble,-clock',
+            'tamper'
+        ],
+        "PUSHBULLET_MIN_EVENT_LEVEL": ('INFO', str, ['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL']),
 
         # Pushover
         "PUSHOVER_ENABLE": False,
         "PUSHOVER_KEY": '',                       # Application token for Pushover
         "PUSHOVER_BROADCAST_KEYS": {              # Pushover user or group keys to broadcast notifications to
             #    '<user_key>': '*'                # value can be '*' or comma separated list of device names
-        "PUSHOVER_IGNORE_EVENTS": [
-            r"zone,[\w]+,no_delay=True",
-            r"zone,[\w]+,exit_delay=.*"],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
-        "PUSHOVER_ALLOW_EVENTS": [r".*"],          # Same as before but as a white list. Default is allow all
-
         },
+        "PUSHOVER_IGNORE_EVENTS": [],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+        "PUSHOVER_ALLOW_EVENTS": [],              # Same as before but as a white list. Default is use EVENT_FILTERS
+        "PUSHOVER_EVENT_FILTERS": [               # list of tags, property changes to include or exclude. See event.py for tag list
+            'alarm,-restore',
+            'trouble,-clock',
+            'tamper'
+        ],
+        "PUSHOVER_MIN_EVENT_LEVEL": ('INFO', str, ['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL']),
 
         # Signal
         "SIGNAL_ENABLE": False,
-        "SIGNAL_CONTACTS": [],                    # Contacts that are allowed to control the panel and receive notifications through Signal
-        "SIGNAL_IGNORE_EVENTS": [
-            r"zone,[\w]+,no_delay=True",
-            r"zone,[\w]+,exit_delay=.*"],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
-        "SIGNAL_ALLOW_EVENTS": [r".*"],            # Same as before but as a white list. Default is allow all
+        "SIGNAL_CONTACTS": [],                  # Contacts that are allowed to control the panel and receive notifications through Signal
+        "SIGNAL_IGNORE_EVENTS": [],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+        "SIGNAL_ALLOW_EVENTS": [],              # Same as before but as a white list. Default is use EVENT_FILTERS
+        "SIGNAL_EVENT_FILTERS": [               # list of tags, property changes to include or exclude. See event.py for tag list
+            'alarm,-restore',
+            'trouble,-clock',
+            'tamper'
+        ],
+        "SIGNAL_MIN_EVENT_LEVEL": ('INFO', str, ['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL']),
 
         # GSM
         "GSM_ENABLE": False,
         "GSM_MODEM_BAUDRATE": (115200, int, (9600, 115200)),    # Baudrate of the GSM modem
         "GSM_MODEM_PORT": '',                     # Pathname of the serial port
         "GSM_CONTACTS": [],                       # Contacts that are allowed to control the panel and receive notifications through SMS
-        "GSM_IGNORE_EVENTS": [],                  # List of tuples or regexp matching "type:label:property" eg. [(major, minor), "zone:HOME:entry_delay", ...]
-        "GSM_ALLOW_EVENTS": [r"partition,[\w]+,alarm=True"],# Same as before but as a white list. Default is to only allow alarm
+        "GSM_IGNORE_EVENTS": [],                  # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+        "GSM_ALLOW_EVENTS": [],                   # Same as before but as a white list. Default is use EVENT_FILTERS
+        "GSM_EVENT_FILTERS": [                    # list of tags, property changes to include or exclude. See event.py for tag list
+            'zone,alarm,trigger'
+        ],
+        "GSM_MIN_EVENT_LEVEL": ('CRITICAL', str, ['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL']),
 
         # IP Socket Interface
         "IP_INTERFACE_ENABLE": False,
         "IP_INTERFACE_BIND_ADDRESS": '0.0.0.0',
         "IP_INTERFACE_BIND_PORT": (10000, int, (1, 65535)),
-        "IP_INTERFACE_PASSWORD": (b'0000', [bytes, type(None)]),
+        "IP_INTERFACE_PASSWORD": (b'paradox', [bytes, type(None)]),
 
         # Dummy Interface for testing
         "DUMMY_INTERFACE_ENABLE": False,
+        "DUMMY_EVENT_FILTERS": [
+            'alarm-restore',
+            'trouble-clock',
+            'tamper'
+            'arm',
+            'disarm'
+        ],
+        "DUMMY_MIN_EVENT_LEVEL": ('DEBUG', str, ['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'])
     }
 
     CONFIG_LOADED = False

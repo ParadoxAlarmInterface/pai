@@ -8,15 +8,37 @@ from typing import Optional
 
 from construct import Construct, Container, MappingError, ChecksumError
 
+from paradox.exceptions import StatusRequestException
 from .event import event_map
-from .property import property_map
 from .parsers import CloseConnection, ErrorMessage, InitializeCommunication, LoginConfirmationResponse, SetTimeDate, \
-    SetTimeDateResponse, PerformPartitionAction, PerformActionResponse, ReadEEPROMResponse, LiveEvent, ReadEEPROM, \
-    RAMDataParserMap, RequestedEvent
+    SetTimeDateResponse, PerformPartitionAction, PerformPartitionActionResponse, PerformZoneAction, \
+    PerformZoneActionResponse, ReadEEPROMResponse, LiveEvent, \
+    ReadEEPROM, RAMDataParserMap, RequestedEvent
+from .property import property_map
 from ..panel import Panel as PanelBase
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
+ZONE_ACTIONS = dict(
+    bypass={
+        "flags": {
+            "bypassed": True
+        },
+        "operation": "set",
+    },
+    clear_bypass={
+        "flags": {
+            "bypassed": True
+        },
+        "operation": "clear",
+    },
+    clear_alarm_memory={
+        "flags": {
+            "generated_alarm": True
+        },
+        "operation": "clear",
+    }
+)
 
 class Panel_EVOBase(PanelBase):
 
@@ -82,6 +104,8 @@ class Panel_EVOBase(PanelBase):
                     return SetTimeDate.parse(message)
                 elif message[0] == 0x40:
                     return PerformPartitionAction.parse(message)
+                elif message[0] == 0xd0:
+                    return PerformZoneAction.parse(message)
             else:
                 if message[0] >> 4 == 0x7:
                     return ErrorMessage.parse(message)
@@ -90,7 +114,9 @@ class Panel_EVOBase(PanelBase):
                 elif message[0] >> 4 == 0x03:
                     return SetTimeDateResponse.parse(message)
                 elif message[0] >> 4 == 4:
-                    return PerformActionResponse.parse(message)
+                    return PerformPartitionActionResponse.parse(message)
+                elif message[0] >> 4 == 0xd:
+                    return PerformZoneActionResponse.parse(message)
                 # elif message[0] == 0x50 and message[2] == 0x80:
                 #     return PanelStatus.parse(message)
                 # elif message[0] == 0x50 and message[2] < 0x80:
@@ -134,7 +160,9 @@ class Panel_EVOBase(PanelBase):
             return False
 
         if reply.fields.value.po.command == 0x0:
-            logger.error("Authentication Failed. Wrong Password or User Type is not FullMaster?")
+            logger.error("Authentication Failed. Wrong PASSWORD. Make sure you use correct PC Password. In Babyware: "
+                         "Right click on your panel -> Properties -> PC Communication (Babyware) -> PC Communication "
+                         "(Babyware) Tab.")
             return False
         else:  # command == 0x1
             if reply.fields.value.po.status.Winload_connected:
@@ -147,45 +175,24 @@ class Panel_EVOBase(PanelBase):
     def _request_status_reply_check(self, message: Container, address: int):
         mvars = message.fields.value
 
-        assert mvars.po.command == 0x5
-        assert mvars.control.ram_access is True
-        assert mvars.control.eeprom_address_bits == 0x0
-        assert mvars.bus_address == 0x00  # panel
-        assert mvars.address == address
+        if (mvars.po.command == 0x5
+            and mvars.control.ram_access is True
+            and mvars.control.eeprom_address_bits == 0x0
+            and mvars.bus_address == 0x00  # panel
+            and mvars.address == address
+        ):
+            return True
 
-        return True
+        return False
 
     async def request_status(self, i: int) -> Optional[Container]:
         args = dict(address=i, length=64, control=dict(ram_access=True))
-        reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, i))
-
-        return reply
-
-    def handle_status(self, message: Container):
-        """Handle MessageStatus"""
-
-        mvars = message.fields.value
-        # Check message
-
-        if mvars.address not in RAMDataParserMap:
-            logger.error(
-                "Parser for memory address ({}) is not implemented. Please review your STATUS_REQUESTS setting. Skipping.".format(mvars.address))
-            return
-        assert len(mvars.data) == 64
-
-        parser = RAMDataParserMap[mvars.address]
-
-        properties = parser.parse(mvars.data)
-
-        if mvars.address == 1:
-            for k in properties.troubles:
-                if k.startswith("_"):  # ignore private properties
-                    continue
-
-                self.core.update_properties('system', 'troubles',
-                                            {k: properties.troubles[k]})
-
-        self.process_properties_bulk(properties, mvars.address)
+        reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, args['address']))
+        if reply is not None:
+            logger.debug("Received status response: %d" % i)
+            return self.handle_status(reply, RAMDataParserMap)
+        else:
+            raise StatusRequestException("No reply to status request: %d" % i)
 
     async def control_partitions(self, partitions: list, command: str) -> bool:
         """
@@ -201,6 +208,28 @@ class Panel_EVOBase(PanelBase):
                 PerformPartitionAction, args, reply_expected=0x04)
         except MappingError:
             logger.error('Partition command: "%s" is not supported' % command)
+            return False
+
+        return reply is not None
+
+    async def control_zones(self, zones: list, command: str) -> bool:
+        """
+        Control zones
+        :param list zones: a list of zones
+        :param str command: textual command
+        :return: True if we have at least one success
+        """
+        if command not in ZONE_ACTIONS:
+            return False
+
+        args = ZONE_ACTIONS[command].copy()
+        args["zones"] = zones
+
+        try:
+            reply = await self.core.send_wait(
+                PerformZoneAction, args, reply_expected=0xd)
+        except MappingError:
+            logger.error('Zone command: "%s" is not supported' % command)
             return False
 
         return reply is not None

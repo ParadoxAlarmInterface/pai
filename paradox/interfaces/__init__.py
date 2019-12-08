@@ -1,122 +1,70 @@
 # -*- coding: utf-8 -*-
 
-import threading
+import asyncio
+import logging
 import queue
+import threading
 
 from paradox.config import config as cfg
-from paradox.event import Event
+
+logger = logging.getLogger('PAI').getChild(__name__)
 
 
-class Interface(threading.Thread):
+class Interface:
+    def __init__(self):
+        super().__init__()  # yes it is required!
+        self.alarm = None
 
+    def set_alarm(self, alarm):
+        """ Sets the alarm """
+        self.alarm = alarm
+
+    def start(self):
+        pass
+
+
+class AsyncInterface(Interface):
     def __init__(self):
         super().__init__()
 
-        self.alarm = None
-        self.logger = None  # assign logger in the subclass
-        self.partitions = {}
+        self._loop = asyncio.get_event_loop()
+        self._running_task = None  # type: asyncio.Task
+
+    def start(self):
+        self._running_task = self._loop.create_task(self.run())
+
+    def stop(self):
+        if self._running_task and not self._running_task.done():
+            self._running_task.cancel()
+
+    async def run(self):
+        pass
+
+
+class ThreadQueueInterface(threading.Thread, Interface):
+    def __init__(self):
+        super().__init__()
 
         self.stop_running = threading.Event()
         self.stop_running.clear()
 
         self.queue = queue.PriorityQueue()
 
-    def set_alarm(self, alarm):
-        """ Sets the alarm """
-        self.alarm = alarm
-
     def stop(self):
-        pass
+        self.queue.put_nowait((0, None,))
+        self.join()
 
-    def notify(self, source, message, level):
+    def run_loop(self, queue_item):
         pass
 
     def run(self):
-        pass
+        while True:
+            try:
+                _, item = self.queue.get()
+                if item is None:
+                    break
+                else:
+                    self.run_loop(item)
+            except Exception:
+                logger.exception("ERROR in Run loop")
 
-    def handle_notify(self, raw):
-        source, message, level = raw
-
-        try:
-            self.send_message(message)
-        except Exception:
-            self.logger.exception("handle_notify")
-
-    def handle_panel_event(self, event):
-        """Handle Live Event"""
-        pass
-
-    def send_command(self, message):
-        """Handle message received from the MQTT broker"""
-        """Format TYPE LABEL COMMAND """
-
-        message = cfg.COMMAND_ALIAS.get(message, message)
-
-        tokens = message.split(" ")
-
-        if len(tokens) != 3:
-            self.logger.warning("Message format is invalid")
-            return False
-
-        if self.alarm is None:
-            self.logger.error("No alarm registered")
-            return False
-
-        element_type = tokens[0].lower()
-        element = tokens[1]
-        command = self.normalize_payload(tokens[2].lower())
-
-        # Process a Zone Command
-        if element_type == 'zone':
-            if command not in ['bypass', 'clear_bypass']:
-                self.logger.error("Invalid command for Zone {}".format(command))
-                return False
-
-            if not self.alarm.control_zone(element, command):
-                self.logger.warning(
-                    "Zone command refused: {}={}".format(element, command))
-                return False
-
-        # Process a Partition Command
-        elif element_type == 'partition':
-            if command not in ['arm', 'disarm', 'arm_stay', 'arm_sleep']:
-                self.logger.error(
-                    "Invalid command for Partition {}".format(command))
-                return False
-
-            if not self.alarm.control_partition(element, command):
-                self.logger.warning(
-                    "Partition command refused: {}={}".format(element, command))
-                return False
-
-        # Process an Output Command
-        elif element_type == 'output':
-            if command not in ['on', 'off', 'pulse']:
-                self.logger.error("Invalid command for Output {}".format(command))
-                return False
-
-            if not self.alarm.control_output(element, command):
-                self.logger.warning(
-                    "Output command refused: {}={}".format(element, command))
-                return False
-        else:
-            self.logger.error("Invalid control property {}".format(element))
-            return False
-
-        return True
-
-    @staticmethod
-    def normalize_payload(message):
-        message = message.strip().lower()
-
-        if message in ['true', 'on', '1', 'enable']:
-            return 'on'
-        elif message in ['false', 'off', '0', 'disable']:
-            return 'off'
-        elif message in ['pulse', 'arm', 'disarm', 'arm_stay', 'arm_sleep', 'bypass', 'clear_bypass']:
-            return message
-
-        return None
-
-    def send_message(self, message):
-        pass

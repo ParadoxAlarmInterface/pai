@@ -2,19 +2,18 @@
 
 # IP Interface
 
-import logging
-from construct import GreedyBytes, Struct, Aligned, Const, Int8ub, Bytes, Int16ul, Default
+import asyncio
 import binascii
+import logging
 import os
 from typing import Awaitable
 
-from paradox.event import Event
-from paradox.lib.crypto import encrypt, decrypt
-from paradox.lib.async_message_manager import RAWMessageHandler
+from construct import GreedyBytes, Struct, Aligned, Const, Int8ub, Bytes, Int16ul, Default
 
-import asyncio
-
+from paradox.interfaces import Interface
 from paradox.config import config as cfg
+from paradox.lib.async_message_manager import RAWMessageHandler
+from paradox.lib.crypto import encrypt, decrypt
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -88,7 +87,10 @@ class ClientConnection():
 
         while True:
             try:
-                data = await self.client_reader.read(1000)
+                data = await asyncio.wait_for(self.client_reader.read(1000), cfg.KEEP_ALIVE_INTERVAL * 1.5)
+            except asyncio.TimeoutError:
+                logger.info("Timeout. Client may have disconnected")
+                break
             except:
                 logger.info("Client disconnected")
                 break
@@ -119,7 +121,7 @@ class ClientConnection():
                 password = in_payload
 
                 if password != self.interface_password:
-                    logger.warn("Authentication Error")
+                    logger.warning("Authentication Error")
                     break
                 else:
                     logger.info("Authentication Success")
@@ -170,7 +172,8 @@ class ClientConnection():
                     status = 'connected'
 
             else:
-                logger.warn("UNKNOWN: raw: {}, payload: {}".format(binascii.hexlify(data), binascii.hexlify(in_payload)))
+                logger.warning(
+                    "UNKNOWN: raw: {}, payload: {}".format(binascii.hexlify(data), binascii.hexlify(in_payload)))
                 continue
 
             if out_payload is not None:
@@ -206,20 +209,20 @@ class ClientConnection():
             if status == 'closing_connection':
                 break
 
-class IPInterface():
+
+class IPInterface(Interface):
     def __init__(self):
+        super().__init__()
         self.key = cfg.IP_INTERFACE_PASSWORD
         self.addr = cfg.IP_INTERFACE_BIND_ADDRESS
         self.port = cfg.IP_INTERFACE_BIND_PORT
-        self.alarm = None
         self.server = None
         self.started = False
         self.name = 'ip_interface'
         self.client_nr = 0
 
     def set_alarm(self, alarm):
-        logger.debug("Set alarm")
-        self.alarm = alarm
+        super(IPInterface, self).set_alarm(alarm)
 
         if not self.server and self.started:
             self.start()
@@ -230,21 +233,27 @@ class IPInterface():
     def stop(self):
         logger.info("Stopping IP Interface")
         if self.server is not None:
-            self.server.cancel()
+            self.server.close()
             self.server = None
         self.started = False
 
     def start(self):
         logger.info("Starting IP Interface")
         self.started = True
+
         if not self.alarm:
             logger.info("No alarm set")
             return
 
-        coro = asyncio.start_server(self.handle_client, self.addr, self.port, loop=self.alarm.work_loop)
-        self.server = self.alarm.work_loop.create_task(coro)
+        asyncio.get_event_loop().create_task(self.run())
 
-        logger.info("IP Interface started")
+    async def run(self):
+        try:
+            self.server = await asyncio.start_server(self.handle_client, self.addr, self.port, loop=self.alarm.work_loop)
+            logger.info('IP Interface: serving on {}'.format(self.server.sockets[0].getsockname()))
+            logger.info("IP Interface started")
+        except Exception as e:
+            logger.error("Failed to start IP Interface {}".format(e))
 
     async def handle_client(self, reader, writer):
         """
@@ -258,7 +267,7 @@ class IPInterface():
 
         self.client_nr = (self.client_nr + 1) % 256
         handler_name = "%s_%d" % (self.name, self.client_nr)
-        self.alarm.message_manager.register_handler(
+        self.alarm.connection.register_handler(
             RAWMessageHandler(connection.handle_panel_message, name=handler_name)
         )
 
@@ -266,7 +275,7 @@ class IPInterface():
         await self.alarm.pause()
 
         await connection.handle()
-        self.alarm.message_manager.deregister_handler(handler_name)
+        self.alarm.connection.deregister_handler(handler_name)
 
         logger.debug("Resuming")
         await self.alarm.resume()

@@ -33,19 +33,20 @@ class PartitionStateAdapter(Adapter):
 
         return 0
 
+ZoneFlagBitStruct = BitStruct(
+    "generated_alarm" / Default(Flag, False),
+    "presently_in_alarm" / Default(Flag, False),
+    "activated_entry_delay" / Default(Flag, False),
+    "activated_intellizone_delay" / Default(Flag, False),
+    "bypassed" / Default(Flag, False),
+    "shutted_down" / Default(Flag, False),
+    "tx_delay" / Default(Flag, False),
+    "supervision_trouble" / Default(Flag, False),
+)
 
 # noinspection PyUnresolvedReferences,PyUnresolvedReferences
 class ZoneFlags(Subconstruct):
-    flag_parser = BitStruct(
-        "supervision_trouble" / Flag,
-        "tx_delay" / Flag,
-        "shutted_down" / Flag,
-        "bypassed" / Flag,
-        "activated_intellizone_delay" / Flag,
-        "activated_entry_delay" / Flag,
-        "presently_in_alarm" / Flag,
-        "generated_alarm" / Flag
-    )
+    flag_parser = ZoneFlagBitStruct
 
     def __init__(self, count, start_index_from=1):
         super(ZoneFlags, self).__init__(self.flag_parser)
