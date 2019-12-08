@@ -105,7 +105,8 @@ class SerialCommunication(Connection):
 
     def on_port_closed(self):
         logger.error('Connection to panel was lost')
-        self.connected_future.set_result(False)
+        if not self.connected_future.done():
+            self.connected_future.set_result(False)
         self.connected = False
 
     def on_port_open(self):
