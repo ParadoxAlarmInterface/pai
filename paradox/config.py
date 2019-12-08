@@ -1,8 +1,8 @@
 import os
 import logging
 
-class Config:
 
+class Config:
     DEFAULTS = { 
         "LOGGING_LEVEL_CONSOLE": logging.INFO,  # See documentation of Logging package
         "LOGGING_LEVEL_FILE": logging.ERROR,
