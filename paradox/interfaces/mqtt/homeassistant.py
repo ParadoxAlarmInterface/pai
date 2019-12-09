@@ -138,32 +138,3 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 )
 
                 self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
-
-    def _preparse_message(self, message) -> typing.Optional[PreparseResponse]:
-        logger.info("message topic={}, payload={}".format(
-            message.topic, str(message.payload.decode("utf-8"))))
-
-        if message.retain:
-            logger.warning("Ignoring retained commands")
-            return None
-
-        if self.alarm is None:
-            logger.warning("No alarm. Ignoring command")
-            return None
-
-        topic = message.topic.split(cfg.MQTT_BASE_TOPIC)[1]
-
-        topics = topic.split("/")
-
-        if len(topics) < 3:
-            logger.error(
-                "Invalid topic in mqtt message: {}".format(message.topic))
-            return None
-
-        content = message.payload.decode("latin").strip()
-
-        element = None
-        if len(topics) >= 4:
-            element = topics[3]
-
-        return PreparseResponse(topics, element, content)
