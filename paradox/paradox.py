@@ -338,6 +338,7 @@ class Paradox:
 
         # Not Found
         if len(zones_selected) == 0:
+            logger.error('No zones selected')
             return False
 
         # Apply state changes
@@ -365,6 +366,7 @@ class Paradox:
 
         # Not Found
         if len(partitions_selected) == 0:
+            logger.error('No partitions selected')
             return False
 
         # Apply state changes
@@ -392,6 +394,7 @@ class Paradox:
 
         # Not Found
         if len(outputs_selected) == 0:
+            logger.error('No outputs selected')
             return False
 
         # Apply state changes

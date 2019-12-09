@@ -14,7 +14,43 @@ from .core import AbstractMQTTInterface, ELEMENT_TOPIC_MAP
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
-PreparseResponse = namedtuple('preparse_response', 'topics element content')
+ParsedMessage = namedtuple('parsed_message', 'topics element content')
+
+
+def mqtt_handle_decorator(func: typing.Callable[["BasicMQTTInterface", ParsedMessage], None]):
+    def wrapper(self: "BasicMQTTInterface", client: Client, userdata, message: MQTTMessage):
+        try:
+            logger.info("message topic={}, payload={}".format(
+                message.topic, str(message.payload.decode("utf-8"))))
+
+            if message.retain:
+                logger.warning("Ignoring retained commands")
+                return
+
+            if self.alarm is None:
+                logger.warning("No alarm. Ignoring command")
+                return
+
+            topic = message.topic.split(cfg.MQTT_BASE_TOPIC)[1]
+
+            topics = topic.split("/")
+
+            if len(topics) < 3:
+                logger.error(
+                    "Invalid topic in mqtt message: {}".format(message.topic))
+                return
+
+            content = message.payload.decode("utf-8").strip()
+
+            element = None
+            if len(topics) >= 4:
+                element = topics[3]
+
+            func(self, ParsedMessage(topics, element, content))
+        except Exception:
+            logger.exception("Failed to execute command")
+
+    return wrapper
 
 
 class BasicMQTTInterface(AbstractMQTTInterface):
@@ -50,114 +86,76 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             self._mqtt_handle_notifications
         )
 
-    def _preparse_message(self, message: MQTTMessage) -> typing.Optional[PreparseResponse]:
-        logger.info("message topic={}, payload={}".format(
-            message.topic, str(message.payload.decode("utf-8"))))
+    @mqtt_handle_decorator
+    def _mqtt_handle_notifications(self, prep: ParsedMessage):
+        topics = prep.topics
+        try:
+            level = EventLevel.from_name(topics[2].upper())
+        except Exception as e:
+            logger.error(e)
+            return
 
-        if message.retain:
-            logger.warning("Ignoring retained commands")
-            return None
+        ps.sendNotification(Notification(sender=self.name, message=prep.content, level=level))
 
-        if self.alarm is None:
-            logger.warning("No alarm. Ignoring command")
-            return None
+    @mqtt_handle_decorator
+    def _mqtt_handle_zone_control(self, prep: ParsedMessage):
+        topics, element, command = prep
+        if not self.alarm.control_zone(element, command):
+            logger.warning("Zone command refused: {}={}".format(element, command))
 
-        topic = message.topic.split(cfg.MQTT_BASE_TOPIC)[1]
+    @mqtt_handle_decorator
+    def _mqtt_handle_partition_control(self, prep: ParsedMessage):
+        topics, element, command = prep
+        command = cfg.MQTT_COMMAND_ALIAS.get(command, command)
 
-        topics = topic.split("/")
-
-        if len(topics) < 3:
-            logger.error(
-                "Invalid topic in mqtt message: {}".format(message.topic))
-            return None
-
-        content = message.payload.decode("utf-8").strip()
-
-        element = None
-        if len(topics) >= 4:
-            element = topics[3]
-
-        return PreparseResponse(topics, element, content)
-
-    def _mqtt_handle_notifications(self, client: Client, userdata, message: MQTTMessage):
-        prep = self._preparse_message(message)
-        if prep:
-            topics = prep.topics
-            try:
-                level = EventLevel.from_name(topics[2].upper())
-            except Exception as e:
-                logger.error(e)
+        if command.startswith('code_toggle-'):
+            tokens = command.split('-')
+            if len(tokens) < 2:
+                logger.warning("Invalid token length {}".format(len(tokens)))
                 return
 
-            ps.sendNotification(Notification(sender=self.name, message=prep.content, level=level))
+            if tokens[1] not in cfg.MQTT_TOGGLE_CODES:
+                logger.warning("Invalid toggle code {}".format(tokens[1]))
+                return
 
-    def _mqtt_handle_zone_control(self, client: Client, userdata, message: MQTTMessage):
-        prep = self._preparse_message(message)
-        if prep:
-            topics, element, command = prep
-            if not self.alarm.control_zone(element, command):
-                logger.warning(
-                    "Zone command refused: {}={}".format(element, command))
+            if element.lower() == 'all':
+                command = 'arm'
 
-    def _mqtt_handle_partition_control(self, client: Client, userdata, message: MQTTMessage):
-        try:
-            prep = self._preparse_message(message)
-            if prep:
-                topics, element, command = prep
-                command = cfg.MQTT_COMMAND_ALIAS.get(command, command)
-
-                if command.startswith('code_toggle-'):
-                    tokens = command.split('-')
-                    if len(tokens) < 2:
-                        return
-
-                    if tokens[1] not in cfg.MQTT_TOGGLE_CODES:
-                        logger.warning("Invalid toggle code {}".format(tokens[1]))
-                        return
-
-                    if element.lower() == 'all':
-                        command = 'arm'
-
-                        for k, v in self.partitions.items():
-                            # If "all" and a single partition is armed, default is
-                            # to disarm
-                            for k1, v1 in self.partitions[k].items():
-                                if (k1 == 'arm' or k1 == 'exit_delay' or k1 == 'entry_delay') and v1:
-                                    command = 'disarm'
-                                    break
-
-                            if command == 'disarm':
-                                break
-
-                    elif element in self.partitions:
-                        if ('arm' in self.partitions[element] and self.partitions[element]['arm']) \
-                                or ('exit_delay' in self.partitions[element] and self.partitions[element]['exit_delay']):
+                for k, v in self.partitions.items():
+                    # If "all" and a single partition is armed, default is
+                    # to disarm
+                    for k1, v1 in self.partitions[k].items():
+                        if (k1 == 'arm' or k1 == 'exit_delay' or k1 == 'entry_delay') and v1:
                             command = 'disarm'
-                        else:
-                            command = 'arm'
-                    else:
-                        logger.debug("Element {} not found".format(element))
-                        return
+                            break
 
-                    ps.sendNotification(Notification(sender="mqtt", message="Command by {}: {}".format(
-                            cfg.MQTT_TOGGLE_CODES[tokens[1]], command), level=EventLevel.INFO))
+                    if command == 'disarm':
+                        break
 
-                logger.debug("Partition command: {} = {}".format(element, command))
-                if not self.alarm.control_partition(element, command):
-                    logger.warning(
-                        "Partition command refused: {}={}".format(element, command))
-        except:
-            logger.exception("Handle Partition Control")
+            elif element in self.partitions:
+                if ('arm' in self.partitions[element] and self.partitions[element]['arm']) \
+                        or ('exit_delay' in self.partitions[element] and self.partitions[element]['exit_delay']):
+                    command = 'disarm'
+                else:
+                    command = 'arm'
+            else:
+                logger.warning("Element {} not found".format(element))
+                return
 
-    def _mqtt_handle_output_control(self, client: Client, userdata, message: MQTTMessage):
-        prep = self._preparse_message(message)
-        if prep:
-            topics, element, command = prep
-            logger.debug("Output command: {} = {}".format(element, command))
+            ps.sendNotification(Notification(sender="mqtt", message="Command by {}: {}".format(
+                    cfg.MQTT_TOGGLE_CODES[tokens[1]], command), level=EventLevel.INFO))
 
-            if not self.alarm.control_output(element, command):
-                logger.warning(
-                    "Output command refused: {}={}".format(element, command))
+        logger.info("Partition command: {} = {}".format(element, command))
+        if not self.alarm.control_partition(element, command):
+            logger.warning("Partition command refused: {}={}".format(element, command))
+
+    @mqtt_handle_decorator
+    def _mqtt_handle_output_control(self, prep: ParsedMessage):
+        topics, element, command = prep
+        logger.debug("Output command: {} = {}".format(element, command))
+
+        if not self.alarm.control_output(element, command):
+            logger.warning("Output command refused: {}={}".format(element, command))
 
     def _handle_panel_event(self, event: Event):
         """
