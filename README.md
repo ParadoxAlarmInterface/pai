@@ -16,6 +16,9 @@
         <a href="https://travis-ci.org/ParadoxAlarmInterface/pai/branches">
             <img alt="GitHub top language" src="https://img.shields.io/github/languages/top/ParadoxAlarmInterface/pai?label=python%203.5%2B&logo=python">
         </a>
+	<a href="https://snyk.io/test/github/ParadoxAlarmInterface/pai?targetFile=requirements.txt">
+	    <img src="https://snyk.io/test/github/ParadoxAlarmInterface/pai/badge.svg?targetFile=requirements.txt" alt="Known Vulnerabilities" data-canonical-src="https://snyk.io/test/github/ParadoxAlarmInterface/pai?targetFile=requirements.txt" style="max-width:100%;">
+	</a>
         <img alt="GitHub" src="https://img.shields.io/github/license/ParadoxAlarmInterface/pai">
     </div>
 </div>
