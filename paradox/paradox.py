@@ -533,7 +533,7 @@ class Paradox:
                 logger.error("Trouble %s has not boolean state: %s", t_key, t_status)
                 continue
 
-            self.storage.update_container_object('system', 'troubles', {t_key: global_trouble})
+            self.storage.update_container_object('system', 'troubles', {t_key: t_status})
 
             global_trouble = global_trouble or t_status
 
