@@ -2,6 +2,7 @@
 
 [![Join the chat at https://gitter.im/paradox-alarm-interface/community](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/paradox-alarm-interface/community)
 
+[![Known Vulnerabilities](https://snyk.io/test/github/ParadoxAlarmInterface/pai/badge.svg?targetFile=requirements.txt)](https://snyk.io/test/github/ParadoxAlarmInterface/pai?targetFile=requirements.txt)
 
 Middleware that aims to connect to a Paradox Alarm panel, exposing the interface for monitoring and control via several technologies.
 With this interface it is possible to integrate Paradox panels with HomeAssistant, OpenHAB, Homebridge or other domotics system that supports MQTT, as well as several IM methods.
