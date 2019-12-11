@@ -69,7 +69,7 @@ git clone https://github.com/jpbarraca/pai.git
 mkdir -p /etc/pai
 cp config/pai.conf.example /etc/pai/pai.conf
 edit /etc/pai/pai.conf as needed
-python3 run.py
+python3 pai.py
 ```
 
 Alternatively see [#Configuration](#configuration) section for supported file locations.
@@ -121,7 +121,7 @@ SERIAL_BAUD = 38400 # or 57600 if you have changed default setting in Babyware
 
 ## Running
 ```
-python3 run.py
+python3 pai.py
 ```
 
 If something goes wrong, you can edit the configuration file to increase the debug level.

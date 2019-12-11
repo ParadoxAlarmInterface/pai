@@ -18,7 +18,7 @@ RUN chown -R pai ${PAI_BASE_DIR} ${PAI_LOGGING_PATH} ${PAI_CONFIG_PATH}
 
 ADD --chown=pai paradox ${PAI_BASE_DIR}/paradox
 ADD --chown=pai requirements.txt ${PAI_BASE_DIR}/requirements.txt
-ADD --chown=pai run.py ${PAI_BASE_DIR}/run.py
+ADD --chown=pai pai.py ${PAI_BASE_DIR}/pai.py
 ADD --chown=pai config/pai.conf.example ${PAI_CONFIG_PATH}/pai.conf
 
 # OR
@@ -36,4 +36,4 @@ VOLUME ${PAI_CONFIG_PATH}
 VOLUME ${PAI_LOGGING_PATH}
 
 # run process
-CMD python run.py
+CMD python pai.py
