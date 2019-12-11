@@ -35,4 +35,4 @@ VOLUME ${PAI_CONFIG_PATH}
 VOLUME ${PAI_LOGGING_PATH}
 
 # run process
-CMD pai-service
+CMD pai-service -c ${PAI_CONFIG_PATH}/pai.conf
