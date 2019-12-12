@@ -136,8 +136,8 @@ class Panel:
 
         data = defaultdict(dict)
 
-        for elem_type in self.mem_map['elements']:
-            elem_def = self.mem_map['elements'][elem_type]
+        for elem_type in self.mem_map['labels']:
+            elem_def = self.mem_map['labels'][elem_type]
 
             addresses = enumerate(chain.from_iterable(elem_def['addresses']), start=1)
             limits = cfg.LIMITS.get(elem_type)
