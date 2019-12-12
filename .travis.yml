@@ -9,18 +9,27 @@ install:
   - pip install .
   - pip install -r requirements.txt
 script: python setup.py test
+deploy:
+  provider: pypi
+  user: __token__
+  distributions: sdist
+  skip_existing: true
+  on:
+    tags: true
+  password:
+    secure: FAeYKD6vIcjAd18VUjuNyPzEpEYIQgyeGhiYBYIr/Wx0+mhPmEqtsNzwgebfyIxkJ9LxHk8Xuo+RBbnXS37tYoH+nJxE3QKfctL1gCzuvm9dVtdF2zhzpVvshRp9g/i02WaXXn5fsvMML6dcMfcfx+MtgymBX1lhkx4DUxwrnINHpC2bJGFjz6sKXVxg2bu9nvQgQGmUoi1r/9z2N3cA5alYkVG4vCVg0w0emxX/bGIIhNYvnLDE06exYxXRPtlgkBZSP49bPcVhBrItea0drsTuWh3l9okW+f0GKXGnBhev9JS8GSbGMQvWufzmd0DYiV+QHSMYq6ontG5S66rc4xOEibiz+Wj/3lBs8+VeNUXG4fIobkUN78CVlQCbiSnWVuN4drZ9U2/T5th5yaJ9LcUlGybDVkwL/PoTlNOjmw+w6RZFTc2fI/GIrrExQuMpx4Vkip627uxt0VbDYGkL5PZAXjYdEJnJa0KQND2UBXx9qBYJeHIX9OQWLYKgpnTggaEe6jwHAvzOTlTXRO/KpPhFC0oSpu4diq2afIVqurrDPzENr97HaKc64hdPtFEbg0gLgf1t6x9K4MHpFmIEWr/2ddMUswBqjaGIEAg3D8bBRFo4kRIRDdmXxsZaLIMfuQw/KtwB4wvaKM5LuwaioViaOZ4OhALI0CpwWn5Ko5s=
 jobs:
   include:
-    - stage: deploy
-      python: '3.6'
-      script: ./.travis/deploy.sh
-      if: type != pull_request AND (branch IN (dev, master) OR tag IS present)
-      addons:
-        apt:
-          sources:
-            - sourceline: 'deb https://download.docker.com/linux/ubuntu/ xenial stable'
-              key_url: 'https://download.docker.com/linux/ubuntu/gpg'
-          packages:
-            - docker-ce
-            - docker-ce-cli
-            - containerd.io
+  - stage: deploy
+    python: '3.6'
+    script: "./.travis/deploy.sh"
+    if: type != pull_request AND (branch IN (dev, master) OR tag IS present)
+    addons:
+      apt:
+        sources:
+        - sourceline: deb https://download.docker.com/linux/ubuntu/ xenial stable
+          key_url: https://download.docker.com/linux/ubuntu/gpg
+        packages:
+        - docker-ce
+        - docker-ce-cli
+        - containerd.io
