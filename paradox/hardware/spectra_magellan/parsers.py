@@ -351,3 +351,55 @@ PerformActionResponse = Struct("fields" / RawCopy(
         "_not_used1" / Padding(33),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
+## EEPROM Structures
+ZoneDefinition = Struct(
+	definition = Enum(Int8ul,
+		disabled=0,
+		delay_1=1,
+		delay_2=2,
+		entry_delay_1_full=3,
+		entry_delay_2_full=4,
+		follow=5,
+		follow_sleep_full=6,
+		follow_full=7,
+		instant=8,
+		instant_sleep_full=9,
+		instant_full=10,
+		instant_fire=11,
+		delayed_fire=12,
+		instant_fire_silent=13,
+		delayed_fire_silent=14,
+		buzzer_24h=15,
+		burglary_24h=16,
+		hold_up_24h=17,
+		gas_24hr=18,
+		heat_24h=19,
+		water_24h=20,
+		freeze_24h=21,
+		panic_24h=22,
+		follow_no_pre_alarm=23,
+		instant_no_pre_alarm=24,
+		keyswitch_maintain=25,
+		keyswitch_momentary=26,
+		instant_no_pre_alarm_stay=33,
+		instant_no_pre_alarm_sleep=34,
+		entry_delay_1_stay_full_instant=35,
+		entry_delay_1_full_instant=36
+		),
+	partition = Int8ul,
+	options = BitStruct(
+		"auto_zone_shutdown" / Flag,
+		"bypassable" / Flag,
+		"rf_supervision" / Flag,
+		"alarm_type" / Enum(BitsInteger(2),
+			audible_alarm_steady=0,
+			silent_alarm=1,
+			audible_alarm_pulse=2,
+			report_only=3
+			),
+		"intellizone" / Flag,
+		"delay_alarm_transmission" / Flag,
+		"force_arming" / Flag
+		)
+)
