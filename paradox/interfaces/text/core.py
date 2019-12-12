@@ -69,7 +69,7 @@ class AbstractTextInterface(ThreadQueueInterface):
         tokens = message.split(" ")
 
         if len(tokens) != 3:
-            m = "Invalid command: {}".format(message_raw)
+            m = "Invalid: {}".format(message_raw)
             logger.warning(m)
             return m
 
@@ -107,7 +107,7 @@ class AbstractTextInterface(ThreadQueueInterface):
             logger.error(m)
             return m
 
-        logger.info("OK")
+        logger.info("OK: {}".format(message_raw))
         return "OK"
 
     #TODO: Remove this (to panels?)

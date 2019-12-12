@@ -29,6 +29,16 @@ class PushBulletWSClient(WebSocketBaseClient):
         self.pb = Pushbullet(cfg.PUSHBULLET_KEY)
         self.manager = WebSocketManager()
         self.interface = interface
+        
+        self.device = None
+        for i,device in enumerate(self.pb.devices):
+            if device.nickname == 'pai':
+                logger.debug("Device found")
+                self.device = device
+                break
+        else:
+            logger.exception("Device not found. Creating 'pai' device")
+            self.device = self.pb.new_device(nickname='pai', icon='system')
 
 
     def stop(self):
@@ -57,19 +67,22 @@ class PushBulletWSClient(WebSocketBaseClient):
         except:
             logger.exception("Unable to parse message")
             return
-
+        
         if message['type'] == 'tickle' and message['subtype'] == 'push':
             now = time.time()
             pushes = self.pb.get_pushes(modified_after=int(now) - 20, limit=1, filter_inactive=True)
-            logger.debug("got pushes {}".format(pushes))
             for p in pushes:
-                self.pb.dismiss_push(p.get("iden"))
-                self.pb.delete_push(p.get("iden"))
-
-                if p.get('direction') == 'outgoing' or p.get('dismissed'):
+                
+                # Ignore messages send by us
+                if p.get('direction') == 'self' and p.get('title') == 'pai':
+                    #logger.debug('Ignoring message sent')
                     continue
-
-                if p.get('sender_email_normalized') in cfg.PUSHBULLET_CONTACTS:
+                
+                if p.get('direction') == 'outgoing' or p.get('dismissed'):
+                    #logger.debug('Ignoring outgoing dismissed')
+                    continue
+                
+                if p.get('sender_email_normalized') in cfg.PUSHBULLET_CONTACTS or p.get('direction') == 'self':
                     ret = self.interface.handle_command(p.get('body'))
 
                     m = "PB {}: {}".format(p.get('sender_email_normalized'), ret)
@@ -77,7 +90,7 @@ class PushBulletWSClient(WebSocketBaseClient):
                 else:
                     m = "PB {} (UNK): {}".format(p.get('sender_email_normalized'), p.get('body'))
                     logger.warning(m)
-
+                
                 self.send_message(m)
                 ps.sendNotification(Notification(sender=self.name, message=m, level=EventLevel.INFO))
 
@@ -97,7 +110,9 @@ class PushBulletWSClient(WebSocketBaseClient):
 
         if not isinstance(dstchat, list):
             dstchat = [dstchat]
-
+        # Push to self
+        self.device.push_note("pai", msg)
+        
         for chat in dstchat:
             if chat.email in cfg.PUSHBULLET_CONTACTS:
                 try:
@@ -113,7 +128,7 @@ class PushbulletTextInterface(ConfiguredAbstractTextInterface):
     def __init__(self):
         super().__init__(cfg.PUSHBULLET_EVENT_FILTERS, cfg.PUSHBULLET_ALLOW_EVENTS, cfg.PUSHBULLET_IGNORE_EVENTS,
                          cfg.PUSHBULLET_MIN_EVENT_LEVEL)
-
+        self.name = PushBulletWSClient.name
         self.pb_ws = None
 
     def _run(self):

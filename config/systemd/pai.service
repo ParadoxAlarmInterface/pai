@@ -5,7 +5,7 @@ After=network-online.target signal.service
 
 [Service]
 WorkingDirectory=/opt/pai
-ExecStart=/usr/bin/python3 /opt/pai/run.py -c /etc/pai/pai.conf
+ExecStart=/usr/bin/python3 /opt/pai/pai.py -c /etc/pai/pai.conf
 User=root
 StandardOutput=syslog
 StandardError=syslog
