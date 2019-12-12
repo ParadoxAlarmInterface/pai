@@ -11,7 +11,7 @@ with open('README.md', 'r') as fh:
 
 setup(
     name='paradox-alarm-interface',
-    version='1.1.0',
+    version='1.2.0',
     author='João Paulo Barraca',
     author_email='jpbarraca@gmail.com',
     description='Interface to Paradox Alarm Panels',
@@ -20,9 +20,6 @@ setup(
     url='https://github.com/ParadoxAlarmInterface/pai',
     download_url='https://github.com/ParadoxAlarmInterface/pai/archive/1.1.0.tar.gz',
     packages=find_packages(exclude=['tests', 'tests.*', 'config.*', 'docs.*']),
-    scripts=[
-        'pai.py'
-    ],
     install_requires=[
         'construct >= 2.9.43',
         'argparse >= 1.4.0'

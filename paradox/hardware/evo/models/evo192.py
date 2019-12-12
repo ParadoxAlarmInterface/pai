@@ -3,7 +3,7 @@ from ..panel import Panel_EVOBase
 
 class Panel_EVO192(Panel_EVOBase):
     mem_map = {
-        "elements": {
+        "labels": {
             "zone": {
                 "label_offset": 0, "addresses": [
                     range(0x00430, 0x00730, 0x10),  # EVO48

@@ -56,7 +56,7 @@ class MQTTConnection(Client):
             self.loop_start()
 
             self.connect(host=cfg.MQTT_HOST, port=cfg.MQTT_PORT, keepalive=cfg.MQTT_KEEPALIVE,
-                bind_address=cfg.MQTT_BIND_ADDRESS)
+                bind_address=cfg.MQTT_BIND_ADDRESS, bind_port=cfg.MQTT_BIND_PORT)
 
             self.state = ConnectionState.CONNECTING
 

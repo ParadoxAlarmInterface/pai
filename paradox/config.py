@@ -56,7 +56,8 @@ class Config:
         "MQTT_USERNAME": (None, [str, type(None)]),  # MQTT Username for authentication
         "MQTT_PASSWORD": (None, [str, type(None)]),  # MQTT Password
         "MQTT_RETAIN": True,                         # Publish messages with Retain
-        "MQTT_BIND_ADDRESS": '127.0.0.1',
+        "MQTT_BIND_ADDRESS": '127.0.0.1',            # MQTT Bind address
+        "MQTT_BIND_PORT": 0,                         # MQTT Bind port
         "MQTT_REPUBLISH_INTERVAL": (60 * 60 * 12, int, (60, 0xFFFFFFFF)),    # Interval for republishing all data
         "MQTT_HOMEASSISTANT_AUTODISCOVERY_ENABLE": False,
 

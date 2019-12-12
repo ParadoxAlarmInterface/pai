@@ -31,11 +31,15 @@ class Panel(PanelBase):
     mem_map = {
         "status_base1": 0x8000,
         "status_base2": 0x1fe0,
-        "elements": {
+        "definitions": {
             "zone": {
-                "label_offset": 0, "addresses": [range(0x010, 0x210, 0x10)],
-                "definitions": 0, "addresses": [range(0x730, 0x800, 0x03)]
-            },
+                "addresses": [
+                    range(0x730, 0x800, 0x03)
+                ]
+            }
+        },
+        "labels": {
+            "zone": {"label_offset": 0, "addresses": [range(0x010, 0x210, 0x10)]},
             "pgm": {"label_offset": 0, "addresses": [range(0x210, 0x310, 0x10)], "template": {
                 "on": False,
                 "pulse": False}
