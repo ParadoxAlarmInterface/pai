@@ -31,7 +31,6 @@ setup(
         'pytest-asyncio',
         'pytest-env',
         'pytest-mock',
-        'asynctest'
         'mock'
     ],
     classifiers=[
