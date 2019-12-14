@@ -130,7 +130,7 @@ If something goes wrong, you can edit the configuration file to increase the deb
 ## Tested Environment
 
 Tested in the following environment:
-* Python > 3.5.2
+* Python 3.6, 3.7, 3.8
 * Mosquitto MQTT Broker >v 1.4.8
 * OrangePi 2G-IOT, NanoPi NEO, and Raspberry Pi 3 through their built in Serial Port (with a level shifter!), or a USB RS232 TTL adapter (CP2102, PL2303, CH340, etc..)
 * Ubuntu Server 16.04.3 LTS
