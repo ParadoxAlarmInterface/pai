@@ -41,7 +41,6 @@ class SerialConnectionProtocol(ConnectionProtocol):
         self.on_port_open()
  
     async def _send_message(self, message):
-
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("PAI -> SER {}".format(binascii.hexlify(message)))
 

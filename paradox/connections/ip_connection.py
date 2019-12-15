@@ -14,6 +14,7 @@ from paradox.lib import stun
 from paradox.lib.crypto import encrypt, decrypt
 from paradox.parsers.paradox_ip_messages import *
 from .connection import Connection, ConnectionProtocol
+from .serial_connection import SerialConnectionProtocol
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -120,7 +121,14 @@ class IPConnection(Connection):
             self.connection = None
 
     def make_protocol(self):
-        return IPConnectionProtocol(self.on_message, self.on_connection_lost, self.key)
+        if cfg.IP_CONNECTION_BARE:
+            return SerialConnectionProtocol(self.on_message, self.on_bare_connection_open, self.on_connection_lost)
+        else:
+            return IPConnectionProtocol(self.on_message, self.on_connection_lost, self.key)
+
+    def on_bare_connection_open(self):
+        logger.info('Serial port open')
+        self.connected = True
 
     async def connect(self):
         tries = 1
