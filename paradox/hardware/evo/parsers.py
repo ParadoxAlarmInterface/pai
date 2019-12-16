@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 from construct import Struct, RawCopy, BitStruct, Const, Nibble, Flag, Rebuild, Int8ub, BitsInteger, Int16ub, Checksum, \
     Bytes, this, Default, Padding, Enum, Int24ub, ExprAdapter, Byte, obj_, Array, Computed, Subconstruct, \
-    ValidationError, ExprSymmetricAdapter, Bitwise, BitsSwapped
+    ValidationError, ExprSymmetricAdapter, Bitwise, BitsSwapped, Octet
 
 from .adapters import PGMFlags, StatusAdapter, DateAdapter, ZoneFlags, PartitionStatus, EventAdapter, ZoneFlagBitStruct
 from ..common import CommunicationSourceIDEnum, ProductIdEnum, calculate_checksum
@@ -149,6 +149,44 @@ RAMDataParserMap = {
     5: Struct(
         "_free" / Padding(1),
         "bus-module_trouble" / StatusAdapter(Bytes(63))
+    )
+}
+
+DefinitionsParserMap = {
+    "zone": BitStruct(
+        "zone_definition" / Enum(Nibble,
+            disabled=0x0,
+            entry_delay1=0x1,
+            entry_delay2=0x2,
+            follow=0x3,
+            instant=0x4,
+            buzzer_24h=0x5,
+            burglary_24h=0x6,
+            holdup_24h=0x7,
+            gas_24h=0x8,
+            heat_24h=0x9,
+            water_24h=0xa,
+            freeze_24h=0xb,
+            delayed_fire_24h=0xc,
+            standard_fire_24h=0xd,
+            stay_delay1=0xe,
+            stay_delay2=0xf,
+        ),
+        "partition" / Nibble,
+        "options" / Struct(
+            "delay_before_transmission" / Flag,
+            "intellizone" / Flag,
+            "alarm_type" / Enum(BitsInteger(2),
+                steady_alarm=0x0,
+                silent_alarm=0x1,
+                pulsed_alarm=0x2,
+                report_only=0x3,
+            ),
+            "force_zone" / Flag,
+            "stay_zone" / Flag,
+            "bypass_enabled" / Flag,
+            "auto_zone_shutdown_enabled" / Flag
+        )
     )
 }
 

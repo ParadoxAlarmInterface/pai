@@ -58,6 +58,7 @@ class Paradox:
         self.loop_wait_event = asyncio.Event()
 
         ps.subscribe(self._on_labels_load, "labels_loaded")
+        ps.subscribe(self._on_definitons_load, "definitons_loaded")
         ps.subscribe(self._on_status_update, "status_update")
         ps.subscribe(self._on_event, "events")
         ps.subscribe(self._on_property_change, "changes")
@@ -139,7 +140,7 @@ class Paradox:
 
             logger.info("Starting communication")
             reply = await self.send_wait(self.panel.get_message('StartCommunication'),
-                                   args=dict(source_id=0x02), reply_expected=0x00)
+                                         args=dict(source_id=0x02), reply_expected=0x00)
 
             if reply is None:
                 raise ConnectionError("Panel did not replied to StartCommunication")
@@ -166,6 +167,11 @@ class Paradox:
                 else:
                     logger.warning("Requested memory dump, but current panel type does not support it yet.")
 
+            logger.info("Loading definitions")
+            definitions = await self.panel.load_definitions()
+            ps.sendMessage('definitons_loaded', data=definitions)
+
+            logger.info("Loading labels")
             labels = await self.panel.load_labels()
             ps.sendMessage('labels_loaded', data=labels)
 
@@ -503,6 +509,12 @@ class Paradox:
             self.connection.write(panel.get_message('CloseConnection').build(dict()))
 
     def _on_labels_load(self, data):
+        for k, d in data.items():
+            self.storage.get_container(k).deep_merge(d)
+
+        logger.debug(self.storage.get_container('zone'))
+
+    def _on_definitons_load(self, data):
         for k, d in data.items():
             self.storage.get_container(k).deep_merge(d)
 
