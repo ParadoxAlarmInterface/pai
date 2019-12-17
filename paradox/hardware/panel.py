@@ -145,11 +145,20 @@ class Panel:
                 parser = parsers[elem_type]
                 assert isinstance(parser, Construct)
                 elem_def = self.mem_map['definitions'][elem_type]
+                limits = cfg.LIMITS.get(elem_type)
+                enabled_indexes = []
 
                 addresses = enumerate(chain.from_iterable(elem_def['addresses']), start=1)
 
                 async for index, raw_data in self._eeprom_batch_reader(addresses, parser.sizeof()):
-                    data[elem_type][index] = parser.parse(raw_data)
+                    element = data[elem_type][index] = parser.parse(raw_data)
+                    definition = element.get('definition')
+                    if definition != 'disabled':
+                        enabled_indexes.append(index)
+
+                if limits is None:
+                    cfg.LIMITS[elem_type] = enabled_indexes
+
         except ResourceWarning:
             pass
 

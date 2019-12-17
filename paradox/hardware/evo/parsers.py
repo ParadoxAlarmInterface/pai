@@ -154,7 +154,7 @@ RAMDataParserMap = {
 
 DefinitionsParserMap = {
     "zone": BitStruct(
-        "zone_definition" / Enum(Nibble,
+        "definition" / Enum(Nibble,
             disabled=0x0,
             entry_delay1=0x1,
             entry_delay2=0x2,
