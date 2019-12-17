@@ -137,6 +137,8 @@ RAMDataParserMap = {
     ),
 }
 
+DefinitionsParserMap = {}
+
 LiveEvent = Struct("fields" / RawCopy(
     Struct(
         "po" / BitStruct(
