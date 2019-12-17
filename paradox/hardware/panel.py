@@ -19,6 +19,7 @@ class Panel:
     mem_map = {}
     event_map = {}
     property_map = {}
+    max_eeprom_response_data_length=0
 
     def __init__(self, core, product_id, variable_message_length=True):
         self.core = core
@@ -184,7 +185,10 @@ class Panel:
 
         return reply.fields.value.data
 
-    async def _eeprom_batch_reader(self, addresses, field_length, max_request_length=64):
+    async def _eeprom_batch_reader(self, addresses, field_length):
+        if self.max_eeprom_response_data_length < 1:
+            raise AssertionError("Wrong max_eeprom_response_data_length")
+
         batch = []
         while True:
             send_batch = None
@@ -192,7 +196,7 @@ class Panel:
                 ia = IndexAddress(*next(addresses))
                 if batch and (
                         (batch[0].address + len(batch) * field_length != ia.address)  # Addresses are not sequential
-                        or ((len(batch) + 1) * field_length > max_request_length)  # one more field will not fit
+                        or ((len(batch) + 1) * field_length > self.max_eeprom_response_data_length)  # one more field will not fit
                 ):
                     send_batch = batch
                     batch = []

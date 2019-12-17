@@ -40,6 +40,7 @@ ZONE_ACTIONS = dict(
 class Panel_EVOBase(PanelBase):
     event_map = event_map
     property_map = property_map
+    max_eeprom_response_data_length = 64
 
     def get_message(self, name: str) -> Construct:
         try:

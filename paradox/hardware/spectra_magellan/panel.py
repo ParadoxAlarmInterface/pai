@@ -26,6 +26,7 @@ class Panel(PanelBase):
 
     event_map = event_map
     property_map = property_map
+    max_eeprom_response_data_length = 32
 
     mem_map = {
         "status_base1": 0x8000,
