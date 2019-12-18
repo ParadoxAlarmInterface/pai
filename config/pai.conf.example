@@ -67,7 +67,7 @@ import logging
 # 
 ### MQTT
 # MQTT_ENABLE = False			# Enable MQTT Interface
-# MQTT_HOST = 'localhost' 		# Hostname or address
+# MQTT_HOST = '127.0.0.1' 		# Hostname or address
 # MQTT_PORT = 1883        		# TCP Port
 # MQTT_KEEPALIVE = 60     		# Keep alive
 # MQTT_USERNAME = None    		# MQTT Username for authentication
