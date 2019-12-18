@@ -512,8 +512,6 @@ class Paradox:
         for k, d in data.items():
             self.storage.get_container(k).deep_merge(d)
 
-        logger.debug(self.storage.get_container('zone'))
-
     def _on_definitons_load(self, data):
         for k, d in data.items():
             self.storage.get_container(k).deep_merge(d)
