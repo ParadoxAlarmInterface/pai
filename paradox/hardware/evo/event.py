@@ -26,8 +26,8 @@ def _zone_generated_alarm(event, storage, *_, **__):
 event_map = {
     0: dict(level=EventLevel.DEBUG, change=dict(open=False), type='zone', message='Zone {label} OK'),
     1: dict(level=EventLevel.DEBUG, change=dict(open=True), type='zone', message='Zone {label} open'),
-    2: dict(level=EventLevel.CRITICAL, tags=['trouble'], change=dict(zone_tamper_trouble=True), type='zone', message='Zone {label} tampered'),
-    3: dict(level=EventLevel.CRITICAL, tags=['trouble'], type='zone', change=dict(fire_loop_trouble=True), message='Zone {label} in fire loop trouble'),
+    2: dict(level=EventLevel.WARN, tags=['trouble'], change=dict(zone_tamper_trouble=True), type='zone', message='Zone {label} tampered'),
+    3: dict(level=EventLevel.WARN, tags=['trouble'], type='zone', change=dict(fire_loop_trouble=True), message='Zone {label} in fire loop trouble'),
     4: dict(level=EventLevel.DEBUG, message='Non-reportable event',
             sub={
                 0: dict(level=EventLevel.CRITICAL, type='system', tags=['trouble'], message='Telephone line trouble'),
@@ -100,8 +100,8 @@ event_map = {
     23: dict(level=EventLevel.INFO, type='zone', change=dict(bypassed=_toggle_provider), tags=['bypass'], message='Zone {label} bypass toggled'),
     24: dict(level=EventLevel.CRITICAL, tags=['alarm', 'trigger'], type='zone', change=dict(generated_alarm=True, presently_in_alarm=True), message='Zone {label} in alarm', hook_fn=_zone_generated_alarm),
     25: dict(level=EventLevel.CRITICAL, tags=['alarm', 'fire', 'trigger'], type='zone', change=dict(fire_alarm=True), message='Zone {label} in fire alarm', hook_fn=_request_status_refresh),
-    26: dict(level=EventLevel.CRITICAL, tags=['alarm', 'restore'], type='zone', change=dict(presently_in_alarm=False), message='Zone {label} alarm restore', hook_fn=_request_status_refresh),
-    27: dict(level=EventLevel.CRITICAL, tags=['alarm', 'fire', 'restore'], type='zone', change=dict(fire_alarm=False), message='Zone {label} fire alarm restore', hook_fn=_request_status_refresh),
+    26: dict(level=EventLevel.WARN, tags=['alarm', 'restore'], type='zone', change=dict(presently_in_alarm=False), message='Zone {label} alarm restore', hook_fn=_request_status_refresh),
+    27: dict(level=EventLevel.WARN, tags=['alarm', 'fire', 'restore'], type='zone', change=dict(fire_alarm=False), message='Zone {label} fire alarm restore', hook_fn=_request_status_refresh),
     28: dict(level=EventLevel.INFO, type='user', message='{label} Early to disarm by user'),
     29: dict(level=EventLevel.INFO, type='user', message='{label} Late to disarm by user'),
     30: dict(level=EventLevel.CRITICAL, type='special', message='Special alarm', tags=['alarm', 'trigger'], sub={
@@ -153,7 +153,7 @@ event_map = {
         20: dict(message='Fail To Communicate IP Receiver 1 (IP)'),
         21: dict(message='Fail To Communicate IP Receiver 2 (IP)')
     }),
-    37: dict(level=EventLevel.WARN, type='system', message='Trouble restore', tags=['trouble', 'restore'], sub={
+    37: dict(level=EventLevel.INFO, type='system', message='Trouble restore', tags=['trouble', 'restore'], sub={
         0: dict(message='TLM trouble restore'),
         1: dict(message='AC failure restore'),
         2: dict(message='Battery failure restore'),
@@ -177,7 +177,7 @@ event_map = {
         21: dict(message='Fail To Communicate IP Receiver 2 (IP) restore'),
         99: dict(message='Any trouble event restore')
     }),
-    38: dict(level=EventLevel.WARN, type='system', message='Module trouble', tags=['trouble'],sub={
+    38: dict(level=EventLevel.WARN, type='system', message='Module trouble', tags=['trouble'], sub={
         0: dict(message='Combus fault'),
         1: dict(message='Module tamper'),
         2: dict(message='ROM/RAM error'),
@@ -189,7 +189,7 @@ event_map = {
         8: dict(message='Auxiliary failure'),
         9: dict(message='Future use'),
     }, module=_minor2_provider),
-    39: dict(level=EventLevel.WARN, type='system', message='Module trouble restore', tags=['trouble', 'restore'],sub={
+    39: dict(level=EventLevel.INFO, type='system', message='Module trouble restore', tags=['trouble', 'restore'], sub={
         0: dict(message='Combus fault restored'),
         1: dict(message='Module tamper restored'),
         2: dict(message='ROM/RAM error restored'),
@@ -204,9 +204,9 @@ event_map = {
     40: dict(level=EventLevel.WARN, type='system', message='Fail to communicate on telephone number',
         telephone=_minor2_provider),
     41: dict(level=EventLevel.WARN, type='zone', changes=dict(zone_low_battery_trouble=True), tags=['trouble'], message='Low battery on zone {label}'),
-    42: dict(level=EventLevel.WARN, type='zone', changes=dict(zone_supervision_trouble=True), message='Zone {label} supervision trouble', tags=['trouble']),
-    43: dict(level=EventLevel.WARN, type='zone', changes=dict(zone_low_battery_trouble=False), message='Low battery on zone {label} restored', tags=['trouble', 'restore']),
-    44: dict(level=EventLevel.WARN, type='zone', changes=dict(zone_supervision_trouble=False),  message='Zone {label} supervision trouble restored', tags=['trouble', 'restore']),
+    42: dict(level=EventLevel.WARN, type='zone', changes=dict(zone_supervision_trouble=True), tags=['trouble'], message='Zone {label} supervision trouble'),
+    43: dict(level=EventLevel.INFO, type='zone', changes=dict(zone_low_battery_trouble=False), tags=['trouble', 'restore'], message='Low battery on zone {label} restored'),
+    44: dict(level=EventLevel.INFO, type='zone', changes=dict(zone_supervision_trouble=False), tags=['trouble', 'restore'],  message='Zone {label} supervision trouble restored'),
     45: dict(level=EventLevel.INFO, type='system', message='Special events', sub={
         0: 'Power-up after total power down',
         1: 'Software reset (watchdog)',
