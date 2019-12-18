@@ -1,6 +1,6 @@
 import os
 import logging
-
+import json
 
 class Config:
     DEFAULTS = { 
@@ -173,6 +173,7 @@ class Config:
 
     CONFIG_LOADED = False
     CONFIG_FILE_LOCATION = None,
+    OPTIONS_FILE_LOCATION = '/data/options.json'
 
     def __init__(self):
         if Config.CONFIG_LOADED:
@@ -258,6 +259,7 @@ class Config:
                         logging.error("Invalid value for config argument {}. Allowed are: {}".format(type(v), k, expected_value))
                         raise(Exception("Error parsing configuration value"))
 
+        # Sets values from env variables
         for args in os.environ:
             if not args.startswith('PAI_') and len(args) > 4:
                 continue
@@ -268,6 +270,22 @@ class Config:
                     v = int(v)
 
                 setattr(Config, opt, v)
+
+        # Sets values from Hass.io add-on options
+        if os.environ.get('OPTIONS_FILE') is not None:
+            Config.OPTIONS_FILE_LOCATION = os.environ.get('OPTIONS_FILE')
+
+        if os.path.exists(Config.OPTIONS_FILE_LOCATION) and os.path.isfile(Config.OPTIONS_FILE_LOCATION):
+            with open(Config.OPTIONS_FILE_LOCATION) as options_file:
+                # loads the options
+                options = json.load(options_file)
+                logging.info("Found options file at {} and loading values!".format(Config.OPTIONS_FILE_LOCATION))
+                
+                for option in options:
+                    if opt in Config.DEFAULTS:
+                        setattr(Config, option, options[option])
+        else:
+            logging.error("Could not find options file at: {}".format(Config.OPTIONS_FILE_LOCATION))
 
         Config.CONFIG_LOADED = True
 

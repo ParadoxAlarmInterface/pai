@@ -1,4 +1,4 @@
-ARG ARCH="arm32v7/"
+ARG ARCH=""
 # RPI ARCH="arm32v7/"
 
 FROM ${ARCH}python:3.6-alpine3.10
@@ -13,8 +13,6 @@ ENV WORK_DIR=workdir \
 ENV PAI_CONFIG_FILE=${PAI_CONFIG_PATH}/pai.conf \
   PAI_LOGGING_FILE=${PAI_LOGGING_PATH}/paradox.log \
   OPTIONS_FILE=${DATA_PATH}/options.json
-
-ENV PAI_CONNECTION_TYPE="$(jq --raw-output '.connection_type' $OPTIONS_FILE)"
 
 # build /opt/mqttwarn
 RUN mkdir -p ${PAI_CONFIG_PATH} ${WORK_DIR} ${PAI_LOGGING_PATH}
