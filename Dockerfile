@@ -1,4 +1,4 @@
-ARG ARCH=""
+ARG ARCH="arm32v7/"
 # RPI ARCH="arm32v7/"
 
 FROM ${ARCH}python:3.6-alpine3.10
