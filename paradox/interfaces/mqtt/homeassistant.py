@@ -56,12 +56,13 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         self.zones = data.get('zone', {})
 
     def _handle_status_update(self, status):
-        if 'partition' in status:
-            self._process_partition_statuses(status['partition'])
-        if 'zone' in status:
-            self._process_zone_statuses(status['zone'])
+        if self.mqtt.connected:
+            if 'partition' in status:
+                self._process_partition_statuses(status['partition'])
+            if 'zone' in status:
+                self._process_zone_statuses(status['zone'])
 
-        self.first_status = False
+            self.first_status = False
 
     def _process_partition_statuses(self, partition_statuses):
         for p_key, p_status in partition_statuses.items():
