@@ -281,9 +281,13 @@ class Config:
                 options = json.load(options_file)
                 logging.info("Found options file at {} and loading values!".format(Config.OPTIONS_FILE_LOCATION))
                 
-                for option in options:
+                for opt in options:
                     if opt in Config.DEFAULTS:
-                        setattr(Config, option, options[option])
+                        v = options[opt]
+                        if v.isdigit():
+                            v = int(v)
+
+                        setattr(Config, opt, v)
         else:
             logging.error("Could not find options file at: {}".format(Config.OPTIONS_FILE_LOCATION))
 
