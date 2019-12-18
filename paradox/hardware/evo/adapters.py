@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import datetime
+from typing import Callable, Any
+
 from construct import *
 
 
@@ -63,6 +65,19 @@ class ZoneFlags(Subconstruct):
 
     def _encode(self, obj, context, path):
         return b"".join([self.flag_parser.build(i) for i in obj])
+
+
+class FlexibleFlagArrayAdapter(Adapter):
+    def __init__(self, subcon, value_decode_fn: Callable[[Any], Any]):
+        super(FlexibleFlagArrayAdapter, self).__init__(subcon)
+        self.value_decode_fn = value_decode_fn
+
+    def _decode(self, obj, context, path):
+        r = dict()
+        for i in range(0, len(obj)):
+            r[i + 1] = self.value_decode_fn(obj[i])
+
+        return r
 
 
 class StatusFlagArrayAdapter(Adapter):

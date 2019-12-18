@@ -39,6 +39,12 @@ class Panel_EVO192(Panel_EVOBase):
                     range(0x01f0, 0x02ae + 2, 2),  # EVO96
                     range(0x60b7, 0x6175 + 2, 2)  # EVO192
                 ]
+            },
+            "partition": {
+                "bit_encoded": True,
+                "addresses": [
+                    [0x39d8]  # All 8 partitions as bits
+                ]
             }
         }
     }

@@ -43,5 +43,18 @@ class Panel_EVO96(Panel_EVOBase):
                 "label_offset": 0,
                 "addresses": [range(0x0345c, 0x365c, 0x10)]
             }
+        },
+        "definitions": {
+            "zone": {
+                "addresses": [
+                    range(0x01f0, 0x02ae + 2, 2)  # EVO96
+                ]
+            },
+            "partition": {
+                "bit_encoded": True,
+                "addresses": [
+                    [0x39d8]  # All 8 partitions as bits
+                ]
+            }
         }
     }

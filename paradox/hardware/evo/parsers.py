@@ -2,9 +2,9 @@ from collections.abc import Mapping
 
 from construct import Struct, RawCopy, BitStruct, Const, Nibble, Flag, Rebuild, Int8ub, BitsInteger, Int16ub, Checksum, \
     Bytes, this, Default, Padding, Enum, Int24ub, ExprAdapter, Byte, obj_, Array, Computed, Subconstruct, \
-    ValidationError, ExprSymmetricAdapter, Bitwise, BitsSwapped, Octet
+    ValidationError, ExprSymmetricAdapter, Bitwise, BitsSwapped
 
-from .adapters import PGMFlags, StatusAdapter, DateAdapter, ZoneFlags, PartitionStatus, EventAdapter, ZoneFlagBitStruct
+from .adapters import PGMFlags, StatusAdapter, DateAdapter, ZoneFlags, PartitionStatus, EventAdapter, ZoneFlagBitStruct, FlexibleFlagArrayAdapter
 from ..common import CommunicationSourceIDEnum, ProductIdEnum, calculate_checksum
 
 LoginConfirmationResponse = Struct("fields" / RawCopy(
@@ -31,7 +31,7 @@ LoginConfirmationResponse = Struct("fields" / RawCopy(
 InitializeCommunication = Struct("fields" / RawCopy(
     Struct(
         "po" / Struct("command" / Const(0x00, Int8ub)),
-        "module_address" / Default(Int8ub, 0x00),
+        "module_address" / Default(Int8ub, 0x00),  # (00= panel/module)
         "_not_used0" / Padding(2),
         "product_id" / ProductIdEnum,
         "firmware" / Struct(
@@ -187,7 +187,10 @@ DefinitionsParserMap = {
             "bypass_enabled" / Flag,
             "auto_zone_shutdown_enabled" / Flag
         )
-    )
+    ),
+    "partition": BitsSwapped(
+        Bitwise(FlexibleFlagArrayAdapter(Array(8, Flag), lambda x: {"definition":"enabled" if x else "disabled"})
+    )),
 }
 
 LiveEvent = Struct("fields" / RawCopy(
@@ -351,11 +354,11 @@ ReadEEPROMResponse = Struct("fields" / RawCopy(
         "packet_length" / Rebuild(Int8ub, lambda
             this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
         "control" / BitStruct(
-            "ram_access" / Flag,
+            "ram_access" / Flag,  # RAM = 0 or EEPROM = 1
             "_not_used" / Padding(5),
-            "eeprom_address_bits" / BitsInteger(2)
+            "eeprom_address_bits" / BitsInteger(2)  # EEPROM address bit 17 and 16
         ),
-        "bus_address" / Int8ub,  # 00 - Panel, 01-FF - Modules
+        "bus_address" / Int8ub,  # 00 - Panel, 01-FE - Modules
         "address" / Int16ub,
         "data" / Bytes(lambda this: this.packet_length - 7)
     )),

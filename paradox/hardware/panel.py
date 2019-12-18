@@ -152,9 +152,15 @@ class Panel:
 
                 async for index, raw_data in self._eeprom_batch_reader(addresses, parser.sizeof()):
                     element = data[elem_type][index] = parser.parse(raw_data)
-                    definition = element.get('definition')
-                    if definition != 'disabled':
-                        enabled_indexes.append(index)
+                    if elem_def.get("bit_encoded"):
+                        for elem_index, elem_data in element.items():
+                            definition = elem_data.get('definition')
+                            if definition != 'disabled':
+                                enabled_indexes.append((index-1)*len(element) + elem_index)
+                    else:
+                        definition = element.get('definition')
+                        if definition != 'disabled':
+                            enabled_indexes.append(index)
 
                 if limits is None:
                     cfg.LIMITS[elem_type] = enabled_indexes

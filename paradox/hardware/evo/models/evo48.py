@@ -38,5 +38,18 @@ class Panel_EVO48(Panel_EVOBase):
                 "label_offset": 0,
                 "addresses": [range(0x0345c, 0x365c, 0x10)]
             }
+        },
+        "definitions": {
+            "zone": {
+                "addresses": [
+                    range(0x01f0, 0x024e + 2, 2)  # EVO48
+                ]
+            },
+            "partition": {
+                "bit_encoded": True,
+                "addresses": [
+                    [0x39d8]  # All 8 partitions as bits
+                ]
+            }
         }
     }
