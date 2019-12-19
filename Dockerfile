@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 ARG ARCH=""
 # RPI ARCH="arm32v7/"
 
