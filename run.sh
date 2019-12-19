@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+set -e
 
 cd "${0%/*}"
-python3 paradox/console_scripts/pai_run.py "$@"
+python3 -m paradox.console_scripts.pai_run "$@"

@@ -50,7 +50,7 @@ class Config:
 
         # MQTT
         "MQTT_ENABLE": False,                        # Enable MQTT Interface
-        "MQTT_HOST": 'localhost',                    # Hostname or address
+        "MQTT_HOST": '127.0.0.1',                    # Hostname or address
         "MQTT_PORT": (1883, int, (1, 65535)),        # TCP Port
         "MQTT_KEEPALIVE": (60, int, (1, 3600)),      # Keep alive
         "MQTT_USERNAME": (None, [str, type(None)]),  # MQTT Username for authentication
@@ -71,6 +71,7 @@ class Config:
         "MQTT_USER_TOPIC": 'users',               # Base for user states
         "MQTT_EVENTS_TOPIC": 'events',            # Base for events
         "MQTT_CONTROL_TOPIC": 'control',          # Base for control of othe elements (ROOT/CONTROL/TYPE)
+        "MQTT_DEFINITION_TOPIC": 'definitions',    # Base for definitions
         "MQTT_HOMEASSISTANT_CONTROL_TOPIC": 'hass_control',
         "MQTT_HOMEASSISTANT_DISCOVERY_PREFIX": 'homeassistant',
         "MQTT_OUTPUT_TOPIC": 'outputs',

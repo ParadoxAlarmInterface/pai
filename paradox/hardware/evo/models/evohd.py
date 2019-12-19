@@ -6,7 +6,7 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 class Panel_EVOHD(Panel_EVOBase):
     mem_map = {
-        "elements": {
+        "labels": {
             "zone": {
                 "label_offset": 0, "addresses": [
                     range(0x00430, 0x00730, 0x10),  # EVO48

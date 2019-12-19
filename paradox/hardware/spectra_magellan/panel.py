@@ -4,15 +4,14 @@ import asyncio
 import binascii
 import inspect
 import logging
-import sys
 from typing import Optional
+
+from construct import Construct, Container, ChecksumError
 
 from paradox.config import config as cfg
 from paradox.exceptions import StatusRequestException
+from . import parsers
 from .event import event_map
-from .parsers import Construct, CloseConnection, ErrorMessage, InitializeCommunication, InitializeCommunicationResponse, \
-    SetTimeDate, SetTimeDateResponse, PerformAction, PerformActionResponse, ReadStatusResponse, ReadEEPROM, \
-    ReadEEPROMResponse, LiveEvent, RAMDataParserMap, Container, ChecksumError
 from .property import property_map
 from ..panel import Panel as PanelBase
 
@@ -27,11 +26,19 @@ class Panel(PanelBase):
 
     event_map = event_map
     property_map = property_map
+    max_eeprom_response_data_length = 32
 
     mem_map = {
         "status_base1": 0x8000,
         "status_base2": 0x1fe0,
-        "elements": {
+        "definitions": {
+            "zone": {
+                "addresses": [
+                    range(0x730, 0x800, 0x03)
+                ]
+            }
+        },
+        "labels": {
             "zone": {"label_offset": 0, "addresses": [range(0x010, 0x210, 0x10)]},
             "pgm": {"label_offset": 0, "addresses": [range(0x210, 0x310, 0x10)], "template": {
                 "on": False,
@@ -74,7 +81,7 @@ class Panel(PanelBase):
                 logger.info("Dumping %s: address %x" % (mem_type, address))
 
                 reply = await self.core.send_wait(
-                    self.get_message('ReadEEPROM'), args,
+                    parsers.ReadEEPROM, args,
                         reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address)
 
                 if reply is None:
@@ -87,7 +94,7 @@ class Panel(PanelBase):
 
     def get_message(self, name: str) -> Construct:
         try:
-            clsmembers = dict(inspect.getmembers(sys.modules[__name__]))
+            clsmembers = dict(inspect.getmembers(parsers))
             if name in clsmembers:
                 return clsmembers[name]
         except ResourceWarning:
@@ -106,36 +113,36 @@ class Panel(PanelBase):
 
             if direction == 'topanel':
                 if message[0] == 0x70 and message[-5] != 0:
-                    return CloseConnection.parse(message)
+                    return parsers.CloseConnection.parse(message)
                 elif message[0] == 0x00:
-                    return InitializeCommunication.parse(message)
+                    return parsers.InitializeCommunication.parse(message)
                 elif message[0] == 0x30:
-                    return SetTimeDate.parse(message)
+                    return parsers.SetTimeDate.parse(message)
                 elif message[0] == 0x40:
-                    return PerformAction.parse(message)
+                    return parsers.PerformAction.parse(message)
                 elif message[0] == 0x50 and message[2] < 0x80:
-                    return ReadEEPROM.parse(message)
+                    return parsers.ReadEEPROM.parse(message)
             
             else:
                 if message[0] == 0x10:
-                    return InitializeCommunicationResponse.parse(message)
+                    return parsers.InitializeCommunicationResponse.parse(message)
                 elif message[0] >> 4 == 0x7 and message[-5] == 0:
-                    return ErrorMessage.parse(message)
+                    return parsers.ErrorMessage.parse(message)
                 elif message[0] >> 4 == 0x03:
-                    return SetTimeDateResponse.parse(message)
+                    return parsers.SetTimeDateResponse.parse(message)
                 elif message[0] >> 4 == 0x04:
-                    return PerformActionResponse.parse(message)
+                    return parsers.PerformActionResponse.parse(message)
                 elif message[0] >> 4 == 0x05 and message[2] == 0x80:
-                    return ReadStatusResponse.parse(message)
+                    return parsers.ReadStatusResponse.parse(message)
                 elif message[0] >> 4 == 0x05 and message[2] < 0x80:
-                    return ReadEEPROMResponse.parse(message)
+                    return parsers.ReadEEPROMResponse.parse(message)
 
             #        elif message[0] == 0x60 and message[2] < 0x80:
             #            return WriteEEPROM.parse(message)
             #        elif message[0] >> 4 == 0x06 and message[2] < 0x80:
             #            return WriteEEPROMResponse.parse(message)
                 elif message[0] >> 4 == 0x0e:
-                    return LiveEvent.parse(message)
+                    return parsers.LiveEvent.parse(message)
 
         except ChecksumError as e:
             logger.error("ChecksumError %s, message: %s" % (str(e), binascii.hexlify(message)))
@@ -156,7 +163,7 @@ class Panel(PanelBase):
                     )
 
         logger.info("Initializing communication")
-        reply = await self.core.send_wait(self.get_message('InitializeCommunication'), args=args, reply_expected=0x10)
+        reply = await self.core.send_wait(parsers.InitializeCommunication, args=args, reply_expected=0x10)
 
         if reply is None:
             logger.error("Initialization Failed")
@@ -182,10 +189,10 @@ class Panel(PanelBase):
 
     async def request_status(self, i: int):
         args = dict(address=self.mem_map['status_base1'] + i)
-        reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, i))
+        reply = await self.core.send_wait(parsers.ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, i))
         if reply is not None:
             logger.debug("Received status response: %d" % i)
-            return self.handle_status(reply, RAMDataParserMap)
+            return self.handle_status(reply, parsers.RAMDataParserMap)
         else:
             raise StatusRequestException("No reply to status request: %d" % i)
 
@@ -203,7 +210,7 @@ class Panel(PanelBase):
 
         for zone in zones:
             args = dict(action=ZONE_ACTIONS[command], argument=(zone - 1))
-            reply = await self.core.send_wait(PerformAction, args, reply_expected=0x04)
+            reply = await self.core.send_wait(parsers.PerformAction, args, reply_expected=0x04)
 
             if reply is not None:
                 accepted = True
@@ -224,7 +231,7 @@ class Panel(PanelBase):
 
         for partition in partitions:
             args = dict(action=PARTITION_ACTIONS[command], argument=(partition - 1))
-            reply = await self.core.send_wait(PerformAction, args, reply_expected=0x04)
+            reply = await self.core.send_wait(parsers.PerformAction, args, reply_expected=0x04)
 
             if reply is not None:
                 accepted = True
@@ -246,18 +253,18 @@ class Panel(PanelBase):
         for output in outputs:
             if command == 'pulse':
                 args = dict(action=PGM_ACTIONS['on'], argument=(output - 1))
-                reply = await self.core.send_wait(PerformAction, args, reply_expected=0x04)
+                reply = await self.core.send_wait(parsers.PerformAction, args, reply_expected=0x04)
                 if reply is None:
                     continue
 
                 await asyncio.sleep(cfg.OUTPUT_PULSE_DURATION)
                 args = dict(action=PGM_ACTIONS['off'], argument=(output - 1))
-                reply = await self.core.send_wait(PerformAction, args, reply_expected=0x04)
+                reply = await self.core.send_wait(parsers.PerformAction, args, reply_expected=0x04)
                 if reply is not None:
                     accepted = True
             else:
                 args = dict(action=PGM_ACTIONS[command], argument=(output - 1))
-                reply = await self.core.send_wait(PerformAction, args, reply_expected=0x04)
+                reply = await self.core.send_wait(parsers.PerformAction, args, reply_expected=0x04)
                 if reply is not None:
                     accepted = True
 
