@@ -1,7 +1,9 @@
+<<<<<<< HEAD
 ARG ARCH=""
 # RPI ARCH="arm32v7/"
 
-FROM ${ARCH}python:3.6-alpine3.10
+FROM ${ARCH}python:3.7-alpine
+
 
 ENV WORK_DIR=workdir \
   DATA_PATH=/data \
