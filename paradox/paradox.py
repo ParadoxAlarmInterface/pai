@@ -58,7 +58,7 @@ class Paradox:
         self.loop_wait_event = asyncio.Event()
 
         ps.subscribe(self._on_labels_load, "labels_loaded")
-        ps.subscribe(self._on_definitons_load, "definitons_loaded")
+        ps.subscribe(self._on_definitions_load, "definitons_loaded")
         ps.subscribe(self._on_status_update, "status_update")
         ps.subscribe(self._on_event, "events")
         ps.subscribe(self._on_property_change, "changes")
@@ -512,7 +512,7 @@ class Paradox:
         for k, d in data.items():
             self.storage.get_container(k).deep_merge(d)
 
-    def _on_definitons_load(self, data):
+    def _on_definitions_load(self, data):
         for k, d in data.items():
             self.storage.get_container(k).deep_merge(d)
 
