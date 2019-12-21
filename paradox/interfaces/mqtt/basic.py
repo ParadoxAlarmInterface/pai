@@ -234,7 +234,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         else:
             publish_value = value
 
-        self.publish('/{}/{}/{}/{}'.format(base,
+        self.publish('{}/{}/{}/{}'.format(base,
                                              element_topic,
                                              sanitize_key(label),
                                              attribute),
