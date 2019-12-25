@@ -137,13 +137,13 @@ class Panel:
 
         data = defaultdict(dict)
         try:
-            parsers = self.get_message('DefinitionsParserMap')
+            def_parsers = self.get_message('DefinitionsParserMap')
 
             definitions = self.mem_map['definitions']
             for elem_type in definitions:
-                if elem_type not in parsers:
+                if elem_type not in def_parsers:
                     logger.warning('No parser for %s definitions', elem_type)
-                parser = parsers[elem_type]
+                parser = def_parsers[elem_type]
                 assert isinstance(parser, Construct)
                 elem_def = definitions[elem_type]
                 limits = cfg.LIMITS.get(elem_type)
@@ -152,13 +152,16 @@ class Panel:
                 addresses = enumerate(chain.from_iterable(elem_def['addresses']), start=1)
 
                 async for index, raw_data in self._eeprom_batch_reader(addresses, parser.sizeof()):
-                    element = data[elem_type][index] = parser.parse(raw_data)
+                    element = parser.parse(raw_data)
                     if elem_def.get("bit_encoded"):
                         for elem_index, elem_data in element.items():
                             definition = elem_data.get('definition')
+                            data_index = (index-1)*len(element) + elem_index
+                            data[elem_type][data_index] = elem_data
                             if definition != 'disabled':
-                                enabled_indexes.append((index-1)*len(element) + elem_index)
+                                enabled_indexes.append(data_index)
                     else:
+                        data[elem_type][index] = element
                         definition = element.get('definition')
                         if definition != 'disabled':
                             enabled_indexes.append(index)
@@ -306,5 +309,3 @@ class Panel:
 
     def dump_memory(self):
         raise NotImplementedError("override dump_memory in a subclass")
-
-

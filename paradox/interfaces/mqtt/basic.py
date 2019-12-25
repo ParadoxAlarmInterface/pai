@@ -189,16 +189,18 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             self._publish_dash(cfg.MQTT_DASH_TEMPLATE, list(self.partitions.keys()))
 
         for element_type in self.definitions: # zones, partitions
-            for i in self.definitions[element_type]: # index
-                if i not in self.labels[element_type]:
+            labels = self.labels[element_type]
+            definitions = self.definitions[element_type]
+            for i in definitions:  # numeric index
+                if i not in labels:
                     continue
                 
-                for attribute in self.definitions[element_type][i]: # attribute
+                for attribute in definitions[i]:  # attribute
                     self._publish(f'{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_DEFINITION_TOPIC}',
                                   element_type,
-                                  self.labels[element_type][i]['key'],
+                                  labels[i]['key'],
                                   attribute,
-                                  self.definitions[element_type][i][attribute])
+                                  definitions[i][attribute])
         
     def _handle_panel_change(self, change: Change):
         attribute = change.property
@@ -213,7 +215,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         self.partitions[label][attribute] = value
         self._publish(f'{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_STATES_TOPIC}', element_type, label, attribute, value)
         
-    def _publish(self, base: str, element_type: str, label: str, attribute: str, value:[str, int, bool]):
+    def _publish(self, base: str, element_type: str, label: str, attribute: str, value: [str, int, bool]):
         if element_type in ELEMENT_TOPIC_MAP:
             element_topic = ELEMENT_TOPIC_MAP[element_type]
         else:
