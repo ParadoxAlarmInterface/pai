@@ -4,7 +4,8 @@ import json
 import re
 from copy import deepcopy
 from functools import reduce
-
+from construct import Container, ListContainer
+from typing import Mapping, List
 
 class JSONByteEncoder(json.JSONEncoder):
     def default(self, o):
@@ -52,3 +53,12 @@ def sanitize_key(key):
         return str(key)
     else:
         return re_sanitize_key.sub('_', key).strip('_')
+
+
+def construct_free(container: Container):
+    if isinstance(container, (Container, Mapping)):
+        return dict((k, construct_free(v)) for k, v in container.items() if not (isinstance(k, str) and k.startswith('_')))
+    elif isinstance(container, (ListContainer, List)):
+        return list(construct_free(v) for v in container)
+    else:
+        return container

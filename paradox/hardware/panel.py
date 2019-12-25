@@ -7,7 +7,7 @@ from itertools import chain
 from construct import Construct, Container, EnumIntegerString
 
 from paradox.config import config as cfg
-from paradox.lib.utils import sanitize_key
+from paradox.lib.utils import sanitize_key, construct_free
 from . import parsers
 
 logger = logging.getLogger('PAI').getChild(__name__)
@@ -172,7 +172,7 @@ class Panel:
         except ResourceWarning:
             pass
 
-        return data
+        return construct_free(data)
 
     async def load_labels(self):
         logger.info("Updating Labels from Panel")
