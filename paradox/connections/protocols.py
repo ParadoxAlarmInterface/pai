@@ -54,14 +54,14 @@ class SerialConnectionProtocol(ConnectionProtocol):
                 if self.buffer[0] >> 4 == 0:
                     potential_packet_length = 37
                 elif self.buffer[0] >> 4 in [1, 3, 4, 5, 6, 7, 8, 9]:
-                    potential_packet_length = self.buffer[1] if self.buffer[1] > 0 and self.buffer[1] <= 71 else 37
+                    potential_packet_length = self.buffer[1] if 0 < self.buffer[1] <= 71 else 37
                 elif self.buffer[0] >> 4 in [0x0A, 0x0B, 0x0D]:
                     potential_packet_length = self.buffer[1]
                 elif self.buffer[0] >> 4 == 0x0C:
                     potential_packet_length = self.buffer[1] * 256 + self.buffer[2]
                 elif self.buffer[0] >> 4 == 0x0E:
-                    if self.buffer[1] < 37 or self.buffer[
-                        1] == 0xFF:  # MG/SP in 21st century and EVO Live Events. Probable values=0x13, 0x13, 0x00, 0xFF
+                    if self.buffer[1] < 37 or self.buffer[1] == 0xFF:
+                        # MG/SP in 21st century and EVO Live Events. Probable values=0x13, 0x13, 0x00, 0xFF
                         potential_packet_length = 37
                     else:
                         potential_packet_length = self.buffer[1]

@@ -139,12 +139,13 @@ class Panel:
         try:
             parsers = self.get_message('DefinitionsParserMap')
 
-            for elem_type in self.mem_map['definitions']:
+            definitions = self.mem_map['definitions']
+            for elem_type in definitions:
                 if elem_type not in parsers:
                     logger.warning('No parser for %s definitions', elem_type)
                 parser = parsers[elem_type]
                 assert isinstance(parser, Construct)
-                elem_def = self.mem_map['definitions'][elem_type]
+                elem_def = definitions[elem_type]
                 limits = cfg.LIMITS.get(elem_type)
                 enabled_indexes = []
 
@@ -209,9 +210,10 @@ class Panel:
             send_batch = None
             try:
                 ia = IndexAddress(*next(addresses))
+                batch_len = len(batch)
                 if batch and (
-                        (batch[0].address + len(batch) * field_length != ia.address)  # Addresses are not sequential
-                        or ((len(batch) + 1) * field_length > self.max_eeprom_response_data_length)  # one more field will not fit
+                        (batch[0].address + batch_len * field_length != ia.address)  # Addresses are not sequential
+                        or ((batch_len + 1) * field_length > self.max_eeprom_response_data_length)  # one more field will not fit
                 ):
                     send_batch = batch
                     batch = []
@@ -274,7 +276,8 @@ class Panel:
     def request_status(self, nr):
         raise NotImplementedError("override request_status in a subclass")
 
-    def handle_status(self, message: Container, parser_map):
+    @staticmethod
+    def handle_status(message: Container, parser_map):
         """Handle MessageStatus"""
         mvars = message.fields.value
 

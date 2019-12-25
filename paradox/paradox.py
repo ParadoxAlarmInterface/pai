@@ -113,8 +113,6 @@ class Paradox:
         self.reset()
         self.run = State.INIT
 
-        self.connection.timeout(0.5)
-
         if not self.panel:
             self.panel = create_panel(self)
             self.connection.variable_message_length(self.panel.variable_message_length)
@@ -250,7 +248,8 @@ class Paradox:
         logger.debug("Scheduling status request: %d" % i)
         return await self.panel.request_status(i)
 
-    def _process_status(self, raw_status: Container):
+    @staticmethod
+    def _process_status(raw_status: Container):
         status = convert_raw_status(raw_status)
 
         for limit_key, limit_arr in cfg.LIMITS.items():
@@ -317,7 +316,6 @@ class Paradox:
             try:
                 async with self.request_lock:
                     if message is not None:
-                        self.connection.timeout(timeout)
                         self.connection.write(message)
 
                     if reply_expected is not None:

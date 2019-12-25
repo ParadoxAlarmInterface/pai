@@ -176,7 +176,8 @@ class Panel(PanelBase):
             logger.error("Authentication Failed. Wrong Password?")
             return False
 
-    def _request_status_reply_check(self, message: Container, address: int):
+    @staticmethod
+    def _request_status_reply_check(message: Container, address: int):
         mvars = message.fields.value
 
         if (

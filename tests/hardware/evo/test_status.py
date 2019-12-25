@@ -1,9 +1,7 @@
-import mock
 import json
 
 from paradox.paradox import Paradox
 from paradox.parsers.status import convert_raw_status
-
 from .status_data import message_parser_output, converted_status
 
 

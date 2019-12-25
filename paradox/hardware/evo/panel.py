@@ -169,7 +169,8 @@ class Panel_EVOBase(PanelBase):
                 logger.error("Authentication Failed")
                 return False
 
-    def _request_status_reply_check(self, message: Container, address: int):
+    @staticmethod
+    def _request_status_reply_check(message: Container, address: int):
         mvars = message.fields.value
 
         if (mvars.po.command == 0x5

@@ -13,6 +13,7 @@ class DateAdapter(Adapter):
     def _encode(self, obj, context, path):
         return [obj.year / 100, obj.year % 100, obj.month, obj.day, obj.hour, obj.minute, obj.second]
 
+
 class ModuleSerialAdapter(Adapter):
     def _decode(self, obj, context, path):
         return hex(int(obj[0]) * 10 ^ 8 + int(obj[1]) * 10 ^ 4 + int(obj[2]) * 10 ^ 2 + int(
@@ -35,6 +36,7 @@ class PartitionStateAdapter(Adapter):
 
         return 0
 
+
 ZoneFlagBitStruct = BitStruct(
     "generated_alarm" / Default(Flag, False),
     "presently_in_alarm" / Default(Flag, False),
@@ -45,6 +47,7 @@ ZoneFlagBitStruct = BitStruct(
     "tx_delay" / Default(Flag, False),
     "supervision_trouble" / Default(Flag, False),
 )
+
 
 # noinspection PyUnresolvedReferences,PyUnresolvedReferences
 class ZoneFlags(Subconstruct):

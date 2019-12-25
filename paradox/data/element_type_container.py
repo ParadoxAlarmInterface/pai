@@ -8,11 +8,10 @@ class ElementTypeContainer(dict):
         for i in remove_keys:
             self.pop(i)
 
-    def select(self, needle) -> Sequence[int]:
+    def select(self, needle: str) -> Sequence[int]:
         """
         Helper function to select objects from provided dictionary
 
-        :param haystack: dictionary
         :param needle:
         :return: Sequence[int] list of object indexes
         """

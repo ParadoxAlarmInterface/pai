@@ -52,9 +52,6 @@ class Connection(AsyncMessageManager):
         else:
             raise ConnectionError("Failed to write data to connection")
 
-    def timeout(self, timeout=5.0):
-        self.default_timeout = timeout
-
     def close(self):
         logger.info('Closing connection')
 

@@ -29,6 +29,8 @@ requests>=2.20.0
 # pydbus>=0.6.0
 # gi>=1.2
 #
+# Tools
+pyyaml>=5.2.0
+#
 # Testing
-# pytest
 PyPubSub>=4.0.3
