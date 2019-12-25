@@ -169,7 +169,7 @@ class Paradox:
 
             logger.info("Loading definitions")
             definitions = await self.panel.load_definitions()
-            ps.sendMessage('definitons_loaded', data=definitions)
+            ps.sendMessage('definitions_loaded', data=definitions)
 
             logger.info("Loading labels")
             labels = await self.panel.load_labels()
