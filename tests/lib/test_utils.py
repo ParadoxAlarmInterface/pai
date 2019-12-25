@@ -1,6 +1,6 @@
-from construct import Container
+from construct import Container, ListContainer
 
-from paradox.lib.utils import deep_merge, sanitize_key
+from paradox.lib.utils import deep_merge, sanitize_key, construct_free
 
 
 def test_deep_merge():
@@ -45,3 +45,16 @@ def test_sanitize_key():
     assert sanitize_key('Living room') == 'Living_room'
 
     assert sanitize_key(1) == '1'
+
+def test_construct_free():
+    a = Container(a=Container(test="this", _io='beer2'), _io='beer')
+
+    r = construct_free(a)
+    assert isinstance(r, dict)
+    assert isinstance(r["a"], dict)
+
+    a = Container(a=ListContainer([Container(test="this", _io='beer2')]), _io='beer')
+
+    r = construct_free(a)
+    assert isinstance(r, dict)
+    assert isinstance(r["a"], list)
