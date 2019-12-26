@@ -31,7 +31,7 @@ import logging
 ### IP Connection Details
 # IP_CONNECTION_HOST = '127.0.0.1'	# IP Module address when using direct IP Connection
 # IP_CONNECTION_PORT = 10000		    # IP Module port when using direct IP Connection
-# IP_CONNECTION_PASSWORD = b'paradox' # IP Module password. "paradox" is default.
+# IP_CONNECTION_PASSWORD = 'paradox' # IP Module password. "paradox" is default.
 # IP_CONNECTION_SITEID = None 		# SITE ID. IF defined, connection will be made through this method.
 # IP_CONNECTION_EMAIL = None 		# Email registered in the site
 # IP_CONNECTION_PANEL_SERIAL = None  # Use a specific panel. Set it to None to use the first
@@ -54,7 +54,6 @@ import logging
 # LABEL_ENCODING = 'utf-8'                # Encoding to use when decoding labels
 # LABEL_REFRESH_INTERVAL = 15 * 60        # Interval between refresh of labels
 # OUTPUT_PULSE_DURATION = 1               # Duration of a PGM pulse in seconds
-# PARTITIONS_CHANGE_NOTIFICATION_IGNORE = ['arm_full', 'exit_delay'] # Do not send notifications for these notifications
 # STATUS_REQUESTS = [0, 1, 2, 3, 4, 5]
 # SYNC_TIME = True    			# Update panel time
 # PASSWORD = '0000'   			# PC Password. Set to None if Panel has no Password.

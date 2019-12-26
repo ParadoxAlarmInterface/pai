@@ -14,7 +14,6 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 IndexAddress = namedtuple('IndexAddress', 'idx address')
 
-
 class Panel:
     mem_map = {}
     event_map = {}

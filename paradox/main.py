@@ -73,6 +73,8 @@ def main(args):
 
     config_logger(logger)
 
+    logger.info("Config loaded from %s", cfg.CONFIG_FILE_LOCATION)
+
     logger.info("Starting Paradox Alarm Interface")
     logger.info("Console Log level set to {}".format(cfg.LOGGING_LEVEL_CONSOLE))
 
