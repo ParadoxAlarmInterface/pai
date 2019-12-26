@@ -11,14 +11,14 @@ with open('README.md', 'r') as fh:
 
 setup(
     name='paradox-alarm-interface',
-    version='1.2.0',
+    version='1.3.0',
     author='João Paulo Barraca',
     author_email='jpbarraca@gmail.com',
     description='Interface to Paradox Alarm Panels',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/ParadoxAlarmInterface/pai',
-    download_url='https://github.com/ParadoxAlarmInterface/pai/archive/1.1.0.tar.gz',
+    download_url='https://github.com/ParadoxAlarmInterface/pai/archive/1.3.0.tar.gz',
     packages=find_packages(exclude=['tests', 'tests.*', 'config.*', 'docs.*']),
     install_requires=[
         'construct >= 2.9.43',
