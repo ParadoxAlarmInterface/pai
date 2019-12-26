@@ -3,17 +3,13 @@
 import binascii
 import inspect
 import logging
-import sys
 from typing import Optional
 
 from construct import Construct, Container, MappingError, ChecksumError
 
 from paradox.exceptions import StatusRequestException
+from . import parsers
 from .event import event_map
-from .parsers import CloseConnection, ErrorMessage, InitializeCommunication, LoginConfirmationResponse, SetTimeDate, \
-    SetTimeDateResponse, PerformPartitionAction, PerformPartitionActionResponse, PerformZoneAction, \
-    PerformZoneActionResponse, ReadEEPROMResponse, LiveEvent, \
-    ReadEEPROM, RAMDataParserMap, RequestedEvent
 from .property import property_map
 from ..panel import Panel as PanelBase
 
@@ -40,14 +36,15 @@ ZONE_ACTIONS = dict(
     }
 )
 
-class Panel_EVOBase(PanelBase):
 
+class Panel_EVOBase(PanelBase):
     event_map = event_map
     property_map = property_map
+    max_eeprom_response_data_length = 64
 
     def get_message(self, name: str) -> Construct:
         try:
-            clsmembers = dict(inspect.getmembers(sys.modules[__name__]))
+            clsmembers = dict(inspect.getmembers(parsers))
             if name in clsmembers:
                 return clsmembers[name]
         except ResourceWarning:
@@ -76,7 +73,7 @@ class Panel_EVOBase(PanelBase):
                     control=dict(ram_access=ram))
                 logger.info("Dumping %s: address %d" % (mem_type, address))
                 reply = await self.core.send_wait(
-                    self.get_message('ReadEEPROM'), args, reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address)
+                    parsers.ReadEEPROM, args, reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address)
 
                 if reply is None:
                     logger.error("Could not read %s: address %d" % (mem_type, address))
@@ -97,26 +94,26 @@ class Panel_EVOBase(PanelBase):
 
             if direction == 'topanel':
                 if message[0] == 0x70:
-                    return CloseConnection.parse(message)
+                    return parsers.CloseConnection.parse(message)
                 elif message[0] == 0x00:
-                    return InitializeCommunication.parse(message)
+                    return parsers.InitializeCommunication.parse(message)
                 elif message[0] == 0x30:
-                    return SetTimeDate.parse(message)
+                    return parsers.SetTimeDate.parse(message)
                 elif message[0] == 0x40:
-                    return PerformPartitionAction.parse(message)
+                    return parsers.PerformPartitionAction.parse(message)
                 elif message[0] == 0xd0:
-                    return PerformZoneAction.parse(message)
+                    return parsers.PerformZoneAction.parse(message)
             else:
                 if message[0] >> 4 == 0x7:
-                    return ErrorMessage.parse(message)
+                    return parsers.ErrorMessage.parse(message)
                 elif message[0] >> 4 == 0x1:
-                    return LoginConfirmationResponse.parse(message)
+                    return parsers.LoginConfirmationResponse.parse(message)
                 elif message[0] >> 4 == 0x03:
-                    return SetTimeDateResponse.parse(message)
+                    return parsers.SetTimeDateResponse.parse(message)
                 elif message[0] >> 4 == 4:
-                    return PerformPartitionActionResponse.parse(message)
+                    return parsers.PerformPartitionActionResponse.parse(message)
                 elif message[0] >> 4 == 0xd:
-                    return PerformZoneActionResponse.parse(message)
+                    return parsers.PerformZoneActionResponse.parse(message)
                 # elif message[0] == 0x50 and message[2] == 0x80:
                 #     return PanelStatus.parse(message)
                 # elif message[0] == 0x50 and message[2] < 0x80:
@@ -125,16 +122,16 @@ class Panel_EVOBase(PanelBase):
                 #     return PanelStatusResponse[message[3]].parse(message)
                 # elif message[0] >> 4 == 0x05 and message[2] < 0x80:
                 elif message[0] >> 4 == 0x05:
-                    return ReadEEPROMResponse.parse(message)
+                    return parsers.ReadEEPROMResponse.parse(message)
                 # elif message[0] == 0x60 and message[2] < 0x80:
                 #     return WriteEEPROM.parse(message)
                 # elif message[0] >> 4 == 0x06 and message[2] < 0x80:
                 #     return WriteEEPROMResponse.parse(message)
                 elif message[0] >> 4 == 0x0e:
                     if message[1] == 0xff:
-                        return LiveEvent.parse(message)
+                        return parsers.LiveEvent.parse(message)
                     else:
-                        return RequestedEvent.parse(message)
+                        return parsers.RequestedEvent.parse(message)
 
         except ChecksumError as e:
             logger.error("ChecksumError %s, message: %s" % (str(e), binascii.hexlify(message)))
@@ -147,9 +144,9 @@ class Panel_EVOBase(PanelBase):
         encoded_password = self.encode_password(password)
 
         raw_data = reply.fields.data + reply.checksum
-        parsed = InitializeCommunication.parse(raw_data)
+        parsed = parsers.InitializeCommunication.parse(raw_data)
         parsed.fields.value.pc_password = encoded_password
-        payload = InitializeCommunication.build(
+        payload = parsers.InitializeCommunication.build(
             dict(fields=dict(value=parsed.fields.value)))
 
         logger.info("Initializing communication")
@@ -172,7 +169,8 @@ class Panel_EVOBase(PanelBase):
                 logger.error("Authentication Failed")
                 return False
 
-    def _request_status_reply_check(self, message: Container, address: int):
+    @staticmethod
+    def _request_status_reply_check(message: Container, address: int):
         mvars = message.fields.value
 
         if (mvars.po.command == 0x5
@@ -187,10 +185,10 @@ class Panel_EVOBase(PanelBase):
 
     async def request_status(self, i: int) -> Optional[Container]:
         args = dict(address=i, length=64, control=dict(ram_access=True))
-        reply = await self.core.send_wait(ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, args['address']))
+        reply = await self.core.send_wait(parsers.ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, args['address']))
         if reply is not None:
             logger.debug("Received status response: %d" % i)
-            return self.handle_status(reply, RAMDataParserMap)
+            return self.handle_status(reply, parsers.RAMDataParserMap)
         else:
             raise StatusRequestException("No reply to status request: %d" % i)
 
@@ -205,7 +203,7 @@ class Panel_EVOBase(PanelBase):
 
         try:
             reply = await self.core.send_wait(
-                PerformPartitionAction, args, reply_expected=0x04)
+                parsers.PerformPartitionAction, args, reply_expected=0x04)
         except MappingError:
             logger.error('Partition command: "%s" is not supported' % command)
             return False
@@ -227,7 +225,7 @@ class Panel_EVOBase(PanelBase):
 
         try:
             reply = await self.core.send_wait(
-                PerformZoneAction, args, reply_expected=0xd)
+                parsers.PerformZoneAction, args, reply_expected=0xd)
         except MappingError:
             logger.error('Zone command: "%s" is not supported' % command)
             return False

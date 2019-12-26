@@ -11,68 +11,12 @@ import requests
 
 from paradox.config import config as cfg
 from paradox.lib import stun
-from paradox.lib.crypto import encrypt, decrypt
-from paradox.parsers.paradox_ip_messages import *
-from .connection import Connection, ConnectionProtocol
+from paradox.lib.crypto import encrypt
+from paradox.parsers.paradox_ip_messages import ip_message, ip_payload_connect_response
+from .connection import Connection
+from .protocols import SerialConnectionProtocol, IPConnectionProtocol
 
 logger = logging.getLogger('PAI').getChild(__name__)
-
-
-class IPConnectionProtocol(ConnectionProtocol):
-    def __init__(self, on_message: typing.Callable[[bytes], None], on_con_lost, key):
-        super(IPConnectionProtocol, self).__init__(on_message=on_message, on_con_lost=on_con_lost)
-        self.buffer = b''
-        self.key = key
-
-    def send_raw(self, raw):
-        if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("PAI -> Mod {}".format(binascii.hexlify(raw)))
-        self.transport.write(raw)
-
-    def send_message(self, message):
-        if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("PAI -> IPC {}".format(binascii.hexlify(message)))
-
-        payload = encrypt(message, self.key)
-        msg = ip_message.build(
-            dict(header=dict(length=len(message), unknown0=0x04, flags=0x09, command=0x00, encrypt=1), payload=payload))
-        if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("IPC -> Mod {}".format(binascii.hexlify(msg)))
-        self.transport.write(msg)
-
-    def _get_message_payload(self, data):
-        message = ip_message.parse(data)
-
-        if len(message.payload) >= 16 and len(message.payload) % 16 == 0 and message.header.flags & 0x01 != 0:
-            message_payload = decrypt(data[16:], self.key)[:message.header.length]
-        else:
-            message_payload = message.payload[:message.header.length]
-
-        if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("IPC -> PAI {}".format(binascii.hexlify(message_payload)))
-
-        return message_payload
-
-    def data_received(self, recv_data):
-        self.buffer += recv_data
-
-        if self.buffer[0] != 0xaa:
-            if len(self.buffer) > 0:
-                logger.warning('Dangling data in the receive buffer: %s' % binascii.hexlify(self.buffer))
-            self.buffer = b''
-            return
-
-        if len(recv_data) + 16 < self.buffer[1]:
-            return
-
-        if len(self.buffer) % 16 != 0:
-            return
-
-        if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("Mod -> IPC {}".format(binascii.hexlify(self.buffer)))
-
-        self.on_message(self._get_message_payload(self.buffer))
-        self.buffer = b''
 
 
 class IPConnection(Connection):
@@ -120,7 +64,14 @@ class IPConnection(Connection):
             self.connection = None
 
     def make_protocol(self):
-        return IPConnectionProtocol(self.on_message, self.on_connection_lost, self.key)
+        if cfg.IP_CONNECTION_BARE:
+            return SerialConnectionProtocol(self.on_message, self.on_bare_connection_open, self.on_connection_lost)
+        else:
+            return IPConnectionProtocol(self.on_message, self.on_connection_lost, self.key)
+
+    def on_bare_connection_open(self):
+        logger.info('Serial port open')
+        self.connected = True
 
     async def connect(self):
         tries = 1

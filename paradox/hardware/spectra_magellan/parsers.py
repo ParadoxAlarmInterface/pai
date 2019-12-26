@@ -24,7 +24,8 @@ InitializeCommunication = Struct("fields" / RawCopy(
             "high" / Default(Int8ub, 0),
             "low" / Default(Int8ub, 0)),
     )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+                                 "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data),
+                                                       this.fields.data))
 
 InitializeCommunicationResponse = Struct("fields" / RawCopy(
     Struct(
@@ -37,7 +38,8 @@ InitializeCommunicationResponse = Struct("fields" / RawCopy(
             "partition_1" / Flag),
         "_not_used0" / Padding(31),
     )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+                                         "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data),
+                                                               this.fields.data))
 
 PanelStatus = Struct("fields" / RawCopy(
     Struct(
@@ -50,8 +52,8 @@ PanelStatus = Struct("fields" / RawCopy(
         "user_high" / Default(Int8ub, 0),
         "user_low" / Default(Int8ub, 0),
     )),
-    Padding(31),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+                     Padding(31),
+                     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 RAMDataParserMap = {
     0: Struct(
@@ -158,7 +160,7 @@ LiveEvent = Struct("fields" / RawCopy(
         "unknown1" / Bytes(1),
         "reserved0" / Bytes(4),
     )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+                   "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 CloseConnection = Struct("fields" / RawCopy(
     Struct(
@@ -175,7 +177,7 @@ CloseConnection = Struct("fields" / RawCopy(
         "user_high" / Default(Int8ub, 0),
         "user_low" / Default(Int8ub, 0),
     )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+                         "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 ErrorMessage = Struct("fields" / RawCopy(
     Struct(
@@ -207,7 +209,7 @@ ErrorMessage = Struct("fields" / RawCopy(
                          ),
         "_not_used1" / Padding(33),
     )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+                      "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 ReadEEPROM = Struct("fields" / RawCopy(
     Struct(
@@ -219,7 +221,7 @@ ReadEEPROM = Struct("fields" / RawCopy(
         "user_high" / Default(Int8ub, 0),
         "user_low" / Default(Int8ub, 0),
     )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+                    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 ReadEEPROMResponse = Struct("fields" / RawCopy(
     Struct(
@@ -234,8 +236,7 @@ ReadEEPROMResponse = Struct("fields" / RawCopy(
         "address" / Int16ub,
         "data" / Bytes(32),
     )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-
+                            "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 ReadStatusResponse = Struct("fields" / RawCopy(
     Struct(
@@ -251,7 +252,7 @@ ReadStatusResponse = Struct("fields" / RawCopy(
         "address" / Int8ub,
         "data" / Bytes(32),
     )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+                            "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 # noinspection PyUnresolvedReferences
 SetTimeDate = Struct("fields" / RawCopy(
@@ -270,7 +271,7 @@ SetTimeDate = Struct("fields" / RawCopy(
         "user_high" / Default(Int8ub, 0),
         "user_low" / Default(Int8ub, 0),
     )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+                     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 SetTimeDateResponse = Struct("fields" / RawCopy(
     Struct(
@@ -283,7 +284,7 @@ SetTimeDateResponse = Struct("fields" / RawCopy(
                 "NeWare_connected" / Flag)),
         "_not_used0" / Padding(35),
     )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+                             "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 PerformAction = Struct("fields" / RawCopy(
     Struct(
@@ -318,7 +319,7 @@ PerformAction = Struct("fields" / RawCopy(
         "user_high" / Default(Int8ub, 0),
         "user_low" / Default(Int8ub, 0),
     )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+                       "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
 PerformActionResponse = Struct("fields" / RawCopy(
     Struct(
@@ -350,4 +351,58 @@ PerformActionResponse = Struct("fields" / RawCopy(
                         Future_Use=0x90),
         "_not_used1" / Padding(33),
     )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+                               "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
+## EEPROM Structures
+DefinitionsParserMap = {
+    "zone": Struct(
+        "definition" / Enum(Int8ul,
+                            disabled=0,
+                            delay_1=1,
+                            delay_2=2,
+                            entry_delay_1_full=3,
+                            entry_delay_2_full=4,
+                            follow=5,
+                            follow_sleep_full=6,
+                            follow_full=7,
+                            instant=8,
+                            instant_sleep_full=9,
+                            instant_full=10,
+                            instant_fire=11,
+                            delayed_fire=12,
+                            instant_fire_silent=13,
+                            delayed_fire_silent=14,
+                            buzzer_24h=15,
+                            burglary_24h=16,
+                            hold_up_24h=17,
+                            gas_24hr=18,
+                            heat_24h=19,
+                            water_24h=20,
+                            freeze_24h=21,
+                            panic_24h=22,
+                            follow_no_pre_alarm=23,
+                            instant_no_pre_alarm=24,
+                            keyswitch_maintain=25,
+                            keyswitch_momentary=26,
+                            instant_no_pre_alarm_stay=33,
+                            instant_no_pre_alarm_sleep=34,
+                            entry_delay_1_stay_full_instant=35,
+                            entry_delay_1_full_instant=36
+                            ),
+        "partition" / Int8ul,
+        "options" / BitStruct(
+            "auto_zone_shutdown" / Flag,
+            "bypassable" / Flag,
+            "rf_supervision" / Flag,
+            "alarm_type" / Enum(BitsInteger(2),
+                                audible_alarm_steady=0,
+                                silent_alarm=1,
+                                audible_alarm_pulse=2,
+                                report_only=3
+                                ),
+            "intellizone" / Flag,
+            "delay_alarm_transmission" / Flag,
+            "force_arming" / Flag
+        )
+    )
+}

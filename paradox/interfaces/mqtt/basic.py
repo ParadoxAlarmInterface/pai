@@ -60,10 +60,16 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         super().__init__()
 
         self.partitions = {}
+        self.definitions = {}
+        self.labels = {}
 
     async def run(self):
+        ps.subscribe(self._handle_panel_labels, "labels_loaded")
+        ps.subscribe(self._handle_panel_definitions, "definitions_loaded")
         ps.subscribe(self._handle_panel_change, "changes")
         ps.subscribe(self._handle_panel_event, "events")
+        ps.subscribe(self._handle_connected, "connected")
+        
 
         await super().run()
 
@@ -171,6 +177,31 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                                         cfg.MQTT_RAW_TOPIC),
                          json.dumps(event.props, ensure_ascii=False, cls=JSONByteEncoder, default=str, sort_keys=True), 0, cfg.MQTT_RETAIN)
 
+    def _handle_panel_labels(self, data: dict):
+        self.labels = data
+
+    def _handle_panel_definitions(self, data: dict):
+        self.definitions = data
+                
+    def _handle_connected(self):
+        # After we get 2 partitions, lets publish a dashboard
+        if cfg.MQTT_DASH_PUBLISH and len(self.partitions) == 2:
+            self._publish_dash(cfg.MQTT_DASH_TEMPLATE, list(self.partitions.keys()))
+
+        for element_type in self.definitions: # zones, partitions
+            labels = self.labels[element_type]
+            definitions = self.definitions[element_type]
+            for i in definitions:  # numeric index
+                if i not in labels:
+                    continue
+                
+                for attribute in definitions[i]:  # attribute
+                    self._publish(f'{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_DEFINITION_TOPIC}',
+                                  element_type,
+                                  labels[i]['key'],
+                                  attribute,
+                                  definitions[i][attribute])
+        
     def _handle_panel_change(self, change: Change):
         attribute = change.property
         label = change.key
@@ -178,33 +209,34 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         element_type = change.type
 
         """Handle Property Change"""
+        if label not in self.partitions:
+            self.partitions[label] = dict()
 
-        # Dash stuff START
-        # TODO: move to a separate component
-        # Keep track of ARM state
-        if element_type == 'partition':
-            if label not in self.partitions:
-                self.partitions[label] = dict()
-
-                # After we get 2 partitions, lets publish a dashboard
-                if cfg.MQTT_DASH_PUBLISH and len(self.partitions) == 2:
-                    self._publish_dash(cfg.MQTT_DASH_TEMPLATE, list(self.partitions.keys()))
-
-            self.partitions[label][attribute] = value
-        # Dash stuff END
-
+        self.partitions[label][attribute] = value
+        self._publish(f'{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_STATES_TOPIC}', element_type, label, attribute, value)
+        
+    def _publish(self, base: str, element_type: str, label: str, attribute: str, value: [str, int, bool]):
         if element_type in ELEMENT_TOPIC_MAP:
             element_topic = ELEMENT_TOPIC_MAP[element_type]
         else:
             element_topic = element_type
+        
+        if isinstance(value, dict):
+            # This is fragile...
+            if '/' in attribute and not attribute.startswith('/'):
+                attribute = f"/{attribute}"
+
+            for attr_name, attr_value in value.items():    
+                label_tp = f"{attribute}/{attr_name}"
+                self._publish(base, element_type, label, label_tp, attr_value)
+            return
 
         if cfg.MQTT_USE_NUMERIC_STATES:
             publish_value = int(value)
         else:
             publish_value = value
 
-        self.publish('{}/{}/{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                             cfg.MQTT_STATES_TOPIC,
+        self.publish('{}/{}/{}/{}'.format(base,
                                              element_topic,
                                              sanitize_key(label),
                                              attribute),

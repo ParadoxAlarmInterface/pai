@@ -58,6 +58,7 @@ class Paradox:
         self.loop_wait_event = asyncio.Event()
 
         ps.subscribe(self._on_labels_load, "labels_loaded")
+        ps.subscribe(self._on_definitions_load, "definitons_loaded")
         ps.subscribe(self._on_status_update, "status_update")
         ps.subscribe(self._on_event, "events")
         ps.subscribe(self._on_property_change, "changes")
@@ -112,8 +113,6 @@ class Paradox:
         self.reset()
         self.run = State.INIT
 
-        self.connection.timeout(0.5)
-
         if not self.panel:
             self.panel = create_panel(self)
             self.connection.variable_message_length(self.panel.variable_message_length)
@@ -139,7 +138,7 @@ class Paradox:
 
             logger.info("Starting communication")
             reply = await self.send_wait(self.panel.get_message('StartCommunication'),
-                                   args=dict(source_id=0x02), reply_expected=0x00)
+                                         args=dict(source_id=0x02), reply_expected=0x00)
 
             if reply is None:
                 raise ConnectionError("Panel did not replied to StartCommunication")
@@ -166,6 +165,11 @@ class Paradox:
                 else:
                     logger.warning("Requested memory dump, but current panel type does not support it yet.")
 
+            logger.info("Loading definitions")
+            definitions = await self.panel.load_definitions()
+            ps.sendMessage('definitions_loaded', data=definitions)
+
+            logger.info("Loading labels")
             labels = await self.panel.load_labels()
             ps.sendMessage('labels_loaded', data=labels)
 
@@ -244,7 +248,8 @@ class Paradox:
         logger.debug("Scheduling status request: %d" % i)
         return await self.panel.request_status(i)
 
-    def _process_status(self, raw_status: Container):
+    @staticmethod
+    def _process_status(raw_status: Container):
         status = convert_raw_status(raw_status)
 
         for limit_key, limit_arr in cfg.LIMITS.items():
@@ -311,7 +316,6 @@ class Paradox:
             try:
                 async with self.request_lock:
                     if message is not None:
-                        self.connection.timeout(timeout)
                         self.connection.write(message)
 
                     if reply_expected is not None:
@@ -503,6 +507,10 @@ class Paradox:
             self.connection.write(panel.get_message('CloseConnection').build(dict()))
 
     def _on_labels_load(self, data):
+        for k, d in data.items():
+            self.storage.get_container(k).deep_merge(d)
+
+    def _on_definitions_load(self, data):
         for k, d in data.items():
             self.storage.get_container(k).deep_merge(d)
 

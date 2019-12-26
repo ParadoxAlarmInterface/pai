@@ -1,7 +1,4 @@
-ARG ARCH=""
-# RPI ARCH="arm32v7/"
-
-FROM ${ARCH}python:3.6-alpine3.10
+FROM python:3.7-alpine
 
 ENV WORK_DIR=workdir \
   PAI_CONFIG_PATH=/etc/pai \

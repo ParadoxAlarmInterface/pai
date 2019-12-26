@@ -3,9 +3,10 @@ import argparse
 import binascii
 import yaml
 from collections import OrderedDict
+
 from paradox.lib.crypto import decrypt
 
-def ordered_load(stream, Loader=yaml.Loader, object_pairs_hook=OrderedDict):
+def ordered_load(stream, Loader=yaml.loader.SafeLoader, object_pairs_hook=OrderedDict):
     class OrderedLoader(Loader):
         pass
 
@@ -21,7 +22,7 @@ def ordered_load(stream, Loader=yaml.Loader, object_pairs_hook=OrderedDict):
 def decrypt_file(file, password):
     PASSWORD2 = None
     try:
-        data = ordered_load(file, yaml.SafeLoader)
+        data = ordered_load(file, yaml.loader.SafeLoader)
 
         n = 0
         for key, value in data.items():

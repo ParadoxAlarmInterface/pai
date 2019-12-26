@@ -67,6 +67,7 @@ class SerialCommunication:
         self.connected_future = None
         self.recv_callback = recv_callback
         self.loop = loop
+        self.connected = False
         asyncio.set_event_loop(loop)
         self.queue = asyncio.Queue()
 

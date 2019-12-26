@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import datetime
+from typing import Callable, Any
+
 from construct import *
 
 
@@ -10,6 +12,7 @@ class DateAdapter(Adapter):
 
     def _encode(self, obj, context, path):
         return [obj.year / 100, obj.year % 100, obj.month, obj.day, obj.hour, obj.minute, obj.second]
+
 
 class ModuleSerialAdapter(Adapter):
     def _decode(self, obj, context, path):
@@ -33,6 +36,7 @@ class PartitionStateAdapter(Adapter):
 
         return 0
 
+
 ZoneFlagBitStruct = BitStruct(
     "generated_alarm" / Default(Flag, False),
     "presently_in_alarm" / Default(Flag, False),
@@ -43,6 +47,7 @@ ZoneFlagBitStruct = BitStruct(
     "tx_delay" / Default(Flag, False),
     "supervision_trouble" / Default(Flag, False),
 )
+
 
 # noinspection PyUnresolvedReferences,PyUnresolvedReferences
 class ZoneFlags(Subconstruct):
@@ -63,6 +68,19 @@ class ZoneFlags(Subconstruct):
 
     def _encode(self, obj, context, path):
         return b"".join([self.flag_parser.build(i) for i in obj])
+
+
+class FlexibleFlagArrayAdapter(Adapter):
+    def __init__(self, subcon, value_decode_fn: Callable[[Any], Any]):
+        super(FlexibleFlagArrayAdapter, self).__init__(subcon)
+        self.value_decode_fn = value_decode_fn
+
+    def _decode(self, obj, context, path):
+        r = dict()
+        for i in range(0, len(obj)):
+            r[i + 1] = self.value_decode_fn(obj[i])
+
+        return r
 
 
 class StatusFlagArrayAdapter(Adapter):

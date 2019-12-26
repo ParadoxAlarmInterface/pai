@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import socket
 import time
 import typing
 from enum import Enum
@@ -55,12 +56,16 @@ class MQTTConnection(Client):
         if self.state == ConnectionState.NEW:
             self.loop_start()
 
-            self.connect(host=cfg.MQTT_HOST, port=cfg.MQTT_PORT, keepalive=cfg.MQTT_KEEPALIVE,
-                bind_address=cfg.MQTT_BIND_ADDRESS, bind_port=cfg.MQTT_BIND_PORT)
+            # TODO: Some initial connection retry mechanism required
+            try:
+                self.connect_async(host=cfg.MQTT_HOST, port=cfg.MQTT_PORT, keepalive=cfg.MQTT_KEEPALIVE,
+                    bind_address=cfg.MQTT_BIND_ADDRESS, bind_port=cfg.MQTT_BIND_PORT)
 
-            self.state = ConnectionState.CONNECTING
+                self.state = ConnectionState.CONNECTING
 
-            logger.info("MQTT loop started")
+                logger.info("MQTT loop started")
+            except socket.gaierror:
+                logger.exception("Failed to connect to MQTT (%s:%d)", cfg.MQTT_HOST, cfg.MQTT_PORT)
 
     def stop(self):
         if self.state in [ConnectionState.CONNECTING, ConnectionState.CONNECTED]:
@@ -104,7 +109,7 @@ class MQTTConnection(Client):
         self.state = ConnectionState.NEW
         self._call_registars("on_disconnect", client, userdata, rc)
 
-    def disconnect(self):
+    def disconnect(self, reasoncode=None, properties=None):
         self.state = ConnectionState.DISCONNECTING
         self._report_status('offline')
         super(MQTTConnection, self).disconnect()
