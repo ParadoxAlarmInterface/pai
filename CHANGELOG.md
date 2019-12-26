@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Config: `MQTT_HOST` default is now `127.0.0.1`
 - Docker uses Python 3.7
+- run.sh fix
 
 ### Removed
 
