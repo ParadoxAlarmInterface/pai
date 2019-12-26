@@ -95,3 +95,9 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+/config/*.conf
+/config/*.json
+/config/*.yaml
+/eeprom.bin
+/ram.bin

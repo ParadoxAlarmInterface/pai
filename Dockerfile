@@ -1,6 +1,7 @@
 FROM python:3.7-alpine
 
 ENV WORK_DIR=workdir \
+  HASSIO_DATA_PATH=/data \
   PAI_CONFIG_PATH=/etc/pai \
   PAI_LOGGING_PATH=/var/log/pai \
   PAI_MQTT_BIND_PORT=18839 \
@@ -35,6 +36,7 @@ USER pai
 # conf file from host
 VOLUME ${PAI_CONFIG_PATH}
 VOLUME ${PAI_LOGGING_PATH}
+VOLUME ${HASSIO_DATA_PATH}
 
 # For IP Interface
 EXPOSE ${PAI_MQTT_BIND_PORT}/tcp

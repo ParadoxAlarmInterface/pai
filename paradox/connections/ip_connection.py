@@ -22,6 +22,8 @@ logger = logging.getLogger('PAI').getChild(__name__)
 class IPConnection(Connection):
     def __init__(self, on_message: typing.Callable[[bytes], None], host='127.0.0.1', port=10000, password=None):
         super(IPConnection, self).__init__(on_message=on_message)
+        if isinstance(password, str):
+            password = password.encode()
         self.password = password
         self.key = password
         self.host = host

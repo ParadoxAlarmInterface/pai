@@ -101,17 +101,6 @@ As project was initially designed for SP/MG panels. EVO panels require some conf
 Set these settings
 ``` python
 STATUS_REQUESTS = list(range(1, 6))
-
-PARTITIONS_CHANGE_NOTIFICATION_IGNORE = [
-  'arm_full',
-  'exit_delay',
-  'all_zone_closed', 
-  'ready',
-  'stay_instant_ready',
-  'force_ready',
-  'entry_delay',
-  'auto_arming_engaged'
-]
 ```
 
 If you use Serial connection you need to set *SERIAL_BAUD*:

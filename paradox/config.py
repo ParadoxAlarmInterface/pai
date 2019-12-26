@@ -1,9 +1,10 @@
 import os
+import sys
 import logging
 
 
-class Config:
-    DEFAULTS = { 
+class Config(object):
+    DEFAULTS = {
         "LOGGING_LEVEL_CONSOLE": logging.INFO,  # See documentation of Logging package
         "LOGGING_LEVEL_FILE": logging.ERROR,
         "LOGGING_FILE": ('/var/log/paradox.log', [type(None), str]),  # or set to file path : '/var/log/paradox.log'
@@ -27,7 +28,7 @@ class Config:
         # IP Connection Details
         "IP_CONNECTION_HOST": '127.0.0.1',                            # IP Module address when using direct IP Connection
         "IP_CONNECTION_PORT": (10000, int, (1, 65535)),               # IP Module port when using direct IP Connection
-        "IP_CONNECTION_PASSWORD": (b'paradox', [bytes, type(None)]),  # IP Module password. "paradox" is default.
+        "IP_CONNECTION_PASSWORD": ('paradox', [str, bytes, type(None)]),  # IP Module password. "paradox" is default.
         "IP_CONNECTION_SITEID": (None, [str, type(None)]),            # If defined, connection will be made through this method.
         "IP_CONNECTION_EMAIL": (None, [str, type(None)]),             # Email registered in the site
         "IP_CONNECTION_PANEL_SERIAL": (None, [str, type(None)]),      # Serial number to be used in multi-panel sites. None for first
@@ -175,13 +176,11 @@ class Config:
     CONFIG_LOADED = False
     CONFIG_FILE_LOCATION = None,
 
-    def __init__(self):
-        if Config.CONFIG_LOADED:
-            return
+    def __dir__(self):
+        return list(self.DEFAULTS.keys()) + list(self.__class__.__dict__) + dir(super(Config, self))
 
-    @staticmethod
-    def load(alt_location=None):
-        Config.CONFIG_LOADED = False
+    def load(self, alt_location=None):
+        self.CONFIG_LOADED = False
 
         env_config_path = os.environ.get('PAI_CONFIG_FILE')
 
@@ -199,26 +198,56 @@ class Config:
         for location in locations:
             location = os.path.expanduser(location)
             if os.path.exists(location) and os.path.isfile(location):
-                Config.CONFIG_FILE_LOCATION = location
+                self.CONFIG_FILE_LOCATION = location
                 break
         else:
-            raise(Exception("ERROR: Could not find configuration file. Tried: {}".format(locations)))
+            err = "ERROR: Could not find configuration file. Tried: {}".format(locations)
+            sys.stderr.write(err+'\n')
+            raise(Exception(err))
+
+        sys.stdout.write("Attempting to load configuration from %s\n" % self.CONFIG_FILE_LOCATION)
 
         entries = {}
-        with open(location) as f:
-            exec(f.read(), None, entries)
+        conf_extension = os.path.splitext(self.CONFIG_FILE_LOCATION)[1]
+        if conf_extension in ['.conf', '.py']:
+            with open(self.CONFIG_FILE_LOCATION) as f:
+                exec(f.read(), None, entries)
+        elif conf_extension in ['.json']:
+            import json
+            with open(self.CONFIG_FILE_LOCATION) as f:
+                entries = json.load(f)
+        elif conf_extension in ['.yaml']:
+            import yaml
+            with open(self.CONFIG_FILE_LOCATION) as f:
+                entries = yaml.safe_load(f)
+        else:
+            err = "ERROR: Unsupported configuration file type"
+            sys.stderr.write(err+'\n')
+            raise(Exception(err))
+
+        # Updates values from env variables
+        for args in os.environ:
+            if not args.startswith('PAI_') or len(args) < 5:
+                continue
+            opt = args[4:]
+            if opt in self.DEFAULTS:
+                v = os.environ[args]
+                if v.isdigit():
+                    v = int(v)
+
+                entries[opt] = v
 
         # Reset defaults
-        for k, v in Config.DEFAULTS.items():
+        for k, v in self.DEFAULTS.items():
             if isinstance(v, tuple):
                 v = v[0]
 
-            setattr(Config, k, v)
+            setattr(self, k, v)
 
         # Set values
         for k, v in entries.items():
-            if k[0].isupper() and k in Config.DEFAULTS:
-                default = Config.DEFAULTS.get(k)
+            if k[0].isupper() and k in self.DEFAULTS:
+                default = self.DEFAULTS.get(k)
                 
                 if isinstance(default, tuple) and 2 <= len(default) <= 3:
                     default_type = default[1]
@@ -235,10 +264,11 @@ class Config:
                     default_type.append(float)
 
                 if type(v) in default_type:
-                    setattr(Config, k, v)
+                    setattr(self, k, v)
                 else:
-                    logging.error("Invalid value type {} for config argument {}. Allowed are: {}".format(type(v), k, default_type))
-                    raise (Exception("Error parsing configuration type"))
+                    err = "Error parsing configuration: Invalid value type {} for config argument {}. Allowed are: {}".format(type(v), k, default_type)
+                    sys.stderr.write(err+'\n')
+                    raise (Exception(err))
 
                 if isinstance(default, tuple) and len(default) == 3:
                     expected_value = default[2]
@@ -254,23 +284,13 @@ class Config:
                         valid = True
 
                     if valid:
-                        setattr(Config, k, v)
+                        setattr(self, k, v)
                     else:
-                        logging.error("Invalid value for config argument {}. Allowed are: {}".format(type(v), k, expected_value))
-                        raise(Exception("Error parsing configuration value"))
+                        err = "Error parsing configuration value: Invalid value for config argument {}. Allowed are: {}".format(type(v), k, expected_value)
+                        sys.stderr.write(err + '\n')
+                        raise(Exception(err))
 
-        for args in os.environ:
-            if not args.startswith('PAI_') and len(args) > 4:
-                continue
-            opt = args[4:]
-            if opt in Config.DEFAULTS:
-                v = os.environ[args]
-                if v.isdigit():
-                    v = int(v)
-
-                setattr(Config, opt, v)
-
-        Config.CONFIG_LOADED = True
+        self.CONFIG_LOADED = True
 
 
 config = Config()
