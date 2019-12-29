@@ -490,9 +490,11 @@ PerformZoneActionResponse = Struct("fields" / RawCopy(
 
 _PGMCommandEnum = Enum(
     Int8ub,
-    none = 0,
-    deactivate = 1,
-    activate = 3
+    release = 0,
+    off = 1,
+    on = 3,
+    on_override = 4,
+    off_override = 2
 )
 
 PerformPGMAction = Struct("fields" / RawCopy(Struct(
