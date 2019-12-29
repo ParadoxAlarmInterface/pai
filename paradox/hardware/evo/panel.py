@@ -110,8 +110,8 @@ class Panel_EVOBase(PanelBase):
                     return parsers.LoginConfirmationResponse.parse(message)
                 elif message[0] >> 4 == 0x03:
                     return parsers.SetTimeDateResponse.parse(message)
-                elif message[0] >> 4 == 4:
-                    return parsers.PerformPartitionActionResponse.parse(message)
+                elif message[0] >> 4 == 4: # Used for partitions and PGMs
+                    return parsers.PerformActionResponse.parse(message)
                 elif message[0] >> 4 == 0xd:
                     return parsers.PerformZoneActionResponse.parse(message)
                 # elif message[0] == 0x50 and message[2] == 0x80:
@@ -226,6 +226,27 @@ class Panel_EVOBase(PanelBase):
         try:
             reply = await self.core.send_wait(
                 parsers.PerformZoneAction, args, reply_expected=0xd)
+        except MappingError:
+            logger.error('Zone command: "%s" is not supported' % command)
+            return False
+
+        return reply is not None
+
+    async def control_outputs(self, outputs, command) -> bool:
+        """
+        Control PGM
+        :param list outputs: a list of pgms
+        :param str command: textual command
+        :return: True if we have at least one success
+        """
+
+        args = {
+            "pgms": outputs,
+            "command": command
+        }
+
+        try:
+            reply = await self.core.send_wait(parsers.PerformPGMAction, args, reply_expected=0x04)
         except MappingError:
             logger.error('Zone command: "%s" is not supported' % command)
             return False

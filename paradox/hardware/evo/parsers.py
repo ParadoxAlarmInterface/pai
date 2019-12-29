@@ -424,7 +424,8 @@ PerformPartitionAction = Struct("fields" / RawCopy(Struct(
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
-PerformPartitionActionResponse = Struct("fields" / RawCopy(
+# Used for partitions and PGMs
+PerformActionResponse = Struct("fields" / RawCopy(
     Struct(
         "po" / BitStruct(
             "command" / Const(0x4, Nibble),
@@ -443,9 +444,20 @@ ZoneActionBitOperation = Enum(Int8ub,
     clear=0x00
 )
 
-class ZoneAdapter(Subconstruct):
+class EnumerationAdapter(Subconstruct):
+    def __init__(self, subcon):
+        super(EnumerationAdapter, self).__init__(subcon)
+
+        def find_count(s):
+            if hasattr(s, 'count'):
+                return s.count
+            else:
+                return find_count(s.subcon)
+
+        self.size = find_count(subcon)
+
     def _build(self, obj, stream, context, path):
-        zones = list([i in obj for i in range(1, 193)])
+        zones = list([i in obj for i in range(1, self.size+1)])
 
         return self.subcon._build(zones, stream, context, path)
 
@@ -456,7 +468,7 @@ PerformZoneAction = Struct("fields" / RawCopy(Struct(
         "flags" / ZoneFlagBitStruct,
         "operation" / ZoneActionBitOperation,
         "_not_used" / Padding(2),
-        "zones" / ZoneAdapter(BitsSwapped(Bitwise(Array(192, Flag)))),
+        "zones" / EnumerationAdapter(BitsSwapped(Bitwise(Array(192, Flag)))),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
@@ -473,6 +485,26 @@ PerformZoneActionResponse = Struct("fields" / RawCopy(
         "flags" / ZoneFlagBitStruct,
         "operation" / ZoneActionBitOperation,
         "_not_used" / Padding(2),
+    )),
+    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
+_PGMCommandEnum = Enum(
+    Int8ub,
+    none = 0,
+    deactivate = 1,
+    activate = 3
+)
+
+PerformPGMAction = Struct("fields" / RawCopy(Struct(
+        "po" / Struct(
+            "command" / Const(0x40, Int8ub)),
+        "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+        "unknown0" / Const(0x06, Int8ub),
+        "_not_used0" / Padding(3),
+        "pgms" / EnumerationAdapter(BitsSwapped(Bitwise(Array(8, Flag)))),
+        "_not_used1" / Padding(7),
+        "command" / _PGMCommandEnum,
+        "_not_used1" / Padding(3),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
