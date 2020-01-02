@@ -55,7 +55,7 @@ import logging
 # LABEL_REFRESH_INTERVAL = 15 * 60        # Interval between refresh of labels
 # OUTPUT_PULSE_DURATION = 1               # Duration of a PGM pulse in seconds
 # STATUS_REQUESTS = [0, 1, 2, 3, 4, 5]
-# SYNC_TIME = True    			# Update panel time
+# SYNC_TIME = False    			# Update panel time
 # PASSWORD = '0000'   			# PC Password. Set to None if Panel has no Password.
 #                                 # In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) ->
 #                                 # PC Communication (Babyware) Tab.
