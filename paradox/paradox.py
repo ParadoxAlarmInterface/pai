@@ -55,6 +55,7 @@ class Paradox:
 
         self.run = State.STOP
         self.request_lock = asyncio.Lock()
+        self.busy = asyncio.Lock()
         self.loop_wait_event = asyncio.Event()
 
         ps.subscribe(self._on_labels_load, "labels_loaded")
@@ -216,6 +217,7 @@ class Paradox:
             tstart = time.time()
             if self.run == State.RUN:
                 try:
+                    await self.busy.acquire()
                     result = await asyncio.gather(*[self._status_request(i) for i in cfg.STATUS_REQUESTS])
                     merged = deep_merge(*result, extend_lists=True, initializer={})
                     self.work_loop.call_soon(self._process_status, merged)
@@ -229,6 +231,8 @@ class Paradox:
                         self.disconnect()
                 except Exception:
                     logger.exception("Loop")
+                finally:
+                    self.busy.release()
 
                 if replies_missing > 0:
                     logger.debug("Loop: Replies missing: {}".format(replies_missing))

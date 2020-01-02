@@ -163,7 +163,8 @@ class ClientConnection():
                     status = 'closing_connection'
                 else:
                     try:
-                        self.alarm.connection.write(in_payload)
+                        async with self.alarm.request_lock, self.alarm.busy:
+                            self.alarm.connection.write(in_payload)
                     except Exception:
                         logger.exception("Send to panel")
                         break

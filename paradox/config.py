@@ -42,7 +42,7 @@ class Config(object):
         "LABEL_REFRESH_INTERVAL": (15 * 60, int, (0, 0xFFFFFFFF)),            # Interval between refresh of labels
         "OUTPUT_PULSE_DURATION": (1, float, (0, 0xFFFFFFFF)),                 # Duration of a PGM pulse in seconds
         "STATUS_REQUESTS": [0, 1, 2, 3, 4, 5],
-        "SYNC_TIME": True,                                                    # Update panel time
+        "SYNC_TIME": False,                                                   # Update panel time
         "PASSWORD": (None, [int, str, bytes, type(None)]),                    # PC Password. Set to None if Panel has no Password. In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) -> PC Communication (Babyware) Tab.
 
         "POWER_UPDATE_INTERVAL": (60, int, (0, 0xFFFFFFFF)),     # Interval between updates of the Power voltages

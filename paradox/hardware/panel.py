@@ -132,6 +132,8 @@ class Panel:
         return bytes(res)
 
     async def load_definitions(self):
+        if 'definitions' not in self.mem_map:
+            return {}
         logger.info("Updating Definitions from Panel")
 
         data = defaultdict(dict)
