@@ -10,7 +10,7 @@
             <img alt="Travis (.org) branch" src="https://img.shields.io/travis/ParadoxAlarmInterface/pai/dev?label=dev&logo=travis">
         </a>
         <a href="https://hub.docker.com/r/paradoxalarminterface/pai">
-            <img alt="Docker Arch" src="https://img.shields.io/badge/docker_arch-amd64%7Carmv7%7Carm64-green?logo=docker">
+            <img alt="Docker Arch" src="https://img.shields.io/badge/docker_arch-386%7Camd64%7Carmv6%7Carmv7%7Carm64-green?logo=docker">
             <img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/paradoxalarminterface/pai?logo=docker">
         </a>
         <a href="https://travis-ci.org/ParadoxAlarmInterface/pai/branches">

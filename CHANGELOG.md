@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2020-01-02
+### Added
+
+- EVOHD definitions for enabled zone and partition detection.
+- Docker platforms i386, amd64, arm64, armv7
+- EVO PGM Control (State reading is not yet implemented)
+- IPInterface to consider asyncio locks
+
+### Changed
+
+- Configuration: SYNC_TIME off by default. Make sure you turn it on in configuration
+
 ## [1.3.1] - 2019-12-27
 ### Changed
 
