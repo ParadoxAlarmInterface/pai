@@ -443,7 +443,7 @@ class Paradox:
             # TODO: REMOVE
             if message is not None:
                 if not evt.id:
-                    logger.warning("Missing element ID in {}/{}, m/m: {}/{}, message: {}".format(evt.type, evt.label or '?', evt.major, evt.minor, evt.message))
+                    logger.debug("Missing element ID in {}/{}, m/m: {}/{}, message: {}".format(evt.type, evt.label or '?', evt.major, evt.minor, evt.message))
                 else:
                     if not element:
                         logger.warning("Missing element with ID {} in {}/{}".format(evt.id, evt.type, evt.label))
