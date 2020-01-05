@@ -66,6 +66,7 @@ Tested in the following environment:
 * [Signal Cli](https://github.com/AsamK/signal-cli) through a DBUS interface
 * Pushbullet.py
 * SIM900 module through a serial port
+* Serial over TCP (above hardware see wiki (ESP32 or other Serial over TCP)
 
 ## Authors
 
