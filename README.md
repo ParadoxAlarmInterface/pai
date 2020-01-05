@@ -66,6 +66,7 @@ Tested in the following environment:
 * [Signal Cli](https://github.com/AsamK/signal-cli) through a DBUS interface
 * Pushbullet.py
 * SIM900 module through a serial port
+* Serial over TCP (ESP32 or Arduino connected to the panel's serial port acts as a proxy)
 
 ## Authors
 
