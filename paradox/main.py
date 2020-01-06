@@ -4,6 +4,7 @@ import sys
 import time
 import signal
 
+from paradox import VERSION
 from paradox.config import config as cfg
 
 
@@ -73,10 +74,10 @@ def main(args):
 
     config_logger(logger)
 
-    logger.info("Config loaded from %s", cfg.CONFIG_FILE_LOCATION)
+    logger.info(f"Starting Paradox Alarm Interface {VERSION}")
+    logger.info(f"Config loaded from {cfg.CONFIG_FILE_LOCATION}")
 
-    logger.info("Starting Paradox Alarm Interface")
-    logger.info("Console Log level set to {}".format(cfg.LOGGING_LEVEL_CONSOLE))
+    logger.info(f"Console Log level set to {cfg.LOGGING_LEVEL_CONSOLE}")
 
     interface_manager = InterfaceManager(config=cfg)
     interface_manager.start()

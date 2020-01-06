@@ -3,6 +3,8 @@
 import sys
 from setuptools import setup, find_packages
 
+from paradox import VERSION
+
 needs_pytest = {'pytest', 'test', 'ptr'}.intersection(sys.argv)
 pytest_runner = ['pytest-runner'] if needs_pytest else []
 
@@ -11,21 +13,21 @@ with open('README.md', 'r') as fh:
 
 setup(
     name='paradox-alarm-interface',
-    version='1.2.0',
+    version=VERSION,
     author='João Paulo Barraca',
     author_email='jpbarraca@gmail.com',
     description='Interface to Paradox Alarm Panels',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/ParadoxAlarmInterface/pai',
-    download_url='https://github.com/ParadoxAlarmInterface/pai/archive/1.1.0.tar.gz',
+    download_url=f'https://github.com/ParadoxAlarmInterface/pai/archive/{VERSION}.tar.gz',
     packages=find_packages(exclude=['tests', 'tests.*', 'config.*', 'docs.*']),
     install_requires=[
         'construct >= 2.9.43',
         'argparse >= 1.4.0'
     ],
     python_requires='>=3.6',
-    setup_requires=[] + pytest_runner,
+    setup_requires=['wheel'] + pytest_runner,
     tests_require=[
         'pytest',
         'pytest-asyncio',

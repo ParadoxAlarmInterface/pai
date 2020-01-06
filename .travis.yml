@@ -12,7 +12,7 @@ script: python setup.py test
 deploy:
   provider: pypi
   user: __token__
-  distributions: sdist
+  distributions: "sdist bdist_wheel"
   skip_existing: true
   on:
     tags: true
