@@ -3,7 +3,7 @@
 import binascii
 import inspect
 import logging
-from typing import Optional
+import typing
 
 from construct import Construct, Container, MappingError, ChecksumError
 
@@ -41,6 +41,7 @@ class Panel_EVOBase(PanelBase):
     event_map = event_map
     property_map = property_map
     max_eeprom_response_data_length = 64
+    status_request_addresses = parsers.RAMDataParserMap.keys()
 
     def get_message(self, name: str) -> Construct:
         try:
@@ -83,7 +84,7 @@ class Panel_EVOBase(PanelBase):
 
                 fh.write(data)
 
-    def parse_message(self, message: bytes, direction='topanel') -> Optional[Container]:
+    def parse_message(self, message: bytes, direction='topanel') -> typing.Optional[Container]:
         try:
             if message is None or len(message) == 0:
                 return None
@@ -183,7 +184,7 @@ class Panel_EVOBase(PanelBase):
 
         return False
 
-    async def request_status(self, i: int) -> Optional[Container]:
+    async def request_status(self, i: int) -> typing.Optional[Container]:
         args = dict(address=i, length=64, control=dict(ram_access=True))
         reply = await self.core.send_wait(parsers.ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, args['address']))
         if reply is not None:

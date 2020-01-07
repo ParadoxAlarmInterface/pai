@@ -218,7 +218,7 @@ class Paradox:
             if self.run == State.RUN:
                 try:
                     await self.busy.acquire()
-                    result = await asyncio.gather(*[self._status_request(i) for i in cfg.STATUS_REQUESTS])
+                    result = await asyncio.gather(*self.panel.get_status_requests())
                     merged = deep_merge(*result, extend_lists=True, initializer={})
                     self.work_loop.call_soon(self._process_status, merged)
                     replies_missing = max(0, replies_missing - 1)
@@ -248,12 +248,8 @@ class Paradox:
             finally:
                 self.loop_wait_event.clear()
 
-    async def _status_request(self, i):
-        logger.debug("Scheduling status request: %d" % i)
-        return await self.panel.request_status(i)
-
     @staticmethod
-    def _process_status(raw_status: Container):
+    def _process_status(raw_status: Container) -> None:
         status = convert_raw_status(raw_status)
 
         for limit_key, limit_arr in cfg.LIMITS.items():

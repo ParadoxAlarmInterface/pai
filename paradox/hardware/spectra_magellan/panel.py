@@ -4,7 +4,7 @@ import asyncio
 import binascii
 import inspect
 import logging
-from typing import Optional
+import typing
 
 from construct import Construct, Container, ChecksumError
 
@@ -27,6 +27,7 @@ class Panel(PanelBase):
     event_map = event_map
     property_map = property_map
     max_eeprom_response_data_length = 32
+    status_request_addresses = parsers.RAMDataParserMap.keys()
 
     mem_map = {
         "status_base1": 0x8000,
@@ -53,11 +54,6 @@ class Panel(PanelBase):
             "siren": {"label_offset": 0, "addresses": [range(0x6d0, 0x700, 0x10)]}
         }
     }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.last_power_update = 0
 
     async def dump_memory(self):
         """
@@ -102,7 +98,7 @@ class Panel(PanelBase):
 
         return super(Panel, self).get_message(name)
 
-    def parse_message(self, message: bytes, direction='topanel') -> Optional[Container]:
+    def parse_message(self, message: bytes, direction='topanel') -> typing.Optional[Container]:
         try:
             if message is None or len(message) == 0:
                 return None

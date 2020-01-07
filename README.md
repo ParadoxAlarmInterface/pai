@@ -95,19 +95,6 @@ Configuration file should be placed in one of these locations:
   - /usr/local/etc/pai/pai.conf
   - ~/.local/etc/pai.conf
 
-### EVO specifics
-As project was initially designed for SP/MG panels. EVO panels require some configuration fine tuning.
-
-Set these settings
-``` python
-STATUS_REQUESTS = list(range(1, 6))
-```
-
-If you use Serial connection you need to set *SERIAL_BAUD*:
-``` python
-SERIAL_BAUD = 38400 # or 57600 if you have changed default setting in Babyware
-```
-
 ## Running
 ```
 python3 pai.py

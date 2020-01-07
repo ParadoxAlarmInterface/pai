@@ -15,10 +15,11 @@ logger = logging.getLogger('PAI').getChild(__name__)
 IndexAddress = namedtuple('IndexAddress', 'idx address')
 
 class Panel:
-    mem_map = {}
-    event_map = {}
-    property_map = {}
-    max_eeprom_response_data_length=0
+    mem_map = {}  # override in a subclass
+    event_map = {}  # override in a subclass
+    property_map = {}  # override in a subclass
+    max_eeprom_response_data_length = 0  # override in a subclass
+    status_request_addresses = []  # override in a subclass
 
     def __init__(self, core, product_id, variable_message_length=True):
         self.core = core
@@ -277,7 +278,10 @@ class Panel:
     def initialize_communication(self, reply, password):
         raise NotImplementedError("override initialize_communication in a subclass")
 
-    def request_status(self, nr):
+    def get_status_requests(self) -> typing.Iterable[typing.Awaitable]:
+        return (self.request_status(i) for i in self.status_request_addresses)
+
+    async def request_status(self, nr) -> typing.Optional[Container]:
         raise NotImplementedError("override request_status in a subclass")
 
     @staticmethod
@@ -287,7 +291,7 @@ class Panel:
 
         if mvars.address not in parser_map:
             logger.error(
-                "Parser for memory address ({}) is not implemented. Please review your STATUS_REQUESTS setting. "
+                "Parser for memory address ({}) is not implemented. "
                 "Skipping.".format(mvars.address)
             )
             return
