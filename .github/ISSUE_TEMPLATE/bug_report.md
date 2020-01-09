@@ -6,6 +6,14 @@ assignees: ''
 
 ---
 
+<!--
+Before creating a bug report look into wiki and FAQ page:
+- Wiki: https://github.com/ParadoxAlarmInterface/pai/wiki
+- FAQ: https://github.com/ParadoxAlarmInterface/pai/wiki/FAQ
+- Use search before posting. Maybe your issue was already solved.
+- You can always use https://gitter.im/paradox-alarm-interface/community to ask a quick question.
+-->
+
 ## Alarm system
 Describe your panel model (ex: EVO192, Spectra SP4000, Magellan MG5050), access mode (Serial, IP150, etc..).
 
