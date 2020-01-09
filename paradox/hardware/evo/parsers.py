@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 from construct import Struct, RawCopy, BitStruct, Const, Nibble, Flag, Rebuild, Int8ub, BitsInteger, Int16ub, Checksum, \
     Bytes, this, Default, Padding, Enum, Int24ub, ExprAdapter, Byte, obj_, Array, Computed, Subconstruct, \
-    ValidationError, ExprSymmetricAdapter, Bitwise, BitsSwapped, Embedded
+    ValidationError, ExprSymmetricAdapter, Bitwise, BitsSwapped, Embedded, ByteSwapped, Bytewise
 
 from .adapters import StatusFlags, ZoneFlags, DateAdapter, PartitionStatus, EventAdapter, \
     ZoneFlagBitStruct, DictArray, EnumerationAdapter
@@ -257,20 +257,20 @@ DefinitionsParserMap = {
             stay_delay2=0xf,
         ),
         "partition" / Nibble,
-        "options" / Struct(
-            "delay_before_transmission" / Flag,
-            "intellizone" / Flag,
+        "options" / ByteSwapped(Struct(
+            "auto_zone_shutdown_enabled" / Flag,
+            "bypass_enabled" / Flag,
+            "stay_zone" / Flag,
+            "force_zone" / Flag,
             "alarm_type" / Enum(BitsInteger(2),
                 steady_alarm=0x0,
-                silent_alarm=0x1,
-                pulsed_alarm=0x2,
+                pulsed_alarm=0x1,
+                silent_alarm=0x2,
                 report_only=0x3,
             ),
-            "force_zone" / Flag,
-            "stay_zone" / Flag,
-            "bypass_enabled" / Flag,
-            "auto_zone_shutdown_enabled" / Flag
-        )
+            "intellizone" / Flag,
+            "delay_before_transmission" / Flag,
+        ))
     ),
     "partition": BitsSwapped(
         Bitwise(
