@@ -159,7 +159,7 @@ class Panel(PanelBase):
                     )
 
         logger.info("Initializing communication")
-        reply = await self.core.send_wait(parsers.InitializeCommunication, args=args, reply_expected=0x10)
+        reply = await self.core.send_wait(parsers.InitializeCommunication, args=args, reply_expected=[0x10, 0x70, 0x00])
 
         if reply is None:
             logger.error("Initialization Failed")
