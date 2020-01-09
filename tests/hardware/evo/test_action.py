@@ -9,7 +9,7 @@ def test_partition_action():
     a = PerformPartitionAction.build({
         "fields": {
             "value": {
-                "commands": commands
+                "partitions": commands
             }
         }
     })

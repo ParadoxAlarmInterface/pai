@@ -2,9 +2,10 @@ from collections.abc import Mapping
 
 from construct import Struct, RawCopy, BitStruct, Const, Nibble, Flag, Rebuild, Int8ub, BitsInteger, Int16ub, Checksum, \
     Bytes, this, Default, Padding, Enum, Int24ub, ExprAdapter, Byte, obj_, Array, Computed, Subconstruct, \
-    ValidationError, ExprSymmetricAdapter, Bitwise, Bytewise, BitsSwapped, Embedded
+    ValidationError, ExprSymmetricAdapter, Bitwise, BitsSwapped, Embedded
 
-from .adapters import PGMFlags, StatusAdapter, DateAdapter, ZoneFlags, PartitionStatus, EventAdapter, ZoneFlagBitStruct, FlexibleFlagArrayAdapter
+from .adapters import StatusFlags, ZoneFlags, DateAdapter, PartitionStatus, EventAdapter, \
+    ZoneFlagBitStruct, DictArray, EnumerationAdapter
 from ..common import CommunicationSourceIDEnum, ProductIdEnum, calculate_checksum
 
 LoginConfirmationResponse = Struct("fields" / RawCopy(
@@ -27,6 +28,7 @@ LoginConfirmationResponse = Struct("fields" / RawCopy(
         "callback" / Int16ub
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
 
 InitializeCommunication = Struct("fields" / RawCopy(
     Struct(
@@ -57,8 +59,8 @@ InitializeCommunication = Struct("fields" / RawCopy(
                     "clear_bell_limit_trouble" / Flag,
                     "combus_speed" / Flag,
                 )),
-                "partitions" / Array(8, Flag),  # EVO section data 3031
-                "siren_output_partition" / Array(8, Flag),  # EVO section data 3032
+                "partitions" / StatusFlags(8),  # EVO section data 3031
+                "siren_output_partition" / StatusFlags(8),  # EVO section data 3032
                 Embedded(Struct(  # EVO section data 3033
                     "multiple_actions_user_menu" / Flag,
                     "user_code_length_flexible" / Flag,
@@ -126,9 +128,21 @@ InitializeCommunication = Struct("fields" / RawCopy(
 RAMDataParserMap = {
     1: Struct(
         "_weekday" / Int8ub,
-        "pgm_flags" / PGMFlags(),
-        "key-switch_triggered" / StatusAdapter(Bytes(4)),
-        "door_open" / StatusAdapter(Bytes(4)),
+        "pgm_flags" / BitStruct(  # TODO: Do we need BitsSwapped here?
+            'chime_zone_partition' / BitsSwapped(StatusFlags(4)),
+            'power_smoke' / Flag,
+            'ground_start' / Flag,
+            'kiss_off' / Flag,
+            'line_ring' / Flag,
+
+            'bell_partition' / BitsSwapped(StatusFlags(8)),
+
+            'fire_alarm' / BitsSwapped(StatusFlags(8)),
+
+            'open_close_kiss_off' / BitsSwapped(StatusFlags(8)),
+        ),
+        "key-switch_triggered" / BitsSwapped(Bitwise(StatusFlags(32))),
+        "door_open" / BitsSwapped(Bitwise(StatusFlags(32))),
         "system" / Struct(
             "troubles" / BitStruct(
                 "system_trouble" / Flag,
@@ -186,9 +200,9 @@ RAMDataParserMap = {
                 "dc" / ExprAdapter(Byte, lambda obj, ctx: round(obj * 22.8 / 255.0, 1), 0),
             )
         ),
-        "zone_open" / StatusAdapter(Bytes(12)),
-        "zone_tamper" / StatusAdapter(Bytes(12)),
-        "zone_low_battery" / StatusAdapter(Bytes(12))
+        "zone_open" / BitsSwapped(Bitwise(StatusFlags(96))),
+        "zone_tamper" / BitsSwapped(Bitwise(StatusFlags(96))),
+        "zone_low_battery" / BitsSwapped(Bitwise(StatusFlags(96))),
     ),
     2: Struct(
         "zone_status" / ZoneFlags(64)
@@ -217,9 +231,10 @@ RAMDataParserMap = {
     ),
     5: Struct(
         "_free" / Padding(1),
-        "bus-module_trouble" / StatusAdapter(Bytes(63))
+        "bus-module_trouble" / BitsSwapped(Bitwise(StatusFlags(504)))
     )
 }
+
 
 DefinitionsParserMap = {
     "zone": BitStruct(
@@ -258,9 +273,18 @@ DefinitionsParserMap = {
         )
     ),
     "partition": BitsSwapped(
-        Bitwise(FlexibleFlagArrayAdapter(Array(8, Flag), lambda x: {"definition":"enabled" if x else "disabled"})
+        Bitwise(
+            DictArray(8, 1, Struct(
+                    "_index" / Computed(this._index + 1),
+                    "definition" / ExprAdapter(
+                        Default(Flag, False),
+                        lambda obj, context: "enabled" if obj else "disabled",
+                        lambda obj, context: obj == "enabled"
+                    )
+            ))
     )),
 }
+
 
 LiveEvent = Struct("fields" / RawCopy(
     Struct(
@@ -282,6 +306,7 @@ LiveEvent = Struct("fields" / RawCopy(
         "_not_used0" / Bytes(1),
     )), "checksum" / Checksum(
     Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
 
 # "Event 1 requested (in compressed format) 1 (12 bytes)
 #   Byte 00: [7-3]: Day, [2-0]: Month (MSB)
@@ -315,6 +340,7 @@ CompressedEvent = Struct(
     "module_serial" / Bytes(4)
 )
 
+
 RequestedEvent = Struct("fields" / RawCopy(
     Struct(
         "po" / BitStruct(
@@ -333,6 +359,7 @@ RequestedEvent = Struct("fields" / RawCopy(
         "data" / Array(lambda this: int((this.length - 7) / 12), CompressedEvent)
     )), "checksum" / Checksum(
     Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
 
 CloseConnection = Struct("fields" / RawCopy(
     Struct(
@@ -410,6 +437,7 @@ ReadEEPROM = Struct("fields" / RawCopy(
     ))),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
+
 ReadEEPROMResponse = Struct("fields" / RawCopy(
     Struct(
         "po" / BitStruct(
@@ -433,6 +461,7 @@ ReadEEPROMResponse = Struct("fields" / RawCopy(
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
+
 SetTimeDate = Struct("fields" / RawCopy(Struct(
         "po" / Struct(
             "command" / Const(0x30, Int8ub)),
@@ -448,6 +477,7 @@ SetTimeDate = Struct("fields" / RawCopy(Struct(
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
+
 SetTimeDateResponse = Struct("fields" / RawCopy(
     Struct(
         "po" / BitStruct(
@@ -462,6 +492,7 @@ SetTimeDateResponse = Struct("fields" / RawCopy(
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
+
 _PartitionCommandEnum = Enum(Nibble,
                              none  = 0,
                              arm = 2,
@@ -472,26 +503,22 @@ _PartitionCommandEnum = Enum(Nibble,
                              beep_keypads = 8
                              )
 
-class PartitionAdapter(Subconstruct):
-    def _build(self, obj, stream, context, path):
-        partitions = dict([(i, 0) for i in range(1, 9) ])
-        partitions.update(obj)
-
-        obj = {"partitions": list(partitions.values())}
-
-        return self.subcon._build(obj, stream, context, path)
 
 PerformPartitionAction = Struct("fields" / RawCopy(Struct(
         "po" / Struct(
             "command" / Const(0x40, Int8ub)),
         "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
         "_not_used0" / Padding(4),
-        "commands" / PartitionAdapter(BitStruct(
-            "partitions" / Array(8, _PartitionCommandEnum),
-        )),
+        "partitions" / Bitwise(
+            DictArray(8, 1, Struct(
+                "_index" / Computed(this._index + 1),
+                "command" / Default(_PartitionCommandEnum, "none")
+            ), pick_key="command")
+        ),
         "_not_used1" / Padding(4),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
 
 # Used for partitions and PGMs
 PerformActionResponse = Struct("fields" / RawCopy(
@@ -508,27 +535,12 @@ PerformActionResponse = Struct("fields" / RawCopy(
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
+
 ZoneActionBitOperation = Enum(Int8ub,
     set=0x08,
     clear=0x00
 )
 
-class EnumerationAdapter(Subconstruct):
-    def __init__(self, subcon):
-        super(EnumerationAdapter, self).__init__(subcon)
-
-        def find_count(s):
-            if hasattr(s, 'count'):
-                return s.count
-            else:
-                return find_count(s.subcon)
-
-        self.size = find_count(subcon)
-
-    def _build(self, obj, stream, context, path):
-        zones = list([i in obj for i in range(1, self.size+1)])
-
-        return self.subcon._build(zones, stream, context, path)
 
 PerformZoneAction = Struct("fields" / RawCopy(Struct(
         "po" / Struct(
@@ -537,9 +549,11 @@ PerformZoneAction = Struct("fields" / RawCopy(Struct(
         "flags" / ZoneFlagBitStruct,
         "operation" / ZoneActionBitOperation,
         "_not_used" / Padding(2),
-        "zones" / EnumerationAdapter(BitsSwapped(Bitwise(Array(192, Flag)))),
+        "zones" / BitsSwapped(Bitwise(
+            EnumerationAdapter(Array(192, Flag)))),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
 
 PerformZoneActionResponse = Struct("fields" / RawCopy(
     Struct(
@@ -557,6 +571,7 @@ PerformZoneActionResponse = Struct("fields" / RawCopy(
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
+
 _PGMCommandEnum = Enum(
     Int8ub,
     release = 0,
@@ -566,18 +581,20 @@ _PGMCommandEnum = Enum(
     off_override = 2
 )
 
+
 PerformPGMAction = Struct("fields" / RawCopy(Struct(
         "po" / Struct(
             "command" / Const(0x40, Int8ub)),
         "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
         "unknown0" / Const(0x06, Int8ub),
         "_not_used0" / Padding(3),
-        "pgms" / EnumerationAdapter(BitsSwapped(Bitwise(Array(8, Flag)))),
+        "pgms" / BitsSwapped(Bitwise(EnumerationAdapter(Array(8, Flag)))),
         "_not_used1" / Padding(7),
         "command" / _PGMCommandEnum,
         "_not_used1" / Padding(3),
     )),
     "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+
 
 ErrorMessage = Struct("fields" / RawCopy(
     Struct(

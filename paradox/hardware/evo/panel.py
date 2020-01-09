@@ -200,7 +200,7 @@ class Panel_EVOBase(PanelBase):
         :param str command: textual command
         :return: True if we have at least one success
         """
-        args = dict(commands=dict((i, command) for i in partitions))
+        args = dict(partitions=dict((i, command) for i in partitions))
 
         try:
             reply = await self.core.send_wait(
@@ -209,6 +209,10 @@ class Panel_EVOBase(PanelBase):
             logger.error('Partition command: "%s" is not supported' % command)
             return False
 
+        if reply:
+            logger.info('Partition command: "%s" succeeded' % command)
+        else:
+            logger.info('Partition command: "%s" failed' % command)
         return reply is not None
 
     async def control_zones(self, zones: list, command: str) -> bool:
@@ -231,6 +235,10 @@ class Panel_EVOBase(PanelBase):
             logger.error('Zone command: "%s" is not supported' % command)
             return False
 
+        if reply:
+            logger.info('Zone command: "%s" succeeded' % command)
+        else:
+            logger.info('Zone command: "%s" failed' % command)
         return reply is not None
 
     async def control_outputs(self, outputs, command) -> bool:
@@ -249,7 +257,11 @@ class Panel_EVOBase(PanelBase):
         try:
             reply = await self.core.send_wait(parsers.PerformPGMAction, args, reply_expected=0x04)
         except MappingError:
-            logger.error('Zone command: "%s" is not supported' % command)
+            logger.error('PGM command: "%s" is not supported' % command)
             return False
 
+        if reply:
+            logger.info('PGM command: "%s" succeeded' % command)
+        else:
+            logger.info('PGM command: "%s" failed' % command)
         return reply is not None
