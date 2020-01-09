@@ -28,10 +28,12 @@ def config_logger(logger):
     logger_level = cfg.LOGGING_LEVEL_CONSOLE
 
     if cfg.LOGGING_FILE is not None:
-        logfile_handler = RotatingFileHandler(cfg.LOGGING_FILE, mode='a',
-                            maxBytes=cfg.LOGGING_FILE_MAX_SIZE*1024*1024, 
-                            backupCount=cfg.LOGGING_FILE_MAX_FILES,
-                            encoding=None, delay=0)
+        logfile_handler = RotatingFileHandler(
+            cfg.LOGGING_FILE, mode='a',
+            maxBytes=cfg.LOGGING_FILE_MAX_SIZE * 1024 * 1024,
+            backupCount=cfg.LOGGING_FILE_MAX_FILES,
+            encoding=None, delay=0
+        )
 
         logfile_handler.setLevel(cfg.LOGGING_LEVEL_FILE)
         logfile_handler.setFormatter(logging.Formatter(get_format(logger_level)))
@@ -44,6 +46,7 @@ def config_logger(logger):
     logger.addHandler(logconsole_handler)
 
     logger.setLevel(logger_level)
+
 
 def exit_handler(signal=None, frame=None):
     global alarm, interface_manager

@@ -42,12 +42,13 @@ def async_loop_unhandled_exception_handler(loop, context):
     # exception = context.get('exception')
     logger.exception("Unhandled exception in async loop")
 
+
 class Paradox:
     def __init__(self, retries=3):
         self.panel = None  # type: Panel
         self._connection = None
         self.retries = retries
-        self.work_loop = asyncio.get_event_loop() # type: asyncio.AbstractEventLoop
+        self.work_loop = asyncio.get_event_loop()  # type: asyncio.AbstractEventLoop
         self.work_loop.set_exception_handler(async_loop_unhandled_exception_handler)
         self.receive_worker_task = None
 
@@ -71,14 +72,16 @@ class Paradox:
             if cfg.CONNECTION_TYPE == "Serial":
                 logger.info("Using Serial Connection")
 
-                self._connection = SerialCommunication(self.on_connection_message, port=cfg.SERIAL_PORT,
-                                                      baud=cfg.SERIAL_BAUD)
+                self._connection = SerialCommunication(
+                    self.on_connection_message, port=cfg.SERIAL_PORT, baud=cfg.SERIAL_BAUD
+                )
             elif cfg.CONNECTION_TYPE == 'IP':
                 logger.info("Using IP Connection")
 
-                self._connection = IPConnection(self.on_connection_message, host=cfg.IP_CONNECTION_HOST,
-                                               port=cfg.IP_CONNECTION_PORT,
-                                               password=cfg.IP_CONNECTION_PASSWORD)
+                self._connection = IPConnection(
+                    self.on_connection_message, host=cfg.IP_CONNECTION_HOST,
+                    port=cfg.IP_CONNECTION_PORT, password=cfg.IP_CONNECTION_PASSWORD
+                )
             else:
                 raise AssertionError("Invalid connection type: {}".format(cfg.CONNECTION_TYPE))
 
@@ -121,7 +124,9 @@ class Paradox:
         try:
             logger.info("Initiating communication")
 
-            initiate_reply = await self.send_wait(self.panel.get_message('InitiateCommunication'), None, reply_expected=0x07)
+            initiate_reply = await self.send_wait(
+                self.panel.get_message('InitiateCommunication'), None, reply_expected=0x07
+            )
 
             if initiate_reply:
                 model = initiate_reply.fields.value.label.strip(b'\0 ').decode(cfg.LABEL_ENCODING)
@@ -136,7 +141,6 @@ class Paradox:
             else:
                 raise ConnectionError("Panel did not replied to InitiateCommunication")
 
-
             logger.info("Starting communication")
             reply = await self.send_wait(self.panel.get_message('StartCommunication'),
                                          args=dict(source_id=0x02), reply_expected=0x00)
@@ -147,7 +151,12 @@ class Paradox:
             if reply.fields.value.product_id is not None:
                 self.panel = create_panel(self, reply.fields.value.product_id)  # Now we know what panel it is. Let's
                 # recreate panel object.
-                ps.sendMessage('panel_detected', panel=dict(product_id=reply.fields.value.product_id, model=model, firmware_version=firmware_version, serial_number=serial_number))
+                ps.sendMessage(
+                    'panel_detected', panel=dict(
+                        product_id=reply.fields.value.product_id, model=model,
+                        firmware_version=firmware_version, serial_number=serial_number
+                    )
+                )
 
             result = await self.panel.initialize_communication(reply, cfg.PASSWORD)
             if not result:
@@ -213,7 +222,7 @@ class Paradox:
         
         replies_missing = 0
 
-        while self.run not in(State.STOP, State.ERROR):
+        while self.run not in (State.STOP, State.ERROR):
             tstart = time.time()
             if self.run == State.RUN:
                 try:
@@ -292,12 +301,12 @@ class Paradox:
             logging.exception("Error parsing message")
 
     async def send_wait(self,
-                  message_type=None,
-                  args=None,
-                  message=None,
-                  retries=5,
-                  timeout=0.5,
-                  reply_expected=None) -> Optional[Container]:
+                        message_type=None,
+                        args=None,
+                        message=None,
+                        retries=5,
+                        timeout=0.5,
+                        reply_expected=None) -> Optional[Container]:
 
         # Connection closed
         if not self.connection.connected:
@@ -323,9 +332,13 @@ class Paradox:
                             reply = await self.connection.wait_for_message(reply_expected, timeout=timeout * 2)
                         elif isinstance(reply_expected, Iterable):
                             reply = await self.connection.wait_for_message(
-                                lambda m: any(m.fields.value.po.command == expected for expected in reply_expected), timeout=timeout*2)
+                                lambda m: any(m.fields.value.po.command == expected for expected in reply_expected),
+                                timeout=timeout*2
+                            )
                         else:
-                            reply = await self.connection.wait_for_message(lambda m: m.fields.value.po.command == reply_expected, timeout=timeout * 2)
+                            reply = await self.connection.wait_for_message(
+                                lambda m: m.fields.value.po.command == reply_expected, timeout=timeout * 2
+                            )
 
                         if reply:
                             return reply
@@ -366,7 +379,7 @@ class Paradox:
         command = command.lower()
         logger.debug("Control Partition: {} - {}".format(partition, command))
 
-        partitions_selected = self.storage.get_container('partition').select(partition) # type: Sequence[int]
+        partitions_selected = self.storage.get_container('partition').select(partition)  # type: Sequence[int]
 
         # Not Found
         if len(partitions_selected) == 0:
@@ -424,7 +437,7 @@ class Paradox:
         if el:
             return el.get("label")
 
-    def handle_event_message(self, message: Container=None):
+    def handle_event_message(self, message: Container = None):
         """Process cfg.Live Event Message and dispatch it to the interface module"""
         try:
             try:
@@ -439,7 +452,11 @@ class Paradox:
             # TODO: REMOVE
             if message is not None:
                 if not evt.id:
-                    logger.debug("Missing element ID in {}/{}, m/m: {}/{}, message: {}".format(evt.type, evt.label or '?', evt.major, evt.minor, evt.message))
+                    logger.debug(
+                        "Missing element ID in {}/{}, m/m: {}/{}, message: {}".format(
+                            evt.type, evt.label or '?', evt.major, evt.minor, evt.message
+                        )
+                    )
                 else:
                     if not element:
                         logger.warning("Missing element with ID {} in {}/{}".format(evt.id, evt.type, evt.label))
@@ -449,7 +466,10 @@ class Paradox:
                                 logger.warning("Missing property {} in {}/{}".format(k, evt.type, evt.label))
                         if evt.label != element.get("label"):
                             logger.warning(
-                                "Labels differ {} != {} in {}/{}".format(element.get("label"), evt.label, evt.type, evt.label))
+                                "Labels differ {} != {} in {}/{}".format(
+                                    element.get("label"), evt.label, evt.type, evt.label
+                                )
+                            )
             # Temporary end
             
             # The event has changes. Update the state
@@ -593,7 +613,9 @@ class Paradox:
             return
 
         try:
-            event = ChangeEvent(change_object=change, property_map=self.panel.property_map, label_provider=self.get_label)
+            event = ChangeEvent(
+                change_object=change, property_map=self.panel.property_map, label_provider=self.get_label
+            )
             if cfg.LOGGING_DUMP_EVENTS:
                 logger.debug("ChangeEvent: {}".format(event))
             ps.sendEvent(event)

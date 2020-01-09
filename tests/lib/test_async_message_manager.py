@@ -3,6 +3,7 @@ import asyncio
 from construct import Container
 from paradox.lib.async_message_manager import AsyncMessageManager, RAWMessageHandler, EventMessageHandler
 
+
 @pytest.mark.asyncio
 async def test_persistent_raw_handler(mocker):
     cb = mocker.MagicMock()
@@ -15,7 +16,6 @@ async def test_persistent_raw_handler(mocker):
 
     assert len(mm.raw_handlers) == 1
 
-
     task1 = mm.schedule_raw_message_handling(msg)
     await task1
     task2 = mm.schedule_raw_message_handling(msg)
@@ -25,6 +25,7 @@ async def test_persistent_raw_handler(mocker):
     cb.assert_has_calls([mocker.call(msg), mocker.call(msg)])
 
     assert len(mm.raw_handlers) == 1
+
 
 @pytest.mark.asyncio
 async def test_raw_handler_register_unregister(mocker):
@@ -43,6 +44,7 @@ async def test_raw_handler_register_unregister(mocker):
 
     assert len(mm.raw_handlers) == 0
 
+
 @pytest.mark.asyncio
 async def test_wait_for_raw_message(mocker):
     loop = asyncio.get_event_loop()
@@ -58,6 +60,7 @@ async def test_wait_for_raw_message(mocker):
     assert len(mm.raw_handlers) == 0
     assert len(mm.handlers) == 0
 
+
 @pytest.mark.asyncio
 async def test_wait_for_message(mocker):
     loop = asyncio.get_event_loop()
@@ -72,6 +75,7 @@ async def test_wait_for_message(mocker):
 
     assert len(mm.raw_handlers) == 0
     assert len(mm.handlers) == 0
+
 
 @pytest.mark.asyncio
 async def test_handler_exception(mocker):

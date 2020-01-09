@@ -2,6 +2,7 @@ from typing import Mapping, Sequence
 
 from paradox.lib.utils import deep_merge
 
+
 class ElementTypeContainer(dict):
     def filter(self, id_arr):
         remove_keys = set(self.keys()) - set(id_arr)

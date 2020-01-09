@@ -9,7 +9,6 @@ from paradox.interfaces import ThreadQueueInterface
 logger = logging.getLogger('PAI').getChild(__name__)
 
 
-
 class AbstractTextInterface(ThreadQueueInterface):
     """Interface Class using any Text interface"""
     name = 'abstract_text'
@@ -110,7 +109,7 @@ class AbstractTextInterface(ThreadQueueInterface):
         logger.info("OK: {}".format(message_raw))
         return "OK"
 
-    #TODO: Remove this (to panels?)
+    # TODO: Remove this (to panels?)
     @staticmethod
     def normalize_payload(message):
         message = message.strip().lower()
@@ -131,7 +130,7 @@ class ConfiguredAbstractTextInterface(AbstractTextInterface):
             raise AssertionError('You can not use *_EVENT_FILTERS and *_ALLOW_EVENTS+*_IGNORE_EVENTS simultaneously')
 
         min_level = EventLevel.from_name(MIN_EVENT_LEVEL)
-        if ALLOW_EVENTS or IGNORE_EVENTS: # Use if defined, else use TAGS as default
+        if ALLOW_EVENTS or IGNORE_EVENTS:  # Use if defined, else use TAGS as default
             logger.debug("Using REGEXP Filter")
             event_filter = LiveEventRegexpFilter(ALLOW_EVENTS, IGNORE_EVENTS, min_level)
         else:

@@ -1,54 +1,54 @@
 from collections.abc import Mapping
 
-from construct import Struct, RawCopy, BitStruct, Const, Nibble, Flag, Rebuild, Int8ub, BitsInteger, Int16ub, Checksum, \
-    Bytes, this, Default, Padding, Enum, Int24ub, ExprAdapter, Byte, obj_, Array, Computed, Subconstruct, \
-    ValidationError, ExprSymmetricAdapter, Bitwise, BitsSwapped, Embedded, ByteSwapped, Bytewise
+from construct import Struct, RawCopy, BitStruct, Const, Nibble, Flag, Int8ub, BitsInteger, Int16ub, \
+    Checksum, Bytes, this, Default, Padding, Enum, Int24ub, ExprAdapter, Byte, obj_, Array, Computed, Subconstruct, \
+    ValidationError, ExprSymmetricAdapter, Bitwise, BitsSwapped, Embedded, ByteSwapped
 
 from .adapters import StatusFlags, ZoneFlags, DateAdapter, PartitionStatus, EventAdapter, \
     ZoneFlagBitStruct, DictArray, EnumerationAdapter
-from ..common import CommunicationSourceIDEnum, ProductIdEnum, calculate_checksum
+from ..common import CommunicationSourceIDEnum, ProductIdEnum, calculate_checksum, PacketLength, PacketChecksum
 
-LoginConfirmationResponse = Struct("fields" / RawCopy(
-    Struct(
-        "po" / BitStruct(
-            "command" / Const(0x1, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Winload_connected" / Flag,
-                "NeWare_connected" / Flag)
-        ),
-        "length" / Rebuild(Int8ub, lambda
-            this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
-        "result" / BitStruct(
-            "_not_used0" / BitsInteger(4),
-            "partition_2" / Flag,
-            "_not_used1" / BitsInteger(3)
-        ),
-        "callback" / Int16ub
-    )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+LoginConfirmationResponse = Struct(
+    "fields" / RawCopy(
+        Struct(
+            "po" / BitStruct(
+                "command" / Const(0x1, Nibble),
+                "status" / Struct(
+                    "reserved" / Flag,
+                    "alarm_reporting_pending" / Flag,
+                    "Winload_connected" / Flag,
+                    "NeWare_connected" / Flag)
+            ),
+            "length" / PacketLength(Int8ub),
+            "result" / BitStruct(
+                "_not_used0" / BitsInteger(4),
+                "partition_2" / Flag,
+                "_not_used1" / BitsInteger(3)
+            ),
+            "callback" / Int16ub
+        )),
+    "checksum" / PacketChecksum(Bytes(1)))
 
-
-InitializeCommunication = Struct("fields" / RawCopy(
-    Struct(
-        "po" / Struct("command" / Const(0x00, Int8ub)),
-        "module_address" / Default(Int8ub, 0x00),  # (00= panel/module)
-        "_not_used0" / Padding(2),
-        "product_id" / ProductIdEnum,
-        "firmware" / Struct(
-            "version" / Int8ub,
-            "revision" / Int8ub,
-            "build" / Int8ub),
-        "panel_id" / Int16ub,
-        "pc_password" / Default(Bytes(2), b'0000'),
-        "modem_speed" / Bytes(1),
-        "source_method" / Default(Enum(Int8ub,
-                                       Winload_Connection=0x00,
-                                       NEware_Connection=0x55), 0x00),
-        "user_code" / Default(Int24ub, 0x000000),
-        "serial_number" / Bytes(4),
-        "system_options" / BitsSwapped(Bitwise(Struct(
+InitializeCommunication = Struct(
+    "fields" / RawCopy(
+        Struct(
+            "po" / Struct("command" / Const(0x00, Int8ub)),
+            "module_address" / Default(Int8ub, 0x00),  # (00= panel/module)
+            "_not_used0" / Padding(2),
+            "product_id" / ProductIdEnum,
+            "firmware" / Struct(
+                "version" / Int8ub,
+                "revision" / Int8ub,
+                "build" / Int8ub),
+            "panel_id" / Int16ub,
+            "pc_password" / Default(Bytes(2), b'0000'),
+            "modem_speed" / Bytes(1),
+            "source_method" / Default(Enum(Int8ub,
+                                           Winload_Connection=0x00,
+                                           NEware_Connection=0x55), 0x00),
+            "user_code" / Default(Int24ub, 0x000000),
+            "serial_number" / Bytes(4),
+            "system_options" / BitsSwapped(BitStruct(
                 Embedded(Struct(  # EVO section data 3030
                     "pgm1_smoke" / Flag,
                     "no_bell_cut_off" / Flag,
@@ -117,13 +117,12 @@ InitializeCommunication = Struct("fields" / RawCopy(
                     "bulglar_alarm_on_door_left_open" / Flag,
                     "who_has_access_during_clock_loss" / Flag,
                 )),
-        ))),
-        "_not_used1" / Padding(4),
-        "source_id" / Default(CommunicationSourceIDEnum, 1),
-        "carrier_length" / Bytes(1)
-    )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-
+            )),
+            "_not_used1" / Padding(4),
+            "source_id" / Default(CommunicationSourceIDEnum, 1),
+            "carrier_length" / Bytes(1)
+        )),
+    "checksum" / PacketChecksum(Bytes(1)))
 
 RAMDataParserMap = {
     1: Struct(
@@ -235,10 +234,10 @@ RAMDataParserMap = {
     )
 }
 
-
 DefinitionsParserMap = {
     "zone": BitStruct(
-        "definition" / Enum(Nibble,
+        "definition" / Enum(
+            Nibble,
             disabled=0x0,
             entry_delay1=0x1,
             entry_delay2=0x2,
@@ -262,7 +261,8 @@ DefinitionsParserMap = {
             "bypass_enabled" / Flag,
             "stay_zone" / Flag,
             "force_zone" / Flag,
-            "alarm_type" / Enum(BitsInteger(2),
+            "alarm_type" / Enum(
+                BitsInteger(2),
                 steady_alarm=0x0,
                 pulsed_alarm=0x1,
                 silent_alarm=0x2,
@@ -275,38 +275,37 @@ DefinitionsParserMap = {
     "partition": BitsSwapped(
         Bitwise(
             DictArray(8, 1, Struct(
-                    "_index" / Computed(this._index + 1),
-                    "definition" / ExprAdapter(
-                        Default(Flag, False),
-                        lambda obj, context: "enabled" if obj else "disabled",
-                        lambda obj, context: obj == "enabled"
-                    )
+                "_index" / Computed(this._index + 1),
+                "definition" / ExprAdapter(
+                    Default(Flag, False),
+                    lambda obj, context: "enabled" if obj else "disabled",
+                    lambda obj, context: obj == "enabled"
+                )
             ))
-    )),
+        )),
 }
 
-
-LiveEvent = Struct("fields" / RawCopy(
-    Struct(
-        "po" / BitStruct(
-            "command" / Const(0xE, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Winload_connected" / Flag,
-                "NeWare_connected" / Flag)),
-        "event_source" / Const(0xFF, Int8ub),
-        "event_nr" / Int16ub,
-        "time" / DateAdapter(Bytes(6)),
-        "event" / EventAdapter(Bytes(4)),
-        "partition" / Computed(this.event.partition),
-        "module_serial" / Bytes(4),
-        "label_type" / Bytes(1),
-        "label" / Bytes(16),
-        "_not_used0" / Bytes(1),
-    )), "checksum" / Checksum(
-    Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-
+LiveEvent = Struct(
+    "fields" / RawCopy(
+        Struct(
+            "po" / BitStruct(
+                "command" / Const(0xE, Nibble),
+                "status" / Struct(
+                    "reserved" / Flag,
+                    "alarm_reporting_pending" / Flag,
+                    "Winload_connected" / Flag,
+                    "NeWare_connected" / Flag)),
+            "event_source" / Const(0xFF, Int8ub),
+            "event_nr" / Int16ub,
+            "time" / DateAdapter(Bytes(6)),
+            "event" / EventAdapter(Bytes(4)),
+            "partition" / Computed(this.event.partition),
+            "module_serial" / Bytes(4),
+            "label_type" / Bytes(1),
+            "label" / Bytes(16),
+            "_not_used0" / Bytes(1),
+        )), "checksum" / PacketChecksum(Bytes(1))
+)
 
 # "Event 1 requested (in compressed format) 1 (12 bytes)
 #   Byte 00: [7-3]: Day, [2-0]: Month (MSB)
@@ -340,54 +339,53 @@ CompressedEvent = Struct(
     "module_serial" / Bytes(4)
 )
 
+RequestedEvent = Struct(
+    "fields" / RawCopy(
+        Struct(
+            "po" / BitStruct(
+                "command" / Const(0xE, Nibble),
+                "status" / Struct(
+                    "reserved" / Flag,
+                    "alarm_reporting_pending" / Flag,
+                    "Winload_connected" / Flag,
+                    "NeWare_connected" / Flag)),
+            "length" / PacketLength(Int8ub),
+            "_not_used0" / Bytes(1),
+            "requested_event_nr" / Const(0x00, Int8ub),
+            "event_nr" / Int16ub,
+            # "data" / Bytes(lambda this: this.length - 7)
+            "data" / Array(lambda x: int((x.length - 7) / 12), CompressedEvent)
+        )), "checksum" / Checksum(
+        Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
 
-RequestedEvent = Struct("fields" / RawCopy(
-    Struct(
-        "po" / BitStruct(
-            "command" / Const(0xE, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Winload_connected" / Flag,
-                "NeWare_connected" / Flag)),
-        "length" / Rebuild(Int8ub, lambda
-            this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
-        "_not_used0" / Bytes(1),
-        "requested_event_nr" / Const(0x00, Int8ub),
-        "event_nr" / Int16ub,
-        # "data" / Bytes(lambda this: this.length - 7)
-        "data" / Array(lambda this: int((this.length - 7) / 12), CompressedEvent)
-    )), "checksum" / Checksum(
-    Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-
-
-CloseConnection = Struct("fields" / RawCopy(
-    Struct(
-        "po" / Struct(
-            "command" / Const(0x70, Int8ub)
-        ),
-        "length" / Rebuild(Int8ub, lambda
-            this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
-        "message" / Default(Enum(Int8ub,
-                         requested_command_failed=0x00,
-                         invalid_user_code=0x01,
-                         partition_in_code_lockout=0x02,
-                         panel_will_disconnect=0x05,
-                         panel_not_connected=0x10,
-                         panel_already_connected=0x11,
-                         invalid_pc_password=0x12,
-                         winload_on_phone_line=0x13,
-                         invalid_module_address=0x14,
-                         cannot_write_in_ram=0x15,
-                         upgrade_request_fail=0x16,
-                         record_number_out_of_range=0x17,
-                         invalid_record_type=0x19,
-                         multibus_not_supported=0x1a,
-                         incorrect_number_of_users=0x1b,
-                         invalid_label_number=0x1c
-                         ), 0x05),
-    )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+CloseConnection = Struct(
+    "fields" / RawCopy(
+        Struct(
+            "po" / Struct(
+                "command" / Const(0x70, Int8ub)
+            ),
+            "length" / PacketLength(Int8ub),
+            "message" / Default(Enum(
+                Int8ub,
+                requested_command_failed=0x00,
+                invalid_user_code=0x01,
+                partition_in_code_lockout=0x02,
+                panel_will_disconnect=0x05,
+                panel_not_connected=0x10,
+                panel_already_connected=0x11,
+                invalid_pc_password=0x12,
+                winload_on_phone_line=0x13,
+                invalid_module_address=0x14,
+                cannot_write_in_ram=0x15,
+                upgrade_request_fail=0x16,
+                record_number_out_of_range=0x17,
+                invalid_record_type=0x19,
+                multibus_not_supported=0x1a,
+                incorrect_number_of_users=0x1b,
+                invalid_label_number=0x1c
+            ), 0x05),
+        )),
+    "checksum" / PacketChecksum(Bytes(1)))
 
 
 class EvoEEPROMAddressAdapter(Subconstruct):
@@ -415,58 +413,56 @@ class EvoEEPROMAddressAdapter(Subconstruct):
         return obj
 
 
-ReadEEPROM = Struct("fields" / RawCopy(
-    EvoEEPROMAddressAdapter(Struct(
-        "po" / BitStruct(
-            "command" / Const(0x5, Nibble),
-            "block" / Default(Nibble, 0),
-        ),
-        "packet_length" / Rebuild(Int8ub, lambda
-            this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
-        "control" / BitStruct(
-            "ram_access" / Default(Flag, False),
-            "alarm_reporting_pending" / Default(Flag, False),
-            "Winload_connected" / Default(Flag, False),
-            "NeWare_connected" / Default(Flag, False),
-            "_not_used" / Default(BitsInteger(2), 0),
-            "eeprom_address_bits" / Default(BitsInteger(2), 0)
-        ),
-        "bus_address" / Default(Int8ub, 0x00),  # 00 - Panel, 01-FF - Modules
-        "address" / ExprSymmetricAdapter(Int16ub, obj_ & 0xffff),
-        "length" / Int8ub
-    ))),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+ReadEEPROM = Struct(
+    "fields" / RawCopy(
+        EvoEEPROMAddressAdapter(Struct(
+            "po" / BitStruct(
+                "command" / Const(0x5, Nibble),
+                "block" / Default(Nibble, 0),
+            ),
+            "packet_length" / PacketLength(Int8ub),
+            "control" / BitStruct(
+                "ram_access" / Default(Flag, False),
+                "alarm_reporting_pending" / Default(Flag, False),
+                "Winload_connected" / Default(Flag, False),
+                "NeWare_connected" / Default(Flag, False),
+                "_not_used" / Default(BitsInteger(2), 0),
+                "eeprom_address_bits" / Default(BitsInteger(2), 0)
+            ),
+            "bus_address" / Default(Int8ub, 0x00),  # 00 - Panel, 01-FF - Modules
+            "address" / ExprSymmetricAdapter(Int16ub, obj_ & 0xffff),
+            "length" / Int8ub
+        ))),
+    "checksum" / PacketChecksum(Bytes(1)))
 
+ReadEEPROMResponse = Struct(
+    "fields" / RawCopy(
+        Struct(
+            "po" / BitStruct(
+                "command" / Const(0x5, Nibble),
+                "status" / Struct(
+                    "reserved" / Flag,
+                    "alarm_reporting_pending" / Flag,
+                    "Winload_connected" / Flag,
+                    "NeWare_connected" / Flag)
+            ),
+            "packet_length" / PacketLength(Int8ub),
+            "control" / BitStruct(
+                "ram_access" / Flag,  # RAM = 0 or EEPROM = 1
+                "_not_used" / Padding(5),
+                "eeprom_address_bits" / BitsInteger(2)  # EEPROM address bit 17 and 16
+            ),
+            "bus_address" / Int8ub,  # 00 - Panel, 01-FE - Modules
+            "address" / Int16ub,
+            "data" / Bytes(lambda x: x.packet_length - 7)
+        )),
+    "checksum" / PacketChecksum(Bytes(1)))
 
-ReadEEPROMResponse = Struct("fields" / RawCopy(
-    Struct(
-        "po" / BitStruct(
-            "command" / Const(0x5, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Winload_connected" / Flag,
-                "NeWare_connected" / Flag)
-        ),
-        "packet_length" / Rebuild(Int8ub, lambda
-            this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
-        "control" / BitStruct(
-            "ram_access" / Flag,  # RAM = 0 or EEPROM = 1
-            "_not_used" / Padding(5),
-            "eeprom_address_bits" / BitsInteger(2)  # EEPROM address bit 17 and 16
-        ),
-        "bus_address" / Int8ub,  # 00 - Panel, 01-FE - Modules
-        "address" / Int16ub,
-        "data" / Bytes(lambda this: this.packet_length - 7)
-    )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-
-
-SetTimeDate = Struct("fields" / RawCopy(Struct(
+SetTimeDate = Struct(
+    "fields" / RawCopy(Struct(
         "po" / Struct(
             "command" / Const(0x30, Int8ub)),
-        "packet_length" / Rebuild(Int8ub,
-                                  lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+        "packet_length" / PacketLength(Int8ub),
         "_not_used0" / Padding(4),
         "century" / Int8ub,
         "year" / Int8ub,
@@ -475,39 +471,39 @@ SetTimeDate = Struct("fields" / RawCopy(Struct(
         "hour" / Int8ub,
         "minute" / Int8ub,
     )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / PacketChecksum(Bytes(1)))
 
+SetTimeDateResponse = Struct(
+    "fields" / RawCopy(
+        Struct(
+            "po" / BitStruct(
+                "command" / Const(0x3, Nibble),
+                "status" / Struct(
+                    "reserved" / Flag,
+                    "alarm_reporting_pending" / Flag,
+                    "Winload_connected" / Flag,
+                    "NeWare_connected" / Flag)),
+            "length" / Int8ub,
+            "_not_used0" / Padding(4),
+        )),
+    "checksum" / PacketChecksum(Bytes(1)))
 
-SetTimeDateResponse = Struct("fields" / RawCopy(
-    Struct(
-        "po" / BitStruct(
-            "command" / Const(0x3, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Winload_connected" / Flag,
-                "NeWare_connected" / Flag)),
-        "length" / Int8ub,
-        "_not_used0" / Padding(4),
-    )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+_PartitionCommandEnum = Enum(
+    Nibble,
+    none=0,
+    arm=2,
+    arm_stay=3,
+    arm_instant=4,
+    arm_force=5,
+    disarm=6,
+    beep_keypads=8
+)
 
-
-_PartitionCommandEnum = Enum(Nibble,
-                             none  = 0,
-                             arm = 2,
-                             arm_stay = 3,
-                             arm_instant = 4,
-                             arm_force = 5,
-                             disarm = 6,
-                             beep_keypads = 8
-                             )
-
-
-PerformPartitionAction = Struct("fields" / RawCopy(Struct(
+PerformPartitionAction = Struct(
+    "fields" / RawCopy(Struct(
         "po" / Struct(
             "command" / Const(0x40, Int8ub)),
-        "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+        "packet_length" / PacketLength(Int8ub),
         "_not_used0" / Padding(4),
         "partitions" / Bitwise(
             DictArray(8, 1, Struct(
@@ -517,75 +513,74 @@ PerformPartitionAction = Struct("fields" / RawCopy(Struct(
         ),
         "_not_used1" / Padding(4),
     )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-
+    "checksum" / PacketChecksum(Bytes(1)))
 
 # Used for partitions and PGMs
-PerformActionResponse = Struct("fields" / RawCopy(
-    Struct(
-        "po" / BitStruct(
-            "command" / Const(0x4, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Winload_connected" / Flag,
-                "NeWare_connected" / Flag)),
-        "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
-        "_not_used0" / Padding(4),
-    )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+PerformActionResponse = Struct(
+    "fields" / RawCopy(
+        Struct(
+            "po" / BitStruct(
+                "command" / Const(0x4, Nibble),
+                "status" / Struct(
+                    "reserved" / Flag,
+                    "alarm_reporting_pending" / Flag,
+                    "Winload_connected" / Flag,
+                    "NeWare_connected" / Flag)),
+            "packet_length" / PacketLength(Int8ub),
+            "_not_used0" / Padding(4),
+        )),
+    "checksum" / PacketChecksum(Bytes(1)))
 
-
-ZoneActionBitOperation = Enum(Int8ub,
+ZoneActionBitOperation = Enum(
+    Int8ub,
     set=0x08,
     clear=0x00
 )
 
-
-PerformZoneAction = Struct("fields" / RawCopy(Struct(
+PerformZoneAction = Struct(
+    "fields" / RawCopy(Struct(
         "po" / Struct(
             "command" / Const(0xd0, Int8ub)),
-        "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+        "packet_length" / PacketLength(Int8ub),
         "flags" / ZoneFlagBitStruct,
         "operation" / ZoneActionBitOperation,
         "_not_used" / Padding(2),
         "zones" / BitsSwapped(Bitwise(
             EnumerationAdapter(Array(192, Flag)))),
     )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / PacketChecksum(Bytes(1)))
 
-
-PerformZoneActionResponse = Struct("fields" / RawCopy(
-    Struct(
-        "po" / BitStruct(
-            "command" / Const(0xd, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Winload_connected" / Flag,
-                "NeWare_connected" / Flag)),
-        "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
-        "flags" / ZoneFlagBitStruct,
-        "operation" / ZoneActionBitOperation,
-        "_not_used" / Padding(2),
-    )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
-
+PerformZoneActionResponse = Struct(
+    "fields" / RawCopy(
+        Struct(
+            "po" / BitStruct(
+                "command" / Const(0xd, Nibble),
+                "status" / Struct(
+                    "reserved" / Flag,
+                    "alarm_reporting_pending" / Flag,
+                    "Winload_connected" / Flag,
+                    "NeWare_connected" / Flag)),
+            "packet_length" / PacketLength(Int8ub),
+            "flags" / ZoneFlagBitStruct,
+            "operation" / ZoneActionBitOperation,
+            "_not_used" / Padding(2),
+        )),
+    "checksum" / PacketChecksum(Bytes(1)))
 
 _PGMCommandEnum = Enum(
     Int8ub,
-    release = 0,
-    off = 1,
-    on = 3,
-    on_override = 4,
-    off_override = 2
+    release=0,
+    off=1,
+    on=3,
+    on_override=4,
+    off_override=2
 )
 
-
-PerformPGMAction = Struct("fields" / RawCopy(Struct(
+PerformPGMAction = Struct(
+    "fields" / RawCopy(Struct(
         "po" / Struct(
             "command" / Const(0x40, Int8ub)),
-        "packet_length" / Rebuild(Int8ub, lambda this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+        "packet_length" / PacketLength(Int8ub),
         "unknown0" / Const(0x06, Int8ub),
         "_not_used0" / Padding(3),
         "pgms" / BitsSwapped(Bitwise(EnumerationAdapter(Array(8, Flag)))),
@@ -593,37 +588,36 @@ PerformPGMAction = Struct("fields" / RawCopy(Struct(
         "command" / _PGMCommandEnum,
         "_not_used1" / Padding(3),
     )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / PacketChecksum(Bytes(1)))
 
-
-ErrorMessage = Struct("fields" / RawCopy(
-    Struct(
-        "po" / BitStruct(
-            "command" / Const(0x7, Nibble),
-            "status" / Struct(
-                "reserved" / Flag,
-                "alarm_reporting_pending" / Flag,
-                "Winload_connected" / Flag,
-                "NeWare_connected" / Flag)),
-        "length" / Rebuild(Int8ub, lambda
-            this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
-        "message" / Enum(Int8ub,
-                         requested_command_failed=0x00,
-                         invalid_user_code=0x01,
-                         partition_in_code_lockout=0x02,
-                         panel_will_disconnect=0x05,
-                         panel_not_connected=0x10,
-                         panel_already_connected=0x11,
-                         invalid_pc_password=0x12,
-                         winload_on_phone_line=0x13,
-                         invalid_module_address=0x14,
-                         cannot_write_in_ram=0x15,
-                         upgrade_request_fail=0x16,
-                         record_number_out_of_range=0x17,
-                         invalid_record_type=0x19,
-                         multibus_not_supported=0x1a,
-                         incorrect_number_of_users=0x1b,
-                         invalid_label_number=0x1c
-                         ),
-    )),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+ErrorMessage = Struct(
+    "fields" / RawCopy(
+        Struct(
+            "po" / BitStruct(
+                "command" / Const(0x7, Nibble),
+                "status" / Struct(
+                    "reserved" / Flag,
+                    "alarm_reporting_pending" / Flag,
+                    "Winload_connected" / Flag,
+                    "NeWare_connected" / Flag)),
+            "length" / PacketLength(Int8ub),
+            "message" / Enum(Int8ub,
+                             requested_command_failed=0x00,
+                             invalid_user_code=0x01,
+                             partition_in_code_lockout=0x02,
+                             panel_will_disconnect=0x05,
+                             panel_not_connected=0x10,
+                             panel_already_connected=0x11,
+                             invalid_pc_password=0x12,
+                             winload_on_phone_line=0x13,
+                             invalid_module_address=0x14,
+                             cannot_write_in_ram=0x15,
+                             upgrade_request_fail=0x16,
+                             record_number_out_of_range=0x17,
+                             invalid_record_type=0x19,
+                             multibus_not_supported=0x1a,
+                             incorrect_number_of_users=0x1b,
+                             invalid_label_number=0x1c
+                             ),
+        )),
+    "checksum" / PacketChecksum(Bytes(1)))

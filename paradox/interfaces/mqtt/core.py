@@ -28,6 +28,7 @@ class ConnectionState(Enum):
 
 class MQTTConnection(Client):
     _instance = None
+
     @classmethod
     def get_instance(cls) -> 'MQTTConnection':
         if cls._instance is None:
@@ -58,8 +59,10 @@ class MQTTConnection(Client):
 
             # TODO: Some initial connection retry mechanism required
             try:
-                self.connect_async(host=cfg.MQTT_HOST, port=cfg.MQTT_PORT, keepalive=cfg.MQTT_KEEPALIVE,
-                    bind_address=cfg.MQTT_BIND_ADDRESS, bind_port=cfg.MQTT_BIND_PORT)
+                self.connect_async(
+                    host=cfg.MQTT_HOST, port=cfg.MQTT_PORT, keepalive=cfg.MQTT_KEEPALIVE,
+                    bind_address=cfg.MQTT_BIND_ADDRESS, bind_port=cfg.MQTT_BIND_PORT
+                )
 
                 self.state = ConnectionState.CONNECTING
 

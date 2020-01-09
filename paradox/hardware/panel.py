@@ -1,7 +1,7 @@
+import binascii
 import inspect
 import logging
 import typing
-import binascii
 from collections import defaultdict, namedtuple
 from itertools import chain
 
@@ -14,6 +14,7 @@ from . import parsers
 logger = logging.getLogger('PAI').getChild(__name__)
 
 IndexAddress = namedtuple('IndexAddress', 'idx address')
+
 
 class Panel:
     mem_map = {}  # override in a subclass
@@ -173,8 +174,10 @@ class Panel:
 
     async def _eeprom_read_address(self, address, length):
         args = dict(address=address, length=length)
-        reply = await self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=lambda
-            m: m.fields.value.po.command == 0x05 and m.fields.value.address == address)
+        reply = await self.core.send_wait(
+            self.get_message('ReadEEPROM'), args,
+            reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address
+        )
 
         if reply is None:
             logger.error("Could not fully load labels")
@@ -241,8 +244,10 @@ class Panel:
                 label = label.decode(cfg.LABEL_ENCODING)
             except UnicodeDecodeError:
                 logger.warning('Unable to properly decode label {} using the {} encoding.\n \
-                    Specify a different encoding using the LABEL_ENCODING configuration option.'.format(b_label,
-                                                                                                        cfg.LABEL_ENCODING))
+                    Specify a different encoding using the LABEL_ENCODING configuration option.'.format(
+                    b_label,
+                    cfg.LABEL_ENCODING
+                ))
                 label = label.decode('utf-8', errors='ignore')
 
             properties = template.copy()

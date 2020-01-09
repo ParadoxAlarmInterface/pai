@@ -21,7 +21,6 @@ from paradox.lib import ps
 logger = logging.getLogger('PAI').getChild(__name__)
 
 
-
 class SerialConnectionProtocol(ConnectionProtocol):
     def __init__(self, on_port_open, on_con_lost, on_recv_data):
         super(SerialConnectionProtocol, self).__init__(on_message=on_recv_data, on_con_lost=on_con_lost)
@@ -47,12 +46,12 @@ class SerialConnectionProtocol(ConnectionProtocol):
             if r < 0:
                 break
 
-            #In the beginning
+            # In the beginning
             if r == 0:
                 self.buffer = self.buffer[2:]
                 continue
             
-            #Buffer is empty
+            # Buffer is empty
             if len(self.buffer) == 0:
                 return
 
@@ -79,6 +78,7 @@ class SerialCommunication:
         self.recv_callback = recv_callback
         self.loop = loop
         self.connected = False
+        self.connection = None
         asyncio.set_event_loop(loop)
         self.queue = asyncio.Queue()
 
@@ -164,7 +164,7 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
 
         logger.debug("GSM Stopped")
 
-    def write(self, message: str, expected: str= None)-> None:
+    def write(self, message: str, expected: str = None) -> None:
         r = b''
         while r != expected:
             r = self.loop.run_until_complete(self.port.write(message))
@@ -198,13 +198,13 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
             return False
 
         try:
-            self.write(b'AT', b'OK') # Init
-            self.write(b'ATE0', b'OK') # Disable Echo
-            self.write(b'AT+CMEE=2', b'OK') # Increase verbosity
-            self.write(b'AT+CMGF=1', b'OK') # SMS Text mode
-            self.write(b'AT+CFUN=1', b'OK') # Enable modem
-            self.write(b'AT+CNMI=1,2,0,0,0', b'OK') # SMS received only when modem enabled, Use +CMT with SMS, No Status Report,  
-            self.write(b'AT+CUSD=1', b'OK') # Enable result code presentation
+            self.write(b'AT', b'OK')  # Init
+            self.write(b'ATE0', b'OK')  # Disable Echo
+            self.write(b'AT+CMEE=2', b'OK')  # Increase verbosity
+            self.write(b'AT+CMGF=1', b'OK')  # SMS Text mode
+            self.write(b'AT+CFUN=1', b'OK')  # Enable modem
+            self.write(b'AT+CNMI=1,2,0,0,0', b'OK')  # SMS received only when modem enabled, Use +CMT with SMS, No Status Report,
+            self.write(b'AT+CUSD=1', b'OK')  # Enable result code presentation
             
         except futures.TimeoutError as e:
             logger.error("No reply from modem")
@@ -248,7 +248,7 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
 
         return True
 
-    def handle_message(self, timestamp: str, source: str , message: str) -> None:
+    def handle_message(self, timestamp: str, source: str, message: str) -> None:
         """ Handle GSM message. It should be a command """
 
         logger.debug("Received: {} {} {}".format(
@@ -275,7 +275,7 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
             data = b'AT+CMGS="%b"\x0d%b\x1a' % (dst.encode(), message.encode())
 
             try:
-                future = asyncio.run_coroutine_threadsafe(self.port.write(data) ,self.loop)
+                future = asyncio.run_coroutine_threadsafe(self.port.write(data), self.loop)
                 result = future.result()
                 logger.debug("SMS result: {}".format(result))
             except:
@@ -303,7 +303,7 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
             logger.info("Modem registered into network")
             ps.sendNotification(Notification(sender=self.name, message="Modem registered into network", level=EventLevel.INFO))
         elif code == 4:
-            logger.warn("CUSD code not supported")
+            logger.warning("CUSD code not supported")
             return
         else:
             return

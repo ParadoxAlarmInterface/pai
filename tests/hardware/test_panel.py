@@ -2,6 +2,7 @@ import binascii
 import pytest
 from paradox.hardware import Panel
 
+
 @pytest.mark.parametrize(
     "input,expected",
     [
@@ -26,4 +27,3 @@ def test_encode_password(input, expected, mocker):
 
     enc_password = panel.encode_password(input)
     assert binascii.hexlify(enc_password) == expected
-

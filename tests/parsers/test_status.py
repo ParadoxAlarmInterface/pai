@@ -8,7 +8,7 @@ evo_status = {
     '_weekday': 5,
     'pgm_flags': dict(chime_zone_partition={1: False, 2: False},
                       power_smoke=False,
-                                  ground_start=False, kiss_off=False, line_ring=False,
+                      ground_start=False, kiss_off=False, line_ring=False,
                       bell_partition={1: False, 2: False},
                       fire_alarm={1: False, 2: False},
                       open_close_kiss_off={1: False, 2: False}),

@@ -47,9 +47,8 @@ class SerialCommunication(Connection):
         self.connected_future = self.loop.create_future()
         self.loop.call_later(5, self.open_timeout)
 
-        _, self.connection = await serial_asyncio.create_serial_connection(self.loop,
-                                        self.make_protocol, 
-                                        self.port_path, 
-                                        self.baud)
+        _, self.connection = await serial_asyncio.create_serial_connection(
+            self.loop, self.make_protocol, self.port_path, self.baud
+        )
 
         return await self.connected_future

@@ -72,10 +72,10 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
 
             state_topic = '{}/{}/{}/{}/{}'.format(
                 cfg.MQTT_BASE_TOPIC,
-                 cfg.MQTT_STATES_TOPIC,
-                 cfg.MQTT_PARTITION_TOPIC,
-                 sanitize_key(partition['key']),
-                 'current_state'
+                cfg.MQTT_STATES_TOPIC,
+                cfg.MQTT_PARTITION_TOPIC,
+                sanitize_key(partition['key']),
+                'current_state'
             )
 
             if self.first_status:  # For HASS auto discovery
@@ -92,7 +92,10 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 )
                 config = dict(
                     name=partition['label'],
-                    unique_id="{}_partition_{}".format(self.detected_panel.get('serial_number', 'pai'), partition['key']),
+                    unique_id="{}_partition_{}".format(
+                        self.detected_panel.get('serial_number', 'pai'),
+                        partition['key']
+                    ),
                     command_topic=command_topic,
                     state_topic=state_topic,
                     availability_topic=self.availability_topic,

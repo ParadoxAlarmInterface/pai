@@ -17,7 +17,9 @@ from ..panel import Panel as PanelBase
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
-PARTITION_ACTIONS = dict(arm=0x04, disarm=0x05, arm_stay=0x01, arm_sleep=0x03,  arm_stay_stayd=0x06, arm_sleep_stay=0x07, disarm_all=0x08)
+PARTITION_ACTIONS = dict(
+    arm=0x04, disarm=0x05, arm_stay=0x01, arm_sleep=0x03,  arm_stay_stayd=0x06, arm_sleep_stay=0x07, disarm_all=0x08
+)
 ZONE_ACTIONS = dict(bypass=0x10, clear_bypass=0x10)
 PGM_ACTIONS = dict(on_override=0x30, off_override=0x31, on=0x32, off=0x33, pulse=0)
 
@@ -78,7 +80,8 @@ class Panel(PanelBase):
 
                 reply = await self.core.send_wait(
                     parsers.ReadEEPROM, args,
-                        reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address)
+                    reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address
+                )
 
                 if reply is None:
                     logger.error("Could not read %s: address %x" % (mem_type, address))
@@ -186,7 +189,9 @@ class Panel(PanelBase):
 
     async def request_status(self, i: int):
         args = dict(address=self.mem_map['status_base1'] + i)
-        reply = await self.core.send_wait(parsers.ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, i))
+        reply = await self.core.send_wait(
+            parsers.ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, i)
+        )
         if reply is not None:
             logger.debug("Received status response: %d" % i)
             return self.handle_status(reply, parsers.RAMDataParserMap)

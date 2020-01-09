@@ -13,6 +13,7 @@ from paradox.lib.format import EventMessageFormatter
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
+
 class EventLevel(Enum):
     NOTSET = logging.NOTSET
     DEBUG = logging.DEBUG

@@ -51,18 +51,18 @@ class IPConnection(Connection):
                 self.stun_control.close()
                 self.stun_control = None
             except Exception as e:
-               logger.exception("stun_control socket close failed")
+                logger.exception("stun_control socket close failed")
         if self.stun_tunnel:
             try:
                 self.stun_tunnel.close()
                 self.stun_tunnel = None
             except Exception as e:
-               logger.exception("stun_control socket close failed")
+                logger.exception("stun_control socket close failed")
         if self.connection:
             try:
                 self.connection.close()
             except Exception as e:
-               logger.exception("connection socket close failed")
+                logger.exception("connection socket close failed")
             self.connection = None
 
     def make_protocol(self):
@@ -92,10 +92,13 @@ class IPConnection(Connection):
                     logger.exception('Try %d/%d. Unable to connect to SITE ID' % (tries, max_tries))
             else:
                 try:
-                    logger.info("Connecting to IP module. Try %d/%d"% (tries, max_tries))
+                    logger.info("Connecting to IP module. Try %d/%d" % (tries, max_tries))
 
-                    _, self.connection = await self.loop.create_connection(self.make_protocol,
-                                                                                   host=self.host, port=self.port)
+                    _, self.connection = await self.loop.create_connection(
+                        self.make_protocol,
+                        host=self.host,
+                        port=self.port
+                    )
                     if cfg.IP_CONNECTION_BARE:
                         return True
 
@@ -249,7 +252,7 @@ class IPConnection(Connection):
             self.connection.send_raw(msg)
             message_payload = await self.wait_for_message(raw=True)
 
-            #logger.debug("F3 answer: {}".format(binascii.hexlify(message_payload)))
+            # logger.debug("F3 answer: {}".format(binascii.hexlify(message_payload)))
 
             # F8
             logger.debug("Sending F8")
@@ -268,7 +271,9 @@ class IPConnection(Connection):
             self.connected = True
         except asyncio.TimeoutError:
             self.connected = False
-            logger.error("Unable to establish session with IP Module. Timeout. Only one connection at a time is allowed.")
+            logger.error(
+                "Unable to establish session with IP Module. Timeout. Only one connection at a time is allowed."
+            )
         except Exception as e:
             self.connected = False
             logger.exception("Unable to establish session with IP Module")

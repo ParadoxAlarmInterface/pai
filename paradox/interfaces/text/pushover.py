@@ -20,6 +20,7 @@ _level_2_priority = {
     EventLevel.CRITICAL: chump.EMERGENCY
 }
 
+
 class PushoverTextInterface(ConfiguredAbstractTextInterface):
     """Interface Class using Pushover"""
     name = 'pushover'
@@ -52,12 +53,14 @@ class PushoverTextInterface(ConfiguredAbstractTextInterface):
             if devices_raw == '*' or devices_raw is None:
                 user.send_message(message, title='Alarm', priority=_level_2_priority.get(level, chump.NORMAL))
             else:
-                devices = list(filter(bool, re.split('[\s]*,[\s]*', devices_raw)))
+                devices = list(filter(bool, re.split(r'[\s]*,[\s]*', devices_raw)))
 
                 for elem in (elem for elem in devices if elem not in user.devices):
                     logger.warning('%s is not in the Pushover device list for the user %s' % (elem, user_key))
 
                 for device in devices:
-                    user.send_message(message, title='PAI', device=device, priority=_level_2_priority.get(level, chump.NORMAL))
+                    user.send_message(
+                        message, title='PAI', device=device, priority=_level_2_priority.get(level, chump.NORMAL)
+                    )
 
         # TODO: Missing the message reception

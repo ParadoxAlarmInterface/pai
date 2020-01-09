@@ -1,5 +1,9 @@
-import pytest
 import binascii
+
+import pytest
+
+from paradox.hardware.spectra_magellan.panel import Panel
+from paradox.hardware.spectra_magellan.parsers import ReadEEPROMResponse
 
 # Label loading
 request_reply_map = {
@@ -8,6 +12,8 @@ request_reply_map = {
     b'50000030000000000000000000000000000000000000000000000000000000000001000081': b'520000304b6f6e796861202020202020202020204d616d6120737a6f6261202020202020a7',
     b'50000040000000000000000000000000000000000000000000000000000000000001000091': b'520000404d616d6120737a6f626120202020202047796572656b20737a6f62612020202033'
 }
+
+
 # 2019-12-04 13:09:38,232 - DEBUG    - PAI.paradox.connections.serial_connection - PAI -> SER
 # 2019-12-04 13:09:38,323 - DEBUG    - PAI.paradox.connections.serial_connection - SER -> PAI
 # 2019-12-04 13:09:38,332 - DEBUG    - PAI.paradox.connections.serial_connection - PAI -> SER
@@ -40,14 +46,13 @@ request_reply_map = {
 # 2019-12-04 13:09:39,693 - DEBUG    - PAI.paradox.connections.serial_connection - SER -> PAI b'520001005a6f6e652031362020202020202020205a6f6e65203137202020202020202020da'
 # 2019-12-04 13:09:39,697 - INFO     - PAI.paradox.hardware.panel - Zone: Eltr, Nappali, Konyha, Mama szoba, Gyerek szoba, Zoz szoba, Lpcshz, Szabotzs, Eltr nyits, Nappali nyits, Bejrati nyits, Mama nyits, Gyerek nyits, Folyos, Zone 15, Zone 16
 
-from paradox.hardware.spectra_magellan.panel import Panel
-from paradox.hardware.spectra_magellan.parsers import ReadEEPROMResponse
 
 async def send_wait(message_type, args, reply_expected):
     out_raw = message_type.build(dict(fields=dict(value=args)))
     in_raw = binascii.unhexlify(request_reply_map[binascii.hexlify(out_raw)])
 
     return ReadEEPROMResponse.parse(in_raw)
+
 
 @pytest.mark.asyncio
 async def test_label_loading(mocker):

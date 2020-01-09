@@ -29,6 +29,7 @@ async def test_handle_panel_event(mocker):
                                                                "type": None}, sort_keys=True),
                                                    0, True)
 
+
 @pytest.mark.parametrize("command,expected", [
     pytest.param(b'arm', 'arm'),
     pytest.param(b'arm_stay', 'arm_stay'),
@@ -55,6 +56,7 @@ def test_mqtt_handle_partition_control(command, expected, mocker):
         expected
     )
 
+
 def test_mqtt_handle_zone_control(mocker):
     interface = BasicMQTTInterface()
     interface.alarm = mocker.MagicMock()
@@ -68,6 +70,7 @@ def test_mqtt_handle_zone_control(mocker):
         "El_t_r",
         "clear_bypass"
     )
+
 
 def test_mqtt_handle_zone_control_utf8(mocker):
     interface = BasicMQTTInterface()

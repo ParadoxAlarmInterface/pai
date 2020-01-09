@@ -69,7 +69,6 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         ps.subscribe(self._handle_panel_change, "changes")
         ps.subscribe(self._handle_panel_event, "events")
         ps.subscribe(self._handle_connected, "connected")
-        
 
         await super().run()
 
@@ -172,10 +171,15 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         """
 
         if cfg.MQTT_PUBLISH_RAW_EVENTS:
-            self.publish('{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC,
-                                        cfg.MQTT_EVENTS_TOPIC,
-                                        cfg.MQTT_RAW_TOPIC),
-                         json.dumps(event.props, ensure_ascii=False, cls=JSONByteEncoder, default=str, sort_keys=True), 0, cfg.MQTT_RETAIN)
+            self.publish(
+                '{}/{}/{}'.format(
+                    cfg.MQTT_BASE_TOPIC,
+                    cfg.MQTT_EVENTS_TOPIC,
+                    cfg.MQTT_RAW_TOPIC
+                ),
+                json.dumps(event.props, ensure_ascii=False, cls=JSONByteEncoder, default=str, sort_keys=True),
+                0, cfg.MQTT_RETAIN
+            )
 
     def _handle_panel_labels(self, data: dict):
         self.labels = data
@@ -188,7 +192,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         if cfg.MQTT_DASH_PUBLISH and len(self.partitions) == 2:
             self._publish_dash(cfg.MQTT_DASH_TEMPLATE, list(self.partitions.keys()))
 
-        for element_type in self.definitions: # zones, partitions
+        for element_type in self.definitions:  # zones, partitions
             labels = self.labels[element_type]
             definitions = self.definitions[element_type]
             for i in definitions:  # numeric index
@@ -236,11 +240,15 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         else:
             publish_value = value
 
-        self.publish('{}/{}/{}/{}'.format(base,
-                                             element_topic,
-                                             sanitize_key(label),
-                                             attribute),
-                     "{}".format(publish_value), 0, cfg.MQTT_RETAIN)
+        self.publish(
+            '{}/{}/{}/{}'.format(
+                base,
+                element_topic,
+                sanitize_key(label),
+                attribute
+            ),
+            "{}".format(publish_value), 0, cfg.MQTT_RETAIN
+        )
 
     def _publish_dash(self, fname, partitions):
         # TODO: move to a separate component

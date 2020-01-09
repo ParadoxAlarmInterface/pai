@@ -31,7 +31,7 @@ class PushBulletWSClient(WebSocketBaseClient):
         self.interface = interface
         
         self.device = None
-        for i,device in enumerate(self.pb.devices):
+        for i, device in enumerate(self.pb.devices):
             if device.nickname == 'pai':
                 logger.debug("Device found")
                 self.device = device
@@ -39,7 +39,6 @@ class PushBulletWSClient(WebSocketBaseClient):
         else:
             logger.exception("Device not found. Creating 'pai' device")
             self.device = self.pb.new_device(nickname='pai', icon='system')
-
 
     def stop(self):
         self.terminate()
@@ -75,11 +74,11 @@ class PushBulletWSClient(WebSocketBaseClient):
                 
                 # Ignore messages send by us
                 if p.get('direction') == 'self' and p.get('title') == 'pai':
-                    #logger.debug('Ignoring message sent')
+                    # logger.debug('Ignoring message sent')
                     continue
                 
                 if p.get('direction') == 'outgoing' or p.get('dismissed'):
-                    #logger.debug('Ignoring outgoing dismissed')
+                    # logger.debug('Ignoring outgoing dismissed')
                     continue
                 
                 if p.get('sender_email_normalized') in cfg.PUSHBULLET_CONTACTS or p.get('direction') == 'self':

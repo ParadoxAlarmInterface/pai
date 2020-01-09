@@ -1,7 +1,7 @@
-from construct import Struct, BitStruct, Const, Nibble, Checksum, Padding, Bytes, this, RawCopy, Int8ub, \
-    Default, Enum, Flag, BitsInteger, Int16ub, Rebuild
+from construct import Struct, BitStruct, Const, Nibble, Padding, Bytes, RawCopy, Int8ub, \
+    Default, Enum, Flag, BitsInteger, Int16ub
 
-from .common import calculate_checksum, ProductIdEnum, CommunicationSourceIDEnum, HexInt
+from .common import ProductIdEnum, CommunicationSourceIDEnum, HexInt, PacketLength, PacketChecksum
 
 InitiateCommunication = Struct(
     "fields" / RawCopy(
@@ -13,7 +13,7 @@ InitiateCommunication = Struct(
             "reserved1" / Padding(35)
         )
     ),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data)
+    "checksum" / PacketChecksum(Bytes(1))
 )
 
 InitiateCommunicationResponse = Struct(
@@ -57,7 +57,7 @@ InitiateCommunicationResponse = Struct(
             "label" / Bytes(8)
         )
     ),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    "checksum" / PacketChecksum(Bytes(1)))
 
 StartCommunication = Struct("fields" / RawCopy(
     Struct(
@@ -68,7 +68,7 @@ StartCommunication = Struct("fields" / RawCopy(
         "user_id" / Struct(
             "high" / Default(Int8ub, 0),
             "low" / Default(Int8ub, 0)),
-    )), "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data))
+    )), "checksum" / PacketChecksum(Bytes(1)))
 
 StartCommunicationResponse = Struct(
     "fields" / RawCopy(
@@ -104,7 +104,7 @@ StartCommunicationResponse = Struct(
             "_not_used2" / Bytes(14),
         )
     ),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data)
+    "checksum" / PacketChecksum(Bytes(1))
 )
 
 CloseConnection = Struct(
@@ -113,10 +113,9 @@ CloseConnection = Struct(
             "po" / Struct(
                 "command" / Const(0x70, Int8ub)
             ),
-            "length" / Rebuild(Int8ub, lambda
-                this: this._root._subcons.fields.sizeof() + this._root._subcons.checksum.sizeof()),
+            "length" / PacketLength(Int8ub),
             "_not_used0" / Padding(34),
         )
     ),
-    "checksum" / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data)
+    "checksum" / PacketChecksum(Bytes(1))
 )

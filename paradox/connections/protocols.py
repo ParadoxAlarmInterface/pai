@@ -10,6 +10,7 @@ from .connection import ConnectionProtocol
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
+
 def checksum(data, min_message_length):
     """Calculates the 8bit checksum of Paradox messages"""
     c = 0

@@ -14,11 +14,11 @@ FAMILY_IPv6 = b'\x02'
 
 # 0b00: Request
 # 0b01: Binding
-BINDING_REQUEST_SIGN = b'\x00\x01' # 16bit (2bytes)
+BINDING_REQUEST_SIGN = b'\x00\x01'  # 16bit (2bytes)
 
 BINDING_RESPONSE_ERROR = b'\x01\x11'
 BINDING_RESPONSE_SUCCESS = b'\x01\x01'
-MAGIC_COOKIE = b'\x21\x12\xA4\x42' # 32bit (4bytes)
+MAGIC_COOKIE = b'\x21\x12\xA4\x42'  # 32bit (4bytes)
 
 CHANGE_RESPONSE_SUCCESS = b'\x01\x03'
 
@@ -72,9 +72,10 @@ STUN_ATTRIBUTE_NAMES = {
     b'\x00\x20': 'XOR-MAPPED-ADDRESS',
 }
 
+
 def generate_transaction_id():
     tid = []
-    for i in range(24): # 96bits (12bytes)
+    for i in range(24):  # 96bits (12bytes)
         tid.append(random.choice('0123456789ABCDEF'))
     return binascii.a2b_hex(''.join(tid))
 
@@ -86,15 +87,17 @@ def build_binding_request(transaction_id):
     body_length = b'\x00\x00'
     return b''.join([BINDING_REQUEST_SIGN, body_length, MAGIC_COOKIE, transaction_id])
 
+
 def build_change_request(transaction_id):
     if len(transaction_id) != 12:
         raise Exception('Invalid transaction id')
 
     body_length = b'\x00\x18'
-    return b''.join([CHANGE_REQUEST, body_length, MAGIC_COOKIE, transaction_id, 
-                REQUESTED_TRANSPORT, b'\x00\x04', TRANSPORT_TCP, RESERVED3,
-                LIFETIME, b'\x00\x04', b'\x00\x00\x02\x58',
-                REQUESTED_ADDRESS_TYPE, b'\x00\x04', FAMILY_IPv4, RESERVED3 ])
+    return b''.join([CHANGE_REQUEST, body_length, MAGIC_COOKIE, transaction_id,
+                     REQUESTED_TRANSPORT, b'\x00\x04', TRANSPORT_TCP, RESERVED3,
+                     LIFETIME, b'\x00\x04', b'\x00\x00\x02\x58',
+                     REQUESTED_ADDRESS_TYPE, b'\x00\x04', FAMILY_IPv4, RESERVED3])
+
 
 def build_connection_bind_request(transaction_id, connection_id):
     if len(transaction_id) != 12:
@@ -105,7 +108,8 @@ def build_connection_bind_request(transaction_id, connection_id):
 
     body_length = b'\x00\x08'
     return b''.join([CONNECTION_BIND_REQUEST, body_length, MAGIC_COOKIE, transaction_id,
-        CONNECTION_ID, b'\x00\x04', connection_id])
+                     CONNECTION_ID, b'\x00\x04', connection_id])
+
 
 def build_connection_refresh_request(transaction_id):
     if len(transaction_id) != 12:
@@ -113,9 +117,10 @@ def build_connection_refresh_request(transaction_id):
 
     body_length = b'\x00\x08'
     return b''.join([CONNECTION_REFRESH_REQUEST, body_length, MAGIC_COOKIE, transaction_id,
-        LIFETIME, b'\x00\x04', b'\x00\x00\x02\x58'])
+                     LIFETIME, b'\x00\x04', b'\x00\x00\x02\x58'])
 
-def build_connect_request(transaction_id,xoraddr=None):
+
+def build_connect_request(transaction_id, xoraddr=None):
     if len(transaction_id) != 12:
         raise Exception('Invalid transaction id')
 
@@ -123,8 +128,9 @@ def build_connect_request(transaction_id,xoraddr=None):
         raise Exception("Invalid connect address")
 
     body_length = b'\x00\x0c'
-    return b''.join([CONNECT_REQUEST, body_length, MAGIC_COOKIE, transaction_id, 
-                XOR_PEER_ADDRESS, b'\x00\x08', xoraddr])
+    return b''.join([CONNECT_REQUEST, body_length, MAGIC_COOKIE, transaction_id,
+                     XOR_PEER_ADDRESS, b'\x00\x08', xoraddr])
+
 
 def validate_response(buf, transaction_id):
     if not buf or len(buf) < 20:
@@ -183,11 +189,11 @@ def read_mapped_address(attr_type, attr_body, attr_len):
     if xor:
         # port
         magicCookieHighBytesInt = int(binascii.b2a_hex(MAGIC_COOKIE[:2]), 16)
-        port =  magicCookieHighBytesInt ^ port
+        port = magicCookieHighBytesInt ^ port
 
         # addr
         magicCookieBytesInt = int(binascii.b2a_hex(MAGIC_COOKIE), 16)
-        addr_int =  magicCookieBytesInt ^ addr_int
+        addr_int = magicCookieBytesInt ^ addr_int
 
     octets = struct.pack('!I', addr_int)
     ip = '.'.join([str(c) for c in octets])
@@ -198,8 +204,8 @@ def read_attributes(attributes, body_length):
     pos = 0
     parsed_attributes = []
     while pos < body_length:
-        attr_type = attributes[pos:pos + 2] # 16bit (2bytes)
-        attr_len = int(binascii.b2a_hex(attributes[pos + 2:pos + 4]), 16) # 16bit (2bytes)
+        attr_type = attributes[pos:pos + 2]  # 16bit (2bytes)
+        attr_len = int(binascii.b2a_hex(attributes[pos + 2:pos + 4]), 16)  # 16bit (2bytes)
         attr_body = attributes[pos + 4:pos + 4 + attr_len]
 
         if attr_type in (MAPPED_ADDRESS, XOR_MAPPED_ADDRESS, b'\x00\x20'):
@@ -216,7 +222,7 @@ def read_attributes(attributes, body_length):
                 attr_len=attr_len
             ))
 
-        attr_head = (2 + 2) # attr_type + attr_len
+        attr_head = (2 + 2)  # attr_type + attr_len
         remain = attr_len % 4
         padding = 4 - remain if remain else 0
         pos += attr_head + attr_len + padding
@@ -240,7 +246,6 @@ def get_error(body):
 
     return False
 
-    
 
 class StunClient(object):
     def __init__(self, host, port=STUN_PORT):
@@ -254,12 +259,12 @@ class StunClient(object):
         self.sock.bind(('0.0.0.0', 0))
         self.host = host
         self.port = port
-        self.sock.connect( (host, port))
+        self.sock.connect((host, port))
 
     def send_tcp_change_request(self):
         self.req = build_change_request(self.transaction_id)
         self.sock.send(self.req)
-        
+
     def send_binding_request(self):
         self.req = build_binding_request(self.transaction_id)
         self.sock.send(self.req)
@@ -272,8 +277,8 @@ class StunClient(object):
         elif xoraddr is not None:
             addr = xoraddr
         else:
-            raise Exception("Invalid arguments") 
-        
+            raise Exception("Invalid arguments")
+
         self.req = build_connect_request(self.transaction_id, addr)
         self.sock.send(self.req)
 
@@ -301,4 +306,3 @@ class StunClient(object):
     def close(self):
         if self.sock:
             self.sock.close()
-

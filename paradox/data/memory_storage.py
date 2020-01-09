@@ -47,8 +47,9 @@ class MemoryStorage:
         for property_name, property_value in changes.items():
 
             if not isinstance(property_name, str):
-                logger.debug('Invalid property name ({}/{}/{}) type: {}'.format(container_name, object_key, property_name,
-                                                                                type(property_name)))
+                logger.debug('Invalid property name ({}/{}/{}) type: {}'.format(
+                    container_name, object_key, property_name, type(property_name)
+                ))
                 continue
             if property_name.startswith('_'):  # skip private properties
                 continue
