@@ -1,6 +1,7 @@
 import inspect
 import logging
 import typing
+import binascii
 from collections import defaultdict, namedtuple
 from itertools import chain
 
@@ -97,40 +98,15 @@ class Panel:
 
     @staticmethod
     def encode_password(password) -> bytes:
-        res = [0] * 2
-
-        if password is None or password in [b'0000', '0000', 0]:
-            return b'\x00\x00'
+        if password is None:
+            password = 0
 
         if isinstance(password, int):
             password = str(password).zfill(4)
+        elif isinstance(password, str):
+            password = password.encode()
 
-        if len(password) != 4:
-            raise (Exception("Password length must be equal to 4. Got {}".format(len(password))))
-
-        if not password.isdigit():
-            raise (Exception("Not supported password {}".format(password)))
-
-        int_password = int(password)
-        i = min(4, len(password))
-        i2 = i // 2 - 1
-
-        while i > 0:
-            b = int(int_password % 10)
-            if b == 0:
-                b = 0x0a
-
-            int_password = int_password // 10
-
-            if i % 2 == 0:
-                res[i2] = b
-            else:
-                res[i2] = ((b << 4) | res[i2]) & 0xff
-                i2 -= 1
-
-            i -= 1
-
-        return bytes(res)
+        return binascii.a2b_hex(password.zfill(4))
 
     async def load_definitions(self):
         if 'definitions' not in self.mem_map:
