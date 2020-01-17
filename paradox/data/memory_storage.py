@@ -1,6 +1,5 @@
 import logging
 from collections import defaultdict
-from enum import Enum
 from typing import Callable
 
 from paradox.config import config as cfg
@@ -9,12 +8,6 @@ from paradox.lib import ps
 from .element_type_container import ElementTypeContainer
 
 logger = logging.getLogger('PAI').getChild(__name__)
-
-
-class PublishPropertyChange(Enum):
-    NO = 0
-    DEFAULT = 1
-    YES = 2
 
 
 class MemoryStorage:

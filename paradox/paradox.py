@@ -4,12 +4,11 @@ import asyncio
 import logging
 import time
 from binascii import hexlify
-from enum import Enum
-from threading import Lock
 from typing import Optional, Sequence, Iterable, Callable
 
 from construct import Container
 
+from paradox.data.enums import RunState
 from paradox.event import Event, LiveEvent, ChangeEvent, Change
 from paradox.config import config as cfg
 from paradox.connections.ip_connection import IPConnection
@@ -23,16 +22,6 @@ from paradox.lib.utils import deep_merge
 from paradox.parsers.status import convert_raw_status
 
 logger = logging.getLogger('PAI').getChild(__name__)
-
-serial_lock = Lock()
-
-
-class State(Enum):
-    STOP = 0
-    INIT = 1
-    RUN = 2
-    PAUSE = 3
-    ERROR = 4
 
 
 def async_loop_unhandled_exception_handler(loop, context):
@@ -54,7 +43,7 @@ class Paradox:
 
         self.storage = Storage()
 
-        self.run = State.STOP
+        self._run_state = RunState.STOP
         self.request_lock = asyncio.Lock()
         self.busy = asyncio.Lock()
         self.loop_wait_event = asyncio.Event()
@@ -64,6 +53,16 @@ class Paradox:
         ps.subscribe(self._on_status_update, "status_update")
         ps.subscribe(self._on_event, "events")
         ps.subscribe(self._on_property_change, "changes")
+
+    @property
+    def run_state(self):
+        return self._run_state
+
+    @run_state.setter
+    def run_state(self, value: RunState):
+        self._run_state = value
+        ps.sendMessage("run-state", state=value)
+        logger.info("Run state: %s", value)
 
     @property
     def connection(self):
@@ -93,9 +92,6 @@ class Paradox:
         self.connection.register_handler(EventMessageHandler(self.handle_event_message))
         self.connection.register_handler(ErrorMessageHandler(self.handle_error_message))
 
-    def reset(self):
-        pass
-
     def connect(self) -> bool:
         task = self.work_loop.create_task(self.connect_async())
         self.work_loop.run_until_complete(task)
@@ -105,17 +101,14 @@ class Paradox:
         self.disconnect()  # socket needs to be also closed
         self.panel = None
 
+        self.run_state = RunState.INIT
         logger.info("Connecting to interface")
         if not await self.connection.connect():
+            self.run_state = RunState.ERROR
             logger.error('Failed to connect to interface')
-            self.run = State.ERROR
             return False
 
         logger.info("Connecting to panel")
-
-        # Reset all states
-        self.reset()
-        self.run = State.INIT
 
         if not self.panel:
             self.panel = create_panel(self)
@@ -184,7 +177,7 @@ class Paradox:
             ps.sendMessage('labels_loaded', data=labels)
 
             logger.info("Connection OK")
-            self.run = State.RUN
+            self.run_state = RunState.RUN
             self.request_status_refresh()  # Trigger status update
 
             ps.sendMessage('connected')
@@ -196,7 +189,7 @@ class Paradox:
         except Exception:
             logger.exception("Connect error")
 
-        self.run = State.ERROR
+        self.run_state = RunState.ERROR
 
         return False
 
@@ -222,9 +215,9 @@ class Paradox:
         
         replies_missing = 0
 
-        while self.run not in (State.STOP, State.ERROR):
+        while self.run_state not in (RunState.STOP, RunState.ERROR):
             tstart = time.time()
-            if self.run == State.RUN:
+            if self.run_state == RunState.RUN:
                 try:
                     await self.busy.acquire()
                     result = await asyncio.gather(*self.panel.get_status_requests())
@@ -295,7 +288,7 @@ class Paradox:
                 logger.debug("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
                 return
 
-            if self.run != State.PAUSE:
+            if self.run_state != RunState.PAUSE:
                 self.connection.schedule_message_handling(recv_message)  # schedule handling in the loop
         except Exception as e:
             logging.exception("Error parsing message")
@@ -493,7 +486,7 @@ class Paradox:
 
     def disconnect(self):
         logger.info("Disconnecting from the Alarm Panel")
-        self.run = State.STOP
+        self.run_state = RunState.STOP
 
         self._clean_session()
         if self.connection.connected:
@@ -502,15 +495,15 @@ class Paradox:
 
     async def pause(self):
         logger.info("Pausing PAI")
-        if self.run == State.RUN:
+        if self.run_state == RunState.RUN:
             logger.info("Pausing from the Alarm Panel")
-            self.run = State.PAUSE
+            self.run_state = RunState.PAUSE
             # EVO IP150 IP Interface does not work if we send this
             # await self.send_wait(self.panel.get_message('CloseConnection'), None)
 
     async def resume(self):
         logger.info("Resuming PAI")
-        if self.run == State.PAUSE:
+        if self.run_state == RunState.PAUSE:
             await self.connect_async()
 
     def _clean_session(self):

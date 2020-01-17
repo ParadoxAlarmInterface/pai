@@ -27,7 +27,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         self.first_status = True
 
         # TODO: Maybe homeassistant needs a separate status topic
-        self.availability_topic = '{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, 'MQTTInterface')
+        self.availability_topic = self.mqtt.run_status_topic
 
     async def run(self):
         ps.subscribe(self._handle_status_update, "status_update")
