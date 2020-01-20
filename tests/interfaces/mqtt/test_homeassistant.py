@@ -42,7 +42,7 @@ async def test_hass():
                     unique_id="pai_partition_Partition_1",
                     command_topic='paradox/control/partitions/Partition_1',
                     state_topic='paradox/states/partitions/Partition_1/current_state',
-                    availability_topic='paradox/interface/run_status',
+                    availability_topic='paradox/interface/availability',
                     device=dict(),
                     payload_disarm="disarm",
                     payload_arm_home="arm_stay",
