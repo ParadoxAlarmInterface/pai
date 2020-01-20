@@ -2,7 +2,7 @@
 #
 # Mandatory packages
 require-python-3
-construct>=2.9.43
+construct~=2.9.43
 argparse>=1.4.0
 #
 # Optional
