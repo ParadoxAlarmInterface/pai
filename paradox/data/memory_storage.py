@@ -1,6 +1,5 @@
 import logging
 from collections import defaultdict
-from enum import Enum
 from typing import Callable
 
 from paradox.config import config as cfg
@@ -9,12 +8,6 @@ from paradox.lib import ps
 from .element_type_container import ElementTypeContainer
 
 logger = logging.getLogger('PAI').getChild(__name__)
-
-
-class PublishPropertyChange(Enum):
-    NO = 0
-    DEFAULT = 1
-    YES = 2
 
 
 class MemoryStorage:
@@ -47,8 +40,9 @@ class MemoryStorage:
         for property_name, property_value in changes.items():
 
             if not isinstance(property_name, str):
-                logger.debug('Invalid property name ({}/{}/{}) type: {}'.format(container_name, object_key, property_name,
-                                                                                type(property_name)))
+                logger.debug('Invalid property name ({}/{}/{}) type: {}'.format(
+                    container_name, object_key, property_name, type(property_name)
+                ))
                 continue
             if property_name.startswith('_'):  # skip private properties
                 continue

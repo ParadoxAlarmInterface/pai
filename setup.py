@@ -3,6 +3,8 @@
 import sys
 from setuptools import setup, find_packages
 
+from paradox import VERSION
+
 needs_pytest = {'pytest', 'test', 'ptr'}.intersection(sys.argv)
 pytest_runner = ['pytest-runner'] if needs_pytest else []
 
@@ -11,21 +13,22 @@ with open('README.md', 'r') as fh:
 
 setup(
     name='paradox-alarm-interface',
-    version='1.4.0',
+    version=VERSION,
     author='João Paulo Barraca',
     author_email='jpbarraca@gmail.com',
     description='Interface to Paradox Alarm Panels',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/ParadoxAlarmInterface/pai',
-    download_url='https://github.com/ParadoxAlarmInterface/pai/archive/1.4.0.tar.gz',
+    download_url=f'https://github.com/ParadoxAlarmInterface/pai/archive/{VERSION}.tar.gz',
     packages=find_packages(exclude=['tests', 'tests.*', 'config.*', 'docs.*']),
     install_requires=[
-        'construct >= 2.9.43',
-        'argparse >= 1.4.0'
+        'construct~=2.9.43',
+        'argparse>=1.4.0',
+        'PyPubSub~=4.0.3'
     ],
     python_requires='>=3.6',
-    setup_requires=[] + pytest_runner,
+    setup_requires=['wheel'] + pytest_runner,
     tests_require=[
         'pytest',
         'pytest-asyncio',
@@ -39,7 +42,16 @@ setup(
         'Operating System :: OS Independent',
     ],
     extras_require={
-        'YAML':  ['PyYAML>=3.13']
+        'YAML':  ['pyyaml>=5.2.0'],
+        'Serial': ['pyserial-asyncio>=0.4'],
+        'IP': ['requests>=2.20.0'],
+        'MQTT': ['paho_mqtt>=1.5.0'],
+        'Pushbullet': [
+            'pushbullet.py>=0.11.0',
+            'ws4py>=0.4.2'
+        ],
+        'Pushover': ['chump>=1.6.0'],
+        'Signal': ['pygobject>=3.20.0', 'pydbus>=0.6.0', 'gi>=1.2']
     },
     entry_points={
         'console_scripts': [

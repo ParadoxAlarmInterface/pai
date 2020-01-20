@@ -4,7 +4,7 @@ import asyncio
 import binascii
 import inspect
 import logging
-from typing import Optional
+import typing
 
 from construct import Construct, Container, ChecksumError
 
@@ -17,7 +17,9 @@ from ..panel import Panel as PanelBase
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
-PARTITION_ACTIONS = dict(arm=0x04, disarm=0x05, arm_stay=0x01, arm_sleep=0x03,  arm_stay_stayd=0x06, arm_sleep_stay=0x07, disarm_all=0x08)
+PARTITION_ACTIONS = dict(
+    arm=0x04, disarm=0x05, arm_stay=0x01, arm_sleep=0x03,  arm_stay_stayd=0x06, arm_sleep_stay=0x07, disarm_all=0x08
+)
 ZONE_ACTIONS = dict(bypass=0x10, clear_bypass=0x10)
 PGM_ACTIONS = dict(on_override=0x30, off_override=0x31, on=0x32, off=0x33, pulse=0)
 
@@ -27,6 +29,7 @@ class Panel(PanelBase):
     event_map = event_map
     property_map = property_map
     max_eeprom_response_data_length = 32
+    status_request_addresses = parsers.RAMDataParserMap.keys()
 
     mem_map = {
         "status_base1": 0x8000,
@@ -54,11 +57,6 @@ class Panel(PanelBase):
         }
     }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.last_power_update = 0
-
     async def dump_memory(self):
         """
         Dumps EEPROM and RAM memory to files
@@ -82,7 +80,8 @@ class Panel(PanelBase):
 
                 reply = await self.core.send_wait(
                     parsers.ReadEEPROM, args,
-                        reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address)
+                    reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address
+                )
 
                 if reply is None:
                     logger.error("Could not read %s: address %x" % (mem_type, address))
@@ -102,7 +101,7 @@ class Panel(PanelBase):
 
         return super(Panel, self).get_message(name)
 
-    def parse_message(self, message: bytes, direction='topanel') -> Optional[Container]:
+    def parse_message(self, message: bytes, direction='topanel') -> typing.Optional[Container]:
         try:
             if message is None or len(message) == 0:
                 return None
@@ -163,7 +162,7 @@ class Panel(PanelBase):
                     )
 
         logger.info("Initializing communication")
-        reply = await self.core.send_wait(parsers.InitializeCommunication, args=args, reply_expected=0x10)
+        reply = await self.core.send_wait(parsers.InitializeCommunication, args=args, reply_expected=[0x10, 0x70, 0x00])
 
         if reply is None:
             logger.error("Initialization Failed")
@@ -190,7 +189,9 @@ class Panel(PanelBase):
 
     async def request_status(self, i: int):
         args = dict(address=self.mem_map['status_base1'] + i)
-        reply = await self.core.send_wait(parsers.ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, i))
+        reply = await self.core.send_wait(
+            parsers.ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, i)
+        )
         if reply is not None:
             logger.debug("Received status response: %d" % i)
             return self.handle_status(reply, parsers.RAMDataParserMap)

@@ -40,6 +40,7 @@ def test_event_handler():
 
     assert 1 == len(mh.handlers)
 
+
 def test_event_handler_failure():
     # eeprom_request_bin = binascii.unhexlify('500800009f004037')
     eeprom_response_bin = binascii.unhexlify(
@@ -102,6 +103,7 @@ def test_handler_two_messages():
     assert task_handle_event2.result() == "event"
 
     assert 1 == len(mh.handlers)
+
 
 def test_handler_timeout():
     def event_handler(message):

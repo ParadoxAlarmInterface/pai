@@ -34,19 +34,21 @@ async def test_hass():
             }
         ))
 
-        interface.mqtt.publish.assert_called_with('homeassistant/alarm_control_panel/pai/Partition_1/config', json.dumps(
-            dict(
-                name='Partition 1',
-                unique_id="pai_partition_Partition_1",
-                command_topic='paradox/control/partitions/Partition_1',
-                state_topic='paradox/states/partitions/Partition_1/current_state',
-                availability_topic='paradox/interface/MQTTInterface',
-                device=dict(),
-                payload_disarm="disarm",
-                payload_arm_home="arm_stay",
-                payload_arm_away="arm",
-                payload_arm_night="arm_sleep"
-            )
-        ), 0, True)
+        interface.mqtt.publish.assert_called_with(
+            'homeassistant/alarm_control_panel/pai/Partition_1/config',
+            json.dumps(
+                dict(
+                    name='Partition 1',
+                    unique_id="pai_partition_Partition_1",
+                    command_topic='paradox/control/partitions/Partition_1',
+                    state_topic='paradox/states/partitions/Partition_1/current_state',
+                    availability_topic='paradox/interface/availability',
+                    device=dict(),
+                    payload_disarm="disarm",
+                    payload_arm_home="arm_stay",
+                    payload_arm_away="arm",
+                    payload_arm_night="arm_sleep"
+                )
+            ), 0, True)
     finally:
         interface.stop()

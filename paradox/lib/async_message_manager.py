@@ -67,7 +67,7 @@ class ErrorMessageHandler(MessageHandler):
 class AsyncMessageManager:
     # handlers: List[MessageHandler]
 
-    def __init__(self, loop = None):
+    def __init__(self, loop=None):
         super(AsyncMessageManager, self).__init__()
 
         if not loop:

@@ -250,7 +250,9 @@ class IPInterface(Interface):
 
     async def run(self):
         try:
-            self.server = await asyncio.start_server(self.handle_client, self.addr, self.port, loop=self.alarm.work_loop)
+            self.server = await asyncio.start_server(
+                self.handle_client, self.addr, self.port, loop=self.alarm.work_loop
+            )
             logger.info('IP Interface: serving on {}'.format(self.server.sockets[0].getsockname()))
             logger.info("IP Interface started")
         except Exception as e:

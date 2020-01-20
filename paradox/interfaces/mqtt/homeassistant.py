@@ -27,7 +27,8 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         self.first_status = True
 
         # TODO: Maybe homeassistant needs a separate status topic
-        self.availability_topic = '{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, 'MQTTInterface')
+        self.availability_topic = self.mqtt.availability_topic
+        self.run_status_topic = self.mqtt.run_status_topic
 
     async def run(self):
         ps.subscribe(self._handle_status_update, "status_update")
@@ -35,6 +36,26 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         ps.subscribe(self._handle_panel_detected, "panel_detected")
 
         await super().run()
+
+    def _publish_run_state_sensor(self):
+        configuration_topic = '{}/sensor/{}/{}/config'.format(
+            cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
+            self.detected_panel.get('serial_number', 'pai'),
+            'run_status'
+        )
+
+        config = dict(
+            name='Run status',
+            unique_id="{}_partition_{}".format(
+                self.detected_panel.get('serial_number', 'pai'),
+                'run_status'
+            ),
+            state_topic=self.run_status_topic,
+            # availability_topic=self.availability_topic,
+            device=self.device
+        )
+
+        self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
 
     def _handle_panel_detected(self, panel):
         self.detected_panel = panel
@@ -45,6 +66,8 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             name=panel.get('model'),
             sw_version=panel.get('firmware_version')
         )
+
+        self._publish_run_state_sensor()
 
     def _handle_labels_loaded(self, data):
         partitions = data.get('partition', {})
@@ -72,10 +95,10 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
 
             state_topic = '{}/{}/{}/{}/{}'.format(
                 cfg.MQTT_BASE_TOPIC,
-                 cfg.MQTT_STATES_TOPIC,
-                 cfg.MQTT_PARTITION_TOPIC,
-                 sanitize_key(partition['key']),
-                 'current_state'
+                cfg.MQTT_STATES_TOPIC,
+                cfg.MQTT_PARTITION_TOPIC,
+                sanitize_key(partition['key']),
+                'current_state'
             )
 
             if self.first_status:  # For HASS auto discovery
@@ -92,7 +115,10 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 )
                 config = dict(
                     name=partition['label'],
-                    unique_id="{}_partition_{}".format(self.detected_panel.get('serial_number', 'pai'), partition['key']),
+                    unique_id="{}_partition_{}".format(
+                        self.detected_panel.get('serial_number', 'pai'),
+                        partition['key']
+                    ),
                     command_topic=command_topic,
                     state_topic=state_topic,
                     availability_topic=self.availability_topic,

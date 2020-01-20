@@ -7,6 +7,7 @@ from functools import reduce
 from construct import Container, ListContainer
 from typing import Mapping, List
 
+
 class JSONByteEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, bytes):
@@ -48,6 +49,8 @@ def deep_merge(*dicts, extend_lists=False, initializer=None):
 
 
 re_sanitize_key = re.compile(r'\W')
+
+
 def sanitize_key(key):
     if isinstance(key, int):
         return str(key)
@@ -57,7 +60,8 @@ def sanitize_key(key):
 
 def construct_free(container: Container):
     if isinstance(container, (Container, Mapping)):
-        return dict((k, construct_free(v)) for k, v in container.items() if not (isinstance(k, str) and k.startswith('_')))
+        return dict(
+            (k, construct_free(v)) for k, v in container.items() if not (isinstance(k, str) and k.startswith('_')))
     elif isinstance(container, (ListContainer, List)):
         return list(construct_free(v) for v in container)
     else:

@@ -4,6 +4,7 @@ import pytest
 from paradox.event import ChangeEvent, Change
 from paradox.hardware.evo import Panel_EVO192
 
+
 def generate_property_test_parameters():
     logfile = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'properties.log')
     with open(logfile, 'r') as f:
@@ -26,16 +27,19 @@ def generate_property_test_parameters():
                 type = aux[0]
                 yield pytest.param(property, type, value, partition, label)
 
+
 def test_property_map_value():
     change = Change(property='arm', new_value=True, old_value=None, type='partition', key='Fridge')
     evt = ChangeEvent(change_object=change, property_map=Panel_EVO192.property_map)
     assert evt
     assert evt.message == "Partition Fridge is armed"
 
+
 def test_property_map_bad():
     change = Change(property='does_not_exist', new_value=True, old_value=None, type='system', key='alarm_in_memory')
     with pytest.raises(AssertionError):
         ChangeEvent(change_object=change, property_map=Panel_EVO192.property_map)
+
 
 @pytest.mark.parametrize("property,type,value,partition,label", generate_property_test_parameters())
 def test_property(property, type, value, partition, label):
@@ -45,6 +49,7 @@ def test_property(property, type, value, partition, label):
     assert evt
     assert len(evt.message) > 0
     print(evt.message)
+
 
 # @pytest.mark.parametrize("property,type,value,partition,label", generate_property_test_parameters())
 # def test_make_messages(property, type, value, partition, label):

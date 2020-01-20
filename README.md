@@ -74,6 +74,7 @@ Tested in the following environment:
 * Ion Darie - [@iondarie](https://github.com/iondarie) - Homebridge integration
 * Jevgeni Kiski - [@yozik04](https://github.com/yozik04) - EVO devices
 
+
 ## Acknowledgments
 
 This work is inspired or uses parts from the following projects:

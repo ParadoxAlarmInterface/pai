@@ -2,7 +2,7 @@ from pubsub import pub
 
 from paradox.event import Event, Change, Notification
 
-PREFIX="pai_"
+PREFIX = "pai_"
 
 
 def subscribe(listener, topicName: str, **curriedArgs):

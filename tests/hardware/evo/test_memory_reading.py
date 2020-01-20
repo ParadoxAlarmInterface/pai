@@ -17,8 +17,8 @@ def test_parse_read_eeprom():
     print(request)
     print(response)
 
-    assert request.fields.value.control.ram_access == False
-    assert response.fields.value.control.ram_access == False
+    assert request.fields.value.control.ram_access is False
+    assert response.fields.value.control.ram_access is False
     assert request.fields.value.address == response.fields.value.address
     assert request.fields.value.length == len(response.fields.value.data)
 

@@ -10,7 +10,7 @@ re_unquote = re.compile(r"^(?P<quote>['\"])(.*)(?P=quote)$")
 logger = logging.getLogger('PAI').getChild(__name__)
 
 
-def _unquote(s:str):
+def _unquote(s: str):
     return re_unquote.sub(r'\2', s)
 
 
@@ -35,6 +35,7 @@ lowercase_value_mapping = {
     'true': True,
     'false': False
 }
+
 
 class EventTagFilter(EventFilter):
     def __init__(self, queries: list, min_level=EventLevel.INFO):

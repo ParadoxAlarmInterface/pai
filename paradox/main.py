@@ -4,6 +4,7 @@ import sys
 import time
 import signal
 
+from paradox import VERSION
 from paradox.config import config as cfg
 
 
@@ -27,10 +28,12 @@ def config_logger(logger):
     logger_level = cfg.LOGGING_LEVEL_CONSOLE
 
     if cfg.LOGGING_FILE is not None:
-        logfile_handler = RotatingFileHandler(cfg.LOGGING_FILE, mode='a',
-                            maxBytes=cfg.LOGGING_FILE_MAX_SIZE*1024*1024, 
-                            backupCount=cfg.LOGGING_FILE_MAX_FILES,
-                            encoding=None, delay=0)
+        logfile_handler = RotatingFileHandler(
+            cfg.LOGGING_FILE, mode='a',
+            maxBytes=cfg.LOGGING_FILE_MAX_SIZE * 1024 * 1024,
+            backupCount=cfg.LOGGING_FILE_MAX_FILES,
+            encoding=None, delay=0
+        )
 
         logfile_handler.setLevel(cfg.LOGGING_LEVEL_FILE)
         logfile_handler.setFormatter(logging.Formatter(get_format(logger_level)))
@@ -44,8 +47,11 @@ def config_logger(logger):
 
     logger.setLevel(logger_level)
 
-def exit_handler(signal=None, frame=None):
+
+def exit_handler(signum=None, frame=None):
     global alarm, interface_manager
+
+    logger.info('Captured signal %d. Exiting' % signum)
     
     if alarm:
         alarm.disconnect()
@@ -73,10 +79,10 @@ def main(args):
 
     config_logger(logger)
 
-    logger.info("Config loaded from %s", cfg.CONFIG_FILE_LOCATION)
+    logger.info(f"Starting Paradox Alarm Interface {VERSION}")
+    logger.info(f"Config loaded from {cfg.CONFIG_FILE_LOCATION}")
 
-    logger.info("Starting Paradox Alarm Interface")
-    logger.info("Console Log level set to {}".format(cfg.LOGGING_LEVEL_CONSOLE))
+    logger.info(f"Console Log level set to {cfg.LOGGING_LEVEL_CONSOLE}")
 
     interface_manager = InterfaceManager(config=cfg)
     interface_manager.start()
@@ -84,6 +90,7 @@ def main(args):
     time.sleep(1)
 
     signal.signal(signal.SIGINT, exit_handler)
+    signal.signal(signal.SIGTERM, exit_handler)
 
     # Start interacting with the alarm
     alarm = Paradox()

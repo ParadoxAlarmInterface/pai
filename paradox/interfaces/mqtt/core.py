@@ -9,7 +9,9 @@ from enum import Enum
 from paho.mqtt.client import Client, MQTT_ERR_SUCCESS
 
 from paradox.config import config as cfg
+from paradox.data.enums import RunState
 from paradox.interfaces import AsyncInterface
+from paradox.lib import ps
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -26,8 +28,17 @@ class ConnectionState(Enum):
     DISCONNECTING = 3
 
 
+RUN_STATE_2_PAYLOAD = {
+    RunState.ERROR: "error",
+    RunState.INIT: "initializing",
+    RunState.PAUSE: "paused",
+    RunState.RUN: "online",
+    RunState.STOP: "stopped",
+}
+
 class MQTTConnection(Client):
     _instance = None
+
     @classmethod
     def get_instance(cls) -> 'MQTTConnection':
         if cls._instance is None:
@@ -37,7 +48,9 @@ class MQTTConnection(Client):
 
     def __init__(self):
         super(MQTTConnection, self).__init__("paradox_mqtt/{}".format(os.urandom(8).hex()))
-        self._status_topic = '{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, 'MQTTInterface')
+        self._last_run_state = "unknown"
+        self.run_status_topic = '{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, 'run_status')
+        self.availability_topic = '{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, 'availability')
         self.on_connect = self._on_connect_cb
         self.on_disconnect = self._on_disconnect_cb
         self.state = ConnectionState.NEW
@@ -45,12 +58,18 @@ class MQTTConnection(Client):
         # self.on_message = lambda client, userdata, message: logger.debug("Message received: %s" % str(message))
         # self.on_publish = lambda client, userdata, mid: logger.debug("Message published: %s" % str(mid))
 
+        ps.subscribe(self.on_run_state_change, "run-state")
+
         self.registrars = []
 
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
             self.username_pw_set(username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
 
-        self.will_set(self._status_topic, 'offline', 0, retain=True)
+        self.will_set(self.availability_topic, 'offline', 0, retain=True)
+
+    def on_run_state_change(self, state: RunState):
+        v = RUN_STATE_2_PAYLOAD.get(state, "unknown")
+        self._report_run_state(v)
 
     def start(self):
         if self.state == ConnectionState.NEW:
@@ -58,8 +77,10 @@ class MQTTConnection(Client):
 
             # TODO: Some initial connection retry mechanism required
             try:
-                self.connect_async(host=cfg.MQTT_HOST, port=cfg.MQTT_PORT, keepalive=cfg.MQTT_KEEPALIVE,
-                    bind_address=cfg.MQTT_BIND_ADDRESS, bind_port=cfg.MQTT_BIND_PORT)
+                self.connect_async(
+                    host=cfg.MQTT_HOST, port=cfg.MQTT_PORT, keepalive=cfg.MQTT_KEEPALIVE,
+                    bind_address=cfg.MQTT_BIND_ADDRESS, bind_port=cfg.MQTT_BIND_PORT
+                )
 
                 self.state = ConnectionState.CONNECTING
 
@@ -72,6 +93,11 @@ class MQTTConnection(Client):
             self.disconnect()
             self.loop_stop()
             logger.info("MQTT loop stopped")
+
+    def publish(self, topic, payload=None, *args, **kwargs):
+        logger.debug("MQTT: {}={}".format(topic, payload))
+
+        super(MQTTConnection, self).publish(topic, payload, *args, **kwargs)
 
     def _call_registars(self, method, *args, **kwargs):
         for r in self.registrars:
@@ -88,14 +114,16 @@ class MQTTConnection(Client):
     def connected(self):
         return self.state == ConnectionState.CONNECTED
 
-    def _report_status(self, status):
-        self.publish(self._status_topic, status, 0, retain=True)
+    def _report_run_state(self, status):
+        self._last_run_state = status
+        self.publish(self.run_status_topic, status, 0, retain=True)
+        self.publish(self.availability_topic, "online" if status in ["online", "paused"] else "offline", 0, retain=True)
 
     def _on_connect_cb(self, client, userdata, flags, result):
         if result == MQTT_ERR_SUCCESS:
             logger.info("MQTT Broker Connected")
             self.state = ConnectionState.CONNECTED
-            self._report_status('online')
+            self._report_run_state(self._last_run_state)
             self._call_registars("on_connect", client, userdata, flags, result)
         else:
             logger.error("Failed to connect to MQTT. Code: %d" % result)
@@ -111,7 +139,7 @@ class MQTTConnection(Client):
 
     def disconnect(self, reasoncode=None, properties=None):
         self.state = ConnectionState.DISCONNECTING
-        self._report_status('offline')
+        self._report_run_state('offline')
         super(MQTTConnection, self).disconnect()
 
 
@@ -150,7 +178,6 @@ class AbstractMQTTInterface(AsyncInterface):
     def publish(self, topic, value, qos, retain):
         self.republish_cache[topic] = {'value': value, 'qos': qos, 'retain': retain, 'last_publish': time.time()}
         self.mqtt.publish(topic, value, qos, retain)
-        logger.debug("MQTT: {}={}".format(topic, value))
 
     def subscribe_callback(self, sub, callback: typing.Callable):
         self.mqtt.message_callback_add(sub, callback)

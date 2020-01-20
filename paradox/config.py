@@ -41,7 +41,6 @@ class Config(object):
         "LABEL_ENCODING": "utf-8",											  # Encoding to use when decoding labels. See https://docs.python.org/3/library/codecs.html#standard-encodings
         "LABEL_REFRESH_INTERVAL": (15 * 60, int, (0, 0xFFFFFFFF)),            # Interval between refresh of labels
         "OUTPUT_PULSE_DURATION": (1, float, (0, 0xFFFFFFFF)),                 # Duration of a PGM pulse in seconds
-        "STATUS_REQUESTS": [0, 1, 2, 3, 4, 5],
         "SYNC_TIME": False,                                                   # Update panel time
         "PASSWORD": (None, [int, str, bytes, type(None)]),                    # PC Password. Set to None if Panel has no Password. In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) -> PC Communication (Babyware) Tab.
 

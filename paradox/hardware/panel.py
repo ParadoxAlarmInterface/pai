@@ -1,3 +1,4 @@
+import binascii
 import inspect
 import logging
 import typing
@@ -14,11 +15,13 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 IndexAddress = namedtuple('IndexAddress', 'idx address')
 
+
 class Panel:
-    mem_map = {}
-    event_map = {}
-    property_map = {}
-    max_eeprom_response_data_length=0
+    mem_map = {}  # override in a subclass
+    event_map = {}  # override in a subclass
+    property_map = {}  # override in a subclass
+    max_eeprom_response_data_length = 0  # override in a subclass
+    status_request_addresses = []  # override in a subclass
 
     def __init__(self, core, product_id, variable_message_length=True):
         self.core = core
@@ -96,40 +99,15 @@ class Panel:
 
     @staticmethod
     def encode_password(password) -> bytes:
-        res = [0] * 2
-
-        if password is None or password in [b'0000', '0000', 0]:
-            return b'\x00\x00'
+        if password is None:
+            password = 0
 
         if isinstance(password, int):
             password = str(password).zfill(4)
+        elif isinstance(password, str):
+            password = password.encode()
 
-        if len(password) != 4:
-            raise (Exception("Password length must be equal to 4. Got {}".format(len(password))))
-
-        if not password.isdigit():
-            raise (Exception("Not supported password {}".format(password)))
-
-        int_password = int(password)
-        i = min(4, len(password))
-        i2 = i // 2 - 1
-
-        while i > 0:
-            b = int(int_password % 10)
-            if b == 0:
-                b = 0x0a
-
-            int_password = int_password // 10
-
-            if i % 2 == 0:
-                res[i2] = b
-            else:
-                res[i2] = ((b << 4) | res[i2]) & 0xff
-                i2 -= 1
-
-            i -= 1
-
-        return bytes(res)
+        return binascii.a2b_hex(password.zfill(4))
 
     async def load_definitions(self):
         if 'definitions' not in self.mem_map:
@@ -196,8 +174,10 @@ class Panel:
 
     async def _eeprom_read_address(self, address, length):
         args = dict(address=address, length=length)
-        reply = await self.core.send_wait(self.get_message('ReadEEPROM'), args, reply_expected=lambda
-            m: m.fields.value.po.command == 0x05 and m.fields.value.address == address)
+        reply = await self.core.send_wait(
+            self.get_message('ReadEEPROM'), args,
+            reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address
+        )
 
         if reply is None:
             logger.error("Could not fully load labels")
@@ -264,8 +244,10 @@ class Panel:
                 label = label.decode(cfg.LABEL_ENCODING)
             except UnicodeDecodeError:
                 logger.warning('Unable to properly decode label {} using the {} encoding.\n \
-                    Specify a different encoding using the LABEL_ENCODING configuration option.'.format(b_label,
-                                                                                                        cfg.LABEL_ENCODING))
+                    Specify a different encoding using the LABEL_ENCODING configuration option.'.format(
+                    b_label,
+                    cfg.LABEL_ENCODING
+                ))
                 label = label.decode('utf-8', errors='ignore')
 
             properties = template.copy()
@@ -277,7 +259,10 @@ class Panel:
     def initialize_communication(self, reply, password):
         raise NotImplementedError("override initialize_communication in a subclass")
 
-    def request_status(self, nr):
+    def get_status_requests(self) -> typing.Iterable[typing.Awaitable]:
+        return (self.request_status(i) for i in self.status_request_addresses)
+
+    async def request_status(self, nr) -> typing.Optional[Container]:
         raise NotImplementedError("override request_status in a subclass")
 
     @staticmethod
@@ -287,7 +272,7 @@ class Panel:
 
         if mvars.address not in parser_map:
             logger.error(
-                "Parser for memory address ({}) is not implemented. Please review your STATUS_REQUESTS setting. "
+                "Parser for memory address ({}) is not implemented. "
                 "Skipping.".format(mvars.address)
             )
             return

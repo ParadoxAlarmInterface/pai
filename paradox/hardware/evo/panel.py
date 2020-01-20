@@ -3,7 +3,7 @@
 import binascii
 import inspect
 import logging
-from typing import Optional
+import typing
 
 from construct import Construct, Container, MappingError, ChecksumError
 
@@ -41,6 +41,7 @@ class Panel_EVOBase(PanelBase):
     event_map = event_map
     property_map = property_map
     max_eeprom_response_data_length = 64
+    status_request_addresses = parsers.RAMDataParserMap.keys()
 
     def get_message(self, name: str) -> Construct:
         try:
@@ -73,7 +74,9 @@ class Panel_EVOBase(PanelBase):
                     control=dict(ram_access=ram))
                 logger.info("Dumping %s: address %d" % (mem_type, address))
                 reply = await self.core.send_wait(
-                    parsers.ReadEEPROM, args, reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address)
+                    parsers.ReadEEPROM, args,
+                    reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address
+                )
 
                 if reply is None:
                     logger.error("Could not read %s: address %d" % (mem_type, address))
@@ -83,7 +86,7 @@ class Panel_EVOBase(PanelBase):
 
                 fh.write(data)
 
-    def parse_message(self, message: bytes, direction='topanel') -> Optional[Container]:
+    def parse_message(self, message: bytes, direction='topanel') -> typing.Optional[Container]:
         try:
             if message is None or len(message) == 0:
                 return None
@@ -110,7 +113,7 @@ class Panel_EVOBase(PanelBase):
                     return parsers.LoginConfirmationResponse.parse(message)
                 elif message[0] >> 4 == 0x03:
                     return parsers.SetTimeDateResponse.parse(message)
-                elif message[0] >> 4 == 4: # Used for partitions and PGMs
+                elif message[0] >> 4 == 4:  # Used for partitions and PGMs
                     return parsers.PerformActionResponse.parse(message)
                 elif message[0] >> 4 == 0xd:
                     return parsers.PerformZoneActionResponse.parse(message)
@@ -173,19 +176,22 @@ class Panel_EVOBase(PanelBase):
     def _request_status_reply_check(message: Container, address: int):
         mvars = message.fields.value
 
-        if (mvars.po.command == 0x5
-            and mvars.control.ram_access is True
-            and mvars.control.eeprom_address_bits == 0x0
-            and mvars.bus_address == 0x00  # panel
-            and mvars.address == address
+        if (
+                mvars.po.command == 0x5
+                and mvars.control.ram_access is True
+                and mvars.control.eeprom_address_bits == 0x0
+                and mvars.bus_address == 0x00  # panel
+                and mvars.address == address
         ):
             return True
 
         return False
 
-    async def request_status(self, i: int) -> Optional[Container]:
+    async def request_status(self, i: int) -> typing.Optional[Container]:
         args = dict(address=i, length=64, control=dict(ram_access=True))
-        reply = await self.core.send_wait(parsers.ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, args['address']))
+        reply = await self.core.send_wait(
+            parsers.ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, args['address'])
+        )
         if reply is not None:
             logger.debug("Received status response: %d" % i)
             return self.handle_status(reply, parsers.RAMDataParserMap)
@@ -199,7 +205,7 @@ class Panel_EVOBase(PanelBase):
         :param str command: textual command
         :return: True if we have at least one success
         """
-        args = dict(commands=dict((i, command) for i in partitions))
+        args = dict(partitions=dict((i, command) for i in partitions))
 
         try:
             reply = await self.core.send_wait(
@@ -208,6 +214,10 @@ class Panel_EVOBase(PanelBase):
             logger.error('Partition command: "%s" is not supported' % command)
             return False
 
+        if reply:
+            logger.info('Partition command: "%s" succeeded' % command)
+        else:
+            logger.info('Partition command: "%s" failed' % command)
         return reply is not None
 
     async def control_zones(self, zones: list, command: str) -> bool:
@@ -230,6 +240,10 @@ class Panel_EVOBase(PanelBase):
             logger.error('Zone command: "%s" is not supported' % command)
             return False
 
+        if reply:
+            logger.info('Zone command: "%s" succeeded' % command)
+        else:
+            logger.info('Zone command: "%s" failed' % command)
         return reply is not None
 
     async def control_outputs(self, outputs, command) -> bool:
@@ -248,7 +262,11 @@ class Panel_EVOBase(PanelBase):
         try:
             reply = await self.core.send_wait(parsers.PerformPGMAction, args, reply_expected=0x04)
         except MappingError:
-            logger.error('Zone command: "%s" is not supported' % command)
+            logger.error('PGM command: "%s" is not supported' % command)
             return False
 
+        if reply:
+            logger.info('PGM command: "%s" succeeded' % command)
+        else:
+            logger.info('PGM command: "%s" failed' % command)
         return reply is not None

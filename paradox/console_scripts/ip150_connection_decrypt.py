@@ -6,6 +6,7 @@ from collections import OrderedDict
 
 from paradox.lib.crypto import decrypt
 
+
 def ordered_load(stream, Loader=yaml.loader.SafeLoader, object_pairs_hook=OrderedDict):
     class OrderedLoader(Loader):
         pass
@@ -18,6 +19,7 @@ def ordered_load(stream, Loader=yaml.loader.SafeLoader, object_pairs_hook=Ordere
         yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
         construct_mapping)
     return yaml.load(stream, OrderedLoader)
+
 
 def decrypt_file(file, password):
     PASSWORD2 = None

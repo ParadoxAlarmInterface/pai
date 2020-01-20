@@ -18,13 +18,13 @@ ip_message = Struct(
 
 ip_payload_connect_response = Struct(
     'login_status' / Enum(Int8ub,
-    	success=0x00,
-    	invalid_password=0x01,
-    	user_already_connected=0x02,
-    	user_already_connected1=0x04),
-    'key'   / Bytes(16),
+                          success=0x00,
+                          invalid_password=0x01,
+                          user_already_connected=0x02,
+                          user_already_connected1=0x04),
+    'key' / Bytes(16),
     'hardware_version' / Int16ub,
     'ip_firmware_major' / Default(HexInt, 5),
     'ip_firmware_minor' / Default(HexInt, 2),
-    'ip_module_serial'	/ Bytes(4),
-    )
+    'ip_module_serial' / Bytes(4),
+)

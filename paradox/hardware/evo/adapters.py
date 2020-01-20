@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 import datetime
-from typing import Callable, Any
 
-from construct import *
+from construct import Adapter, Array, Container, ListContainer, BitStruct, Flag, Default, Subconstruct, BitsInteger, \
+    Construct, Struct, Computed, this, Bytes
 
 
 class DateAdapter(Adapter):
@@ -14,27 +14,82 @@ class DateAdapter(Adapter):
         return [obj.year / 100, obj.year % 100, obj.month, obj.day, obj.hour, obj.minute, obj.second]
 
 
-class ModuleSerialAdapter(Adapter):
-    def _decode(self, obj, context, path):
-        return hex(int(obj[0]) * 10 ^ 8 + int(obj[1]) * 10 ^ 4 + int(obj[2]) * 10 ^ 2 + int(
-            obj[3]) * 10 ^ 0)
-
-
-class PartitionStateAdapter(Adapter):
-    states = dict(arm=4, disarm=5, arm_sleep=3, arm_stay=1, none=0)
+class DictArray(Adapter):
+    def __init__(self, count, first_index, subcon, pick_key: str = None):
+        super(DictArray, self).__init__(Array(count, subcon))
+        self._first_index = first_index
+        self._pick_key = pick_key
 
     def _decode(self, obj, context, path):
-        for k, v in enumerate(self.states):
-            if v == obj[0]:
-                return k
+        if not isinstance(obj, list):
+            raise TypeError("list should be passed for decoding")
 
-        return "unknown"
+        n_obj = Container()
+        for item in obj:
+            v = item
+            if self._pick_key:
+                v = item.get(self._pick_key)
+            n_obj[item._index] = v
+
+        return n_obj
 
     def _encode(self, obj, context, path):
-        if obj in self.states:
-            return self.states[obj]
+        if not isinstance(obj, dict):
+            raise TypeError("dict should be passed for decoding")
 
-        return 0
+        n_obj = ListContainer()
+
+        count = self.subcon.count  # Array count
+
+        for k in range(self._first_index, self._first_index + count):
+            o = {"_index": k}
+            v = obj.get(k)
+            if v is not None:
+                if self._pick_key:
+                    v = {self._pick_key: v}
+                o.update(v)
+            n_obj.append(o)
+
+        return n_obj
+
+
+class EnumerationAdapter(Subconstruct):
+    def __init__(self, subcon):
+        super(EnumerationAdapter, self).__init__(subcon)
+
+        def find_count(s):
+            if hasattr(s, 'count'):
+                return s.count
+            else:
+                return find_count(s.subcon)
+
+        self.size = find_count(subcon)
+
+    def _build(self, obj, stream, context, path):
+        zones = list([i in obj for i in range(1, self.size+1)])
+
+        return self.subcon._build(zones, stream, context, path)
+
+
+def StatusFlags(count):
+    return DictArray(count, 1, Struct(
+                "_index" / Computed(this._index + 1),
+                "flag" / Default(Flag, False)
+            ), pick_key="flag")
+
+
+def ZoneFlags(count, start_index_from=1):
+    return DictArray(count, start_index_from, BitStruct(
+        "_index" / Computed(this._index + start_index_from),
+        "generated_alarm" / Default(Flag, False),
+        "presently_in_alarm" / Default(Flag, False),
+        "activated_entry_delay" / Default(Flag, False),
+        "activated_intellizone_delay" / Default(Flag, False),
+        "bypassed" / Default(Flag, False),
+        "shutted_down" / Default(Flag, False),
+        "tx_delay" / Default(Flag, False),
+        "supervision_trouble" / Default(Flag, False),
+    ))
 
 
 ZoneFlagBitStruct = BitStruct(
@@ -49,62 +104,6 @@ ZoneFlagBitStruct = BitStruct(
 )
 
 
-# noinspection PyUnresolvedReferences,PyUnresolvedReferences
-class ZoneFlags(Subconstruct):
-    flag_parser = ZoneFlagBitStruct
-
-    def __init__(self, count, start_index_from=1):
-        super(ZoneFlags, self).__init__(self.flag_parser)
-
-        self.count = count
-        self.start_index_from = start_index_from
-
-    def _parse(self, stream, context, path):
-        count = self.count
-        obj = Container()
-        for i in range(self.start_index_from, self.start_index_from + count):
-            obj[i] = self.subcon._parsereport(stream, context, path)
-        return obj
-
-    def _encode(self, obj, context, path):
-        return b"".join([self.flag_parser.build(i) for i in obj])
-
-
-class FlexibleFlagArrayAdapter(Adapter):
-    def __init__(self, subcon, value_decode_fn: Callable[[Any], Any]):
-        super(FlexibleFlagArrayAdapter, self).__init__(subcon)
-        self.value_decode_fn = value_decode_fn
-
-    def _decode(self, obj, context, path):
-        r = dict()
-        for i in range(0, len(obj)):
-            r[i + 1] = self.value_decode_fn(obj[i])
-
-        return r
-
-
-class StatusFlagArrayAdapter(Adapter):
-    def _decode(self, obj, context, path):
-        r = dict()
-        for i in range(0, len(obj)):
-            status = obj[i]
-            r[i + 1] = status
-
-        return r
-
-
-class StatusAdapter(Adapter):
-    def _decode(self, obj, context, path):
-        r = dict()
-        for i in range(0, len(obj)):
-            status = obj[i]
-            for j in range(0, 8):
-                r[i * 8 + j + 1] = (((status >> j) & 0x01) == 0x01)
-
-        return r
-
-
-# noinspection PyUnresolvedReferences,PyUnresolvedReferences,PyUnresolvedReferences
 class PartitionStatus(Subconstruct):
     first2 = BitStruct(
         'fire_alarm' / Flag,
@@ -191,24 +190,6 @@ class PartitionStatus(Subconstruct):
         return obj
 
 
-class PGMFlags(Subconstruct):
-    parser = BitStruct(
-        'chime_zone_partition' / StatusFlagArrayAdapter(Array(4, Flag)),
-        'power_smoke' / Flag,
-        'ground_start' / Flag,
-        'kiss_off' / Flag,
-        'line_ring' / Flag,
-
-        'bell_partition' / StatusFlagArrayAdapter(Array(8, Flag)),
-
-        'fire_alarm' / StatusFlagArrayAdapter(Array(8, Flag)),
-
-        'open_close_kiss_off' / StatusFlagArrayAdapter(Array(8, Flag))
-    )
-
-    def __init__(self):
-        super(PGMFlags, self).__init__(self.parser)
-
 class EventAdapter(Adapter):
     def _decode(self, obj, context, path):
         event_group = obj[0]
@@ -224,6 +205,7 @@ class EventAdapter(Adapter):
             'minor2': event_2,
             'partition': partition
         })
+
 
 # class CompressedEventAdapter(Adapter):
 #     def _decode(self, obj, context, path):

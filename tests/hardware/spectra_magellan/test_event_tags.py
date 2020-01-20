@@ -5,6 +5,7 @@ from paradox.lib.event_filter import EventTagFilter
 from paradox.hardware.spectra_magellan import parsers
 from paradox.event import LiveEvent
 
+
 def event_iterator():
     for major, config in event_map.items():
         payload = b'\xe2\x14\x13\x01\x04\x0b\n\x02\x0c\x00\x00\x00\x00\x00\x02XXXXXXXXXXX     \x01\x00\x00\x00\x00\x9c'
@@ -20,6 +21,7 @@ def event_iterator():
         else:
             raw.event.minor = 0
             yield LiveEvent(event, event_map)
+
 
 def test_alarm():
     event_filter = EventTagFilter(['alarm,-restore'])
@@ -40,6 +42,7 @@ def test_alarm():
 
     assert 'Special alarm: Panic medical' in matches
 
+
 def test_arm():
     event_filter = EventTagFilter(['arm'])
 
@@ -53,6 +56,7 @@ def test_arm():
     assert 'Arming by user XXXXXXXXXXX' in matches
 
     assert 'Special arming: No movement arming' in matches
+
 
 def test_disarm():
     event_filter = EventTagFilter(['disarm'])
@@ -70,6 +74,7 @@ def test_disarm():
     assert 'Disarming after alarm by user XXXXXXXXXXX' in matches
     assert 'Disarming through WinLoad' in matches
     assert 'Disarming through WinLoad after alarm' in matches
+
 
 def test_disarm_after_alarm():
     event_filter = EventTagFilter(['disarm+after_alarm'])

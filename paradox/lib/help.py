@@ -16,13 +16,16 @@ MODULES = {
     'gi': dict(mandatory=False, desc='the Signal interface', install_name='gi>=1.2'),
 }
 
+
 def import_error_help(error):
     logger.error("Could not import Python3 module '{}': {}\n".format(error.name, error))
 
     if error.name in MODULES:
         m = MODULES[error.name]
-        logger.error("The module is required for {} and IS{} mandatory.".format(m['desc'], ' NOT' if not m['mandatory'] else ''))
-        if  not m['mandatory']:
+        logger.error(
+            "The module is required for {} and IS{} mandatory.".format(m['desc'], ' NOT' if not m['mandatory'] else '')
+        )
+        if not m['mandatory']:
             logger.error('If you do not require such functionality, you can disable it in the config file,')
             logger.error('and skip installing the module.\n')
         logger.error("To install ONLY this module, execute: \n")

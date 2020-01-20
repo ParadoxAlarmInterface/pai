@@ -4,12 +4,11 @@ import asyncio
 import logging
 import time
 from binascii import hexlify
-from enum import Enum
-from threading import Lock
 from typing import Optional, Sequence, Iterable, Callable
 
 from construct import Container
 
+from paradox.data.enums import RunState
 from paradox.event import Event, LiveEvent, ChangeEvent, Change
 from paradox.config import config as cfg
 from paradox.connections.ip_connection import IPConnection
@@ -24,16 +23,6 @@ from paradox.parsers.status import convert_raw_status
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
-serial_lock = Lock()
-
-
-class State(Enum):
-    STOP = 0
-    INIT = 1
-    RUN = 2
-    PAUSE = 3
-    ERROR = 4
-
 
 def async_loop_unhandled_exception_handler(loop, context):
     logger.error("Unhandled exception in async loop(%s): %s", loop, context)
@@ -42,18 +31,19 @@ def async_loop_unhandled_exception_handler(loop, context):
     # exception = context.get('exception')
     logger.exception("Unhandled exception in async loop")
 
+
 class Paradox:
     def __init__(self, retries=3):
         self.panel = None  # type: Panel
         self._connection = None
         self.retries = retries
-        self.work_loop = asyncio.get_event_loop() # type: asyncio.AbstractEventLoop
+        self.work_loop = asyncio.get_event_loop()  # type: asyncio.AbstractEventLoop
         self.work_loop.set_exception_handler(async_loop_unhandled_exception_handler)
         self.receive_worker_task = None
 
         self.storage = Storage()
 
-        self.run = State.STOP
+        self._run_state = RunState.STOP
         self.request_lock = asyncio.Lock()
         self.busy = asyncio.Lock()
         self.loop_wait_event = asyncio.Event()
@@ -65,20 +55,32 @@ class Paradox:
         ps.subscribe(self._on_property_change, "changes")
 
     @property
+    def run_state(self):
+        return self._run_state
+
+    @run_state.setter
+    def run_state(self, value: RunState):
+        self._run_state = value
+        ps.sendMessage("run-state", state=value)
+        logger.info("Run state: %s", value)
+
+    @property
     def connection(self):
         if not self._connection:
             # Load a connection to the alarm
             if cfg.CONNECTION_TYPE == "Serial":
                 logger.info("Using Serial Connection")
 
-                self._connection = SerialCommunication(self.on_connection_message, port=cfg.SERIAL_PORT,
-                                                      baud=cfg.SERIAL_BAUD)
+                self._connection = SerialCommunication(
+                    self.on_connection_message, port=cfg.SERIAL_PORT, baud=cfg.SERIAL_BAUD
+                )
             elif cfg.CONNECTION_TYPE == 'IP':
                 logger.info("Using IP Connection")
 
-                self._connection = IPConnection(self.on_connection_message, host=cfg.IP_CONNECTION_HOST,
-                                               port=cfg.IP_CONNECTION_PORT,
-                                               password=cfg.IP_CONNECTION_PASSWORD)
+                self._connection = IPConnection(
+                    self.on_connection_message, host=cfg.IP_CONNECTION_HOST,
+                    port=cfg.IP_CONNECTION_PORT, password=cfg.IP_CONNECTION_PASSWORD
+                )
             else:
                 raise AssertionError("Invalid connection type: {}".format(cfg.CONNECTION_TYPE))
 
@@ -90,9 +92,6 @@ class Paradox:
         self.connection.register_handler(EventMessageHandler(self.handle_event_message))
         self.connection.register_handler(ErrorMessageHandler(self.handle_error_message))
 
-    def reset(self):
-        pass
-
     def connect(self) -> bool:
         task = self.work_loop.create_task(self.connect_async())
         self.work_loop.run_until_complete(task)
@@ -102,17 +101,14 @@ class Paradox:
         self.disconnect()  # socket needs to be also closed
         self.panel = None
 
+        self.run_state = RunState.INIT
         logger.info("Connecting to interface")
         if not await self.connection.connect():
+            self.run_state = RunState.ERROR
             logger.error('Failed to connect to interface')
-            self.run = State.ERROR
             return False
 
         logger.info("Connecting to panel")
-
-        # Reset all states
-        self.reset()
-        self.run = State.INIT
 
         if not self.panel:
             self.panel = create_panel(self)
@@ -121,7 +117,9 @@ class Paradox:
         try:
             logger.info("Initiating communication")
 
-            initiate_reply = await self.send_wait(self.panel.get_message('InitiateCommunication'), None, reply_expected=0x07)
+            initiate_reply = await self.send_wait(
+                self.panel.get_message('InitiateCommunication'), None, reply_expected=0x07
+            )
 
             if initiate_reply:
                 model = initiate_reply.fields.value.label.strip(b'\0 ').decode(cfg.LABEL_ENCODING)
@@ -136,7 +134,6 @@ class Paradox:
             else:
                 raise ConnectionError("Panel did not replied to InitiateCommunication")
 
-
             logger.info("Starting communication")
             reply = await self.send_wait(self.panel.get_message('StartCommunication'),
                                          args=dict(source_id=0x02), reply_expected=0x00)
@@ -147,7 +144,12 @@ class Paradox:
             if reply.fields.value.product_id is not None:
                 self.panel = create_panel(self, reply.fields.value.product_id)  # Now we know what panel it is. Let's
                 # recreate panel object.
-                ps.sendMessage('panel_detected', panel=dict(product_id=reply.fields.value.product_id, model=model, firmware_version=firmware_version, serial_number=serial_number))
+                ps.sendMessage(
+                    'panel_detected', panel=dict(
+                        product_id=reply.fields.value.product_id, model=model,
+                        firmware_version=firmware_version, serial_number=serial_number
+                    )
+                )
 
             result = await self.panel.initialize_communication(reply, cfg.PASSWORD)
             if not result:
@@ -175,7 +177,7 @@ class Paradox:
             ps.sendMessage('labels_loaded', data=labels)
 
             logger.info("Connection OK")
-            self.run = State.RUN
+            self.run_state = RunState.RUN
             self.request_status_refresh()  # Trigger status update
 
             ps.sendMessage('connected')
@@ -187,7 +189,7 @@ class Paradox:
         except Exception:
             logger.exception("Connect error")
 
-        self.run = State.ERROR
+        self.run_state = RunState.ERROR
 
         return False
 
@@ -213,12 +215,12 @@ class Paradox:
         
         replies_missing = 0
 
-        while self.run not in(State.STOP, State.ERROR):
+        while self.run_state not in (RunState.STOP, RunState.ERROR):
             tstart = time.time()
-            if self.run == State.RUN:
+            if self.run_state == RunState.RUN:
                 try:
                     await self.busy.acquire()
-                    result = await asyncio.gather(*[self._status_request(i) for i in cfg.STATUS_REQUESTS])
+                    result = await asyncio.gather(*self.panel.get_status_requests())
                     merged = deep_merge(*result, extend_lists=True, initializer={})
                     self.work_loop.call_soon(self._process_status, merged)
                     replies_missing = max(0, replies_missing - 1)
@@ -248,12 +250,8 @@ class Paradox:
             finally:
                 self.loop_wait_event.clear()
 
-    async def _status_request(self, i):
-        logger.debug("Scheduling status request: %d" % i)
-        return await self.panel.request_status(i)
-
     @staticmethod
-    def _process_status(raw_status: Container):
+    def _process_status(raw_status: Container) -> None:
         status = convert_raw_status(raw_status)
 
         for limit_key, limit_arr in cfg.LIMITS.items():
@@ -290,18 +288,18 @@ class Paradox:
                 logger.debug("Unknown message: %s" % (" ".join("{:02x} ".format(c) for c in message)))
                 return
 
-            if self.run != State.PAUSE:
+            if self.run_state != RunState.PAUSE:
                 self.connection.schedule_message_handling(recv_message)  # schedule handling in the loop
         except Exception as e:
             logging.exception("Error parsing message")
 
     async def send_wait(self,
-                  message_type=None,
-                  args=None,
-                  message=None,
-                  retries=5,
-                  timeout=0.5,
-                  reply_expected=None) -> Optional[Container]:
+                        message_type=None,
+                        args=None,
+                        message=None,
+                        retries=5,
+                        timeout=0.5,
+                        reply_expected=None) -> Optional[Container]:
 
         # Connection closed
         if not self.connection.connected:
@@ -327,9 +325,13 @@ class Paradox:
                             reply = await self.connection.wait_for_message(reply_expected, timeout=timeout * 2)
                         elif isinstance(reply_expected, Iterable):
                             reply = await self.connection.wait_for_message(
-                                lambda m: any(m.fields.value.po.command == expected for expected in reply_expected), timeout=timeout*2)
+                                lambda m: any(m.fields.value.po.command == expected for expected in reply_expected),
+                                timeout=timeout*2
+                            )
                         else:
-                            reply = await self.connection.wait_for_message(lambda m: m.fields.value.po.command == reply_expected, timeout=timeout * 2)
+                            reply = await self.connection.wait_for_message(
+                                lambda m: m.fields.value.po.command == reply_expected, timeout=timeout * 2
+                            )
 
                         if reply:
                             return reply
@@ -370,7 +372,7 @@ class Paradox:
         command = command.lower()
         logger.debug("Control Partition: {} - {}".format(partition, command))
 
-        partitions_selected = self.storage.get_container('partition').select(partition) # type: Sequence[int]
+        partitions_selected = self.storage.get_container('partition').select(partition)  # type: Sequence[int]
 
         # Not Found
         if len(partitions_selected) == 0:
@@ -428,7 +430,7 @@ class Paradox:
         if el:
             return el.get("label")
 
-    def handle_event_message(self, message: Container=None):
+    def handle_event_message(self, message: Container = None):
         """Process cfg.Live Event Message and dispatch it to the interface module"""
         try:
             try:
@@ -443,7 +445,11 @@ class Paradox:
             # TODO: REMOVE
             if message is not None:
                 if not evt.id:
-                    logger.warning("Missing element ID in {}/{}, m/m: {}/{}, message: {}".format(evt.type, evt.label or '?', evt.major, evt.minor, evt.message))
+                    logger.debug(
+                        "Missing element ID in {}/{}, m/m: {}/{}, message: {}".format(
+                            evt.type, evt.label or '?', evt.major, evt.minor, evt.message
+                        )
+                    )
                 else:
                     if not element:
                         logger.warning("Missing element with ID {} in {}/{}".format(evt.id, evt.type, evt.label))
@@ -453,7 +459,10 @@ class Paradox:
                                 logger.warning("Missing property {} in {}/{}".format(k, evt.type, evt.label))
                         if evt.label != element.get("label"):
                             logger.warning(
-                                "Labels differ {} != {} in {}/{}".format(element.get("label"), evt.label, evt.type, evt.label))
+                                "Labels differ {} != {} in {}/{}".format(
+                                    element.get("label"), evt.label, evt.type, evt.label
+                                )
+                            )
             # Temporary end
             
             # The event has changes. Update the state
@@ -477,7 +486,7 @@ class Paradox:
 
     def disconnect(self):
         logger.info("Disconnecting from the Alarm Panel")
-        self.run = State.STOP
+        self.run_state = RunState.STOP
 
         self._clean_session()
         if self.connection.connected:
@@ -486,15 +495,15 @@ class Paradox:
 
     async def pause(self):
         logger.info("Pausing PAI")
-        if self.run == State.RUN:
+        if self.run_state == RunState.RUN:
             logger.info("Pausing from the Alarm Panel")
-            self.run = State.PAUSE
+            self.run_state = RunState.PAUSE
             # EVO IP150 IP Interface does not work if we send this
             # await self.send_wait(self.panel.get_message('CloseConnection'), None)
 
     async def resume(self):
         logger.info("Resuming PAI")
-        if self.run == State.PAUSE:
+        if self.run_state == RunState.PAUSE:
             await self.connect_async()
 
     def _clean_session(self):
@@ -597,7 +606,9 @@ class Paradox:
             return
 
         try:
-            event = ChangeEvent(change_object=change, property_map=self.panel.property_map, label_provider=self.get_label)
+            event = ChangeEvent(
+                change_object=change, property_map=self.panel.property_map, label_provider=self.get_label
+            )
             if cfg.LOGGING_DUMP_EVENTS:
                 logger.debug("ChangeEvent: {}".format(event))
             ps.sendEvent(event)

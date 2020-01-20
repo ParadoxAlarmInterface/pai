@@ -10,6 +10,7 @@ __status__ = "Beta"
 
 import argparse
 
+
 def main():
     from paradox.main import main
     parser = argparse.ArgumentParser()
