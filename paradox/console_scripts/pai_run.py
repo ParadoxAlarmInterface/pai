@@ -11,7 +11,7 @@ __status__ = "Beta"
 import argparse
 
 
-def main():
+def run():
     from paradox.main import main
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--config", type=str, default=None,
@@ -25,6 +25,6 @@ def main():
 if __name__ == '__main__':
     from paradox.lib import help
     try:
-        main()
+        run()
     except ImportError as error:
         help.import_error_help(error)

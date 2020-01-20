@@ -88,6 +88,7 @@ def main(args):
     time.sleep(1)
 
     signal.signal(signal.SIGINT, exit_handler)
+    signal.signal(signal.SIGTERM, exit_handler)
 
     # Start interacting with the alarm
     alarm = Paradox()
