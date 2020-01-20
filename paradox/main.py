@@ -48,8 +48,10 @@ def config_logger(logger):
     logger.setLevel(logger_level)
 
 
-def exit_handler(signal=None, frame=None):
+def exit_handler(signum=None, frame=None):
     global alarm, interface_manager
+
+    logger.info('Captured signal %d. Exiting' % signum)
     
     if alarm:
         alarm.disconnect()
