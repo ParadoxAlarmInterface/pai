@@ -27,7 +27,8 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         self.first_status = True
 
         # TODO: Maybe homeassistant needs a separate status topic
-        self.availability_topic = self.mqtt.run_status_topic
+        self.availability_topic = self.mqtt.availability_topic
+        self.run_status_topic = self.mqtt.run_status_topic
 
     async def run(self):
         ps.subscribe(self._handle_status_update, "status_update")
@@ -35,6 +36,26 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         ps.subscribe(self._handle_panel_detected, "panel_detected")
 
         await super().run()
+
+    def _publish_run_state_sensor(self):
+        configuration_topic = '{}/sensor/{}/{}/config'.format(
+            cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
+            self.detected_panel.get('serial_number', 'pai'),
+            'run_status'
+        )
+
+        config = dict(
+            name='Run status',
+            unique_id="{}_partition_{}".format(
+                self.detected_panel.get('serial_number', 'pai'),
+                'run_status'
+            ),
+            state_topic=self.run_status_topic,
+            availability_topic=self.availability_topic,
+            device=self.device
+        )
+
+        self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
 
     def _handle_panel_detected(self, panel):
         self.detected_panel = panel
@@ -45,6 +66,8 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             name=panel.get('model'),
             sw_version=panel.get('firmware_version')
         )
+
+        self._publish_run_state_sensor()
 
     def _handle_labels_loaded(self, data):
         partitions = data.get('partition', {})

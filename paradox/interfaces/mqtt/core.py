@@ -50,6 +50,7 @@ class MQTTConnection(Client):
         super(MQTTConnection, self).__init__("paradox_mqtt/{}".format(os.urandom(8).hex()))
         self._last_run_state = "unknown"
         self.run_status_topic = '{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, 'run_status')
+        self.availability_topic = '{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, 'availability')
         self.on_connect = self._on_connect_cb
         self.on_disconnect = self._on_disconnect_cb
         self.state = ConnectionState.NEW
@@ -64,7 +65,7 @@ class MQTTConnection(Client):
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
             self.username_pw_set(username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
 
-        self.will_set(self.run_status_topic, 'offline', 0, retain=True)
+        self.will_set(self.availability_topic, 'offline', 0, retain=True)
 
     def on_run_state_change(self, state: RunState):
         v = RUN_STATE_2_PAYLOAD.get(state, "unknown")
@@ -116,6 +117,7 @@ class MQTTConnection(Client):
     def _report_run_state(self, status):
         self._last_run_state = status
         self.publish(self.run_status_topic, status, 0, retain=True)
+        self.publish(self.availability_topic, "online" if status in ["online", "paused"] else "offline", 0, retain=True)
 
     def _on_connect_cb(self, client, userdata, flags, result):
         if result == MQTT_ERR_SUCCESS:
