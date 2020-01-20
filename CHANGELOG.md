@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2020-01-20
+### Added
+- MQTT: Added `paradox/interface/run_status` and has more statuses: `error, initializing, paused, online, stopped, offline`
+- MQTT: Added `paradox/interface/availability` that has only `online`, `offline` statuses. Basically it is replacement for `MQTTInterface` but has more strict `online` status.
+- Proper `SIGTERM` handling. Docker containers do not die instantly but shutdown gracefully.
+- PAI reports it's version in logs.
+- PAI logs executed command result
+
+### Changed
+
+- Configuration: `0` in`PASSWORD` is not encoded to `a` anymore. If you have problems see [FAQ](https://github.com/ParadoxAlarmInterface/pai/wiki/FAQ#authentication-failed-wrong-password)
+- Configuration: `STATUS_REQUESTS` config parameter removed. Panels know what they need.
+- MQTT: `paradox/interface/MQTTInterface` removed.
+- Dependencies: Sticking to `construct 2.9`.
+- Less CRITICAL events in SP/MG
+- Some GSM interface fixes
+- setup.py improvements
+
 ## [1.4.0] - 2020-01-02
 ### Added
 
