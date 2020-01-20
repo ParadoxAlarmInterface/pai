@@ -51,7 +51,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 'run_status'
             ),
             state_topic=self.run_status_topic,
-            availability_topic=self.availability_topic,
+            # availability_topic=self.availability_topic,
             device=self.device
         )
 
