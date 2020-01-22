@@ -62,7 +62,6 @@ class Paradox:
     def run_state(self, value: RunState):
         self._run_state = value
         ps.sendMessage("run-state", state=value)
-        logger.info("Run state: %s", value)
 
     @property
     def connection(self):

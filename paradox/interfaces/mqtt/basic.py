@@ -20,16 +20,28 @@ ParsedMessage = namedtuple('parsed_message', 'topics element content')
 def mqtt_handle_decorator(func: typing.Callable[["BasicMQTTInterface", ParsedMessage], None]):
     def wrapper(self: "BasicMQTTInterface", client: Client, userdata, message: MQTTMessage):
         try:
-            logger.info("message topic={}, payload={}".format(
-                message.topic, str(message.payload.decode("utf-8"))))
-
             if message.retain:
-                logger.warning("Ignoring retained commands")
+                logger.warning(
+                    "Ignoring command: retained message topic={}, payload={}".format(
+                        message.topic, str(message.payload.decode("utf-8"))
+                    )
+                )
                 return
 
             if self.alarm is None:
-                logger.warning("No alarm. Ignoring command")
+                logger.warning(
+                    "No alarm. Ignoring command: message topic={}, payload={}".format(
+                        message.topic, str(message.payload.decode("utf-8"))
+                    )
+                )
                 return
+
+            logger.info(
+                "message topic={}, payload={}".format(
+                    message.topic,
+                    str(message.payload.decode("utf-8"))
+                )
+            )
 
             topic = message.topic.split(cfg.MQTT_BASE_TOPIC)[1]
 
