@@ -51,7 +51,8 @@ def config_logger(logger):
 def exit_handler(signum=None, frame=None):
     global alarm, interface_manager
 
-    logger.info('Captured signal %d. Exiting' % signum)
+    if signum is not None:
+        logger.info('Captured signal %d. Exiting' % signum)
     
     if alarm:
         alarm.disconnect()
