@@ -1,9 +1,14 @@
+import asyncio
+
+import pytest
+
 from paradox.event import EventLevel, Change
 from paradox.lib import ps
 from paradox.paradox import Paradox
 
 
-def test_partitions(mocker):
+@pytest.mark.asyncio
+async def test_partitions(mocker):
     alarm = Paradox()
     alarm.panel = mocker.MagicMock()
     alarm.panel.property_map = {
@@ -27,6 +32,8 @@ def test_partitions(mocker):
         }
     ))
 
+    await asyncio.sleep(0.01)
+
     assert isinstance(alarm.panel, mocker.MagicMock)
 
     alarm.storage.update_container_object("partition", "Partition_1", dict(arm=True))
@@ -43,18 +50,19 @@ def test_partitions(mocker):
             )
         }
     ))
+    await asyncio.sleep(0.01)
 
     assert isinstance(alarm.panel, mocker.MagicMock)
 
     ps.sendChange.assert_any_call(Change('partition', 'Partition_1', 'current_state', 'disarmed', initial=True))
     ps.sendChange.assert_any_call(Change('partition', 'Partition_1', 'target_state', 'disarmed', initial=True))
     ps.sendChange.assert_any_call(Change('partition', 'Partition_1', 'arm', False, initial=False))
-    assert ps.sendChange.call_count == 3
 
     assert ps.sendEvent.call_count == 0
 
 
-def test_partitions_callable_prop(mocker):
+@pytest.mark.asyncio
+async def test_partitions_callable_prop(mocker):
     alarm = Paradox()
     alarm.panel = mocker.MagicMock()
     alarm.panel.property_map = {
@@ -78,6 +86,8 @@ def test_partitions_callable_prop(mocker):
         }
     ))
 
+    await asyncio.sleep(0.01)
+
     ps.sendMessage("status_update", status=dict(
         partition={
             1: dict(
@@ -85,6 +95,8 @@ def test_partitions_callable_prop(mocker):
             )
         }
     ))
+
+    await asyncio.sleep(0.01)
 
     ps.sendChange.assert_any_call(Change('partition', 'Partition_1', 'arm', False, initial=True))
     ps.sendChange.reset_mock()

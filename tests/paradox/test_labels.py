@@ -1,9 +1,13 @@
+import asyncio
+
+import pytest
+
 from paradox.lib.ps import sendMessage
 from paradox.data.element_type_container import ElementTypeContainer
 from paradox.paradox import Paradox
 
-
-def test_on_labels_load():
+@pytest.mark.asyncio
+async def test_on_labels_load():
     alarm = Paradox(None)
 
     sendMessage("labels_loaded", data=dict(
@@ -15,6 +19,8 @@ def test_on_labels_load():
             )
         }
     ))
+
+    await asyncio.sleep(0.01)
 
     assert isinstance(alarm.storage.get_container('partition'), ElementTypeContainer)
 

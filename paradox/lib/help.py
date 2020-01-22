@@ -4,7 +4,6 @@ logger = logging.getLogger('PAI').getChild(__name__)
 MODULES = {
     'construct': dict(mandatory=True, desc='basic operation', install_name='construct>=2.9.43'),
     'argparse': dict(mandatory=True, desc='basic operation', install_name='argparse>=1.4.0'),
-    'pubsub': dict(mandatory=True, desc='basic operation', install_name='PyPubSub=>4.0.3'),
     'pyserial': dict(mandatory=False, desc='the serial connection', install_name='pyserial>=3.4'),
     'serial_asyncio': dict(mandatory=False, desc='the serial connection', install_name='pyserial-asyncio>=0.4'),
     'pushbullet': dict(mandatory=False, desc='the Pushbullet interface', install_name='pushbullet.py=>0.11.0'),

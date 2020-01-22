@@ -34,6 +34,8 @@ async def test_hass():
             }
         ))
 
+        await asyncio.sleep(0.01)
+
         interface.mqtt.publish.assert_called_with(
             'homeassistant/alarm_control_panel/pai/Partition_1/config',
             json.dumps(
