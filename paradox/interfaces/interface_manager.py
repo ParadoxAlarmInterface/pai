@@ -1,11 +1,14 @@
 import logging
 
+from paradox.interfaces import Interface
+
 logger = logging.getLogger('PAI').getChild(__name__)
 
 
 class InterfaceManager:
 
-    def __init__(self, config=None):
+    def __init__(self, alarm, config=None):
+        self.alarm = alarm
         self.conf = config
         self.interfaces = []
 
@@ -15,7 +18,7 @@ class InterfaceManager:
             try:
                 logger.info("Using GSM Interface")
                 from paradox.interfaces.text.gsm import GSMTextInterface
-                self.register(GSMTextInterface())
+                self.register(GSMTextInterface(self.alarm))
             except Exception:
                 logger.exception("Unable to start GSM Interface")
 
@@ -24,7 +27,7 @@ class InterfaceManager:
             try:
                 logger.info("Using Signal Interface")
                 from paradox.interfaces.text.signal import SignalTextInterface
-                self.register(SignalTextInterface())
+                self.register(SignalTextInterface(self.alarm))
             except Exception:
                 logger.exception("Unable to start Signal Interface")
 
@@ -33,7 +36,7 @@ class InterfaceManager:
             try:
                 logger.info("Using MQTT Interface")
                 from paradox.interfaces.mqtt.basic import BasicMQTTInterface
-                self.register(BasicMQTTInterface())
+                self.register(BasicMQTTInterface(self.alarm))
             except Exception:
                 logger.exception("Unable to start MQTT Interface")
 
@@ -41,7 +44,7 @@ class InterfaceManager:
             try:
                 logger.info("Using HomeAssistant MQTT Interface")
                 from paradox.interfaces.mqtt.homeassistant import HomeAssistantMQTTInterface
-                self.register(HomeAssistantMQTTInterface())
+                self.register(HomeAssistantMQTTInterface(self.alarm))
             except Exception:
                 logger.exception("Unable to start HomeAssistant MQTT Interface")
 
@@ -50,7 +53,7 @@ class InterfaceManager:
             try:
                 logger.info("Using Pushbullet Interface")
                 from paradox.interfaces.text.pushbullet import PushbulletTextInterface
-                self.register(PushbulletTextInterface())
+                self.register(PushbulletTextInterface(self.alarm))
             except Exception:
                 logger.exception("Unable to start Pushbullet Interface")
 
@@ -59,7 +62,7 @@ class InterfaceManager:
             try:
                 logger.info("Using Pushover Interface")
                 from paradox.interfaces.text.pushover import PushoverTextInterface
-                self.register(PushoverTextInterface())
+                self.register(PushoverTextInterface(self.alarm))
             except Exception:
                 logger.exception("Unable to start Pushover Interface")
 
@@ -68,7 +71,7 @@ class InterfaceManager:
             try:
                 logger.info("Using IP Interface")
                 from paradox.interfaces.ip_interface import IPInterface
-                self.register(IPInterface())
+                self.register(IPInterface(self.alarm))
             except Exception:
                 logger.exception("Unable to start IP Interface")
 
@@ -77,11 +80,11 @@ class InterfaceManager:
             try:
                 logger.info("Using Dummy Interface")
                 from paradox.interfaces.text.dummy import DummyInterface
-                self.register(DummyInterface())
+                self.register(DummyInterface(self.alarm))
             except Exception:
                 logger.exception("Unable to start Dummy Interface")
 
-    def register(self, interface):
+    def register(self, interface: Interface):
         logger.debug("Registering Interface {}".format(interface.name))
         interface.start()  # Starts interface thread
 
@@ -98,10 +101,3 @@ class InterfaceManager:
                     "Error stopping interface {}".format(interface.name))
         logger.debug("All Interfaces stopped")
 
-    def set_alarm(self, alarm):
-        for interface in self.interfaces:
-            try:
-                interface.set_alarm(alarm)
-            except Exception:
-                logger.exception(
-                    "Error adding alarm to interface {}".format(interface.name))

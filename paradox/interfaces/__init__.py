@@ -11,12 +11,9 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 
 class Interface:
-    def __init__(self):
+    def __init__(self, alarm):
         super().__init__()  # yes it is required!
-        self.alarm = None
-
-    def set_alarm(self, alarm):
-        """ Sets the alarm """
+        self.name = "override"
         self.alarm = alarm
 
     def start(self):
@@ -24,8 +21,8 @@ class Interface:
 
 
 class AsyncInterface(Interface):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, alarm):
+        super().__init__(alarm)
 
         self._loop = asyncio.get_event_loop()
         self._running_task = None  # type: asyncio.Task
@@ -42,8 +39,10 @@ class AsyncInterface(Interface):
 
 
 class ThreadQueueInterface(threading.Thread, Interface):
-    def __init__(self):
+    def __init__(self, alarm):
         super().__init__()
+
+        self.alarm = alarm
 
         self.stop_running = threading.Event()
         self.stop_running.clear()

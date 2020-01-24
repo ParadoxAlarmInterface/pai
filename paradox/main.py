@@ -85,17 +85,14 @@ def main(args):
 
     logger.info(f"Console Log level set to {cfg.LOGGING_LEVEL_CONSOLE}")
 
-    interface_manager = InterfaceManager(config=cfg)
-    interface_manager.start()
-
-    time.sleep(1)
-
     signal.signal(signal.SIGINT, exit_handler)
     signal.signal(signal.SIGTERM, exit_handler)
 
     # Start interacting with the alarm
     alarm = Paradox()
-    interface_manager.set_alarm(alarm)
+    interface_manager = InterfaceManager(alarm, config=cfg)
+    interface_manager.start()
+
     retry = 1
     while alarm is not None:
         logger.info("Starting...")

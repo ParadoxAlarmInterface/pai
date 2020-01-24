@@ -13,13 +13,13 @@ class AbstractTextInterface(ThreadQueueInterface):
     """Interface Class using any Text interface"""
     name = 'abstract_text'
 
-    def __init__(self, event_filter: EventFilter, min_level=EventLevel.INFO):
-        super().__init__()
+    def __init__(self, alarm, event_filter: EventFilter, min_level=EventLevel.INFO):
+        super().__init__(alarm)
 
         self.event_filter = event_filter
 
         self.min_level = min_level
-        self.alarm = None
+        self.alarm = alarm
 
     def stop(self):
         super().stop()
@@ -44,9 +44,6 @@ class AbstractTextInterface(ThreadQueueInterface):
 
     def _run(self):
         pass
-
-    def set_alarm(self, alarm):
-        self.alarm = alarm
 
     def send_message(self, message: str, level: EventLevel):
         pass
@@ -125,7 +122,7 @@ class AbstractTextInterface(ThreadQueueInterface):
 
 
 class ConfiguredAbstractTextInterface(AbstractTextInterface):
-    def __init__(self, EVENT_FILTERS, ALLOW_EVENTS, IGNORE_EVENTS, MIN_EVENT_LEVEL):
+    def __init__(self, alarm, EVENT_FILTERS, ALLOW_EVENTS, IGNORE_EVENTS, MIN_EVENT_LEVEL):
         if EVENT_FILTERS and (ALLOW_EVENTS or IGNORE_EVENTS):
             raise AssertionError('You can not use *_EVENT_FILTERS and *_ALLOW_EVENTS+*_IGNORE_EVENTS simultaneously')
 
@@ -137,4 +134,4 @@ class ConfiguredAbstractTextInterface(AbstractTextInterface):
             logger.debug("Using Tag Filter")
             event_filter = EventTagFilter(EVENT_FILTERS, min_level)
 
-        super().__init__(event_filter=event_filter, min_level=min_level)
+        super().__init__(alarm, event_filter=event_filter, min_level=min_level)

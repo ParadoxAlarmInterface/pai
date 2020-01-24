@@ -212,8 +212,8 @@ class ClientConnection():
 
 
 class IPInterface(Interface):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, alarm):
+        super().__init__(alarm)
         self.key = cfg.IP_INTERFACE_PASSWORD
         self.addr = cfg.IP_INTERFACE_BIND_ADDRESS
         self.port = cfg.IP_INTERFACE_BIND_PORT
@@ -221,12 +221,6 @@ class IPInterface(Interface):
         self.started = False
         self.name = 'ip_interface'
         self.client_nr = 0
-
-    def set_alarm(self, alarm):
-        super(IPInterface, self).set_alarm(alarm)
-
-        if not self.server and self.started:
-            self.start()
 
     # def on_connection_lost(self):
     #     logger.error('Connection with client was lost')

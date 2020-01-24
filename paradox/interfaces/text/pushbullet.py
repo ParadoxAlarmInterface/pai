@@ -124,8 +124,8 @@ class PushBulletWSClient(WebSocketBaseClient):
 class PushbulletTextInterface(ConfiguredAbstractTextInterface):
     """Interface Class using Pushbullet"""
 
-    def __init__(self):
-        super().__init__(cfg.PUSHBULLET_EVENT_FILTERS, cfg.PUSHBULLET_ALLOW_EVENTS, cfg.PUSHBULLET_IGNORE_EVENTS,
+    def __init__(self, alarm):
+        super().__init__(alarm, cfg.PUSHBULLET_EVENT_FILTERS, cfg.PUSHBULLET_ALLOW_EVENTS, cfg.PUSHBULLET_IGNORE_EVENTS,
                          cfg.PUSHBULLET_MIN_EVENT_LEVEL)
         self.name = PushBulletWSClient.name
         self.pb_ws = None
