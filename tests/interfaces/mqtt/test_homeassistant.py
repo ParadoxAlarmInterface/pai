@@ -9,7 +9,7 @@ import json
 
 @pytest.mark.asyncio
 async def test_hass():
-    interface = HomeAssistantMQTTInterface()
+    interface = HomeAssistantMQTTInterface(None)
     interface.mqtt = MagicMock()
     interface.start()
 

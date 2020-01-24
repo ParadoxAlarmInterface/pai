@@ -10,7 +10,7 @@ from paradox.interfaces.mqtt.basic import BasicMQTTInterface
 
 @pytest.mark.asyncio
 async def test_handle_panel_event(mocker):
-    interface = BasicMQTTInterface()
+    interface = BasicMQTTInterface(mocker.MagicMock())
     interface.mqtt = mocker.MagicMock()
 
     event = Event()
@@ -43,8 +43,7 @@ async def test_handle_panel_event(mocker):
     pytest.param(b'disarmed', 'disarm')
 ])
 def test_mqtt_handle_partition_control(command, expected, mocker):
-    interface = BasicMQTTInterface()
-    interface.alarm = mocker.MagicMock()
+    interface = BasicMQTTInterface(mocker.MagicMock())
 
     message = MQTTMessage(topic=b'paradox/control/partition/First_floor')
     message.payload = command
@@ -58,8 +57,7 @@ def test_mqtt_handle_partition_control(command, expected, mocker):
 
 
 def test_mqtt_handle_zone_control(mocker):
-    interface = BasicMQTTInterface()
-    interface.alarm = mocker.MagicMock()
+    interface = BasicMQTTInterface(mocker.MagicMock())
 
     message = MQTTMessage(topic=b'paradox/control/zones/El_t_r')
     message.payload = b'clear_bypass'
@@ -73,8 +71,7 @@ def test_mqtt_handle_zone_control(mocker):
 
 
 def test_mqtt_handle_zone_control_utf8(mocker):
-    interface = BasicMQTTInterface()
-    interface.alarm = mocker.MagicMock()
+    interface = BasicMQTTInterface(mocker.MagicMock())
 
     message = MQTTMessage(topic='paradox/control/zones/Előtér'.encode('utf-8'))
     message.payload = b'clear_bypass'
