@@ -17,8 +17,6 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 class SignalTextInterface(ConfiguredAbstractTextInterface):
     """Interface Class using Signal"""
-    name = 'signal'
-
     def __init__(self, alarm):
         super().__init__(alarm, cfg.SIGNAL_EVENT_FILTERS, cfg.SIGNAL_ALLOW_EVENTS, cfg.SIGNAL_IGNORE_EVENTS,
                          cfg.SIGNAL_MIN_EVENT_LEVEL)

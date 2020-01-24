@@ -14,8 +14,6 @@ PreparseResponse = namedtuple('preparse_response', 'topics element content')
 
 
 class HomeAssistantMQTTInterface(AbstractMQTTInterface):
-    name = "homeassistant_mqtt"
-
     def __init__(self, alarm):
         super().__init__(alarm)
         self.armed = dict()

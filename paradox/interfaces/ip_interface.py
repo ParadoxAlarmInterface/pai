@@ -219,7 +219,6 @@ class IPInterface(Interface):
         self.port = cfg.IP_INTERFACE_BIND_PORT
         self.server = None
         self.started = False
-        self.name = 'ip_interface'
         self.client_nr = 0
 
     # def on_connection_lost(self):

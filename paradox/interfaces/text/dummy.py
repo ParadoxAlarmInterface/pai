@@ -13,8 +13,6 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 class DummyInterface(AbstractTextInterface):
     """Interface Class using Dummy"""
-    name = 'dummy'
-
     def __init__(self, alarm):
         min_level = EventLevel.from_name(cfg.DUMMY_MIN_EVENT_LEVEL)
         event_filter = EventTagFilter(queries=cfg.DUMMY_EVENT_FILTERS, min_level=min_level)

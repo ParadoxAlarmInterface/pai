@@ -145,8 +145,6 @@ class MQTTConnection(Client):
 
 class AbstractMQTTInterface(AsyncInterface):
     """Interface Class using MQTT"""
-    name = 'abstract_mqtt'
-
     def __init__(self, alarm):
         super().__init__(alarm)
 

@@ -11,8 +11,6 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 class AbstractTextInterface(ThreadQueueInterface):
     """Interface Class using any Text interface"""
-    name = 'abstract_text'
-
     def __init__(self, alarm, event_filter: EventFilter, min_level=EventLevel.INFO):
         super().__init__(alarm)
 

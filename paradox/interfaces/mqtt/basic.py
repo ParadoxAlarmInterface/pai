@@ -66,8 +66,6 @@ def mqtt_handle_decorator(func: typing.Callable[["BasicMQTTInterface", ParsedMes
 
 
 class BasicMQTTInterface(AbstractMQTTInterface):
-    name = 'basic_mqtt'
-
     def __init__(self, alarm):
         super().__init__(alarm)
 

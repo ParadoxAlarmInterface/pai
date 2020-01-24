@@ -143,8 +143,6 @@ class SerialCommunication:
 
 class GSMTextInterface(ConfiguredAbstractTextInterface):
     """Interface Class using GSM"""
-    name = 'gsm'
-
     def __init__(self, alarm):
         super().__init__(alarm, cfg.GSM_EVENT_FILTERS, cfg.GSM_ALLOW_EVENTS, cfg.GSM_IGNORE_EVENTS,
                          cfg.GSM_MIN_EVENT_LEVEL)

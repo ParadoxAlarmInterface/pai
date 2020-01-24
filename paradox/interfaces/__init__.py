@@ -13,7 +13,7 @@ logger = logging.getLogger('PAI').getChild(__name__)
 class Interface:
     def __init__(self, alarm):
         super().__init__()  # yes it is required!
-        self.name = "override"
+        self.name = self.__class__.__name__
         self.alarm = alarm
 
     def start(self):
@@ -40,7 +40,7 @@ class AsyncInterface(Interface):
 
 class ThreadQueueInterface(threading.Thread, Interface):
     def __init__(self, alarm):
-        super().__init__()
+        super().__init__(name=self.__class__.__name__)
 
         self.alarm = alarm
 
