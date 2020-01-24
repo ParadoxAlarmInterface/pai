@@ -23,8 +23,6 @@ class AbstractTextInterface(ThreadQueueInterface):
 
     def stop(self):
         super().stop()
-        if self.alarm is not None:
-            self.alarm.disconnect()
 
     def run(self):
         logger.info("Starting Interface")

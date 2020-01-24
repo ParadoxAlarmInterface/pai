@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from logging.handlers import RotatingFileHandler
 import sys
@@ -68,6 +69,38 @@ def exit_handler(signum=None, frame=None):
     sys.exit(0)
 
 
+async def run_loop(alarm: Paradox):
+    retry = 1
+    while alarm is not None:
+        logger.info("Starting...")
+        retry_time_wait = 2 ^ retry
+        retry_time_wait = 30 if retry_time_wait > 30 else retry_time_wait
+
+        try:
+            if await alarm.connect():
+                retry = 1
+                await alarm.loop()
+            else:
+                logger.error("Unable to connect to alarm")
+
+            time.sleep(retry_time_wait)
+        except ConnectionError as e:  # Connection to IP Module or MQTT lost
+            logger.error("Connection to panel lost: %s. Restarting" % str(e))
+            time.sleep(retry_time_wait)
+
+        except OSError:  # Connection to IP Module or MQTT lost
+            logger.exception("Restarting")
+            time.sleep(retry_time_wait)
+
+        except (KeyboardInterrupt, SystemExit, AuthenticationFailed):
+            break  # break exits the retry loop
+        except Exception:
+            logger.exception("Restarting")
+            time.sleep(retry_time_wait)
+
+        retry += 1
+
+
 def main(args):
     global alarm, interface_manager
     
@@ -93,35 +126,8 @@ def main(args):
     interface_manager = InterfaceManager(alarm, config=cfg)
     interface_manager.start()
 
-    retry = 1
-    while alarm is not None:
-        logger.info("Starting...")
-        retry_time_wait = 2 ^ retry
-        retry_time_wait = 30 if retry_time_wait > 30 else retry_time_wait
-
-        try:
-            if alarm.connect():
-                retry = 1
-                alarm.loop()
-            else:
-                logger.error("Unable to connect to alarm")
-
-            time.sleep(retry_time_wait)
-        except ConnectionError as e:  # Connection to IP Module or MQTT lost
-            logger.error("Connection to panel lost: %s. Restarting" % str(e))
-            time.sleep(retry_time_wait)
-
-        except OSError:  # Connection to IP Module or MQTT lost
-            logger.exception("Restarting")
-            time.sleep(retry_time_wait)
-
-        except (KeyboardInterrupt, SystemExit, AuthenticationFailed):
-            break  # break exits the retry loop
-        except Exception:
-            logger.exception("Restarting")
-            time.sleep(retry_time_wait)
-
-        retry += 1
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(run_loop(alarm))
     
     exit_handler()
 

@@ -91,13 +91,9 @@ class Paradox:
         self.connection.register_handler(EventMessageHandler(self.handle_event_message))
         self.connection.register_handler(ErrorMessageHandler(self.handle_error_message))
 
-    def connect(self) -> bool:
-        task = self.work_loop.create_task(self.connect_async())
-        self.work_loop.run_until_complete(task)
-        return task.result()
-
-    async def connect_async(self):
-        self.disconnect()  # socket needs to be also closed
+    async def connect(self):
+        if self._connection:
+            self.disconnect()  # socket needs to be also closed
         self.panel = None
 
         self.run_state = RunState.INIT
@@ -203,11 +199,7 @@ class Paradox:
         else:
             logger.info("Panel time synchronized")
 
-    def loop(self):
-        task = self.work_loop.create_task(self.async_loop())
-        self.work_loop.run_until_complete(task)
-
-    async def async_loop(self):
+    async def loop(self):
         logger.debug("Loop start")
         
         replies_missing = 0
@@ -501,7 +493,7 @@ class Paradox:
     async def resume(self):
         logger.info("Resuming PAI")
         if self.run_state == RunState.PAUSE:
-            await self.connect_async()
+            await self.connect()
 
     def _clean_session(self):
         logger.info("Clean Session")
