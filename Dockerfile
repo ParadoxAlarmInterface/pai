@@ -10,12 +10,11 @@ ENV WORK_DIR=workdir \
 ENV PAI_CONFIG_FILE=${PAI_CONFIG_PATH}/pai.conf \
   PAI_LOGGING_FILE=${PAI_LOGGING_PATH}/paradox.log
 
-# build /opt/mqttwarn
-RUN mkdir -p ${PAI_CONFIG_PATH} ${WORK_DIR} ${PAI_LOGGING_PATH}
-
-# add user paradox to image
-RUN addgroup pai && adduser -S pai -G pai
-RUN chown -R pai ${WORK_DIR} ${PAI_LOGGING_PATH} ${PAI_CONFIG_PATH}
+RUN apk add --update tzdata \
+  && rm -rf /var/cache/apk/* \
+  && mkdir -p ${PAI_CONFIG_PATH} ${WORK_DIR} ${PAI_LOGGING_PATH} \
+  && addgroup pai && adduser -S pai -G pai \
+  && chown -R pai ${WORK_DIR} ${PAI_LOGGING_PATH} ${PAI_CONFIG_PATH}
 
 COPY --chown=pai . ${WORK_DIR}
 COPY --chown=pai config/pai.conf.example ${PAI_CONFIG_FILE}
