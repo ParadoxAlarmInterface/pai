@@ -7,7 +7,7 @@ import typing
 
 from construct import Construct, Container, MappingError, ChecksumError
 
-from paradox.exceptions import StatusRequestException
+from paradox.exceptions import StatusRequestException, AuthenticationFailed
 from . import parsers
 from .event import event_map
 from .property import property_map
@@ -163,7 +163,7 @@ class Panel_EVOBase(PanelBase):
             logger.error("Authentication Failed. Wrong PASSWORD. Make sure you use correct PC Password. In Babyware: "
                          "Right click on your panel -> Properties -> PC Communication (Babyware) -> PC Communication "
                          "(Babyware) Tab.")
-            return False
+            raise AuthenticationFailed('Wrong PASSWORD')
         else:  # command == 0x1
             if reply.fields.value.po.status.Winload_connected:
                 logger.info("Authentication Success")

@@ -6,7 +6,7 @@ import signal
 
 from paradox import VERSION
 from paradox.config import config as cfg
-
+from paradox.exceptions import AuthenticationFailed
 
 from paradox.paradox import Paradox
 from paradox.interfaces.interface_manager import InterfaceManager
@@ -118,9 +118,8 @@ def main(args):
             logger.exception("Restarting")
             time.sleep(retry_time_wait)
 
-        except (KeyboardInterrupt, SystemExit):
+        except (KeyboardInterrupt, SystemExit, AuthenticationFailed):
             break  # break exits the retry loop
-
         except Exception:
             logger.exception("Restarting")
             time.sleep(retry_time_wait)

@@ -185,8 +185,6 @@ class Paradox:
             logger.error("Timeout while connecting to panel: %s" % str(e))
         except ConnectionError as e:
             logger.error("Failed to connect: %s" % str(e))
-        except Exception:
-            logger.exception("Connect error")
 
         self.run_state = RunState.ERROR
 

@@ -9,7 +9,7 @@ import typing
 from construct import Construct, Container, ChecksumError
 
 from paradox.config import config as cfg
-from paradox.exceptions import StatusRequestException
+from paradox.exceptions import StatusRequestException, AuthenticationFailed
 from . import parsers
 from .event import event_map
 from .property import property_map
@@ -173,7 +173,7 @@ class Panel(PanelBase):
             return True
         elif reply.fields.value.po.command == 0x70 or reply.fields.value.po.command == 0x00:
             logger.error("Authentication Failed. Wrong Password?")
-            return False
+            raise AuthenticationFailed('Wrong PASSWORD')
 
     @staticmethod
     def _request_status_reply_check(message: Container, address: int):
