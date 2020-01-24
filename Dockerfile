@@ -10,8 +10,7 @@ ENV WORK_DIR=workdir \
 ENV PAI_CONFIG_FILE=${PAI_CONFIG_PATH}/pai.conf \
   PAI_LOGGING_FILE=${PAI_LOGGING_PATH}/paradox.log
 
-RUN apk add --update tzdata \
-  && rm -rf /var/cache/apk/* \
+RUN apk add --no-cache tzdata \
   && mkdir -p ${PAI_CONFIG_PATH} ${WORK_DIR} ${PAI_LOGGING_PATH} \
   && addgroup pai && adduser -S pai -G pai \
   && chown -R pai ${WORK_DIR} ${PAI_LOGGING_PATH} ${PAI_CONFIG_PATH}
