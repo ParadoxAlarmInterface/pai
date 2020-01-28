@@ -10,7 +10,7 @@ from paho.mqtt.client import Client, MQTT_ERR_SUCCESS
 
 from paradox.config import config as cfg
 from paradox.data.enums import RunState
-from paradox.interfaces import AsyncInterface
+from paradox.interfaces import ThreadQueueInterface
 from paradox.lib import ps
 
 logger = logging.getLogger('PAI').getChild(__name__)
@@ -143,7 +143,7 @@ class MQTTConnection(Client):
         super(MQTTConnection, self).disconnect()
 
 
-class AbstractMQTTInterface(AsyncInterface):
+class AbstractMQTTInterface(ThreadQueueInterface):
     """Interface Class using MQTT"""
     def __init__(self, alarm):
         super().__init__(alarm)
@@ -164,10 +164,8 @@ class AbstractMQTTInterface(AsyncInterface):
         self.mqtt.stop()
         super().stop()
 
-    async def run(self):
-        while True:
-            await asyncio.sleep(cfg.MQTT_REPUBLISH_INTERVAL)
-
+    def _run(self):
+        while not self.stop_running.wait(cfg.MQTT_REPUBLISH_INTERVAL):
             trigger = time.time() - cfg.MQTT_REPUBLISH_INTERVAL
 
             for k, v in filter(lambda f: f[1].get("last_publish") <= trigger, self.republish_cache.items()):

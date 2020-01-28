@@ -47,23 +47,21 @@ class ThreadQueueInterface(threading.Thread, Interface):
         self.stop_running = threading.Event()
         self.stop_running.clear()
 
-        self.queue = queue.PriorityQueue()
-
     def stop(self):
-        self.queue.put_nowait((0, None,))
+        self.stop_running.set()
         self.join()
 
-    def run_loop(self, queue_item):
-        pass
-
     def run(self):
-        while True:
-            try:
-                _, item = self.queue.get()
-                if item is None:
-                    break
-                else:
-                    self.run_loop(item)
-            except Exception:
-                logger.exception("ERROR in Run loop")
+        try:
+            self._run()
+        except (KeyboardInterrupt, SystemExit):
+            logger.debug("Interface loop stopping")
+            self.stop()
+        except Exception:
+            logger.exception("Interface loop")
+
+        super().run()
+
+    def _run(self):
+        pass
 

@@ -73,17 +73,13 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         self.definitions = {}
         self.labels = {}
 
-    async def run(self):
+    def on_connect(self, mqttc, userdata, flags, result):
         ps.subscribe(self._handle_panel_labels, "labels_loaded")
         ps.subscribe(self._handle_panel_definitions, "definitions_loaded")
         ps.subscribe(self._handle_panel_change, "changes")
         ps.subscribe(self._handle_panel_event, "events")
         ps.subscribe(self._handle_connected, "connected")
 
-        await super().run()
-
-    def on_connect(self, mqttc, userdata, flags, result):
-        super().on_connect(mqttc, userdata, flags, result)
         self.subscribe_callback(
             "{}/{}/{}/#".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC, cfg.MQTT_OUTPUT_TOPIC),
             self._mqtt_handle_output_control
@@ -269,7 +265,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             with open(fname, 'r') as f:
                 data = f.read()
                 data = data.replace('__PARTITION1__', partitions[0]).replace('__PARTITION2__', partitions[1])
-                self.mqtt.publish(cfg.MQTT_DASH_TOPIC, data, 2, True)
+                self.publish(cfg.MQTT_DASH_TOPIC, data, 2, True)
                 logger.info("MQTT Dash panel published to {}".format(cfg.MQTT_DASH_TOPIC))
         else:
             logger.warning("MQTT DASH Template not found: {}".format(fname))

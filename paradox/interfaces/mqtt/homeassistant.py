@@ -28,12 +28,10 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         self.availability_topic = self.mqtt.availability_topic
         self.run_status_topic = self.mqtt.run_status_topic
 
-    async def run(self):
+    def on_connect(self, mqttc, userdata, flags, result):
         ps.subscribe(self._handle_status_update, "status_update")
         ps.subscribe(self._handle_labels_loaded, "labels_loaded")
         ps.subscribe(self._handle_panel_detected, "panel_detected")
-
-        await super().run()
 
     def _publish_run_state_sensor(self):
         configuration_topic = '{}/sensor/{}/{}/config'.format(
