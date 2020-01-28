@@ -2,10 +2,7 @@
 
 import asyncio
 import logging
-import queue
 import threading
-
-from paradox.config import config as cfg
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -43,7 +40,6 @@ class ThreadQueueInterface(threading.Thread, Interface):
         super().__init__(name=self.__class__.__name__)
 
         self.alarm = alarm
-        self.loop = asyncio.get_event_loop()
 
         self.stop_running = threading.Event()
         self.stop_running.clear()

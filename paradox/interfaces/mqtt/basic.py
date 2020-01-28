@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -17,7 +18,10 @@ logger = logging.getLogger('PAI').getChild(__name__)
 ParsedMessage = namedtuple('parsed_message', 'topics element content')
 
 
-def mqtt_handle_decorator(func: typing.Callable[["BasicMQTTInterface", ParsedMessage], None]):
+def mqtt_handle_decorator(func: typing.Callable[
+    ["BasicMQTTInterface", ParsedMessage],
+    typing.Coroutine[None, "BasicMQTTInterface", ParsedMessage]
+]):
     def wrapper(self: "BasicMQTTInterface", client: Client, userdata, message: MQTTMessage):
         try:
             if message.retain:
@@ -58,7 +62,7 @@ def mqtt_handle_decorator(func: typing.Callable[["BasicMQTTInterface", ParsedMes
             if len(topics) >= 4:
                 element = topics[3]
 
-            func(self, ParsedMessage(topics, element, content))
+            asyncio.run_coroutine_threadsafe(func(self, ParsedMessage(topics, element, content)), self.alarm.work_loop)
         except Exception:
             logger.exception("Failed to execute command")
 
@@ -98,7 +102,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         )
 
     @mqtt_handle_decorator
-    def _mqtt_handle_notifications(self, prep: ParsedMessage):
+    async def _mqtt_handle_notifications(self, prep: ParsedMessage):
         topics = prep.topics
         try:
             level = EventLevel.from_name(topics[2].upper())
@@ -109,13 +113,13 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         ps.sendNotification(Notification(sender=self.name, message=prep.content, level=level))
 
     @mqtt_handle_decorator
-    def _mqtt_handle_zone_control(self, prep: ParsedMessage):
+    async def _mqtt_handle_zone_control(self, prep: ParsedMessage):
         topics, element, command = prep
-        if not self.alarm.control_zone(element, command):
+        if not await self.alarm.control_zone(element, command):
             logger.warning("Zone command refused: {}={}".format(element, command))
 
     @mqtt_handle_decorator
-    def _mqtt_handle_partition_control(self, prep: ParsedMessage):
+    async def _mqtt_handle_partition_control(self, prep: ParsedMessage):
         topics, element, command = prep
         command = cfg.MQTT_COMMAND_ALIAS.get(command, command)
 
@@ -157,15 +161,15 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                     cfg.MQTT_TOGGLE_CODES[tokens[1]], command), level=EventLevel.INFO))
 
         logger.info("Partition command: {} = {}".format(element, command))
-        if not self.alarm.control_partition(element, command):
+        if not await self.alarm.control_partition(element, command):
             logger.warning("Partition command refused: {}={}".format(element, command))
 
     @mqtt_handle_decorator
-    def _mqtt_handle_output_control(self, prep: ParsedMessage):
+    async def _mqtt_handle_output_control(self, prep: ParsedMessage):
         topics, element, command = prep
         logger.debug("Output command: {} = {}".format(element, command))
 
-        if not self.alarm.control_output(element, command):
+        if not await self.alarm.control_output(element, command):
             logger.warning("Output command refused: {}={}".format(element, command))
 
     def _handle_panel_event(self, event: Event):

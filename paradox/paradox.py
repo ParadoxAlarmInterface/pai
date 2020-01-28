@@ -331,12 +331,13 @@ class Paradox:
                 result = 'timeout'
             except Exception:
                 result = 'exception'
+                raise
             finally:
                 logger.debug('send/receive %s in %.4f s', result, time.time() - t1)
 
         return None  # Probably it needs to throw an exception instead of returning None
 
-    def control_zone(self, zone: str, command: str) -> bool:
+    async def control_zone(self, zone: str, command: str) -> bool:
         command = command.lower()
         logger.debug("Control Zone: {} - {}".format(zone, command))
 
@@ -350,9 +351,7 @@ class Paradox:
         # Apply state changes
         accepted = False
         try:
-            coro = self.panel.control_zones(zones_selected, command)
-            future = asyncio.run_coroutine_threadsafe(coro, self.work_loop)
-            accepted = future.result(10)
+            accepted = await self.panel.control_zones(zones_selected, command)
         except NotImplementedError:
             logger.error('control_zones is not implemented for this alarm type')
         except asyncio.CancelledError:
@@ -365,7 +364,7 @@ class Paradox:
 
         return accepted
 
-    def control_partition(self, partition: str, command: str) -> bool:
+    async def control_partition(self, partition: str, command: str) -> bool:
         command = command.lower()
         logger.debug("Control Partition: {} - {}".format(partition, command))
 
@@ -379,9 +378,7 @@ class Paradox:
         # Apply state changes
         accepted = False
         try:
-            coro = self.panel.control_partitions(partitions_selected, command)
-            future = asyncio.run_coroutine_threadsafe(coro, self.work_loop)
-            accepted = future.result(10)
+            accepted = await self.panel.control_partitions(partitions_selected, command)
         except NotImplementedError:
             logger.error('control_partitions is not implemented for this alarm type')
         except asyncio.CancelledError:
@@ -394,7 +391,7 @@ class Paradox:
 
         return accepted
 
-    def control_output(self, output, command) -> bool:
+    async def control_output(self, output, command) -> bool:
         command = command.lower()
         logger.debug("Control Output: {} - {}".format(output, command))
 
@@ -408,9 +405,7 @@ class Paradox:
         # Apply state changes
         accepted = False
         try:
-            coro = self.panel.control_outputs(outputs_selected, command)
-            future = asyncio.run_coroutine_threadsafe(coro, self.work_loop)
-            accepted = future.result(10)
+            accepted = await self.panel.control_outputs(outputs_selected, command)
         except NotImplementedError:
             logger.error('control_outputs is not implemented for this alarm type')
         except asyncio.CancelledError:
