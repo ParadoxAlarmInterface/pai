@@ -280,7 +280,7 @@ class Paradox:
             if self.run_state != RunState.PAUSE:
                 self.connection.schedule_message_handling(recv_message)  # schedule handling in the loop
         except Exception as e:
-            logging.exception("Error parsing message")
+            logger.exception("Error parsing message")
 
     async def send_wait(self,
                         message_type=None,
@@ -304,6 +304,8 @@ class Paradox:
                 logger.debug('Request retry (%d/%d)', retry, retries)
             retry += 1
 
+            t1 = time.time()
+            result = 'unknown'
             try:
                 async with self.request_lock:
                     if message is not None:
@@ -322,10 +324,15 @@ class Paradox:
                                 lambda m: m.fields.value.po.command == reply_expected, timeout=timeout * 2
                             )
 
+                        result = 'ok'
                         if reply:
                             return reply
             except asyncio.TimeoutError:
-                pass
+                result = 'timeout'
+            except Exception:
+                result = 'exception'
+            finally:
+                logger.debug('send/receive %s in %.4f s', result, time.time() - t1)
 
         return None  # Probably it needs to throw an exception instead of returning None
 
@@ -348,9 +355,10 @@ class Paradox:
             accepted = future.result(10)
         except NotImplementedError:
             logger.error('control_zones is not implemented for this alarm type')
+        except asyncio.CancelledError:
+            logger.error('control_zones canceled')
         except asyncio.TimeoutError:
             logger.error('control_zones timeout')
-            future.cancel()
 
         # Refresh status
         self.request_status_refresh()  # Trigger status update
@@ -376,9 +384,10 @@ class Paradox:
             accepted = future.result(10)
         except NotImplementedError:
             logger.error('control_partitions is not implemented for this alarm type')
+        except asyncio.CancelledError:
+            logger.error('control_partitions canceled')
         except asyncio.TimeoutError:
             logger.error('control_partitions timeout')
-            future.cancel()
 
         # Refresh status
         self.request_status_refresh()  # Trigger status update
@@ -404,9 +413,10 @@ class Paradox:
             accepted = future.result(10)
         except NotImplementedError:
             logger.error('control_outputs is not implemented for this alarm type')
+        except asyncio.CancelledError:
+            logger.error('control_outputs canceled')
         except asyncio.TimeoutError:
             logger.error('control_outputs timeout')
-            future.cancel()
         # Apply state changes
 
         # Refresh status
