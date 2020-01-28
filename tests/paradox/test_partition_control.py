@@ -1,11 +1,9 @@
 import binascii
 import asyncio
 import pytest
-from mock import MagicMock
 import typing
 from paradox.hardware import create_panel
 from paradox.data.enums import RunState
-from paradox.hardware.spectra_magellan.parsers import LiveEvent
 from paradox.lib.ps import sendMessage
 from paradox.paradox import Paradox
 from paradox.lib.async_message_manager import AsyncMessageManager
@@ -53,7 +51,6 @@ async def send_initial_status(alarm):
 
     await asyncio.sleep(0.01)
 
-
 class MockConnection(AsyncMessageManager):
     def __init__(self, on_message: typing.Callable[[bytes], None]):
         super().__init__()
@@ -62,64 +59,123 @@ class MockConnection(AsyncMessageManager):
         self.pending = []
 
     def connect(self):
-        self.connected = True
         return True
     
     def write(self, data: bytes):
         logger.debug(f"PAI -> CON: {binascii.hexlify(data)}")
         if len(self.pending) > 0:
-            message = self.pending[0]
-            del self.pending[0]
+            message = self.pending.pop(0)
 
-            logger.debug(f"CON -> PAI {binascii.hexlify(message)}")
+            logger.debug(f"CON -> PAI: {binascii.hexlify(message)}")
             self.on_message(message)
 
         return True
 
-    def close(self):
-        logger.info('Closing connection')
-        self.connected = False
-        self.loop.stop()
-
-
-class MockInterface():
-    def __init__(self, alarm):
-        super().__init__()
+class MockClient(threading.Thread):
+    def __init__(self, alarm, partitions, command):
+        threading.Thread.__init__(self)
         self.alarm = alarm
-        self.t = threading.Thread(target=self.worker, daemon=False)
-        self.t.start()
-        self.loop = asyncio.new_event_loop()
+        self.partitions = partitions
+        self.command = command
+        self.result = None
 
-    def worker(self):
-        self.alarm.control_partition('all', 'arm')
+    def run(self):
+        logger.debug(f"Issuing {self.command} to {self.partitions} ")
+        try:
+            self.result = self.alarm.control_partition(self.partitions, self.command)
+            logger.debug(f"Control result: {self.result}")
+
+        except concurrent.futures._base.TimeoutError:
+            logger.exception("Tiemout Error")
+            self.result = "Timeout Error"
+
+    def join(self, timeout=None):
+        super(MockClient, self).join(timeout)
+        if isinstance(self.result, str) or not self.result:
+            raise Exception(str(self.result))
 
 
-@pytest.mark.asyncio
-async def test_partition_arm_spmg():
+@pytest.fixture(scope='function')
+async def setup_panel():
     cfg.LOGGING_LEVEL_CONSOLE = logging.DEBUG
     cfg.LOGGING_DUMP_PACKETS = True
     
     logger.setLevel(logging.DEBUG)
     alarm = Paradox()
+    #alarm.work_loop.set_debug(True)
 
     alarm.run_state = RunState.RUN
+    alarm.panel = create_panel(alarm, 'MAGELLAN_MG5050')
     
     await send_initial_status(alarm)
-
-    alarm.panel = create_panel(alarm, 'MAGELLAN_MG5050')
-
     con = MockConnection(alarm.on_connection_message)
+    
+    alarm._connection = con
+    alarm._register_connection_handlers()
+    
+    return alarm, con 
+
+@pytest.mark.asyncio
+async def test_partition_arm_spmg_single_1(setup_panel):
+    alarm, con = setup_panel
+
+    con.pending.append(binascii.unhexlify('42000400000000000000000000000000000000000000000000000000000000000000000046'))
+    
+    cli = MockClient(alarm, '1', 'arm')
+    cli.start()
+    await asyncio.sleep(0.01)
+
+    cli.join(11)
+    time.sleep(1)
+
+    assert not cli.is_alive()
+
+@pytest.mark.asyncio
+async def test_partition_arm_spmg_single_2(setup_panel):
+    alarm, con = setup_panel
+
+    con.pending.append(binascii.unhexlify('42000400000000000000000000000000000000000000000000000000000000000000000046'))
+    
+    cli = MockClient(alarm, '2', 'arm')
+    cli.start()
+    await asyncio.sleep(0.01)
+
+    cli.join(11)
+    time.sleep(1)
+
+    assert not cli.is_alive()
+
+
+@pytest.mark.asyncio
+async def test_partition_arm_spmg_single_event(setup_panel):
+    alarm, con = setup_panel
+    
+    con.pending.append(binascii.unhexlify('e2141401110f22020e000000000002494e544552494f5220202020202020200100000000cc'))
+    con.pending.append(binascii.unhexlify('42000400000000000000000000000000000000000000000000000000000000000000000046'))
+
+    cli = MockClient(alarm, '1', 'arm')
+    cli.start()
+    await asyncio.sleep(0.01)
+
+    cli.join(11)
+    time.sleep(1)
+
+    assert not cli.is_alive()
+
+@pytest.mark.asyncio
+async def test_partition_arm_spmg_all(setup_panel):
+    alarm, con = setup_panel
+
     con.pending.append(binascii.unhexlify('42000400000000000000000000000000000000000000000000000000000000000000000046'))
     con.pending.append(binascii.unhexlify('e2141401110f22020e000000000002494e544552494f5220202020202020200100000000cc'))
     con.pending.append(binascii.unhexlify('42000400000000000000000000000000000000000000000000000000000000000000000046'))
 
-    alarm._connection = con
-    alarm._register_connection_handlers()
-    
-    cli = MockInterface(alarm)
-    
+    cli = MockClient(alarm, 'all', 'arm')
+    cli.start()
     await asyncio.sleep(0.01)
-    logger.debug("Cleaning test")
-    cli.t.join()
-    con.close()
-    assert False
+
+    cli.join(11)
+    time.sleep(1)
+
+    assert not cli.is_alive()
+
