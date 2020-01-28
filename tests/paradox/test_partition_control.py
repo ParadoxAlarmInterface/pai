@@ -125,8 +125,7 @@ async def test_partition_arm_spmg_single_1(setup_panel):
     cli.start()
     await asyncio.sleep(0.01)
 
-    cli.join(11)
-    time.sleep(1)
+    cli.join(0.01)
 
     assert not cli.is_alive()
 
@@ -140,8 +139,7 @@ async def test_partition_arm_spmg_single_2(setup_panel):
     cli.start()
     await asyncio.sleep(0.01)
 
-    cli.join(11)
-    time.sleep(1)
+    cli.join(0.01)
 
     assert not cli.is_alive()
 
@@ -155,10 +153,9 @@ async def test_partition_arm_spmg_single_event(setup_panel):
 
     cli = MockClient(alarm, '1', 'arm')
     cli.start()
-    await asyncio.sleep(0.01)
+    await asyncio.sleep(2.01)  # to trigger one timeout
 
-    cli.join(11)
-    time.sleep(1)
+    cli.join(0.01)
 
     assert not cli.is_alive()
 
@@ -172,10 +169,8 @@ async def test_partition_arm_spmg_all(setup_panel):
 
     cli = MockClient(alarm, 'all', 'arm')
     cli.start()
-    await asyncio.sleep(0.01)
+    await asyncio.sleep(2.01)  # to trigger one timeout
 
-    cli.join(11)
-    time.sleep(1)
+    cli.join(0.01)
 
     assert not cli.is_alive()
-
