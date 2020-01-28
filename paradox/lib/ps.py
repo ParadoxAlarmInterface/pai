@@ -7,6 +7,7 @@ from paradox.event import Event, Change, Notification
 
 PREFIX = "pai_"
 
+loop = asyncio.get_event_loop()
 
 class Listener:
     def __init__(self, callback: Callable, **curriedArgs):
@@ -17,7 +18,6 @@ class Listener:
         kwargs2 = self.curriedArgs.copy()
         kwargs2.update(**kwargs)
 
-        loop = asyncio.get_event_loop()
         loop.call_soon_threadsafe(functools.partial(self.callback, **kwargs2))
 
     def __eq__(self, other):
@@ -50,17 +50,17 @@ def subscribe(listener, topicName: str, **curriedArgs):
 
 
 def sendMessage(topicName: str, **msgData):
-    asyncio.get_event_loop().create_task(pub.sendMessage(PREFIX + topicName, **msgData))
+    loop.create_task(pub.sendMessage(PREFIX + topicName, **msgData))
 
 
 def sendEvent(event: Event):
-    asyncio.get_event_loop().create_task(pub.sendMessage(PREFIX + "events", event=event))
+    loop.create_task(pub.sendMessage(PREFIX + "events", event=event))
 
 
 def sendChange(change: Change):
-    asyncio.get_event_loop().create_task(pub.sendMessage(PREFIX + "changes", change=change))
+    loop.create_task(pub.sendMessage(PREFIX + "changes", change=change))
 
 
 def sendNotification(notification: Notification):
-    asyncio.get_event_loop().create_task(pub.sendMessage(PREFIX + "notifications", notification=notification))
+    loop.create_task(pub.sendMessage(PREFIX + "notifications", notification=notification))
 

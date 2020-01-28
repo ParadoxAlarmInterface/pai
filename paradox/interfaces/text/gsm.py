@@ -222,7 +222,7 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
 
         while not self.modem_connected and not self.stop_running.isSet():
             if not self.connect():
-                logging.warning("Could not connect to modem")
+                logger.warning("Could not connect to modem")
 
             self.stop_running.wait(5)
 
