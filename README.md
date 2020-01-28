@@ -93,3 +93,7 @@ The code was developed as a way of integrating personally owned Paradox systems,
 It is not affiliated with any company and it doesn't have have commercial intent.
 
 The code is provided AS IS and the developers will not be held responsible for failures in the alarm systems, or any other malfunction.
+
+## With support from JetBrains
+
+![https://www.jetbrains.com/?from=PAI](./docs/jetbrains.svg)
