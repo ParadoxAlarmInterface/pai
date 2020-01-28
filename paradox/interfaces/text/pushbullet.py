@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import asyncio
 import json
 import logging
 import time
@@ -82,7 +82,8 @@ class PushBulletWSClient(WebSocketBaseClient):
                     continue
                 
                 if p.get('sender_email_normalized') in cfg.PUSHBULLET_CONTACTS or p.get('direction') == 'self':
-                    ret = self.interface.handle_command(p.get('body'))
+                    future = asyncio.run_coroutine_threadsafe(self.interface.handle_command(p.get('body')), self.interface.alarm.work_loop)
+                    ret = future.result(10)
 
                     m = "PB {}: {}".format(p.get('sender_email_normalized'), ret)
                     logger.info(m)

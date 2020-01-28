@@ -252,7 +252,8 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
             timestamp, source, message))
 
         if source in cfg.GSM_CONTACTS:
-            ret = self.handle_command(message)
+            future = asyncio.run_coroutine_threadsafe(self.handle_command(message), self.alarm.work_loop)
+            ret = future.result(10)
 
             m = "GSM {}: {}".format(source, ret)
             logger.info(m)

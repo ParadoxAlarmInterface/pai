@@ -42,7 +42,7 @@ class AbstractTextInterface(ThreadQueueInterface):
         if self.event_filter.match(event):
             self.send_message(event.message, event.level)
 
-    def handle_command(self, message_raw):
+    async def handle_command(self, message_raw):
         message = cfg.COMMAND_ALIAS.get(message_raw, message_raw)
 
         tokens = message.split(" ")
@@ -63,21 +63,21 @@ class AbstractTextInterface(ThreadQueueInterface):
 
         # Process a Zone Command
         if element_type == 'zone':
-            if not self.alarm.control_zone(element, command):
+            if not await self.alarm.control_zone(element, command):
                 m = "Zone command error: {}={}".format(element, command)
                 logger.warning(m)
                 return m
 
         # Process a Partition Command
         elif element_type == 'partition':
-            if not self.alarm.control_partition(element, command):
+            if not await self.alarm.control_partition(element, command):
                 m = "Partition command error: {}={}".format(element, command)
                 logger.warning(m)
                 return m
 
         # Process an Output Command
         elif element_type == 'output':
-            if not self.alarm.control_output(element, command):
+            if not await self.alarm.control_output(element, command):
                 m = "Output command error: {}={}".format(element, command)
                 logger.warning(m)
                 return m
