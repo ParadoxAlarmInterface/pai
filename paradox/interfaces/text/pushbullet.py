@@ -131,7 +131,7 @@ class PushbulletTextInterface(ConfiguredAbstractTextInterface):
         self.pb_ws = None
 
     def _run(self):
-        logger.info("Starting Pushbullet Interface")
+        super(PushbulletTextInterface, self)._run()
         try:
             self.pb_ws = PushBulletWSClient(self, 'wss://stream.pushbullet.com/websocket/{}'.format(cfg.PUSHBULLET_KEY))
             self.pb_ws.connect()

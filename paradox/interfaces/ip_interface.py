@@ -225,14 +225,13 @@ class IPInterface(Interface):
     #     logger.error('Connection with client was lost')
 
     def stop(self):
-        logger.info("Stopping IP Interface")
         if self.server is not None:
             self.server.close()
             self.server = None
         self.started = False
 
     def start(self):
-        logger.info("Starting IP Interface")
+        logger.info("Starting %s Interface", self.name)
         self.started = True
 
         if not self.alarm:

@@ -154,7 +154,6 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
 
     def stop(self):
         """ Stops the GSM Interface Thread"""
-        logger.info("Stopping GSM Interface")
         self.stop_running.set()
 
         self.loop.stop()
@@ -219,7 +218,7 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
         return True
 
     def _run(self):
-        logger.info("Starting GSM Interface")
+        super(GSMTextInterface, self)._run()
 
         while not self.modem_connected and not self.stop_running.isSet():
             if not self.connect():

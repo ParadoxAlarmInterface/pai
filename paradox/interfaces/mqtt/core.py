@@ -160,11 +160,12 @@ class AbstractMQTTInterface(ThreadQueueInterface):
 
     def stop(self):
         """ Stops the MQTT Interface Thread"""
-        logger.debug("Stopping MQTT Interface")
         self.mqtt.stop()
         super().stop()
 
     def _run(self):
+        super(AbstractMQTTInterface, self)._run()
+
         while not self.stop_running.wait(cfg.MQTT_REPUBLISH_INTERVAL):
             trigger = time.time() - cfg.MQTT_REPUBLISH_INTERVAL
 

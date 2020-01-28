@@ -27,7 +27,6 @@ class SignalTextInterface(ConfiguredAbstractTextInterface):
     def stop(self):
 
         """ Stops the Signal Interface Thread"""
-        logger.debug("Stopping Signal Interface")
         if self.loop is not None:
             self.loop.quit()
 
@@ -36,7 +35,7 @@ class SignalTextInterface(ConfiguredAbstractTextInterface):
         logger.debug("Signal Stopped")
 
     def _run(self):
-        logger.info("Starting Signal Interface")
+        super(SignalTextInterface, self)._run()
 
         bus = SystemBus()
 

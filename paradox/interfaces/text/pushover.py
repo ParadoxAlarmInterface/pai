@@ -31,7 +31,7 @@ class PushoverTextInterface(ConfiguredAbstractTextInterface):
         self.users = {}
 
     def _run(self):
-        logger.info("Starting Pushover Interface")
+        super(PushoverTextInterface, self)._run()
 
         self.app = chump.Application(cfg.PUSHOVER_KEY)
         if not self.app.is_authenticated:

@@ -43,6 +43,7 @@ class ThreadQueueInterface(threading.Thread, Interface):
         super().__init__(name=self.__class__.__name__)
 
         self.alarm = alarm
+        self.loop = asyncio.get_event_loop()
 
         self.stop_running = threading.Event()
         self.stop_running.clear()
@@ -63,5 +64,5 @@ class ThreadQueueInterface(threading.Thread, Interface):
         super().run()
 
     def _run(self):
-        pass
+        logger.info("Starting %s Interface", self.name)
 

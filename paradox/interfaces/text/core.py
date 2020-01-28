@@ -22,24 +22,11 @@ class AbstractTextInterface(ThreadQueueInterface):
     def stop(self):
         super().stop()
 
-    def run(self):
-        logger.info("Starting Interface")
+    def _run(self):
+        super(AbstractTextInterface, self)._run()
 
         ps.subscribe(self.handle_panel_event, "events")
         ps.subscribe(self.handle_notify, "notifications")
-
-        try:
-            self._run()
-        except (KeyboardInterrupt, SystemExit):
-            logger.debug("Interface loop stopping")
-            self.stop()
-        except Exception:
-            logger.exception("Interface loop")
-
-        super().run()
-
-    def _run(self):
-        pass
 
     def send_message(self, message: str, level: EventLevel):
         pass
