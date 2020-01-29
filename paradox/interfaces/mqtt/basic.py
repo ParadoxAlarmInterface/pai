@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 import os
@@ -10,7 +9,7 @@ from paho.mqtt.client import MQTTMessage, Client
 from paradox.config import config as cfg
 from paradox.event import EventLevel, Event, Change, Notification
 from paradox.lib import ps
-from paradox.lib.utils import JSONByteEncoder, sanitize_key
+from paradox.lib.utils import JSONByteEncoder, sanitize_key, call_soon_in_main_loop
 from .core import AbstractMQTTInterface, ELEMENT_TOPIC_MAP
 
 logger = logging.getLogger('PAI').getChild(__name__)
@@ -62,7 +61,7 @@ def mqtt_handle_decorator(func: typing.Callable[
             if len(topics) >= 4:
                 element = topics[3]
 
-            asyncio.run_coroutine_threadsafe(func(self, ParsedMessage(topics, element, content)), self.alarm.work_loop)
+            call_soon_in_main_loop(func(self, ParsedMessage(topics, element, content)))
         except Exception:
             logger.exception("Failed to execute command")
 
@@ -157,8 +156,13 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                 logger.warning("Element {} not found".format(element))
                 return
 
-            ps.sendNotification(Notification(sender="mqtt", message="Command by {}: {}".format(
-                    cfg.MQTT_TOGGLE_CODES[tokens[1]], command), level=EventLevel.INFO))
+            ps.sendNotification(
+                Notification(
+                    sender="mqtt",
+                    message="Command by {}: {}".format(cfg.MQTT_TOGGLE_CODES[tokens[1]], command),
+                    level=EventLevel.INFO
+                )
+            )
 
         logger.info("Partition command: {} = {}".format(element, command))
         if not await self.alarm.control_partition(element, command):
@@ -196,7 +200,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
     def _handle_panel_definitions(self, data: dict):
         self.definitions = data
-                
+
     def _handle_connected(self):
         # After we get 2 partitions, lets publish a dashboard
         if cfg.MQTT_DASH_PUBLISH and len(self.partitions) == 2:
@@ -208,14 +212,14 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             for i in definitions:  # numeric index
                 if i not in labels:
                     continue
-                
+
                 for attribute in definitions[i]:  # attribute
                     self._publish(f'{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_DEFINITION_TOPIC}',
                                   element_type,
                                   labels[i]['key'],
                                   attribute,
                                   definitions[i][attribute])
-        
+
     def _handle_panel_change(self, change: Change):
         attribute = change.property
         label = change.key
@@ -228,19 +232,19 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
         self.partitions[label][attribute] = value
         self._publish(f'{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_STATES_TOPIC}', element_type, label, attribute, value)
-        
+
     def _publish(self, base: str, element_type: str, label: str, attribute: str, value: [str, int, bool]):
         if element_type in ELEMENT_TOPIC_MAP:
             element_topic = ELEMENT_TOPIC_MAP[element_type]
         else:
             element_topic = element_type
-        
+
         if isinstance(value, dict):
             # This is fragile...
             if '/' in attribute and not attribute.startswith('/'):
                 attribute = f"/{attribute}"
 
-            for attr_name, attr_value in value.items():    
+            for attr_name, attr_value in value.items():
                 label_tp = f"{attribute}/{attr_name}"
                 self._publish(base, element_type, label, label_tp, attr_value)
             return

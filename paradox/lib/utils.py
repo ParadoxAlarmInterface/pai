@@ -1,11 +1,23 @@
 # -*- coding: utf-8 -*-
-
+import asyncio
 import json
 import re
+import threading
+import typing
 from copy import deepcopy
 from functools import reduce
 from construct import Container, ListContainer
 from typing import Mapping, List
+
+
+loop = asyncio.get_event_loop()
+
+
+def call_soon_in_main_loop(coro: typing.Coroutine) -> None:
+    if threading.current_thread() is threading.main_thread():
+        asyncio.ensure_future(coro, loop=loop)  # Returns asyncio.Future
+    else:
+        asyncio.run_coroutine_threadsafe(coro, loop=loop)  # Returns concurrent.futures.Future
 
 
 class JSONByteEncoder(json.JSONEncoder):

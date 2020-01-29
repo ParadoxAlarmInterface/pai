@@ -4,6 +4,7 @@ from collections import defaultdict
 from typing import Callable, List, Mapping
 
 from paradox.event import Event, Change, Notification
+from paradox.lib.utils import call_soon_in_main_loop
 
 PREFIX = "pai_"
 
@@ -50,17 +51,17 @@ def subscribe(listener, topicName: str, **curriedArgs):
 
 
 def sendMessage(topicName: str, **msgData):
-    loop.create_task(pub.sendMessage(PREFIX + topicName, **msgData))
+    call_soon_in_main_loop(pub.sendMessage(PREFIX + topicName, **msgData))
 
 
 def sendEvent(event: Event):
-    loop.create_task(pub.sendMessage(PREFIX + "events", event=event))
+    call_soon_in_main_loop(pub.sendMessage(PREFIX + "events", event=event))
 
 
 def sendChange(change: Change):
-    loop.create_task(pub.sendMessage(PREFIX + "changes", change=change))
+    call_soon_in_main_loop(pub.sendMessage(PREFIX + "changes", change=change))
 
 
 def sendNotification(notification: Notification):
-    loop.create_task(pub.sendMessage(PREFIX + "notifications", notification=notification))
+    call_soon_in_main_loop(pub.sendMessage(PREFIX + "notifications", notification=notification))
 
