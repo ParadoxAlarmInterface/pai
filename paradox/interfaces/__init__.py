@@ -46,7 +46,6 @@ class ThreadQueueInterface(threading.Thread, Interface):
 
     def stop(self):
         self.stop_running.set()
-        self.join()
 
     def run(self):
         try:

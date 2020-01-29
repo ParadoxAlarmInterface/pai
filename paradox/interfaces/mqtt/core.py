@@ -36,6 +36,7 @@ RUN_STATE_2_PAYLOAD = {
     RunState.STOP: "stopped",
 }
 
+
 class MQTTConnection(Client):
     _instance = None
 
@@ -162,19 +163,31 @@ class AbstractMQTTInterface(ThreadQueueInterface):
         """ Stops the MQTT Interface Thread"""
         self.mqtt.stop()
         super().stop()
+        self.republish_task.cancel()
+        self.loop.call_soon_threadsafe(self.loop.stop)
 
-    def _run(self):
-        super(AbstractMQTTInterface, self)._run()
-
-        while not self.stop_running.wait(cfg.MQTT_REPUBLISH_INTERVAL):
+    async def republish_loop(self):
+        while True:
+            await asyncio.sleep(cfg.MQTT_REPUBLISH_INTERVAL)
             trigger = time.time() - cfg.MQTT_REPUBLISH_INTERVAL
 
             for k, v in filter(lambda f: f[1].get("last_publish") <= trigger, self.republish_cache.items()):
                 self.publish(k, v['value'], v['qos'], v['retain'])
 
+    def _run(self):
+        super(AbstractMQTTInterface, self)._run()
+
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+
+        self.republish_task = self.loop.create_task(self.republish_loop())
+
+        self.loop.run_forever()
+        self.loop.close()
+
     def publish(self, topic, value, qos, retain):
         self.republish_cache[topic] = {'value': value, 'qos': qos, 'retain': retain, 'last_publish': time.time()}
-        self.mqtt.publish(topic, value, qos, retain)
+        self.loop.call_soon_threadsafe(self.mqtt.publish, topic, value, qos, retain)
 
     def subscribe_callback(self, sub, callback: typing.Callable):
         self.mqtt.message_callback_add(sub, callback)
