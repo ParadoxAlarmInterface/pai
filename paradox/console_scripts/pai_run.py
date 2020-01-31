@@ -9,7 +9,11 @@ __email__ = "jpbarraca@gmail.com"
 __status__ = "Beta"
 
 import argparse
+import sys
 
+if sys.version_info[0] < 3 or sys.version_info[1] < 6:
+    print("You are using Python %s.%s, but PAI requires at least Python 3.6" % (sys.version_info[0], sys.version_info[1])) 
+    sys.exit(-1)
 
 def main():
     from paradox.main import main
