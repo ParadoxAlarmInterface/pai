@@ -1,14 +1,16 @@
 import asyncio
-import functools
+import logging
 from collections import defaultdict
-from typing import Callable, List, Mapping
+from typing import Callable, List, Mapping, Awaitable
 
 from paradox.event import Event, Change, Notification
 from paradox.lib.utils import call_soon_in_main_loop
 
 PREFIX = "pai_"
 
+logger = logging.getLogger('PAI').getChild(__name__)
 loop = asyncio.get_event_loop()
+
 
 class Listener:
     def __init__(self, callback: Callable, **curriedArgs):
@@ -19,7 +21,9 @@ class Listener:
         kwargs2 = self.curriedArgs.copy()
         kwargs2.update(**kwargs)
 
-        loop.call_soon_threadsafe(functools.partial(self.callback, **kwargs2))
+        result = self.callback(**kwargs2)
+        if isinstance(result, Awaitable):
+            await result
 
     def __eq__(self, other):
         if isinstance(other, Listener):
@@ -64,4 +68,3 @@ def sendChange(change: Change):
 
 def sendNotification(notification: Notification):
     call_soon_in_main_loop(pub.sendMessage(PREFIX + "notifications", notification=notification))
-

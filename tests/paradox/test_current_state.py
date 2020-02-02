@@ -6,12 +6,11 @@ from mock import MagicMock
 
 from paradox.hardware.evo import Panel_EVO192
 from paradox.hardware.evo.parsers import LiveEvent
-from paradox.lib.ps import sendMessage
 from paradox.paradox import Paradox
 
 
-async def send_initial_status(alarm):
-    sendMessage("labels_loaded", data=dict(
+def send_initial_status(alarm):
+    alarm._on_labels_load(data=dict(
         partition={
             1: dict(
                 id=1,
@@ -21,7 +20,7 @@ async def send_initial_status(alarm):
         }
     ))
 
-    sendMessage("status_update", status=dict(
+    alarm._on_status_update(status=dict(
         partition={
             1: dict(
                 arm=False,
@@ -32,8 +31,6 @@ async def send_initial_status(alarm):
             )
         }
     ))
-
-    await asyncio.sleep(0.01)
 
     alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {
         'current_state': 'disarmed',
@@ -47,16 +44,15 @@ async def test_current_state_armed_away(mocker):
     mocker.spy(alarm.storage, 'update_container_object')
     alarm.panel = MagicMock()
 
-    await send_initial_status(alarm)
+    send_initial_status(alarm)
 
-    sendMessage("status_update", status=dict(
+    alarm._on_status_update(status=dict(
         partition={
             1: dict(
                 arm=True
             )
         }
     ))
-    await asyncio.sleep(0.01)
 
     alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {
         'current_state': 'armed_away',
@@ -70,9 +66,9 @@ async def test_current_state_pending(mocker):
     mocker.spy(alarm.storage, 'update_container_object')
     alarm.panel = MagicMock()
 
-    await send_initial_status(alarm)
+    send_initial_status(alarm)
 
-    sendMessage("status_update", status=dict(
+    alarm._on_status_update(status=dict(
         partition={
             1: dict(
                 arm=True,
@@ -80,7 +76,6 @@ async def test_current_state_pending(mocker):
             )
         }
     ))
-    await asyncio.sleep(0.01)
 
     alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {
         'current_state': 'pending',
@@ -94,9 +89,9 @@ async def test_current_arm_stay(mocker):
     mocker.spy(alarm.storage, 'update_container_object')
     alarm.panel = MagicMock()
 
-    await send_initial_status(alarm)
+    send_initial_status(alarm)
 
-    sendMessage("status_update", status=dict(
+    alarm._on_status_update(status=dict(
         partition={
             1: dict(
                 arm=True,
@@ -104,7 +99,6 @@ async def test_current_arm_stay(mocker):
             )
         }
     ))
-    await asyncio.sleep(0.01)
 
     alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {
         'current_state': 'armed_home',
@@ -118,7 +112,7 @@ async def test_current_alarm(mocker):
     mocker.spy(alarm.storage, 'update_container_object')
     alarm.panel = Panel_EVO192(alarm, 5)
 
-    await send_initial_status(alarm)
+    send_initial_status(alarm)
 
     payload = binascii.unhexlify('e2ff1cc414130b010f2c1801030000000000024f66666963652020202020202020202000d9')
     raw = LiveEvent.parse(payload)
