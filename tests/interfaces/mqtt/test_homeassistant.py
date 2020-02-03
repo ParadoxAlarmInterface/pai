@@ -8,13 +8,16 @@ import json
 
 
 @pytest.mark.asyncio
-async def test_hass():
-    interface = HomeAssistantMQTTInterface()
+async def test_hass(mocker):
+    # mocker.patch('paradox.lib.utils.main_thread_loop', asyncio.get_event_loop())
+
+    interface = HomeAssistantMQTTInterface(mocker.MagicMock())
     interface.mqtt = MagicMock()
     interface.start()
+    interface.on_connect(None, None, None, None)
 
     try:
-        await asyncio.sleep(0.1)  # TODO: Bad way to wait for a start
+        await asyncio.sleep(0.01)  # TODO: Bad way to wait for a start
 
         sendMessage("labels_loaded", data=dict(
             partition={
@@ -33,6 +36,8 @@ async def test_hass():
                 )
             }
         ))
+
+        await asyncio.sleep(0.01)
 
         interface.mqtt.publish.assert_called_with(
             'homeassistant/alarm_control_panel/pai/Partition_1/config',

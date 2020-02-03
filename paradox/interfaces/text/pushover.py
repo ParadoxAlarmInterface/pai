@@ -23,17 +23,15 @@ _level_2_priority = {
 
 class PushoverTextInterface(ConfiguredAbstractTextInterface):
     """Interface Class using Pushover"""
-    name = 'pushover'
-
-    def __init__(self):
-        super().__init__(cfg.PUSHOVER_EVENT_FILTERS, cfg.PUSHOVER_ALLOW_EVENTS, cfg.PUSHOVER_IGNORE_EVENTS,
+    def __init__(self, alarm):
+        super().__init__(alarm, cfg.PUSHOVER_EVENT_FILTERS, cfg.PUSHOVER_ALLOW_EVENTS, cfg.PUSHOVER_IGNORE_EVENTS,
                          cfg.PUSHOVER_MIN_EVENT_LEVEL)
 
         self.app = None
         self.users = {}
 
     def _run(self):
-        logger.info("Starting Pushover Interface")
+        super(PushoverTextInterface, self)._run()
 
         self.app = chump.Application(cfg.PUSHOVER_KEY)
         if not self.app.is_authenticated:

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import asyncio
 import json
 import logging
 import time
@@ -82,7 +82,11 @@ class PushBulletWSClient(WebSocketBaseClient):
                     continue
                 
                 if p.get('sender_email_normalized') in cfg.PUSHBULLET_CONTACTS or p.get('direction') == 'self':
-                    ret = self.interface.handle_command(p.get('body'))
+                    future = asyncio.run_coroutine_threadsafe(
+                        self.interface.handle_command(p.get('body')),
+                        self.interface.alarm.work_loop
+                    )
+                    ret = future.result(10)
 
                     m = "PB {}: {}".format(p.get('sender_email_normalized'), ret)
                     logger.info(m)
@@ -124,14 +128,14 @@ class PushBulletWSClient(WebSocketBaseClient):
 class PushbulletTextInterface(ConfiguredAbstractTextInterface):
     """Interface Class using Pushbullet"""
 
-    def __init__(self):
-        super().__init__(cfg.PUSHBULLET_EVENT_FILTERS, cfg.PUSHBULLET_ALLOW_EVENTS, cfg.PUSHBULLET_IGNORE_EVENTS,
+    def __init__(self, alarm):
+        super().__init__(alarm, cfg.PUSHBULLET_EVENT_FILTERS, cfg.PUSHBULLET_ALLOW_EVENTS, cfg.PUSHBULLET_IGNORE_EVENTS,
                          cfg.PUSHBULLET_MIN_EVENT_LEVEL)
         self.name = PushBulletWSClient.name
         self.pb_ws = None
 
     def _run(self):
-        logger.info("Starting Pushbullet Interface")
+        super(PushbulletTextInterface, self)._run()
         try:
             self.pb_ws = PushBulletWSClient(self, 'wss://stream.pushbullet.com/websocket/{}'.format(cfg.PUSHBULLET_KEY))
             self.pb_ws.connect()

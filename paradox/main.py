@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from logging.handlers import RotatingFileHandler
 import sys
@@ -6,7 +7,7 @@ import signal
 
 from paradox import VERSION
 from paradox.config import config as cfg
-
+from paradox.exceptions import AuthenticationFailed
 
 from paradox.paradox import Paradox
 from paradox.interfaces.interface_manager import InterfaceManager
@@ -51,7 +52,8 @@ def config_logger(logger):
 def exit_handler(signum=None, frame=None):
     global alarm, interface_manager
 
-    logger.info('Captured signal %d. Exiting' % signum)
+    if signum is not None:
+        logger.info('Captured signal %d. Exiting' % signum)
     
     if alarm:
         alarm.disconnect()
@@ -65,6 +67,38 @@ def exit_handler(signum=None, frame=None):
     
     logger.info("Good bye!")
     sys.exit(0)
+
+
+async def run_loop(alarm: Paradox):
+    retry = 1
+    while alarm is not None:
+        logger.info("Starting...")
+        retry_time_wait = 2 ^ retry
+        retry_time_wait = 30 if retry_time_wait > 30 else retry_time_wait
+
+        try:
+            if await alarm.connect():
+                retry = 1
+                await alarm.loop()
+            else:
+                logger.error("Unable to connect to alarm")
+
+            time.sleep(retry_time_wait)
+        except ConnectionError as e:  # Connection to IP Module or MQTT lost
+            logger.error("Connection to panel lost: %s. Restarting" % str(e))
+            time.sleep(retry_time_wait)
+
+        except OSError:  # Connection to IP Module or MQTT lost
+            logger.exception("Restarting")
+            time.sleep(retry_time_wait)
+
+        except (KeyboardInterrupt, SystemExit, AuthenticationFailed):
+            break  # break exits the retry loop
+        except Exception:
+            logger.exception("Restarting")
+            time.sleep(retry_time_wait)
+
+        retry += 1
 
 
 def main(args):
@@ -84,47 +118,16 @@ def main(args):
 
     logger.info(f"Console Log level set to {cfg.LOGGING_LEVEL_CONSOLE}")
 
-    interface_manager = InterfaceManager(config=cfg)
-    interface_manager.start()
-
-    time.sleep(1)
-
     signal.signal(signal.SIGINT, exit_handler)
     signal.signal(signal.SIGTERM, exit_handler)
 
     # Start interacting with the alarm
     alarm = Paradox()
-    interface_manager.set_alarm(alarm)
-    retry = 1
-    while alarm is not None:
-        logger.info("Starting...")
-        retry_time_wait = 2 ^ retry
-        retry_time_wait = 30 if retry_time_wait > 30 else retry_time_wait
+    interface_manager = InterfaceManager(alarm, config=cfg)
+    interface_manager.start()
 
-        try:
-            if alarm.connect():
-                retry = 1
-                alarm.loop()
-            else:
-                logger.error("Unable to connect to alarm")
-
-            time.sleep(retry_time_wait)
-        except ConnectionError as e:  # Connection to IP Module or MQTT lost
-            logger.error("Connection to panel lost: %s. Restarting" % str(e))
-            time.sleep(retry_time_wait)
-
-        except OSError:  # Connection to IP Module or MQTT lost
-            logger.exception("Restarting")
-            time.sleep(retry_time_wait)
-
-        except (KeyboardInterrupt, SystemExit):
-            break  # break exits the retry loop
-
-        except Exception:
-            logger.exception("Restarting")
-            time.sleep(retry_time_wait)
-
-        retry += 1
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(run_loop(alarm))
     
     exit_handler()
 

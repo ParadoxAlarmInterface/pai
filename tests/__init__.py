@@ -7,7 +7,7 @@ config.load(path.join(path.dirname(__file__), 'pai.conf'))
 
 
 def configure_logger():
-    FORMAT = '%(asctime)s - %(levelname)-8s - %(name)s - %(message)s'
+    FORMAT = '%(asctime)s - %(levelname)-8s - %(threadName)-10s - %(name)s - %(message)s'
     logger = logging.getLogger('PAI')
     logconsole_handler = logging.StreamHandler()
     logconsole_handler.setFormatter(logging.Formatter(FORMAT))

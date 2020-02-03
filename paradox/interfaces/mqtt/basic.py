@@ -9,7 +9,7 @@ from paho.mqtt.client import MQTTMessage, Client
 from paradox.config import config as cfg
 from paradox.event import EventLevel, Event, Change, Notification
 from paradox.lib import ps
-from paradox.lib.utils import JSONByteEncoder, sanitize_key
+from paradox.lib.utils import JSONByteEncoder, sanitize_key, call_soon_in_main_loop
 from .core import AbstractMQTTInterface, ELEMENT_TOPIC_MAP
 
 logger = logging.getLogger('PAI').getChild(__name__)
@@ -17,19 +17,34 @@ logger = logging.getLogger('PAI').getChild(__name__)
 ParsedMessage = namedtuple('parsed_message', 'topics element content')
 
 
-def mqtt_handle_decorator(func: typing.Callable[["BasicMQTTInterface", ParsedMessage], None]):
+def mqtt_handle_decorator(func: typing.Callable[
+    ["BasicMQTTInterface", ParsedMessage],
+    typing.Coroutine[None, "BasicMQTTInterface", ParsedMessage]
+]):
     def wrapper(self: "BasicMQTTInterface", client: Client, userdata, message: MQTTMessage):
         try:
-            logger.info("message topic={}, payload={}".format(
-                message.topic, str(message.payload.decode("utf-8"))))
-
             if message.retain:
-                logger.warning("Ignoring retained commands")
+                logger.warning(
+                    "Ignoring command: retained message topic={}, payload={}".format(
+                        message.topic, str(message.payload.decode("utf-8"))
+                    )
+                )
                 return
 
             if self.alarm is None:
-                logger.warning("No alarm. Ignoring command")
+                logger.warning(
+                    "No alarm. Ignoring command: message topic={}, payload={}".format(
+                        message.topic, str(message.payload.decode("utf-8"))
+                    )
+                )
                 return
+
+            logger.info(
+                "message topic={}, payload={}".format(
+                    message.topic,
+                    str(message.payload.decode("utf-8"))
+                )
+            )
 
             topic = message.topic.split(cfg.MQTT_BASE_TOPIC)[1]
 
@@ -46,7 +61,7 @@ def mqtt_handle_decorator(func: typing.Callable[["BasicMQTTInterface", ParsedMes
             if len(topics) >= 4:
                 element = topics[3]
 
-            func(self, ParsedMessage(topics, element, content))
+            call_soon_in_main_loop(func(self, ParsedMessage(topics, element, content)))
         except Exception:
             logger.exception("Failed to execute command")
 
@@ -54,26 +69,20 @@ def mqtt_handle_decorator(func: typing.Callable[["BasicMQTTInterface", ParsedMes
 
 
 class BasicMQTTInterface(AbstractMQTTInterface):
-    name = 'basic_mqtt'
-
-    def __init__(self):
-        super().__init__()
+    def __init__(self, alarm):
+        super().__init__(alarm)
 
         self.partitions = {}
         self.definitions = {}
         self.labels = {}
 
-    async def run(self):
+    def on_connect(self, mqttc, userdata, flags, result):
         ps.subscribe(self._handle_panel_labels, "labels_loaded")
         ps.subscribe(self._handle_panel_definitions, "definitions_loaded")
         ps.subscribe(self._handle_panel_change, "changes")
         ps.subscribe(self._handle_panel_event, "events")
         ps.subscribe(self._handle_connected, "connected")
 
-        await super().run()
-
-    def on_connect(self, mqttc, userdata, flags, result):
-        super().on_connect(mqttc, userdata, flags, result)
         self.subscribe_callback(
             "{}/{}/{}/#".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC, cfg.MQTT_OUTPUT_TOPIC),
             self._mqtt_handle_output_control
@@ -92,7 +101,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         )
 
     @mqtt_handle_decorator
-    def _mqtt_handle_notifications(self, prep: ParsedMessage):
+    async def _mqtt_handle_notifications(self, prep: ParsedMessage):
         topics = prep.topics
         try:
             level = EventLevel.from_name(topics[2].upper())
@@ -103,13 +112,13 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         ps.sendNotification(Notification(sender=self.name, message=prep.content, level=level))
 
     @mqtt_handle_decorator
-    def _mqtt_handle_zone_control(self, prep: ParsedMessage):
+    async def _mqtt_handle_zone_control(self, prep: ParsedMessage):
         topics, element, command = prep
-        if not self.alarm.control_zone(element, command):
+        if not await self.alarm.control_zone(element, command):
             logger.warning("Zone command refused: {}={}".format(element, command))
 
     @mqtt_handle_decorator
-    def _mqtt_handle_partition_control(self, prep: ParsedMessage):
+    async def _mqtt_handle_partition_control(self, prep: ParsedMessage):
         topics, element, command = prep
         command = cfg.MQTT_COMMAND_ALIAS.get(command, command)
 
@@ -147,19 +156,24 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                 logger.warning("Element {} not found".format(element))
                 return
 
-            ps.sendNotification(Notification(sender="mqtt", message="Command by {}: {}".format(
-                    cfg.MQTT_TOGGLE_CODES[tokens[1]], command), level=EventLevel.INFO))
+            ps.sendNotification(
+                Notification(
+                    sender="mqtt",
+                    message="Command by {}: {}".format(cfg.MQTT_TOGGLE_CODES[tokens[1]], command),
+                    level=EventLevel.INFO
+                )
+            )
 
         logger.info("Partition command: {} = {}".format(element, command))
-        if not self.alarm.control_partition(element, command):
+        if not await self.alarm.control_partition(element, command):
             logger.warning("Partition command refused: {}={}".format(element, command))
 
     @mqtt_handle_decorator
-    def _mqtt_handle_output_control(self, prep: ParsedMessage):
+    async def _mqtt_handle_output_control(self, prep: ParsedMessage):
         topics, element, command = prep
         logger.debug("Output command: {} = {}".format(element, command))
 
-        if not self.alarm.control_output(element, command):
+        if not await self.alarm.control_output(element, command):
             logger.warning("Output command refused: {}={}".format(element, command))
 
     def _handle_panel_event(self, event: Event):
@@ -186,7 +200,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
     def _handle_panel_definitions(self, data: dict):
         self.definitions = data
-                
+
     def _handle_connected(self):
         # After we get 2 partitions, lets publish a dashboard
         if cfg.MQTT_DASH_PUBLISH and len(self.partitions) == 2:
@@ -198,14 +212,14 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             for i in definitions:  # numeric index
                 if i not in labels:
                     continue
-                
+
                 for attribute in definitions[i]:  # attribute
                     self._publish(f'{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_DEFINITION_TOPIC}',
                                   element_type,
                                   labels[i]['key'],
                                   attribute,
                                   definitions[i][attribute])
-        
+
     def _handle_panel_change(self, change: Change):
         attribute = change.property
         label = change.key
@@ -218,19 +232,19 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
         self.partitions[label][attribute] = value
         self._publish(f'{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_STATES_TOPIC}', element_type, label, attribute, value)
-        
+
     def _publish(self, base: str, element_type: str, label: str, attribute: str, value: [str, int, bool]):
         if element_type in ELEMENT_TOPIC_MAP:
             element_topic = ELEMENT_TOPIC_MAP[element_type]
         else:
             element_topic = element_type
-        
+
         if isinstance(value, dict):
             # This is fragile...
             if '/' in attribute and not attribute.startswith('/'):
                 attribute = f"/{attribute}"
 
-            for attr_name, attr_value in value.items():    
+            for attr_name, attr_value in value.items():
                 label_tp = f"{attribute}/{attr_name}"
                 self._publish(base, element_type, label, label_tp, attr_value)
             return
@@ -259,7 +273,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             with open(fname, 'r') as f:
                 data = f.read()
                 data = data.replace('__PARTITION1__', partitions[0]).replace('__PARTITION2__', partitions[1])
-                self.mqtt.publish(cfg.MQTT_DASH_TOPIC, data, 2, True)
+                self.publish(cfg.MQTT_DASH_TOPIC, data, 2, True)
                 logger.info("MQTT Dash panel published to {}".format(cfg.MQTT_DASH_TOPIC))
         else:
             logger.warning("MQTT DASH Template not found: {}".format(fname))

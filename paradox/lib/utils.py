@@ -1,11 +1,30 @@
 # -*- coding: utf-8 -*-
-
+import asyncio
 import json
 import re
+import threading
+import typing
 from copy import deepcopy
 from functools import reduce
+
 from construct import Container, ListContainer
-from typing import Mapping, List
+
+main_thread_loop = asyncio.get_event_loop()
+
+
+def call_soon_in_main_loop(fn: typing.Union[typing.Callable, typing.Coroutine]) -> None:
+    if threading.current_thread() is threading.main_thread():
+        loop = asyncio.get_event_loop()
+        if isinstance(fn, typing.Coroutine):
+            loop.create_task(fn)
+        else:
+            loop.call_soon(fn)
+    else:
+        assert main_thread_loop.is_running()
+        if isinstance(fn, typing.Coroutine):
+            asyncio.run_coroutine_threadsafe(fn, loop=main_thread_loop)  # Returns concurrent.futures.Future
+        else:
+            main_thread_loop.call_soon_threadsafe(fn)
 
 
 class JSONByteEncoder(json.JSONEncoder):
@@ -59,10 +78,10 @@ def sanitize_key(key):
 
 
 def construct_free(container: Container):
-    if isinstance(container, (Container, Mapping)):
+    if isinstance(container, (Container, typing.Mapping)):
         return dict(
             (k, construct_free(v)) for k, v in container.items() if not (isinstance(k, str) and k.startswith('_')))
-    elif isinstance(container, (ListContainer, List)):
+    elif isinstance(container, (ListContainer, typing.List)):
         return list(construct_free(v) for v in container)
     else:
         return container

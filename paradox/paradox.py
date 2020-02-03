@@ -62,7 +62,6 @@ class Paradox:
     def run_state(self, value: RunState):
         self._run_state = value
         ps.sendMessage("run-state", state=value)
-        logger.info("Run state: %s", value)
 
     @property
     def connection(self):
@@ -92,13 +91,9 @@ class Paradox:
         self.connection.register_handler(EventMessageHandler(self.handle_event_message))
         self.connection.register_handler(ErrorMessageHandler(self.handle_error_message))
 
-    def connect(self) -> bool:
-        task = self.work_loop.create_task(self.connect_async())
-        self.work_loop.run_until_complete(task)
-        return task.result()
-
-    async def connect_async(self):
-        self.disconnect()  # socket needs to be also closed
+    async def connect(self):
+        if self._connection:
+            self.disconnect()  # socket needs to be also closed
         self.panel = None
 
         self.run_state = RunState.INIT
@@ -186,8 +181,6 @@ class Paradox:
             logger.error("Timeout while connecting to panel: %s" % str(e))
         except ConnectionError as e:
             logger.error("Failed to connect: %s" % str(e))
-        except Exception:
-            logger.exception("Connect error")
 
         self.run_state = RunState.ERROR
 
@@ -206,11 +199,7 @@ class Paradox:
         else:
             logger.info("Panel time synchronized")
 
-    def loop(self):
-        task = self.work_loop.create_task(self.async_loop())
-        self.work_loop.run_until_complete(task)
-
-    async def async_loop(self):
+    async def loop(self):
         logger.debug("Loop start")
         
         replies_missing = 0
@@ -291,7 +280,7 @@ class Paradox:
             if self.run_state != RunState.PAUSE:
                 self.connection.schedule_message_handling(recv_message)  # schedule handling in the loop
         except Exception as e:
-            logging.exception("Error parsing message")
+            logger.exception("Error parsing message")
 
     async def send_wait(self,
                         message_type=None,
@@ -315,6 +304,8 @@ class Paradox:
                 logger.debug('Request retry (%d/%d)', retry, retries)
             retry += 1
 
+            t1 = time.time()
+            result = 'unknown'
             try:
                 async with self.request_lock:
                     if message is not None:
@@ -333,14 +324,20 @@ class Paradox:
                                 lambda m: m.fields.value.po.command == reply_expected, timeout=timeout * 2
                             )
 
+                        result = 'ok'
                         if reply:
                             return reply
             except asyncio.TimeoutError:
-                pass
+                result = 'timeout'
+            except Exception:
+                result = 'exception'
+                raise
+            finally:
+                logger.debug('send/receive %s in %.4f s', result, time.time() - t1)
 
         return None  # Probably it needs to throw an exception instead of returning None
 
-    def control_zone(self, zone: str, command: str) -> bool:
+    async def control_zone(self, zone: str, command: str) -> bool:
         command = command.lower()
         logger.debug("Control Zone: {} - {}".format(zone, command))
 
@@ -354,21 +351,20 @@ class Paradox:
         # Apply state changes
         accepted = False
         try:
-            coro = self.panel.control_zones(zones_selected, command)
-            future = asyncio.run_coroutine_threadsafe(coro, self.work_loop)
-            accepted = future.result(10)
+            accepted = await self.panel.control_zones(zones_selected, command)
         except NotImplementedError:
             logger.error('control_zones is not implemented for this alarm type')
+        except asyncio.CancelledError:
+            logger.error('control_zones canceled')
         except asyncio.TimeoutError:
             logger.error('control_zones timeout')
-            future.cancel()
 
         # Refresh status
         self.request_status_refresh()  # Trigger status update
 
         return accepted
 
-    def control_partition(self, partition: str, command: str) -> bool:
+    async def control_partition(self, partition: str, command: str) -> bool:
         command = command.lower()
         logger.debug("Control Partition: {} - {}".format(partition, command))
 
@@ -382,21 +378,20 @@ class Paradox:
         # Apply state changes
         accepted = False
         try:
-            coro = self.panel.control_partitions(partitions_selected, command)
-            future = asyncio.run_coroutine_threadsafe(coro, self.work_loop)
-            accepted = future.result(10)
+            accepted = await self.panel.control_partitions(partitions_selected, command)
         except NotImplementedError:
             logger.error('control_partitions is not implemented for this alarm type')
+        except asyncio.CancelledError:
+            logger.error('control_partitions canceled')
         except asyncio.TimeoutError:
             logger.error('control_partitions timeout')
-            future.cancel()
 
         # Refresh status
         self.request_status_refresh()  # Trigger status update
 
         return accepted
 
-    def control_output(self, output, command) -> bool:
+    async def control_output(self, output, command) -> bool:
         command = command.lower()
         logger.debug("Control Output: {} - {}".format(output, command))
 
@@ -410,14 +405,13 @@ class Paradox:
         # Apply state changes
         accepted = False
         try:
-            coro = self.panel.control_outputs(outputs_selected, command)
-            future = asyncio.run_coroutine_threadsafe(coro, self.work_loop)
-            accepted = future.result(10)
+            accepted = await self.panel.control_outputs(outputs_selected, command)
         except NotImplementedError:
             logger.error('control_outputs is not implemented for this alarm type')
+        except asyncio.CancelledError:
+            logger.error('control_outputs canceled')
         except asyncio.TimeoutError:
             logger.error('control_outputs timeout')
-            future.cancel()
         # Apply state changes
 
         # Refresh status
@@ -504,7 +498,7 @@ class Paradox:
     async def resume(self):
         logger.info("Resuming PAI")
         if self.run_state == RunState.PAUSE:
-            await self.connect_async()
+            await self.connect()
 
     def _clean_session(self):
         logger.info("Clean Session")

@@ -1,3 +1,7 @@
+import asyncio
+
+import pytest
+
 from paradox.lib.ps import sendMessage
 from paradox.data.element_type_container import ElementTypeContainer
 from paradox.paradox import Paradox
@@ -6,7 +10,7 @@ from paradox.paradox import Paradox
 def test_on_labels_load():
     alarm = Paradox(None)
 
-    sendMessage("labels_loaded", data=dict(
+    alarm._on_labels_load(data=dict(
         partition={
             1: dict(
                 id=1,

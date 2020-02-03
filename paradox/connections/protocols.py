@@ -1,4 +1,3 @@
-import asyncio
 import binascii
 import logging
 import typing
@@ -7,6 +6,7 @@ from paradox.config import config as cfg
 from paradox.lib.crypto import encrypt, decrypt
 from paradox.parsers.paradox_ip_messages import ip_message
 from .connection import ConnectionProtocol
+from ..lib.utils import call_soon_in_main_loop
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -30,7 +30,6 @@ class SerialConnectionProtocol(ConnectionProtocol):
         super(SerialConnectionProtocol, self).__init__(on_message=on_message, on_con_lost=on_con_lost)
         self.buffer = b''
         self.on_port_open = on_port_open
-        self.loop = asyncio.get_event_loop()
 
     def connection_made(self, transport):
         super(SerialConnectionProtocol, self).connection_made(transport)
@@ -43,7 +42,7 @@ class SerialConnectionProtocol(ConnectionProtocol):
         await self.transport.write(message)
 
     def send_message(self, message):
-        asyncio.run_coroutine_threadsafe(self._send_message(message), self.loop)
+        call_soon_in_main_loop(self._send_message(message))
 
     def data_received(self, recv_data):
         self.buffer += recv_data

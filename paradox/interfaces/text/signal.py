@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import asyncio
 import logging
 
 from gi.repository import GLib
@@ -17,10 +17,8 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 class SignalTextInterface(ConfiguredAbstractTextInterface):
     """Interface Class using Signal"""
-    name = 'signal'
-
-    def __init__(self):
-        super().__init__(cfg.SIGNAL_EVENT_FILTERS, cfg.SIGNAL_ALLOW_EVENTS, cfg.SIGNAL_IGNORE_EVENTS,
+    def __init__(self, alarm):
+        super().__init__(alarm, cfg.SIGNAL_EVENT_FILTERS, cfg.SIGNAL_ALLOW_EVENTS, cfg.SIGNAL_IGNORE_EVENTS,
                          cfg.SIGNAL_MIN_EVENT_LEVEL)
 
         self.signal = None
@@ -29,7 +27,6 @@ class SignalTextInterface(ConfiguredAbstractTextInterface):
     def stop(self):
 
         """ Stops the Signal Interface Thread"""
-        logger.debug("Stopping Signal Interface")
         if self.loop is not None:
             self.loop.quit()
 
@@ -38,7 +35,7 @@ class SignalTextInterface(ConfiguredAbstractTextInterface):
         logger.debug("Signal Stopped")
 
     def _run(self):
-        logger.info("Starting Signal Interface")
+        super(SignalTextInterface, self)._run()
 
         bus = SystemBus()
 
@@ -67,7 +64,8 @@ class SignalTextInterface(ConfiguredAbstractTextInterface):
             timestamp, message, groupID, message, attachments))
 
         if source in cfg.SIGNAL_CONTACTS:
-            ret = self.handle_command(message)
+            future = asyncio.run_coroutine_threadsafe(self.handle_command(message), self.alarm.work_loop)
+            ret = future.result(10)
 
             m = "Signal {} : {}".format(source, ret)
             logger.info(m)

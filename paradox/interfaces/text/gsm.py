@@ -143,10 +143,8 @@ class SerialCommunication:
 
 class GSMTextInterface(ConfiguredAbstractTextInterface):
     """Interface Class using GSM"""
-    name = 'gsm'
-
-    def __init__(self):
-        super().__init__(cfg.GSM_EVENT_FILTERS, cfg.GSM_ALLOW_EVENTS, cfg.GSM_IGNORE_EVENTS,
+    def __init__(self, alarm):
+        super().__init__(alarm, cfg.GSM_EVENT_FILTERS, cfg.GSM_ALLOW_EVENTS, cfg.GSM_IGNORE_EVENTS,
                          cfg.GSM_MIN_EVENT_LEVEL)
 
         self.port = None
@@ -156,7 +154,6 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
 
     def stop(self):
         """ Stops the GSM Interface Thread"""
-        logger.info("Stopping GSM Interface")
         self.stop_running.set()
 
         self.loop.stop()
@@ -221,11 +218,11 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
         return True
 
     def _run(self):
-        logger.info("Starting GSM Interface")
+        super(GSMTextInterface, self)._run()
 
         while not self.modem_connected and not self.stop_running.isSet():
             if not self.connect():
-                logging.warning("Could not connect to modem")
+                logger.warning("Could not connect to modem")
 
             self.stop_running.wait(5)
 
@@ -255,7 +252,8 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
             timestamp, source, message))
 
         if source in cfg.GSM_CONTACTS:
-            ret = self.handle_command(message)
+            future = asyncio.run_coroutine_threadsafe(self.handle_command(message), self.alarm.work_loop)
+            ret = future.result(10)
 
             m = "GSM {}: {}".format(source, ret)
             logger.info(m)

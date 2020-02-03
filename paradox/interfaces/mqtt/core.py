@@ -10,7 +10,7 @@ from paho.mqtt.client import Client, MQTT_ERR_SUCCESS
 
 from paradox.config import config as cfg
 from paradox.data.enums import RunState
-from paradox.interfaces import AsyncInterface
+from paradox.interfaces import ThreadQueueInterface
 from paradox.lib import ps
 
 logger = logging.getLogger('PAI').getChild(__name__)
@@ -35,6 +35,7 @@ RUN_STATE_2_PAYLOAD = {
     RunState.RUN: "online",
     RunState.STOP: "stopped",
 }
+
 
 class MQTTConnection(Client):
     _instance = None
@@ -143,12 +144,10 @@ class MQTTConnection(Client):
         super(MQTTConnection, self).disconnect()
 
 
-class AbstractMQTTInterface(AsyncInterface):
+class AbstractMQTTInterface(ThreadQueueInterface):
     """Interface Class using MQTT"""
-    name = 'abstract_mqtt'
-
-    def __init__(self):
-        super().__init__()
+    def __init__(self, alarm):
+        super().__init__(alarm)
 
         self.mqtt = MQTTConnection.get_instance()
         self.mqtt.register(self)
@@ -162,22 +161,33 @@ class AbstractMQTTInterface(AsyncInterface):
 
     def stop(self):
         """ Stops the MQTT Interface Thread"""
-        logger.debug("Stopping MQTT Interface")
         self.mqtt.stop()
         super().stop()
+        self.republish_task.cancel()
+        self.loop.call_soon_threadsafe(self.loop.stop)
 
-    async def run(self):
+    async def republish_loop(self):
         while True:
             await asyncio.sleep(cfg.MQTT_REPUBLISH_INTERVAL)
-
             trigger = time.time() - cfg.MQTT_REPUBLISH_INTERVAL
 
             for k, v in filter(lambda f: f[1].get("last_publish") <= trigger, self.republish_cache.items()):
                 self.publish(k, v['value'], v['qos'], v['retain'])
 
+    def _run(self):
+        super(AbstractMQTTInterface, self)._run()
+
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+
+        self.republish_task = self.loop.create_task(self.republish_loop())
+
+        self.loop.run_forever()
+        self.loop.close()
+
     def publish(self, topic, value, qos, retain):
         self.republish_cache[topic] = {'value': value, 'qos': qos, 'retain': retain, 'last_publish': time.time()}
-        self.mqtt.publish(topic, value, qos, retain)
+        self.loop.call_soon_threadsafe(self.mqtt.publish, topic, value, qos, retain)
 
     def subscribe_callback(self, sub, callback: typing.Callable):
         self.mqtt.message_callback_add(sub, callback)

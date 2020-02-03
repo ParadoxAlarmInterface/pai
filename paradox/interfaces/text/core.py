@@ -11,42 +11,22 @@ logger = logging.getLogger('PAI').getChild(__name__)
 
 class AbstractTextInterface(ThreadQueueInterface):
     """Interface Class using any Text interface"""
-    name = 'abstract_text'
-
-    def __init__(self, event_filter: EventFilter, min_level=EventLevel.INFO):
-        super().__init__()
+    def __init__(self, alarm, event_filter: EventFilter, min_level=EventLevel.INFO):
+        super().__init__(alarm)
 
         self.event_filter = event_filter
 
         self.min_level = min_level
-        self.alarm = None
+        self.alarm = alarm
 
     def stop(self):
         super().stop()
-        if self.alarm is not None:
-            self.alarm.disconnect()
 
-    def run(self):
-        logger.info("Starting Interface")
+    def _run(self):
+        super(AbstractTextInterface, self)._run()
 
         ps.subscribe(self.handle_panel_event, "events")
         ps.subscribe(self.handle_notify, "notifications")
-
-        try:
-            self._run()
-        except (KeyboardInterrupt, SystemExit):
-            logger.debug("Interface loop stopping")
-            self.stop()
-        except Exception:
-            logger.exception("Interface loop")
-
-        super().run()
-
-    def _run(self):
-        pass
-
-    def set_alarm(self, alarm):
-        self.alarm = alarm
 
     def send_message(self, message: str, level: EventLevel):
         pass
@@ -62,7 +42,7 @@ class AbstractTextInterface(ThreadQueueInterface):
         if self.event_filter.match(event):
             self.send_message(event.message, event.level)
 
-    def handle_command(self, message_raw):
+    async def handle_command(self, message_raw):
         message = cfg.COMMAND_ALIAS.get(message_raw, message_raw)
 
         tokens = message.split(" ")
@@ -83,21 +63,21 @@ class AbstractTextInterface(ThreadQueueInterface):
 
         # Process a Zone Command
         if element_type == 'zone':
-            if not self.alarm.control_zone(element, command):
+            if not await self.alarm.control_zone(element, command):
                 m = "Zone command error: {}={}".format(element, command)
                 logger.warning(m)
                 return m
 
         # Process a Partition Command
         elif element_type == 'partition':
-            if not self.alarm.control_partition(element, command):
+            if not await self.alarm.control_partition(element, command):
                 m = "Partition command error: {}={}".format(element, command)
                 logger.warning(m)
                 return m
 
         # Process an Output Command
         elif element_type == 'output':
-            if not self.alarm.control_output(element, command):
+            if not await self.alarm.control_output(element, command):
                 m = "Output command error: {}={}".format(element, command)
                 logger.warning(m)
                 return m
@@ -125,7 +105,7 @@ class AbstractTextInterface(ThreadQueueInterface):
 
 
 class ConfiguredAbstractTextInterface(AbstractTextInterface):
-    def __init__(self, EVENT_FILTERS, ALLOW_EVENTS, IGNORE_EVENTS, MIN_EVENT_LEVEL):
+    def __init__(self, alarm, EVENT_FILTERS, ALLOW_EVENTS, IGNORE_EVENTS, MIN_EVENT_LEVEL):
         if EVENT_FILTERS and (ALLOW_EVENTS or IGNORE_EVENTS):
             raise AssertionError('You can not use *_EVENT_FILTERS and *_ALLOW_EVENTS+*_IGNORE_EVENTS simultaneously')
 
@@ -137,4 +117,4 @@ class ConfiguredAbstractTextInterface(AbstractTextInterface):
             logger.debug("Using Tag Filter")
             event_filter = EventTagFilter(EVENT_FILTERS, min_level)
 
-        super().__init__(event_filter=event_filter, min_level=min_level)
+        super().__init__(alarm, event_filter=event_filter, min_level=min_level)

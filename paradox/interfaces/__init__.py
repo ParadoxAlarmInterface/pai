@@ -2,21 +2,15 @@
 
 import asyncio
 import logging
-import queue
 import threading
-
-from paradox.config import config as cfg
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
 
 class Interface:
-    def __init__(self):
+    def __init__(self, alarm):
         super().__init__()  # yes it is required!
-        self.alarm = None
-
-    def set_alarm(self, alarm):
-        """ Sets the alarm """
+        self.name = self.__class__.__name__
         self.alarm = alarm
 
     def start(self):
@@ -24,8 +18,8 @@ class Interface:
 
 
 class AsyncInterface(Interface):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, alarm):
+        super().__init__(alarm)
 
         self._loop = asyncio.get_event_loop()
         self._running_task = None  # type: asyncio.Task
@@ -42,29 +36,28 @@ class AsyncInterface(Interface):
 
 
 class ThreadQueueInterface(threading.Thread, Interface):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, alarm):
+        super().__init__(name=self.__class__.__name__)
+
+        self.alarm = alarm
 
         self.stop_running = threading.Event()
         self.stop_running.clear()
 
-        self.queue = queue.PriorityQueue()
-
     def stop(self):
-        self.queue.put_nowait((0, None,))
-        self.join()
-
-    def run_loop(self, queue_item):
-        pass
+        self.stop_running.set()
 
     def run(self):
-        while True:
-            try:
-                _, item = self.queue.get()
-                if item is None:
-                    break
-                else:
-                    self.run_loop(item)
-            except Exception:
-                logger.exception("ERROR in Run loop")
+        try:
+            self._run()
+        except (KeyboardInterrupt, SystemExit):
+            logger.debug("Interface loop stopping")
+            self.stop()
+        except Exception:
+            logger.exception("Interface loop")
+
+        super().run()
+
+    def _run(self):
+        logger.info("Starting %s Interface", self.name)
 

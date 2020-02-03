@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from paradox.paradox import Paradox
 from paradox.parsers.status import convert_raw_status
 from .status_data import message_parser_output, converted_status
@@ -44,7 +46,8 @@ def test_convert_raw_status(mocker):
     #         raise
 
 
-def test_update_properties(mocker):
+@pytest.mark.asyncio
+async def test_update_properties(mocker):
     alarm = Paradox()
     alarm.panel = mocker.MagicMock()
     ps = mocker.patch("paradox.lib.ps")
