@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2020-02-03
+
+### Changed
+- Serial connection exceptions fix
+
 ## [2.0.0] - 2020-02-03
 ### Added
 - Docker: Installing tzdata package. Fixes [Time zone not correct](https://github.com/ParadoxAlarmInterface/hassio-repository/issues/7)
