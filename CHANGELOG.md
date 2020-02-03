@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2020-02-03
+### Added
+- Docker: Installing tzdata package. Fixes [Time zone not correct](https://github.com/ParadoxAlarmInterface/hassio-repository/issues/7)
+- Python 3.6+ check.
+- In case of a wrong password PAI stops. Prevents panel locking due to many retries with a wrong password.
+- All events and commands are scheduled in a run loop for later processing.
+
+### Changed
+
+- MQTT Interfaces now do their work in a separate threads and asyncio run loops. Frees main loop for more urgent work. Probably fixes #89, #126
+- `Paradox` class methods changed to async only: `connect`, `loop`, `control_zone`, `control_partition`, `control_output`
+
+### Removed
+
+- Dependencies: PyPubSub fully removed from dependencies and replaced with our own async version.
+
+
 ## [1.5.0] - 2020-01-20
 ### Added
 - MQTT: Added `paradox/interface/run_status` and has more statuses: `error, initializing, paused, online, stopped, offline`
