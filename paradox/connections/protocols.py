@@ -39,7 +39,7 @@ class SerialConnectionProtocol(ConnectionProtocol):
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("PAI -> SER {}".format(binascii.hexlify(message)))
 
-        await self.transport.write(message)
+        self.transport.write(message)
 
     def send_message(self, message):
         call_soon_in_main_loop(self._send_message(message))
