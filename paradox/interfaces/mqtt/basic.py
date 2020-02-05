@@ -197,14 +197,14 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
     def _handle_panel_labels(self, data: dict):
         self.labels = data
+ 
+        if cfg.MQTT_DASH_PUBLISH and len(list(self.labels.get('partition', {}).keys())) >= 2:
+            self._publish_dash(cfg.MQTT_DASH_TEMPLATE, self.labels.get('partition', {}))
 
     def _handle_panel_definitions(self, data: dict):
         self.definitions = data
 
     def _handle_connected(self):
-        # After we get 2 partitions, lets publish a dashboard
-        if cfg.MQTT_DASH_PUBLISH and len(self.partitions) == 2:
-            self._publish_dash(cfg.MQTT_DASH_TEMPLATE, list(self.partitions.keys()))
 
         for element_type in self.definitions:  # zones, partitions
             labels = self.labels[element_type]
@@ -266,13 +266,16 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
     def _publish_dash(self, fname, partitions):
         # TODO: move to a separate component
-        if len(partitions) < 2:
+        if len(list(partitions.keys())) < 2:
             return
 
         if os.path.exists(fname):
             with open(fname, 'r') as f:
                 data = f.read()
-                data = data.replace('__PARTITION1__', partitions[0]).replace('__PARTITION2__', partitions[1])
+
+                for k in partitions.keys():
+                    data = data.replace(f'__PARTITION{k}__', partitions[k]['label'])
+
                 self.publish(cfg.MQTT_DASH_TOPIC, data, 2, True)
                 logger.info("MQTT Dash panel published to {}".format(cfg.MQTT_DASH_TOPIC))
         else:
