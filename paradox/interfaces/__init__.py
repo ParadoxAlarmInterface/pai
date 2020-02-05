@@ -46,6 +46,9 @@ class ThreadQueueInterface(threading.Thread, Interface):
 
     def stop(self):
         self.stop_running.set()
+        if threading.current_thread() != self:
+            self.join()
+            logger.debug("Interface %s thread stopped", self.name)
 
     def run(self):
         try:
@@ -55,8 +58,6 @@ class ThreadQueueInterface(threading.Thread, Interface):
             self.stop()
         except Exception:
             logger.exception("Interface loop")
-
-        super().run()
 
     def _run(self):
         logger.info("Starting %s Interface", self.name)

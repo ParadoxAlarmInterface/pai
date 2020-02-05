@@ -7,7 +7,7 @@ import signal
 
 from paradox import VERSION
 from paradox.config import config as cfg
-from paradox.exceptions import AuthenticationFailed
+from paradox.exceptions import PAICriticalException
 
 from paradox.paradox import Paradox
 from paradox.interfaces.interface_manager import InterfaceManager
@@ -87,12 +87,13 @@ async def run_loop(alarm: Paradox):
         except ConnectionError as e:  # Connection to IP Module or MQTT lost
             logger.error("Connection to panel lost: %s. Restarting" % str(e))
             time.sleep(retry_time_wait)
-
         except OSError:  # Connection to IP Module or MQTT lost
             logger.exception("Restarting")
             time.sleep(retry_time_wait)
-
-        except (KeyboardInterrupt, SystemExit, AuthenticationFailed):
+        except PAICriticalException:
+            logger.exception("PAI Critical exception. Stopping PAI")
+            break
+        except (KeyboardInterrupt, SystemExit):
             break  # break exits the retry loop
         except Exception:
             logger.exception("Restarting")

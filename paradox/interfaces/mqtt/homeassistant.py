@@ -7,6 +7,7 @@ from paradox.config import config as cfg
 from paradox.lib import ps
 from paradox.lib.utils import sanitize_key
 from .core import AbstractMQTTInterface
+from ...data.model import DetectedPanel
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -20,11 +21,9 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         self.partitions = {}
         self.zones = {}
         self.device = {}
-        self.detected_panel = {}
 
         self.first_status = True
 
-        # TODO: Maybe homeassistant needs a separate status topic
         self.availability_topic = self.mqtt.availability_topic
         self.run_status_topic = self.mqtt.run_status_topic
 
@@ -36,14 +35,14 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
     def _publish_run_state_sensor(self):
         configuration_topic = '{}/sensor/{}/{}/config'.format(
             cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
-            self.detected_panel.get('serial_number', 'pai'),
+            self.device_serial_number,
             'run_status'
         )
 
         config = dict(
             name='Run status',
             unique_id="{}_partition_{}".format(
-                self.detected_panel.get('serial_number', 'pai'),
+                self.device_serial_number,
                 'run_status'
             ),
             state_topic=self.run_status_topic,
@@ -53,14 +52,15 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
 
         self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
 
-    def _handle_panel_detected(self, panel):
-        self.detected_panel = panel
+    def _handle_panel_detected(self, panel: DetectedPanel):
+        self.device_serial_number = panel.serial_number
+
         self.device = dict(
             manufacturer="Paradox",
-            model=panel.get('model'),
-            identifiers=["Paradox", panel.get('model'), panel.get('serial_number')],
-            name=panel.get('model'),
-            sw_version=panel.get('firmware_version')
+            model=panel.model,
+            identifiers=["Paradox", panel.model, panel.serial_number],
+            name=panel.model,
+            sw_version=panel.firmware_version
         )
 
         self._publish_run_state_sensor()
@@ -75,7 +75,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         self.zones = data.get('zone', {})
 
     def _handle_status_update(self, status):
-        if self.mqtt.connected:
+        if self.mqtt.connected and self.device:
             if 'partition' in status:
                 self._process_partition_statuses(status['partition'])
             if 'zone' in status:
@@ -100,7 +100,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             if self.first_status:  # For HASS auto discovery
                 configuration_topic = '{}/alarm_control_panel/{}/{}/config'.format(
                     cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
-                    self.detected_panel.get('serial_number', 'pai'),
+                    self.device_serial_number,
                     sanitize_key(partition['key'])
                 )
                 command_topic = '{}/{}/{}/{}'.format(
@@ -112,7 +112,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 config = dict(
                     name=partition['label'],
                     unique_id="{}_partition_{}".format(
-                        self.detected_panel.get('serial_number', 'pai'),
+                        self.device_serial_number,
                         partition['key']
                     ),
                     command_topic=command_topic,
@@ -145,7 +145,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
 
                 config = dict(
                     name=zone['label'],
-                    unique_id="{}_zone_{}_open".format(self.detected_panel.get('serial_number', 'pai'), zone['key']),
+                    unique_id="{}_zone_{}_open".format(self.device_serial_number, zone['key']),
                     state_topic=open_topic,
                     device_class="motion",
                     availability_topic=self.availability_topic,
@@ -156,7 +156,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
 
                 configuration_topic = '{}/binary_sensor/{}/{}/config'.format(
                     cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
-                    self.detected_panel.get('serial_number', 'pai'),
+                    self.device_serial_number,
                     sanitize_key(zone['key'])
                 )
 

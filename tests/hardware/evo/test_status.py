@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 import pytest
@@ -54,4 +55,4 @@ async def test_update_properties(mocker):
 
     alarm._on_status_update(converted_status)
 
-    print(ps)
+    await asyncio.sleep(0.01)
