@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -76,13 +77,21 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         self.definitions = {}
         self.labels = {}
 
-    def on_connect(self, mqttc, userdata, flags, result):
+        self.connected_future = asyncio.Future()  # TODO: do not create it, use some other
+        self.labels_future = asyncio.Future()
+        self.definitions_future = asyncio.Future()
+
+        ready_future = asyncio.ensure_future(
+            asyncio.gather(self.connected_future, self.labels_future, self.definitions_future)
+        )
+        ready_future.add_done_callback(lambda x: self._on_ready())
+
         ps.subscribe(self._handle_panel_labels, "labels_loaded")
         ps.subscribe(self._handle_panel_definitions, "definitions_loaded")
         ps.subscribe(self._handle_panel_change, "changes")
         ps.subscribe(self._handle_panel_event, "events")
-        ps.subscribe(self._handle_connected, "connected")
 
+    def on_connect(self, mqttc, userdata, flags, result):
         self.subscribe_callback(
             "{}/{}/{}/#".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC, cfg.MQTT_OUTPUT_TOPIC),
             self._mqtt_handle_output_control
@@ -99,6 +108,8 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_NOTIFICATIONS_TOPIC, "#"),
             self._mqtt_handle_notifications
         )
+
+        self.connected_future.set_result(True)
 
     @mqtt_handle_decorator
     async def _mqtt_handle_notifications(self, prep: ParsedMessage):
@@ -197,28 +208,13 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
     def _handle_panel_labels(self, data: dict):
         self.labels = data
- 
-        if cfg.MQTT_DASH_PUBLISH and len(list(self.labels.get('partition', {}).keys())) >= 2:
-            self._publish_dash(cfg.MQTT_DASH_TEMPLATE, self.labels.get('partition', {}))
+
+        self.labels_future.set_result(data)
 
     def _handle_panel_definitions(self, data: dict):
         self.definitions = data
 
-    def _handle_connected(self):
-
-        for element_type in self.definitions:  # zones, partitions
-            labels = self.labels[element_type]
-            definitions = self.definitions[element_type]
-            for i in definitions:  # numeric index
-                if i not in labels:
-                    continue
-
-                for attribute in definitions[i]:  # attribute
-                    self._publish(f'{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_DEFINITION_TOPIC}',
-                                  element_type,
-                                  labels[i]['key'],
-                                  attribute,
-                                  definitions[i][attribute])
+        self.definitions_future.set_result(data)
 
     def _handle_panel_change(self, change: Change):
         attribute = change.property
@@ -263,6 +259,24 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             ),
             "{}".format(publish_value), 0, cfg.MQTT_RETAIN
         )
+
+    def _on_ready(self):
+        for element_type in self.definitions:  # zones, partitions
+            labels = self.labels[element_type]
+            definitions = self.definitions[element_type]
+            for i in definitions:  # numeric index
+                if i not in labels:
+                    continue
+
+                for attribute in definitions[i]:  # attribute
+                    self._publish(f'{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_DEFINITION_TOPIC}',
+                                  element_type,
+                                  labels[i]['key'],
+                                  attribute,
+                                  definitions[i][attribute])
+
+        if cfg.MQTT_DASH_PUBLISH and len(list(self.labels.get('partition', {}).keys())) >= 2:
+            self._publish_dash(cfg.MQTT_DASH_TEMPLATE, self.labels.get('partition', {}))
 
     def _publish_dash(self, fname, partitions):
         # TODO: move to a separate component
