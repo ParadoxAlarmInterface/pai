@@ -10,11 +10,10 @@ from paradox.interfaces.mqtt.homeassistant import HomeAssistantMQTTInterface
 from paradox.lib.ps import sendMessage
 
 
-@pytest.fixture(scope="function")
-def interface(mocker):
+@pytest.mark.asyncio
+async def test_hass(mocker):
     mocker.patch('paradox.lib.utils.main_thread_loop', asyncio.get_event_loop())
     con = mocker.patch("paradox.interfaces.mqtt.core.MQTTConnection")
-    con.get_instance.return_value.connected = True
     con.get_instance.return_value.availability_topic = "paradox/interface/availability"
     con.get_instance.return_value.run_status_topic = "paradox/interface/run_status"
 
@@ -23,12 +22,8 @@ def interface(mocker):
     interface = HomeAssistantMQTTInterface(alarm)
     interface.start()
     interface.on_connect(None, None, None, None)
+    assert interface.connected_future.done() and interface.connected_future.result() is True
 
-    return interface
-
-
-@pytest.mark.asyncio
-async def test_hass(interface, mocker):
     try:
         await asyncio.sleep(0.01)  # TODO: Bad way to wait for a start
 

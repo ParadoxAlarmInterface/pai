@@ -9,8 +9,7 @@ from paradox.event import Event
 from paradox.interfaces.mqtt.basic import BasicMQTTInterface
 
 
-@pytest.fixture(scope="function")
-def interface(mocker):
+def get_interface(mocker):
     mocker.patch('paradox.lib.utils.main_thread_loop', asyncio.get_event_loop())
     con = mocker.patch("paradox.interfaces.mqtt.core.MQTTConnection")
     con.get_instance.return_value.connected = True
@@ -24,7 +23,8 @@ def interface(mocker):
 
 
 @pytest.mark.asyncio
-async def test_handle_panel_event(interface, mocker):
+async def test_handle_panel_event(mocker):
+    interface = get_interface(mocker)
     try:
         await asyncio.sleep(0.01)
 
@@ -63,7 +63,8 @@ async def test_handle_panel_event(interface, mocker):
     pytest.param(b'disarmed', 'disarm')
 ])
 @pytest.mark.asyncio
-async def test_mqtt_handle_partition_control(interface, command, expected, mocker):
+async def test_mqtt_handle_partition_control(command, expected, mocker):
+    interface = get_interface(mocker)
     try:
         await asyncio.sleep(0.01)
 
@@ -84,7 +85,8 @@ async def test_mqtt_handle_partition_control(interface, command, expected, mocke
 
 
 @pytest.mark.asyncio
-async def test_mqtt_handle_zone_control(interface, mocker):
+async def test_mqtt_handle_zone_control(mocker):
+    interface = get_interface(mocker)
     try:
         await asyncio.sleep(0.01)
 
@@ -105,7 +107,8 @@ async def test_mqtt_handle_zone_control(interface, mocker):
 
 
 @pytest.mark.asyncio
-async def test_mqtt_handle_zone_control_utf8(interface, mocker):
+async def test_mqtt_handle_zone_control_utf8(mocker):
+    interface = get_interface(mocker)
     try:
         await asyncio.sleep(0.01)
 
