@@ -105,6 +105,7 @@ class Config(object):
         # Pushbullet
         "PUSHBULLET_ENABLE": False,
         "PUSHBULLET_KEY": '',                     # Authentication key used for Pushbullet
+        "PUSHBULLET_DEVICE": 'pai',               # Destination device for notifications
         "PUSHBULLET_CONTACTS": [],                # Pushbullet user identifiers for notifications and interaction
         "PUSHBULLET_IGNORE_EVENTS": [],           # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
         "PUSHBULLET_ALLOW_EVENTS": [],            # Same as before but as a white list. Default is use EVENT_FILTERS
