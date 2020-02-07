@@ -38,12 +38,20 @@ def send_initial_status(alarm):
     })
 
 
-@pytest.mark.asyncio
-async def test_current_state_armed_away(mocker):
+@pytest.fixture(scope="function")
+def alarm(mocker):
+    mocker.patch('paradox.lib.utils.main_thread_loop', asyncio.get_event_loop())
+    # conn = mocker.patch("paradox.interfaces.mqtt.core.MQTTConnection")
+    # conn.connected = True
     alarm = Paradox(None)
     mocker.spy(alarm.storage, 'update_container_object')
     alarm.panel = MagicMock()
 
+    return alarm
+
+
+@pytest.mark.asyncio
+async def test_current_state_armed_away(alarm):
     send_initial_status(alarm)
 
     alarm._on_status_update(status=dict(
@@ -61,11 +69,7 @@ async def test_current_state_armed_away(mocker):
 
 
 @pytest.mark.asyncio
-async def test_current_state_pending(mocker):
-    alarm = Paradox(None)
-    mocker.spy(alarm.storage, 'update_container_object')
-    alarm.panel = MagicMock()
-
+async def test_current_state_pending(alarm):
     send_initial_status(alarm)
 
     alarm._on_status_update(status=dict(
@@ -84,11 +88,7 @@ async def test_current_state_pending(mocker):
 
 
 @pytest.mark.asyncio
-async def test_current_arm_stay(mocker):
-    alarm = Paradox(None)
-    mocker.spy(alarm.storage, 'update_container_object')
-    alarm.panel = MagicMock()
-
+async def test_current_arm_stay(alarm):
     send_initial_status(alarm)
 
     alarm._on_status_update(status=dict(
@@ -108,9 +108,10 @@ async def test_current_arm_stay(mocker):
 
 @pytest.mark.asyncio
 async def test_current_alarm(mocker):
+    mocker.patch('paradox.lib.utils.main_thread_loop', asyncio.get_event_loop())
     alarm = Paradox(None)
-    mocker.spy(alarm.storage, 'update_container_object')
     alarm.panel = Panel_EVO192(alarm, 5)
+    mocker.spy(alarm.storage, 'update_container_object')
 
     send_initial_status(alarm)
 
@@ -123,3 +124,4 @@ async def test_current_alarm(mocker):
     alarm.storage.update_container_object.assert_any_call('partition', 'Partition_1', {
         'current_state': 'triggered'
     })
+    alarm.panel = None

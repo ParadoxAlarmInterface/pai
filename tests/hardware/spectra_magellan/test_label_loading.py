@@ -74,4 +74,7 @@ async def test_label_loading(mocker):
     core.send_wait = send_wait
     panel = Panel(core=core, product_id=0)
 
-    print(await panel.load_labels())
+    labels = await panel.load_labels()
+
+    assert labels['zone'][1]['key'] == 'El_t_r'
+    assert labels['zone'][1]['id'] == 1

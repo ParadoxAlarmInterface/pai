@@ -9,12 +9,13 @@ from typing import Optional, Sequence, Iterable, Callable
 from construct import Container
 
 from paradox.data.enums import RunState
+from paradox.data.model import DetectedPanel
 from paradox.event import Event, LiveEvent, ChangeEvent, Change
 from paradox.config import config as cfg
 from paradox.connections.ip_connection import IPConnection
 from paradox.connections.serial_connection import SerialCommunication
 from paradox.data.memory_storage import MemoryStorage as Storage
-from paradox.exceptions import StatusRequestException
+from paradox.exceptions import StatusRequestException, PanelNotDetected, async_loop_unhandled_exception_handler
 from paradox.hardware import create_panel
 from paradox.lib import ps
 from paradox.lib.async_message_manager import EventMessageHandler, ErrorMessageHandler
@@ -22,14 +23,6 @@ from paradox.lib.utils import deep_merge
 from paradox.parsers.status import convert_raw_status
 
 logger = logging.getLogger('PAI').getChild(__name__)
-
-
-def async_loop_unhandled_exception_handler(loop, context):
-    logger.error("Unhandled exception in async loop(%s): %s", loop, context)
-
-    loop.default_exception_handler(context)
-    # exception = context.get('exception')
-    logger.exception("Unhandled exception in async loop")
 
 
 class Paradox:
@@ -140,11 +133,15 @@ class Paradox:
                 self.panel = create_panel(self, reply.fields.value.product_id)  # Now we know what panel it is. Let's
                 # recreate panel object.
                 ps.sendMessage(
-                    'panel_detected', panel=dict(
-                        product_id=reply.fields.value.product_id, model=model,
-                        firmware_version=firmware_version, serial_number=serial_number
+                    'panel_detected', panel=DetectedPanel(
+                        product_id=reply.fields.value.product_id,
+                        model=model,
+                        firmware_version=firmware_version,
+                        serial_number=serial_number
                     )
                 )
+            else:
+                raise PanelNotDetected('Failed to detect panel')
 
             result = await self.panel.initialize_communication(reply, cfg.PASSWORD)
             if not result:

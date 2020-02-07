@@ -87,8 +87,10 @@ class InterfaceManager:
             try:
                 logger.info(f"Stopping {interface.name}")
                 interface.stop()
+                interface.alarm = None
             except Exception:
                 logger.exception(
                     "Error stopping interface {}".format(interface.name))
         logger.debug("All Interfaces stopped")
+        self.interfaces = []
 

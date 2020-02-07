@@ -111,6 +111,14 @@ class MQTTConnection(Client):
     def register(self, cls):
         self.registrars.append(cls)
 
+        self.start()
+
+    def unregister(self, cls):
+        self.registrars.remove(cls)
+
+        if len(self.registrars) == 0:
+            self.stop()
+
     @property
     def connected(self):
         return self.state == ConnectionState.CONNECTED
@@ -150,21 +158,24 @@ class AbstractMQTTInterface(ThreadQueueInterface):
         super().__init__(alarm)
 
         self.mqtt = MQTTConnection.get_instance()
-        self.mqtt.register(self)
-        logger.debug("Registars: %d", len(self.mqtt.registrars))
-
         self.republish_cache = {}
 
     def start(self):
         super().start()
-        self.mqtt.start()
+        self.mqtt.register(self)
+        logger.debug("Registars: %d", len(self.mqtt.registrars))
 
     def stop(self):
         """ Stops the MQTT Interface Thread"""
-        self.mqtt.stop()
+        def stop_loop():
+            self.republish_task.cancel()
+            self.loop.stop()
+
+        self.loop.call_soon_threadsafe(stop_loop)
+
+        self.mqtt.unregister(self)
+
         super().stop()
-        self.republish_task.cancel()
-        self.loop.call_soon_threadsafe(self.loop.stop)
 
     async def republish_loop(self):
         while True:

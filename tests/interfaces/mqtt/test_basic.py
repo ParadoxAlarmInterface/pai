@@ -9,13 +9,22 @@ from paradox.event import Event
 from paradox.interfaces.mqtt.basic import BasicMQTTInterface
 
 
-@pytest.mark.asyncio
-async def test_handle_panel_event(mocker):
+def get_interface(mocker):
+    mocker.patch('paradox.lib.utils.main_thread_loop', asyncio.get_event_loop())
+    con = mocker.patch("paradox.interfaces.mqtt.core.MQTTConnection")
+    con.get_instance.return_value.connected = True
+    con.get_instance.return_value.availability_topic = "paradox/interface/availability"
+    con.get_instance.return_value.run_status_topic = "paradox/interface/run_status"
     interface = BasicMQTTInterface(mocker.MagicMock())
-    interface.mqtt = mocker.MagicMock()
     interface.start()
     interface.on_connect(None, None, None, None)
 
+    return interface
+
+
+@pytest.mark.asyncio
+async def test_handle_panel_event(mocker):
+    interface = get_interface(mocker)
     try:
         await asyncio.sleep(0.01)
 
@@ -37,6 +46,9 @@ async def test_handle_panel_event(mocker):
                                                        0, True)
     finally:
         interface.stop()
+        interface.join()
+        assert not interface.is_alive()
+
 
 @pytest.mark.parametrize("command,expected", [
     pytest.param(b'arm', 'arm'),
@@ -52,10 +64,7 @@ async def test_handle_panel_event(mocker):
 ])
 @pytest.mark.asyncio
 async def test_mqtt_handle_partition_control(command, expected, mocker):
-    interface = BasicMQTTInterface(mocker.MagicMock())
-    interface.start()
-    interface.on_connect(None, None, None, None)
-
+    interface = get_interface(mocker)
     try:
         await asyncio.sleep(0.01)
 
@@ -71,14 +80,13 @@ async def test_mqtt_handle_partition_control(command, expected, mocker):
         )
     finally:
         interface.stop()
+        interface.join()
+        assert not interface.is_alive()
 
 
 @pytest.mark.asyncio
 async def test_mqtt_handle_zone_control(mocker):
-    interface = BasicMQTTInterface(mocker.MagicMock())
-    interface.start()
-    interface.on_connect(None, None, None, None)
-
+    interface = get_interface(mocker)
     try:
         await asyncio.sleep(0.01)
 
@@ -94,14 +102,13 @@ async def test_mqtt_handle_zone_control(mocker):
         )
     finally:
         interface.stop()
+        interface.join()
+        assert not interface.is_alive()
 
 
 @pytest.mark.asyncio
 async def test_mqtt_handle_zone_control_utf8(mocker):
-    interface = BasicMQTTInterface(mocker.MagicMock())
-    interface.start()
-    interface.on_connect(None, None, None, None)
-
+    interface = get_interface(mocker)
     try:
         await asyncio.sleep(0.01)
 
@@ -117,3 +124,5 @@ async def test_mqtt_handle_zone_control_utf8(mocker):
         )
     finally:
         interface.stop()
+        interface.join()
+        assert not interface.is_alive()

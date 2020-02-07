@@ -1,15 +1,17 @@
-import binascii
 import asyncio
-import pytest
-import typing
-from paradox.hardware import create_panel
-from paradox.data.enums import RunState
-from paradox.lib.ps import sendMessage
-from paradox.paradox import Paradox
-from paradox.lib.async_message_manager import AsyncMessageManager
+import binascii
 import logging
-import time
 import threading
+import typing
+
+import pytest
+
+from paradox.data.enums import RunState
+from paradox.hardware import create_panel
+from paradox.lib.async_message_manager import AsyncMessageManager
+from paradox.lib.ps import sendMessage
+from paradox.lib.utils import call_soon_in_main_loop
+from paradox.paradox import Paradox
 
 logger = logging.getLogger('PAI').getChild(__name__)
 from paradox.config import config as cfg
@@ -79,15 +81,13 @@ class MockClient(threading.Thread):
         self.command = command
         self.result = None
 
+    async def _control(self):
+        self.result = await self.alarm.control_partition(self.partitions, self.command)
+        logger.debug(f"Control result: {self.result}")
+
     def run(self):
         logger.debug(f"Issuing {self.command} to {self.partitions} ")
-        try:
-            self.result = self.alarm.control_partition(self.partitions, self.command)
-            logger.debug(f"Control result: {self.result}")
-
-        except concurrent.futures._base.TimeoutError:
-            logger.exception("Tiemout Error")
-            self.result = "Timeout Error"
+        call_soon_in_main_loop(self._control())
 
     def join(self, timeout=None):
         super(MockClient, self).join(timeout)
@@ -96,9 +96,12 @@ class MockClient(threading.Thread):
 
 
 @pytest.fixture(scope='function')
-async def setup_panel():
-    cfg.LOGGING_LEVEL_CONSOLE = logging.DEBUG
-    cfg.LOGGING_DUMP_PACKETS = True
+async def setup_panel(mocker):
+    mocker.patch.object(cfg, "LOGGING_LEVEL_CONSOLE", logging.DEBUG)
+    mocker.patch.object(cfg, "LOGGING_DUMP_PACKETS", True)
+    mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_event_loop())
+    # cfg.LOGGING_LEVEL_CONSOLE = logging.DEBUG
+    # cfg.LOGGING_DUMP_PACKETS = True
     
     logger.setLevel(logging.DEBUG)
     alarm = Paradox()
@@ -125,7 +128,7 @@ async def test_partition_arm_spmg_single_1(setup_panel):
     cli.start()
     await asyncio.sleep(0.01)
 
-    cli.join(0.01)
+    cli.join(1)
 
     assert not cli.is_alive()
 
@@ -139,7 +142,7 @@ async def test_partition_arm_spmg_single_2(setup_panel):
     cli.start()
     await asyncio.sleep(0.01)
 
-    cli.join(0.01)
+    cli.join(1)
 
     assert not cli.is_alive()
 
@@ -155,7 +158,7 @@ async def test_partition_arm_spmg_single_event(setup_panel):
     cli.start()
     await asyncio.sleep(2.01)  # to trigger one timeout
 
-    cli.join(0.01)
+    cli.join(1)
 
     assert not cli.is_alive()
 
@@ -171,6 +174,6 @@ async def test_partition_arm_spmg_all(setup_panel):
     cli.start()
     await asyncio.sleep(2.01)  # to trigger one timeout
 
-    cli.join(0.01)
+    cli.join(1)
 
     assert not cli.is_alive()
