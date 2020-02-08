@@ -46,7 +46,8 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
 
     def on_connect(self, client, userdata, flags, result):
         # TODO: do not create connected_future, use some other
-        self.connected_future.set_result(True)
+        if not self.connected_future.done():
+            self.connected_future.set_result(True)
 
     def _handle_labels_loaded(self, data):
         partitions = data.get('partition', {})

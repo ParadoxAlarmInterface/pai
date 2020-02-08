@@ -109,7 +109,8 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             self._mqtt_handle_notifications
         )
 
-        self.connected_future.set_result(True)
+        if not self.connected_future.done():
+            self.connected_future.set_result(True)
 
     @mqtt_handle_decorator
     async def _mqtt_handle_notifications(self, prep: ParsedMessage):
@@ -209,12 +210,14 @@ class BasicMQTTInterface(AbstractMQTTInterface):
     def _handle_panel_labels(self, data: dict):
         self.labels = data
 
-        self.labels_future.set_result(data)
+        if not self.labels_future.done():
+            self.labels_future.set_result(data)
 
     def _handle_panel_definitions(self, data: dict):
         self.definitions = data
 
-        self.definitions_future.set_result(data)
+        if not self.definitions_future.done():
+            self.definitions_future.set_result(data)
 
     def _handle_panel_change(self, change: Change):
         attribute = change.property
