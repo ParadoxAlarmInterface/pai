@@ -32,7 +32,7 @@ class PushBulletWSClient(WebSocketBaseClient):
         
         self.device = None
         for i, device in enumerate(self.pb.devices):
-            if device.nickname == 'pai':
+            if device.nickname == cfg.PUSHBULLET_DEVICE:
                 logger.debug("Device found")
                 self.device = device
                 break
@@ -114,12 +114,12 @@ class PushBulletWSClient(WebSocketBaseClient):
         if not isinstance(dstchat, list):
             dstchat = [dstchat]
         # Push to self
-        self.device.push_note("pai", msg)
+        self.device.push_note(cfg.PUSHBULLET_DEVICE, msg)
         
         for chat in dstchat:
             if chat.email in cfg.PUSHBULLET_CONTACTS:
                 try:
-                    self.pb.push_note("pai", msg, chat=chat)
+                    self.pb.push_note(cfg.PUSHBULLET_DEVICE, msg, chat=chat)
                 except Exception:
                     logger.exception("Sending message")
                     time.sleep(5)
