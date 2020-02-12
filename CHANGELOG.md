@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Hass.io: Container does not use host network anymore. Please update `MQTT_HOST` to use real IP address or IP address of a docker interface. `localhost`, `127.0.0.1` will stop working.
 - MQTT Interfaces now do their work in a separate threads and asyncio run loops. Frees main loop for more urgent work. Probably fixes #89, #126
 - `Paradox` class methods changed to async only: `connect`, `loop`, `control_zone`, `control_partition`, `control_output`
 
