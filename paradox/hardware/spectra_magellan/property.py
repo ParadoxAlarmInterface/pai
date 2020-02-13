@@ -100,19 +100,19 @@ property_map = {
         level=EventLevel.DEBUG, tags=['voltage', 'power'],
         message="DC voltage is {value}V"),
     "entry_delay": dict(
-        level=EventLevel.INFO, tags=['alarm'],
+        level=EventLevel.INFO, tags=['entry', 'delay'],
         message={"True": "{Type} {label} in entry delay",
                  "False": "{Type} {label} not in entry delay"}),
     "entry_delay_finished": dict(
-        level=EventLevel.DEBUG, tags=['alarm'],
+        level=EventLevel.DEBUG, tags=['entry', 'delay'],
         message={"True": "{Type} {label} entry delay is finished",
                  "False": "{Type} {label} entry delay is not finished"}),
     "exit_delay": dict(
-        level=EventLevel.INFO, tags=['arm'],
+        level=EventLevel.INFO, tags=['exit', 'delay'],
         message={"True": "{Type} {label} in exit delay",
                  "False": "{Type} {label} not in exit delay"}),
     "exit_delay_finished": dict(
-        level=EventLevel.DEBUG, tags=['arm'],
+        level=EventLevel.DEBUG, tags=['exit', 'delay'],
         message={"True": "{Type} {label} exit delay is finished",
                  "False": "{Type} {label} exit delay is not finished"}),
     "fire_delay": dict(
