@@ -6,7 +6,7 @@ from paradox.config import config as cfg
 from paradox.lib.crypto import encrypt, decrypt
 from paradox.parsers.paradox_ip_messages import ip_message
 from .connection import ConnectionProtocol
-from ..lib.utils import call_soon_in_main_loop
+from ..exceptions import NotConnectedException
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
@@ -35,14 +35,14 @@ class SerialConnectionProtocol(ConnectionProtocol):
         super(SerialConnectionProtocol, self).connection_made(transport)
         self.on_port_open()
 
-    async def _send_message(self, message):
+    def send_message(self, message):
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("PAI -> SER {}".format(binascii.hexlify(message)))
 
-        self.transport.write(message)
+        if self.transport is None:
+            raise NotConnectedException("Not connected")
 
-    def send_message(self, message):
-        call_soon_in_main_loop(self._send_message(message))
+        self.transport.write(message)
 
     def data_received(self, recv_data):
         self.buffer += recv_data
@@ -105,6 +105,9 @@ class IPConnectionProtocol(ConnectionProtocol):
     def send_message(self, message):
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("PAI -> IPC {}".format(binascii.hexlify(message)))
+
+        if self.transport is None:
+            raise NotConnectedException("Not connected")
 
         payload = encrypt(message, self.key)
         msg = ip_message.build(

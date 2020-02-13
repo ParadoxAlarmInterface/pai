@@ -10,6 +10,10 @@ class StatusRequestException(PAIException):
     pass
 
 
+class NotConnectedException(PAIException):
+    pass
+
+
 class PAICriticalException(PAIException):
     """Should stop PAI"""
     pass
