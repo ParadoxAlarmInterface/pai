@@ -128,11 +128,11 @@ import logging
 # PUSHBULLET_MIN_EVENT_LEVEL = 'INFO'
 ## Event filtering by tags:
 # PUSHBULLET_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
-#     'alarm,-restore', # or
-#     'trouble,-clock', # or
-#     'tamper'
+#     'live,alarm,-restore', # or
+#     'live,trouble,-clock', # or
+#     'live,tamper'
 # ]
-## - OR - event filtering using regexp
+## - OR - event filtering using regexp. Cannot be used together with _EVENT_FILTERS
 # PUSHBULLET_ALLOW_EVENTS = [r".*"] # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
 # PUSHBULLET_IGNORE_EVENTS = [ # Same as previous  but to ignore some specific events that matched in _ALLOW_EVENTS
 #     r"zone,[\w]+,no_delay=True",
@@ -149,11 +149,11 @@ import logging
 # PUSHOVER_MIN_EVENT_LEVEL = 'INFO'
 ## Event filtering by tags:
 # PUSHOVER_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
-#     'alarm,-restore', # or
-#     'trouble,-clock', # or
-#     'tamper'
+#     'live,alarm,-restore', # or
+#     'live,trouble,-clock', # or
+#     'live,tamper'
 # ]
-## - OR - event filtering using regexp
+## - OR - event filtering using regexp. Cannot be used together with _EVENT_FILTERS
 # PUSHOVER_ALLOW_EVENTS = [r".*"] # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
 # PUSHOVER_IGNORE_EVENTS = [ # Same as previous  but to ignore some specific events that matched in _ALLOW_EVENTS
 #     r"zone,[\w]+,no_delay=True",
@@ -168,11 +168,11 @@ import logging
 # SIGNAL_MIN_EVENT_LEVEL = 'INFO'
 ## Event filtering by tags:
 # SIGNAL_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
-#     'alarm,-restore', # or
-#     'trouble,-clock', # or
-#     'tamper'
+#     'live,alarm,-restore', # or
+#     'live,trouble,-clock', # or
+#     'live,tamper'
 # ]
-## - OR - event filtering using regexp
+## - OR - event filtering using regexp. Cannot be used together with _EVENT_FILTERS
 # SIGNAL_ALLOW_EVENTS = [r".*"] # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
 # SIGNAL_IGNORE_EVENTS = [ # Same as previous  but to ignore some specific events that matched in _ALLOW_EVENTS
 #     r"zone,[\w]+,no_delay=True",
@@ -189,9 +189,9 @@ import logging
 # GSM_MIN_EVENT_LEVEL = 'CRITICAL'
 ## Event filtering by tags:
 # GSM_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
-#     'zone,alarm,trigger'
+#     'live,zone,alarm,trigger'
 # ]
-## - OR - event filtering using regexp
+## - OR - event filtering using regexp. Cannot be used together with _EVENT_FILTERS
 # GSM_ALLOW_EVENTS = [r".*"] # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
 # GSM_IGNORE_EVENTS = [ # Same as previous  but to ignore some specific events that matched in _ALLOW_EVENTS
 #     r"zone,[\w]+,no_delay=True",
