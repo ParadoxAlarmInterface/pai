@@ -33,3 +33,10 @@ jobs:
         - docker-ce
         - docker-ce-cli
         - containerd.io
+notifications:
+  webhooks:
+    urls:
+      - https://webhooks.gitter.im/e/008067a67792a8e27478
+    on_success: change
+    on_failure: always
+    on_start: never
