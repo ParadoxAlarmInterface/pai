@@ -255,7 +255,7 @@ class Panel:
 
             properties = template.copy()
             properties['id'] = index
-            properties['key'] = sanitize_key(label) or f"{elem_type}_{index}"
+            properties['key'] = sanitize_key(label) or sanitize_key(f"{elem_type} {index}")
             properties['label'] = label
             element_dict[index] = properties
 
