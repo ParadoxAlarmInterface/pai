@@ -166,7 +166,7 @@ class Panel:
             if limits is not None:
                 addresses = iter((i, a) for i, a in addresses if i in limits)
 
-            await self._load_labels(data[elem_type], addresses, label_offset=elem_def['label_offset'])
+            await self._load_labels(data, elem_type, addresses, label_offset=elem_def['label_offset'])
 
             logger.info("{}: {}".format(elem_type.title(), ', '.join([v["label"] for v in data[elem_type].values()])))
 
@@ -217,7 +217,8 @@ class Panel:
                         yield ia2.idx, data[i * field_length:(i + 1) * field_length]
 
     async def _load_labels(self,
-                           data_dict: dict,
+                           data: dict,
+                           elem_type: str,
                            addresses: typing.Iterator[typing.Tuple[int, int]],
                            field_length=16,
                            label_offset=0,
@@ -232,6 +233,8 @@ class Panel:
         :param template: Default template
         :return:
         """
+        element_dict = data[elem_type]
+
         if template is None:
             template = {}
 
@@ -252,9 +255,9 @@ class Panel:
 
             properties = template.copy()
             properties['id'] = index
-            properties['key'] = sanitize_key(label)
+            properties['key'] = sanitize_key(label) or f"{elem_type}_{index}"
             properties['label'] = label
-            data_dict[index] = properties
+            element_dict[index] = properties
 
     def initialize_communication(self, reply, password):
         raise NotImplementedError("override initialize_communication in a subclass")
