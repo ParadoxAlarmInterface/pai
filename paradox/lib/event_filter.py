@@ -2,7 +2,7 @@ import logging
 import re
 from collections import namedtuple
 
-from paradox.event import Event, LiveEvent, EventLevel
+from paradox.event import Event, LiveEvent, EventLevel, ChangeEvent
 
 re_match = re.compile(r"[+-]?(?P<quote>['\"])?(?(quote).+?|[a-z_A-Z=]+)(?(quote)(?P=quote))")
 re_unquote = re.compile(r"^(?P<quote>['\"])(.*)(?P=quote)$")
@@ -78,6 +78,12 @@ class EventTagFilter(EventFilter):
 
     def match(self, event: Event):
         tags = [event.type]
+
+        if isinstance(event, LiveEvent):
+            tags.append('live')
+        elif isinstance(event, ChangeEvent):
+            tags.append('change')
+
         if event.tags:
             tags += event.tags
 

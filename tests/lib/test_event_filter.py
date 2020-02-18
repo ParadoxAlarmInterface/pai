@@ -27,6 +27,9 @@ def test_tag_match():
     assert EventTagFilter(['partition, arm']).match(event) is True
     assert EventTagFilter(['partition, -arm']).match(event) is False
 
+    assert EventTagFilter(['live,partition,arm']).match(event) is False
+    assert EventTagFilter(['change,partition,arm']).match(event) is False
+
     event.level = EventLevel.DEBUG
     assert EventTagFilter(['partition+arm']).match(event) is False
 
@@ -55,6 +58,9 @@ def test_zone_generated_alarm_match(mocker):
     assert EventTagFilter(['zone,alarm,Beer']).match(event_) is True
     assert EventTagFilter(['zone,alarm,-Beer']).match(event_) is False
 
+    assert EventTagFilter(['live,zone,alarm']).match(event_) is True
+    assert EventTagFilter(['change,zone,alarm']).match(event_) is False
+
 
 def test_zone_generated_alarm_changes_match(mocker):
     label_provider = mocker.MagicMock(return_value="Beer")
@@ -78,6 +84,9 @@ def test_zone_generated_alarm_changes_match(mocker):
     assert EventTagFilter(['generated_alarm=True-presently_in_alarm=True']).match(event_) is False
 
     assert EventTagFilter(['-generated_alarm=False']).match(event_) is True
+
+    assert EventTagFilter(['live,generated_alarm=True']).match(event_) is True
+    assert EventTagFilter(['change,generated_alarm=True']).match(event_) is False
 
     with pytest.raises(AssertionError):
         EventTagFilter(['-=False'])

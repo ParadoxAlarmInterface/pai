@@ -110,9 +110,9 @@ class Config(object):
         "PUSHBULLET_IGNORE_EVENTS": [],           # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
         "PUSHBULLET_ALLOW_EVENTS": [],            # Same as before but as a white list. Default is use EVENT_FILTERS
         "PUSHBULLET_EVENT_FILTERS": [             # list of tags, property changes to include or exclude. See event.py for tag list
-            'alarm,-restore',
-            'trouble,-clock',
-            'tamper'
+            'live,alarm,-restore',
+            'live,trouble,-clock',
+            'live,tamper'
         ],
         "PUSHBULLET_MIN_EVENT_LEVEL": ('INFO', str, ['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL']),
 
@@ -125,9 +125,9 @@ class Config(object):
         "PUSHOVER_IGNORE_EVENTS": [],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
         "PUSHOVER_ALLOW_EVENTS": [],              # Same as before but as a white list. Default is use EVENT_FILTERS
         "PUSHOVER_EVENT_FILTERS": [               # list of tags, property changes to include or exclude. See event.py for tag list
-            'alarm,-restore',
-            'trouble,-clock',
-            'tamper'
+            'live,alarm,-restore',
+            'live,trouble,-clock',
+            'live,tamper'
         ],
         "PUSHOVER_MIN_EVENT_LEVEL": ('INFO', str, ['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL']),
 
@@ -137,9 +137,9 @@ class Config(object):
         "SIGNAL_IGNORE_EVENTS": [],             # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
         "SIGNAL_ALLOW_EVENTS": [],              # Same as before but as a white list. Default is use EVENT_FILTERS
         "SIGNAL_EVENT_FILTERS": [               # list of tags, property changes to include or exclude. See event.py for tag list
-            'alarm,-restore',
-            'trouble,-clock',
-            'tamper'
+            'live,alarm,-restore',
+            'live,trouble,-clock',
+            'live,tamper'
         ],
         "SIGNAL_MIN_EVENT_LEVEL": ('INFO', str, ['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL']),
 
@@ -151,7 +151,7 @@ class Config(object):
         "GSM_IGNORE_EVENTS": [],                  # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
         "GSM_ALLOW_EVENTS": [],                   # Same as before but as a white list. Default is use EVENT_FILTERS
         "GSM_EVENT_FILTERS": [                    # list of tags, property changes to include or exclude. See event.py for tag list
-            'zone,alarm,trigger'
+            'live,zone,alarm,trigger'
         ],
         "GSM_MIN_EVENT_LEVEL": ('CRITICAL', str, ['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL']),
 
@@ -164,11 +164,11 @@ class Config(object):
         # Dummy Interface for testing
         "DUMMY_INTERFACE_ENABLE": False,
         "DUMMY_EVENT_FILTERS": [
-            'alarm-restore',
-            'trouble-clock',
-            'tamper'
-            'arm',
-            'disarm'
+            'live,alarm-restore',
+            'live,trouble-clock',
+            'live,tamper'
+            'live,arm',
+            'live,disarm'
         ],
         "DUMMY_MIN_EVENT_LEVEL": ('DEBUG', str, ['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'])
     }
