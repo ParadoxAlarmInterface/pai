@@ -271,9 +271,13 @@ class IPInterface(Interface):
         logger.info("Client %d connected" % self.client_nr)
         await self.alarm.pause()
 
-        await connection.handle()
-        self.alarm.connection.deregister_handler(handler_name)
+        try:
+            await connection.handle()
+        except Exception:
+            logger.exception("Client %d connection raised exception" % self.client_nr)
+        finally:
+            self.alarm.connection.deregister_handler(handler_name)
 
-        logger.debug("Resuming")
-        await self.alarm.resume()
-        logger.info("Client %d disconnected" % self.client_nr)
+            logger.debug("Resuming")
+            await self.alarm.resume()
+            logger.info("Client %d disconnected" % self.client_nr)
