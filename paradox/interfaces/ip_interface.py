@@ -46,6 +46,8 @@ ip_payload_connect_response = Struct(
 
 class ClientConnection():
     def __init__(self, reader, writer, alarm, key):
+        if isinstance(key, str):
+            key = key.encode()
         self.client_writer = writer
         self.client_reader = reader
         self.alarm = alarm
