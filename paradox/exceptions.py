@@ -2,6 +2,7 @@ import logging
 
 logger = logging.getLogger('PAI').getChild(__name__)
 
+
 class PAIException(Exception):
     pass
 
@@ -25,6 +26,11 @@ class AuthenticationFailed(PAICriticalException):
 
 class PanelNotDetected(PAICriticalException):
     pass
+
+
+class SerialConnectionOpenFailed(PAICriticalException):
+    pass
+
 
 def async_loop_unhandled_exception_handler(loop, context):
     exception = context.get('exception')
