@@ -86,7 +86,7 @@ class SerialConnectionProtocol(ConnectionProtocol):
                 self.buffer = self.buffer[1:]
 
     def connection_lost(self, exc):
-        logger.error('The serial port was closed')
+        logger.error(f'The serial port was closed: {exc}')
         self.buffer = b''
         super(SerialConnectionProtocol, self).connection_lost(exc)
 

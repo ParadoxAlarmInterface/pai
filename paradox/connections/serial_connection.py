@@ -29,7 +29,8 @@ class SerialCommunication(Connection):
 
     def on_port_open(self):
         logger.info('Serial port open')
-        self.connected_future.set_result(True)
+        if not self.connected_future.done():
+            self.connected_future.set_result(True)
         self.connected = True
 
     def open_timeout(self):
@@ -54,6 +55,7 @@ class SerialCommunication(Connection):
                 self.loop, self.make_protocol, self.port_path, self.baud
             )
         except SerialException as e:
+            self.connected_future.cancel()
             raise SerialConnectionOpenFailed from e
 
         return await self.connected_future
