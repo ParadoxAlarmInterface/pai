@@ -28,7 +28,6 @@ def checksum(data, min_message_length):
 class SerialConnectionProtocol(ConnectionProtocol):
     def __init__(self, on_message: typing.Callable[[bytes], None], on_port_open, on_con_lost):
         super(SerialConnectionProtocol, self).__init__(on_message=on_message, on_con_lost=on_con_lost)
-        self.buffer = b''
         self.on_port_open = on_port_open
 
     def connection_made(self, transport):
@@ -85,16 +84,10 @@ class SerialConnectionProtocol(ConnectionProtocol):
             else:
                 self.buffer = self.buffer[1:]
 
-    def connection_lost(self, exc):
-        logger.error(f'The serial port was closed: {exc}')
-        self.buffer = b''
-        super(SerialConnectionProtocol, self).connection_lost(exc)
-
 
 class IPConnectionProtocol(ConnectionProtocol):
     def __init__(self, on_message: typing.Callable[[bytes], None], on_con_lost, key):
         super(IPConnectionProtocol, self).__init__(on_message=on_message, on_con_lost=on_con_lost)
-        self.buffer = b''
         self.key = key
 
     def send_raw(self, raw):

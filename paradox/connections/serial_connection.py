@@ -51,7 +51,7 @@ class SerialCommunication(Connection):
         self.loop.call_later(5, self.open_timeout)
 
         try:
-            _, self.connection = await serial_asyncio.create_serial_connection(
+            _, self._protocol = await serial_asyncio.create_serial_connection(
                 self.loop, self.make_protocol, self.port_path, self.baud
             )
         except SerialException as e:

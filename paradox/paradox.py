@@ -86,7 +86,7 @@ class Paradox:
 
     async def connect(self):
         if self._connection:
-            self.disconnect()  # socket needs to be also closed
+            await self.disconnect()  # socket needs to be also closed
         self.panel = None
 
         self.run_state = RunState.INIT
@@ -216,7 +216,8 @@ class Paradox:
                     replies_missing += 1
                     if replies_missing > 3:
                         logger.error("Lost communication with panel")
-                        self.disconnect()
+                        await self.disconnect()
+                        return
                 except Exception:
                     logger.exception("Loop")
                 finally:
@@ -470,18 +471,18 @@ class Paradox:
         error_enum = message.fields.value.message
 
         if error_enum == 'panel_not_connected':
-            self.disconnect()
+            asyncio.create_task(self.disconnect())
         else:
             message = self.panel.get_error_message(error_enum)
             logger.error("Got ERROR Message: {}".format(message))
 
-    def disconnect(self):
+    async def disconnect(self):
         logger.info("Disconnecting from the Alarm Panel")
         self.run_state = RunState.STOP
 
         self._clean_session()
         if self.connection.connected:
-            self.connection.close()
+            await self.connection.close()
             logger.info("Disconnected from the Alarm Panel")
 
     async def pause(self):
@@ -501,6 +502,7 @@ class Paradox:
         logger.info("Clean Session")
         if self.connection.connected:
             if not self.panel:
+                logger.info("No panel, creating generic one")
                 panel = create_panel(self)
             else:
                 panel = self.panel
