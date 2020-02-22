@@ -20,7 +20,6 @@ class ConnectionProtocol(asyncio.Protocol):
         self.buffer = b''
 
     def connection_made(self, transport):
-        logger.info("Connection made")
         self.transport = transport
 
     def is_closing(self):
@@ -28,7 +27,6 @@ class ConnectionProtocol(asyncio.Protocol):
 
     async def close(self):
         if self.transport:
-            logger.info('Closing transport')
             try:
                 self.transport.close()
             except Exception:
@@ -85,8 +83,6 @@ class Connection(AsyncMessageManager):
             raise ConnectionError("Failed to write data to connection")
 
     async def close(self):
-        logger.info('Closing connection')
-
         if self._protocol:
             await self._protocol.close()
             self._protocol = None
