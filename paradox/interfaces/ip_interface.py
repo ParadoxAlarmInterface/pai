@@ -107,6 +107,9 @@ class ClientConnection():
             in_payload = message.payload
 
             if len(in_payload) >= 16 and message.header.flags & 0x01 != 0 and len(in_payload) % 16 == 0:
+                if message.header.command == 0xf0:
+                    self.connection_key = next_connection_key = self.interface_password
+
                 in_payload = decrypt(in_payload, self.connection_key)[:message.header.length]
 
             in_payload = in_payload[:message.header.length]
