@@ -1,4 +1,4 @@
-<div align="left">
+<div align="center">
     <div style="display: flex;">
         <a href="https://gitter.im/paradox-alarm-interface/community">
             <img alt="Gitter" src="https://img.shields.io/gitter/room/paradox-alarm-interface/community?logo=gitter">
@@ -23,7 +23,11 @@
     </div>
 </div>
 
-# PAI - Paradox Alarm Interface
+<br/>
+<p align="center"> 
+<img src="https://github.com/ParadoxAlarmInterface/pai/raw/master/docs/pai_logo.png">
+</p>
+<h1 align="center">PAI - Paradox Alarm Interface</h1>
 
 Middleware that aims to connect to a Paradox Alarm panel, exposing the interface for monitoring and control via several technologies.
 With this interface it is possible to integrate Paradox panels with HomeAssistant, OpenHAB, Homebridge or other domotics system that supports MQTT, as well as several IM methods.
