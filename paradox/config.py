@@ -86,7 +86,7 @@ class Config(object):
         "MQTT_DASH_PUBLISH": False,
         "MQTT_DASH_TOPIC": "metrics/exchange/pai",
         "MQTT_DASH_TEMPLATE": "/etc/pai/mqtt_dash.txt",
-        "MQTT_CHALLENGE_SECRET": None,
+        "MQTT_CHALLENGE_SECRET": (None, [str, type(None)]),  # MQTT Command authorization challenge
         "MQTT_CHALLENGE_TOPIC": "challenge",
         "MQTT_CHALLENGE_ROUNDS": 1000,
 
