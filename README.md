@@ -32,7 +32,7 @@
 Middleware that aims to connect to a Paradox Alarm panel, exposing the interface for monitoring and control via several technologies.
 With this interface it is possible to integrate Paradox panels with HomeAssistant, OpenHAB, Homebridge or other domotics system that supports MQTT, as well as several IM methods.
 
-It supports MG/SP/EVO panels connected through a serial port, which is present in all panels (TTL 5V), or through a USB 307 module. It also supports connections using the IP150 module, both directly (firmware version <4.0), and through the SITE ID (firmware versions >4.0).
+It supports MG/SP/EVO panels connected through a serial port, which is present in all panels (TTL 5V), or through a USB 307 module. It also supports connections using the IP150 module, both directly (firmware version < 4.0 or >= 4.40.004), and through the SITE ID (firmware versions >4.0).
 
 Support for Magellan, Spectra and EVO panels is very stable. If you find a bug, please report it.
 
@@ -45,7 +45,7 @@ On Android, if you install [MQTT Dash](https://play.google.com/store/apps/detail
 ![mqtt_dash](https://user-images.githubusercontent.com/497717/52603920-d4984d80-2e60-11e9-9772-578b10576b3c.jpg)
 
 ## Things you need to have to be able to connect
-We support two connection options: via Serial and via IP150 Module
+We support two [connection options](https://github.com/ParadoxAlarmInterface/pai/wiki/Connection-methods): via [Serial](https://github.com/ParadoxAlarmInterface/pai/wiki/Connection-methods#serial-connection) and via [IP150 Module](https://github.com/ParadoxAlarmInterface/pai/wiki/Connection-methods#ip-module-connection-IP100-IP150).
 
 #### For all connection methods
 - **PC Password:** 4 digit `[0-9a-f]` password.
