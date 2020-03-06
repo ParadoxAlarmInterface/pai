@@ -3,12 +3,13 @@ import logging
 import typing
 
 from paradox.config import config as cfg
-from paradox.lib.crypto import encrypt, decrypt
+from paradox.lib.crypto import decrypt, encrypt
 from paradox.parsers.paradox_ip_messages import ip_message
-from .connection import ConnectionProtocol
-from ..exceptions import NotConnectedException
 
-logger = logging.getLogger('PAI').getChild(__name__)
+from ..exceptions import NotConnectedException
+from .connection import ConnectionProtocol
+
+logger = logging.getLogger("PAI").getChild(__name__)
 
 
 def checksum(data, min_message_length):
@@ -26,8 +27,12 @@ def checksum(data, min_message_length):
 
 
 class SerialConnectionProtocol(ConnectionProtocol):
-    def __init__(self, on_message: typing.Callable[[bytes], None], on_port_open, on_con_lost):
-        super(SerialConnectionProtocol, self).__init__(on_message=on_message, on_con_lost=on_con_lost)
+    def __init__(
+        self, on_message: typing.Callable[[bytes], None], on_port_open, on_con_lost
+    ):
+        super(SerialConnectionProtocol, self).__init__(
+            on_message=on_message, on_con_lost=on_con_lost
+        )
         self.on_port_open = on_port_open
 
     def connection_made(self, transport):
@@ -53,7 +58,9 @@ class SerialConnectionProtocol(ConnectionProtocol):
                 if self.buffer[0] >> 4 == 0:
                     potential_packet_length = 37
                 elif self.buffer[0] >> 4 in [1, 3, 4, 5, 6, 7, 8, 9]:
-                    potential_packet_length = self.buffer[1] if 0 < self.buffer[1] <= 71 else 37
+                    potential_packet_length = (
+                        self.buffer[1] if 0 < self.buffer[1] <= 71 else 37
+                    )
                 elif self.buffer[0] >> 4 in [0x0A, 0x0B, 0x0D]:
                     potential_packet_length = self.buffer[1]
                 elif self.buffer[0] >> 4 == 0x0C:
@@ -76,7 +83,7 @@ class SerialConnectionProtocol(ConnectionProtocol):
             frame = self.buffer[:potential_packet_length]
 
             if checksum(frame, min_length):
-                self.buffer = self.buffer[len(frame):]  # Remove message
+                self.buffer = self.buffer[len(frame) :]  # Remove message
                 if cfg.LOGGING_DUMP_PACKETS:
                     logger.debug("SER -> PAI {}".format(binascii.hexlify(frame)))
 
@@ -87,7 +94,9 @@ class SerialConnectionProtocol(ConnectionProtocol):
 
 class IPConnectionProtocol(ConnectionProtocol):
     def __init__(self, on_message: typing.Callable[[bytes], None], on_con_lost, key):
-        super(IPConnectionProtocol, self).__init__(on_message=on_message, on_con_lost=on_con_lost)
+        super(IPConnectionProtocol, self).__init__(
+            on_message=on_message, on_con_lost=on_con_lost
+        )
         self.key = key
 
     def send_raw(self, raw):
@@ -104,7 +113,17 @@ class IPConnectionProtocol(ConnectionProtocol):
 
         payload = encrypt(message, self.key)
         msg = ip_message.build(
-            dict(header=dict(length=len(message), unknown0=0x04, flags=0x09, command=0x00, encrypt=1), payload=payload))
+            dict(
+                header=dict(
+                    length=len(message),
+                    unknown0=0x04,
+                    flags=0x09,
+                    command=0x00,
+                    encrypt=1,
+                ),
+                payload=payload,
+            )
+        )
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("IPC -> Mod {}".format(binascii.hexlify(msg)))
         self.transport.write(msg)
@@ -112,10 +131,14 @@ class IPConnectionProtocol(ConnectionProtocol):
     def _get_message_payload(self, data):
         message = ip_message.parse(data)
 
-        if len(message.payload) >= 16 and len(message.payload) % 16 == 0 and message.header.flags & 0x01 != 0:
-            message_payload = decrypt(data[16:], self.key)[:message.header.length]
+        if (
+            len(message.payload) >= 16
+            and len(message.payload) % 16 == 0
+            and message.header.flags & 0x01 != 0
+        ):
+            message_payload = decrypt(data[16:], self.key)[: message.header.length]
         else:
-            message_payload = message.payload[:message.header.length]
+            message_payload = message.payload[: message.header.length]
 
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("IPC -> PAI {}".format(binascii.hexlify(message_payload)))
@@ -125,10 +148,13 @@ class IPConnectionProtocol(ConnectionProtocol):
     def data_received(self, recv_data):
         self.buffer += recv_data
 
-        if self.buffer[0] != 0xaa:
+        if self.buffer[0] != 0xAA:
             if len(self.buffer) > 0:
-                logger.warning('Dangling data in the receive buffer: %s' % binascii.hexlify(self.buffer))
-            self.buffer = b''
+                logger.warning(
+                    "Dangling data in the receive buffer: %s"
+                    % binascii.hexlify(self.buffer)
+                )
+            self.buffer = b""
             return
 
         if len(recv_data) + 16 < self.buffer[1]:
@@ -141,4 +167,4 @@ class IPConnectionProtocol(ConnectionProtocol):
             logger.debug("Mod -> IPC {}".format(binascii.hexlify(self.buffer)))
 
         self.on_message(self._get_message_payload(self.buffer))
-        self.buffer = b''
+        self.buffer = b""

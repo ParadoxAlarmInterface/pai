@@ -17,7 +17,7 @@ class ElementTypeContainer(dict):
         :return: Sequence[int] list of object indexes
         """
         selected = []  # type: Sequence[int]
-        if needle == 'all' or needle == '0':
+        if needle == "all" or needle == "0":
             selected = list(self)
         else:
             if needle.isdigit() and 0 < int(needle) < len(self):
@@ -45,7 +45,9 @@ class ElementTypeContainer(dict):
         for k, v in self.items():
             if isinstance(v, Mapping) and "key" in v and v["key"] == key:
                 return True
-        return super(ElementTypeContainer, self).__contains__(self.__keytransform__(key))
+        return super(ElementTypeContainer, self).__contains__(
+            self.__keytransform__(key)
+        )
 
     def __getitem__(self, key):
         if isinstance(key, str):

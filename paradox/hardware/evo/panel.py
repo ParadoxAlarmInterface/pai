@@ -5,35 +5,20 @@ import inspect
 import logging
 import typing
 
-from construct import Construct, Container, MappingError, ChecksumError
+from construct import ChecksumError, Construct, Container, MappingError
+from paradox.exceptions import AuthenticationFailed, StatusRequestException
 
-from paradox.exceptions import StatusRequestException, AuthenticationFailed
+from ..panel import Panel as PanelBase
 from . import parsers
 from .event import event_map
 from .property import property_map
-from ..panel import Panel as PanelBase
 
-logger = logging.getLogger('PAI').getChild(__name__)
+logger = logging.getLogger("PAI").getChild(__name__)
 
 ZONE_ACTIONS = dict(
-    bypass={
-        "flags": {
-            "bypassed": True
-        },
-        "operation": "set",
-    },
-    clear_bypass={
-        "flags": {
-            "bypassed": True
-        },
-        "operation": "clear",
-    },
-    clear_alarm_memory={
-        "flags": {
-            "generated_alarm": True
-        },
-        "operation": "clear",
-    }
+    bypass={"flags": {"bypassed": True}, "operation": "set",},
+    clear_bypass={"flags": {"bypassed": True}, "operation": "clear",},
+    clear_alarm_memory={"flags": {"generated_alarm": True}, "operation": "clear",},
 )
 
 
@@ -58,24 +43,25 @@ class Panel_EVOBase(PanelBase):
         Dumps EEPROM and RAM memory to files
         :return:
         """
-        await self.dump_memory_to_file('eeprom.bin', range(0, 0xffff, 64))
-        await self.dump_memory_to_file('ram.bin', range(0, 59), True)
+        await self.dump_memory_to_file("eeprom.bin", range(0, 0xFFFF, 64))
+        await self.dump_memory_to_file("ram.bin", range(0, 59), True)
 
     async def dump_memory_to_file(self, file, range_, ram=False):
         mem_type = "RAM" if ram else "EEPROM"
         logger.info("Dump " + mem_type)
 
         packet_length = 64  # 64 is max
-        with open(file, 'wb') as fh:
+        with open(file, "wb") as fh:
             for address in range_:
                 args = dict(
-                    address=address,
-                    length=packet_length,
-                    control=dict(ram_access=ram))
+                    address=address, length=packet_length, control=dict(ram_access=ram)
+                )
                 logger.info("Dumping %s: address %d" % (mem_type, address))
                 reply = await self.core.send_wait(
-                    parsers.ReadEEPROM, args,
-                    reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address
+                    parsers.ReadEEPROM,
+                    args,
+                    reply_expected=lambda m: m.fields.value.po.command == 0x05
+                    and m.fields.value.address == address,
                 )
 
                 if reply is None:
@@ -86,7 +72,9 @@ class Panel_EVOBase(PanelBase):
 
                 fh.write(data)
 
-    def parse_message(self, message: bytes, direction='topanel') -> typing.Optional[Container]:
+    def parse_message(
+        self, message: bytes, direction="topanel"
+    ) -> typing.Optional[Container]:
         try:
             if message is None or len(message) == 0:
                 return None
@@ -95,7 +83,7 @@ class Panel_EVOBase(PanelBase):
             if parent_parsed:
                 return parent_parsed
 
-            if direction == 'topanel':
+            if direction == "topanel":
                 if message[0] == 0x70:
                     return parsers.CloseConnection.parse(message)
                 elif message[0] == 0x00:
@@ -104,7 +92,7 @@ class Panel_EVOBase(PanelBase):
                     return parsers.SetTimeDate.parse(message)
                 elif message[0] == 0x40:
                     return parsers.PerformPartitionAction.parse(message)
-                elif message[0] == 0xd0:
+                elif message[0] == 0xD0:
                     return parsers.PerformZoneAction.parse(message)
             else:
                 if message[0] >> 4 == 0x7:
@@ -115,7 +103,7 @@ class Panel_EVOBase(PanelBase):
                     return parsers.SetTimeDateResponse.parse(message)
                 elif message[0] >> 4 == 4:  # Used for partitions and PGMs
                     return parsers.PerformActionResponse.parse(message)
-                elif message[0] >> 4 == 0xd:
+                elif message[0] >> 4 == 0xD:
                     return parsers.PerformZoneActionResponse.parse(message)
                 # elif message[0] == 0x50 and message[2] == 0x80:
                 #     return PanelStatus.parse(message)
@@ -130,16 +118,20 @@ class Panel_EVOBase(PanelBase):
                 #     return WriteEEPROM.parse(message)
                 # elif message[0] >> 4 == 0x06 and message[2] < 0x80:
                 #     return WriteEEPROMResponse.parse(message)
-                elif message[0] >> 4 == 0x0e:
-                    if message[1] == 0xff:
+                elif message[0] >> 4 == 0x0E:
+                    if message[1] == 0xFF:
                         return parsers.LiveEvent.parse(message)
                     else:
                         return parsers.RequestedEvent.parse(message)
 
         except ChecksumError as e:
-            logger.error("ChecksumError %s, message: %s" % (str(e), binascii.hexlify(message)))
+            logger.error(
+                "ChecksumError %s, message: %s" % (str(e), binascii.hexlify(message))
+            )
         except Exception:
-            logger.exception("Exception parsing message: %s" % (binascii.hexlify(message)))
+            logger.exception(
+                "Exception parsing message: %s" % (binascii.hexlify(message))
+            )
 
         return None
 
@@ -150,7 +142,8 @@ class Panel_EVOBase(PanelBase):
         parsed = parsers.InitializeCommunication.parse(raw_data)
         parsed.fields.value.pc_password = encoded_password
         payload = parsers.InitializeCommunication.build(
-            dict(fields=dict(value=parsed.fields.value)))
+            dict(fields=dict(value=parsed.fields.value))
+        )
 
         logger.info("Initializing communication")
         reply = await self.core.send_wait(message=payload, reply_expected=[0x1, 0x0])
@@ -160,10 +153,12 @@ class Panel_EVOBase(PanelBase):
             return False
 
         if reply.fields.value.po.command == 0x0:
-            logger.error("Authentication Failed. Wrong PASSWORD. Make sure you use correct PC Password. In Babyware: "
-                         "Right click on your panel -> Properties -> PC Communication (Babyware) -> PC Communication "
-                         "(Babyware) Tab.")
-            raise AuthenticationFailed('Wrong PASSWORD')
+            logger.error(
+                "Authentication Failed. Wrong PASSWORD. Make sure you use correct PC Password. In Babyware: "
+                "Right click on your panel -> Properties -> PC Communication (Babyware) -> PC Communication "
+                "(Babyware) Tab."
+            )
+            raise AuthenticationFailed("Wrong PASSWORD")
         else:  # command == 0x1
             if reply.fields.value.po.status.Winload_connected:
                 logger.info("Authentication Success")
@@ -177,11 +172,11 @@ class Panel_EVOBase(PanelBase):
         mvars = message.fields.value
 
         if (
-                mvars.po.command == 0x5
-                and mvars.control.ram_access is True
-                and mvars.control.eeprom_address_bits == 0x0
-                and mvars.bus_address == 0x00  # panel
-                and mvars.address == address
+            mvars.po.command == 0x5
+            and mvars.control.ram_access is True
+            and mvars.control.eeprom_address_bits == 0x0
+            and mvars.bus_address == 0x00  # panel
+            and mvars.address == address
         ):
             return True
 
@@ -190,7 +185,11 @@ class Panel_EVOBase(PanelBase):
     async def request_status(self, i: int) -> typing.Optional[Container]:
         args = dict(address=i, length=64, control=dict(ram_access=True))
         reply = await self.core.send_wait(
-            parsers.ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, args['address'])
+            parsers.ReadEEPROM,
+            args,
+            reply_expected=lambda m: self._request_status_reply_check(
+                m, args["address"]
+            ),
         )
         if reply is not None:
             logger.debug("Received status response: %d" % i)
@@ -209,7 +208,8 @@ class Panel_EVOBase(PanelBase):
 
         try:
             reply = await self.core.send_wait(
-                parsers.PerformPartitionAction, args, reply_expected=0x04)
+                parsers.PerformPartitionAction, args, reply_expected=0x04
+            )
         except MappingError:
             logger.error('Partition command: "%s" is not supported' % command)
             return False
@@ -235,7 +235,8 @@ class Panel_EVOBase(PanelBase):
 
         try:
             reply = await self.core.send_wait(
-                parsers.PerformZoneAction, args, reply_expected=0xd)
+                parsers.PerformZoneAction, args, reply_expected=0xD
+            )
         except MappingError:
             logger.error('Zone command: "%s" is not supported' % command)
             return False
@@ -254,13 +255,12 @@ class Panel_EVOBase(PanelBase):
         :return: True if we have at least one success
         """
 
-        args = {
-            "pgms": outputs,
-            "command": command
-        }
+        args = {"pgms": outputs, "command": command}
 
         try:
-            reply = await self.core.send_wait(parsers.PerformPGMAction, args, reply_expected=0x04)
+            reply = await self.core.send_wait(
+                parsers.PerformPGMAction, args, reply_expected=0x04
+            )
         except MappingError:
             logger.error('PGM command: "%s" is not supported' % command)
             return False

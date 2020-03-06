@@ -5,9 +5,10 @@ from typing import Callable
 from paradox.config import config as cfg
 from paradox.event import Change
 from paradox.lib import ps
+
 from .element_type_container import ElementTypeContainer
 
-logger = logging.getLogger('PAI').getChild(__name__)
+logger = logging.getLogger("PAI").getChild(__name__)
 
 
 class MemoryStorage:
@@ -21,7 +22,7 @@ class MemoryStorage:
         c = self.get_container(container_name)
         el = c.get(key)
         if create_if_missing and el is None:
-            el = c[key] = {'key': key}
+            el = c[key] = {"key": key}
 
         return el
 
@@ -34,26 +35,33 @@ class MemoryStorage:
 
         # logger.debug('update_properties %s/%s=%s', container_name, key, change)
         element = self.get_container_object(container_name, key, create_if_missing=True)
-        object_key = element['key']
+        object_key = element["key"]
 
         # Publish changes and update state
         for property_name, property_value in changes.items():
 
             if not isinstance(property_name, str):
-                logger.debug('Invalid property name ({}/{}/{}) type: {}'.format(
-                    container_name, object_key, property_name, type(property_name)
-                ))
+                logger.debug(
+                    "Invalid property name ({}/{}/{}) type: {}".format(
+                        container_name, object_key, property_name, type(property_name)
+                    )
+                )
                 continue
-            if property_name.startswith('_'):  # skip private properties
+            if property_name.startswith("_"):  # skip private properties
                 continue
 
             old = element.get(property_name)
 
-            if isinstance(property_value, Callable):  # function to make new value from the old one
+            if isinstance(
+                property_value, Callable
+            ):  # function to make new value from the old one
                 try:
                     property_value = property_value(old)
                 except Exception:
-                    logger.exception('Exception caught during property "%s" convert. Ignoring', property_name)
+                    logger.exception(
+                        'Exception caught during property "%s" convert. Ignoring',
+                        property_name,
+                    )
                     continue
 
             # Standard processing of changes
@@ -65,6 +73,8 @@ class MemoryStorage:
                 element[property_name] = property_value  # Initial value, do not notify
                 # suppress = 'trouble' not in property_name
 
-            change_object = Change(container_name, object_key, property_name, property_value, old)
+            change_object = Change(
+                container_name, object_key, property_name, property_value, old
+            )
             logger.debug(change_object)
             ps.sendChange(change_object)

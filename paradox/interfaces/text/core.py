@@ -1,16 +1,18 @@
 import logging
 
-from paradox.lib import ps
-from paradox.lib.event_filter import LiveEventRegexpFilter, EventTagFilter, EventFilter
-from paradox.event import EventLevel, Event, Notification
 from paradox.config import config as cfg
+from paradox.event import Event, EventLevel, Notification
 from paradox.interfaces import ThreadQueueInterface
+from paradox.lib import ps
+from paradox.lib.event_filter import (EventFilter, EventTagFilter,
+                                      LiveEventRegexpFilter)
 
-logger = logging.getLogger('PAI').getChild(__name__)
+logger = logging.getLogger("PAI").getChild(__name__)
 
 
 class AbstractTextInterface(ThreadQueueInterface):
     """Interface Class using any Text interface"""
+
     def __init__(self, alarm, event_filter: EventFilter, min_level=EventLevel.INFO):
         super().__init__(alarm)
 
@@ -62,21 +64,21 @@ class AbstractTextInterface(ThreadQueueInterface):
         command = self.normalize_payload(tokens[2].lower())
 
         # Process a Zone Command
-        if element_type == 'zone':
+        if element_type == "zone":
             if not await self.alarm.control_zone(element, command):
                 m = "Zone command error: {}={}".format(element, command)
                 logger.warning(m)
                 return m
 
         # Process a Partition Command
-        elif element_type == 'partition':
+        elif element_type == "partition":
             if not await self.alarm.control_partition(element, command):
                 m = "Partition command error: {}={}".format(element, command)
                 logger.warning(m)
                 return m
 
         # Process an Output Command
-        elif element_type == 'output':
+        elif element_type == "output":
             if not await self.alarm.control_output(element, command):
                 m = "Output command error: {}={}".format(element, command)
                 logger.warning(m)
@@ -94,20 +96,32 @@ class AbstractTextInterface(ThreadQueueInterface):
     def normalize_payload(message):
         message = message.strip().lower()
 
-        if message in ['true', 'on', '1', 'enable']:
-            return 'on'
-        elif message in ['false', 'off', '0', 'disable']:
-            return 'off'
-        elif message in ['pulse', 'arm', 'disarm', 'arm_stay', 'arm_sleep', 'bypass', 'clear_bypass']:
+        if message in ["true", "on", "1", "enable"]:
+            return "on"
+        elif message in ["false", "off", "0", "disable"]:
+            return "off"
+        elif message in [
+            "pulse",
+            "arm",
+            "disarm",
+            "arm_stay",
+            "arm_sleep",
+            "bypass",
+            "clear_bypass",
+        ]:
             return message
 
         return None
 
 
 class ConfiguredAbstractTextInterface(AbstractTextInterface):
-    def __init__(self, alarm, EVENT_FILTERS, ALLOW_EVENTS, IGNORE_EVENTS, MIN_EVENT_LEVEL):
+    def __init__(
+        self, alarm, EVENT_FILTERS, ALLOW_EVENTS, IGNORE_EVENTS, MIN_EVENT_LEVEL
+    ):
         if EVENT_FILTERS and (ALLOW_EVENTS or IGNORE_EVENTS):
-            raise AssertionError('You can not use *_EVENT_FILTERS and *_ALLOW_EVENTS+*_IGNORE_EVENTS simultaneously')
+            raise AssertionError(
+                "You can not use *_EVENT_FILTERS and *_ALLOW_EVENTS+*_IGNORE_EVENTS simultaneously"
+            )
 
         min_level = EventLevel.from_name(MIN_EVENT_LEVEL)
         if ALLOW_EVENTS or IGNORE_EVENTS:  # Use if defined, else use TAGS as default

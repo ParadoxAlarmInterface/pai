@@ -1,27 +1,28 @@
 import asyncio
 import logging
-from logging.handlers import RotatingFileHandler
-import sys
 import signal
+import sys
+from logging.handlers import RotatingFileHandler
 
 from paradox import VERSION
 from paradox.config import config as cfg
 from paradox.exceptions import PAICriticalException
-
-from paradox.paradox import Paradox
 from paradox.interfaces.interface_manager import InterfaceManager
+from paradox.paradox import Paradox
 
 alarm = None
 interface_manager = None
 
-logger = logging.getLogger('PAI')
+logger = logging.getLogger("PAI")
 
 
 def get_format(level):
     if level <= logging.DEBUG:
-        return '%(asctime)s - %(levelname)-8s - %(threadName)-10s - %(name)s - %(message)s'
+        return (
+            "%(asctime)s - %(levelname)-8s - %(threadName)-10s - %(name)s - %(message)s"
+        )
     else:
-        return '%(asctime)s - %(levelname)-8s - %(name)s - %(message)s'
+        return "%(asctime)s - %(levelname)-8s - %(name)s - %(message)s"
 
 
 def config_logger(logger):
@@ -29,10 +30,12 @@ def config_logger(logger):
 
     if cfg.LOGGING_FILE is not None:
         logfile_handler = RotatingFileHandler(
-            cfg.LOGGING_FILE, mode='a',
+            cfg.LOGGING_FILE,
+            mode="a",
             maxBytes=cfg.LOGGING_FILE_MAX_SIZE * 1024 * 1024,
             backupCount=cfg.LOGGING_FILE_MAX_FILES,
-            encoding=None, delay=0
+            encoding=None,
+            delay=0,
         )
 
         logfile_handler.setLevel(cfg.LOGGING_LEVEL_FILE)
@@ -52,8 +55,8 @@ async def exit_handler(signame=None):
     global alarm, interface_manager
 
     if signame is not None:
-        logger.info(f'Captured signal {signame}. Exiting')
-    
+        logger.info(f"Captured signal {signame}. Exiting")
+
     if alarm:
         await alarm.disconnect()
         alarm = None
@@ -104,9 +107,10 @@ async def run_loop():
 
 def main(args):
     global alarm, interface_manager
-    
-    if 'config' in args and args.config is not None:
+
+    if "config" in args and args.config is not None:
         import os
+
         config_file = os.path.abspath(args.config)
         cfg.load(config_file)
     else:
@@ -122,9 +126,11 @@ def main(args):
     # Start interacting with the alarm
     alarm = Paradox()
     loop = asyncio.get_event_loop()
-    for signame in ('SIGINT', 'SIGTERM'):
+    for signame in ("SIGINT", "SIGTERM"):
         sig = getattr(signal, signame)
-        loop.add_signal_handler(sig, lambda: asyncio.ensure_future(exit_handler(signame)))
+        loop.add_signal_handler(
+            sig, lambda: asyncio.ensure_future(exit_handler(signame))
+        )
 
     interface_manager = InterfaceManager(alarm, config=cfg)
     interface_manager.start()

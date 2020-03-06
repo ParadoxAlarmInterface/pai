@@ -4,19 +4,18 @@ import json
 import logging
 import time
 
-from pushbullet import Pushbullet
-from ws4py.client import WebSocketBaseClient
-from ws4py.manager import WebSocketManager
-
 from paradox.config import config as cfg
 from paradox.event import EventLevel, Notification
 from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
 from paradox.lib import ps
+from pushbullet import Pushbullet
+from ws4py.client import WebSocketBaseClient
+from ws4py.manager import WebSocketManager
 
 # Pushbullet interface.
 # Only exposes critical status changes and accepts commands
 
-logger = logging.getLogger('PAI').getChild(__name__)
+logger = logging.getLogger("PAI").getChild(__name__)
 
 
 class PushBulletWSClient(WebSocketBaseClient):
@@ -29,7 +28,7 @@ class PushBulletWSClient(WebSocketBaseClient):
         self.pb = Pushbullet(cfg.PUSHBULLET_KEY)
         self.manager = WebSocketManager()
         self.interface = interface
-        
+
         self.device = None
         for i, device in enumerate(self.pb.devices):
             if device.nickname == cfg.PUSHBULLET_DEVICE:
@@ -38,7 +37,7 @@ class PushBulletWSClient(WebSocketBaseClient):
                 break
         else:
             logger.exception("Device not found. Creating 'pai' device")
-            self.device = self.pb.new_device(nickname='pai', icon='system')
+            self.device = self.pb.new_device(nickname="pai", icon="system")
 
     def stop(self):
         self.terminate()
@@ -66,36 +65,45 @@ class PushBulletWSClient(WebSocketBaseClient):
         except:
             logger.exception("Unable to parse message")
             return
-        
-        if message['type'] == 'tickle' and message['subtype'] == 'push':
+
+        if message["type"] == "tickle" and message["subtype"] == "push":
             now = time.time()
-            pushes = self.pb.get_pushes(modified_after=int(now) - 20, limit=1, filter_inactive=True)
+            pushes = self.pb.get_pushes(
+                modified_after=int(now) - 20, limit=1, filter_inactive=True
+            )
             for p in pushes:
-                
+
                 # Ignore messages send by us
-                if p.get('direction') == 'self' and p.get('title') == 'pai':
+                if p.get("direction") == "self" and p.get("title") == "pai":
                     # logger.debug('Ignoring message sent')
                     continue
-                
-                if p.get('direction') == 'outgoing' or p.get('dismissed'):
+
+                if p.get("direction") == "outgoing" or p.get("dismissed"):
                     # logger.debug('Ignoring outgoing dismissed')
                     continue
-                
-                if p.get('sender_email_normalized') in cfg.PUSHBULLET_CONTACTS or p.get('direction') == 'self':
+
+                if (
+                    p.get("sender_email_normalized") in cfg.PUSHBULLET_CONTACTS
+                    or p.get("direction") == "self"
+                ):
                     future = asyncio.run_coroutine_threadsafe(
-                        self.interface.handle_command(p.get('body')),
-                        self.interface.alarm.work_loop
+                        self.interface.handle_command(p.get("body")),
+                        self.interface.alarm.work_loop,
                     )
                     ret = future.result(10)
 
-                    m = "PB {}: {}".format(p.get('sender_email_normalized'), ret)
+                    m = "PB {}: {}".format(p.get("sender_email_normalized"), ret)
                     logger.info(m)
                 else:
-                    m = "PB {} (UNK): {}".format(p.get('sender_email_normalized'), p.get('body'))
+                    m = "PB {} (UNK): {}".format(
+                        p.get("sender_email_normalized"), p.get("body")
+                    )
                     logger.warning(m)
-                
+
                 self.send_message(m)
-                ps.sendNotification(Notification(sender=self.name, message=m, level=EventLevel.INFO))
+                ps.sendNotification(
+                    Notification(sender=self.name, message=m, level=EventLevel.INFO)
+                )
 
     def unhandled_error(self, error):
         logger.error("{}".format(error))
@@ -115,7 +123,7 @@ class PushBulletWSClient(WebSocketBaseClient):
             dstchat = [dstchat]
         # Push to self
         self.device.push_note(cfg.PUSHBULLET_DEVICE, msg)
-        
+
         for chat in dstchat:
             if chat.email in cfg.PUSHBULLET_CONTACTS:
                 try:
@@ -129,15 +137,23 @@ class PushbulletTextInterface(ConfiguredAbstractTextInterface):
     """Interface Class using Pushbullet"""
 
     def __init__(self, alarm):
-        super().__init__(alarm, cfg.PUSHBULLET_EVENT_FILTERS, cfg.PUSHBULLET_ALLOW_EVENTS, cfg.PUSHBULLET_IGNORE_EVENTS,
-                         cfg.PUSHBULLET_MIN_EVENT_LEVEL)
+        super().__init__(
+            alarm,
+            cfg.PUSHBULLET_EVENT_FILTERS,
+            cfg.PUSHBULLET_ALLOW_EVENTS,
+            cfg.PUSHBULLET_IGNORE_EVENTS,
+            cfg.PUSHBULLET_MIN_EVENT_LEVEL,
+        )
         self.name = PushBulletWSClient.name
         self.pb_ws = None
 
     def _run(self):
         super(PushbulletTextInterface, self)._run()
         try:
-            self.pb_ws = PushBulletWSClient(self, 'wss://stream.pushbullet.com/websocket/{}'.format(cfg.PUSHBULLET_KEY))
+            self.pb_ws = PushBulletWSClient(
+                self,
+                "wss://stream.pushbullet.com/websocket/{}".format(cfg.PUSHBULLET_KEY),
+            )
             self.pb_ws.connect()
         except:
             logger.exception("Could not connect to Pushbullet service")

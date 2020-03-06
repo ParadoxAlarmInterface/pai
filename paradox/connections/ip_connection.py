@@ -12,15 +12,23 @@ import requests
 from paradox.config import config as cfg
 from paradox.lib import stun
 from paradox.lib.crypto import encrypt
-from paradox.parsers.paradox_ip_messages import ip_message, ip_payload_connect_response
-from .connection import Connection
-from .protocols import SerialConnectionProtocol, IPConnectionProtocol
+from paradox.parsers.paradox_ip_messages import (ip_message,
+                                                 ip_payload_connect_response)
 
-logger = logging.getLogger('PAI').getChild(__name__)
+from .connection import Connection
+from .protocols import IPConnectionProtocol, SerialConnectionProtocol
+
+logger = logging.getLogger("PAI").getChild(__name__)
 
 
 class IPConnection(Connection):
-    def __init__(self, on_message: typing.Callable[[bytes], None], host='127.0.0.1', port=10000, password=None):
+    def __init__(
+        self,
+        on_message: typing.Callable[[bytes], None],
+        host="127.0.0.1",
+        port=10000,
+        password=None,
+    ):
         super(IPConnection, self).__init__(on_message=on_message)
         if isinstance(password, str):
             password = password.encode()
@@ -36,7 +44,7 @@ class IPConnection(Connection):
         self.stun_tunnel = None
 
     def on_connection_lost(self):
-        logger.error('Connection to panel was lost')
+        logger.error("Connection to panel was lost")
 
         if self.stun_control:
             try:
@@ -58,12 +66,16 @@ class IPConnection(Connection):
 
     def make_protocol(self):
         if cfg.IP_CONNECTION_BARE:
-            return SerialConnectionProtocol(self.on_message, self.on_bare_connection_open, self.on_connection_lost)
+            return SerialConnectionProtocol(
+                self.on_message, self.on_bare_connection_open, self.on_connection_lost
+            )
         else:
-            return IPConnectionProtocol(self.on_message, self.on_connection_lost, self.key)
+            return IPConnectionProtocol(
+                self.on_message, self.on_connection_lost, self.key
+            )
 
     def on_bare_connection_open(self):
-        logger.info('Serial port open')
+        logger.info("Serial port open")
         self.connected = True
 
     async def connect(self):
@@ -72,7 +84,10 @@ class IPConnection(Connection):
 
         while tries <= max_tries:
 
-            if cfg.IP_CONNECTION_SITEID is not None and cfg.IP_CONNECTION_EMAIL is not None:
+            if (
+                cfg.IP_CONNECTION_SITEID is not None
+                and cfg.IP_CONNECTION_EMAIL is not None
+            ):
                 try:
                     r = await self.connect_to_site()
 
@@ -80,15 +95,17 @@ class IPConnection(Connection):
                         if await self.connect_to_module():
                             return True
                 except Exception:
-                    logger.exception('Try %d/%d. Unable to connect to SITE ID' % (tries, max_tries))
+                    logger.exception(
+                        "Try %d/%d. Unable to connect to SITE ID" % (tries, max_tries)
+                    )
             else:
                 try:
-                    logger.info("Connecting to IP module. Try %d/%d" % (tries, max_tries))
+                    logger.info(
+                        "Connecting to IP module. Try %d/%d" % (tries, max_tries)
+                    )
 
                     _, self._protocol = await self.loop.create_connection(
-                        self.make_protocol,
-                        host=self.host,
-                        port=self.port
+                        self.make_protocol, host=self.host, port=self.port
                     )
                     if cfg.IP_CONNECTION_BARE:
                         return True
@@ -96,9 +113,15 @@ class IPConnection(Connection):
                     if await self.connect_to_module():
                         return True
                 except OSError as e:
-                    logger.error('Connect to IP Module failed (try %d/%d): %s' % (tries, max_tries, str(e)))
+                    logger.error(
+                        "Connect to IP Module failed (try %d/%d): %s"
+                        % (tries, max_tries, str(e))
+                    )
                 except Exception:
-                    logger.exception("Unable to connect to IP Module (try %d/%d)" % (tries, max_tries))
+                    logger.exception(
+                        "Unable to connect to IP Module (try %d/%d)"
+                        % (tries, max_tries)
+                    )
 
             tries += 1
 
@@ -108,7 +131,9 @@ class IPConnection(Connection):
         self.connection_timestamp = 0
         logger.info("Connecting to Site: {}".format(cfg.IP_CONNECTION_SITEID))
         if self.site_info is None:
-            self.site_info = self.get_site_info(siteid=cfg.IP_CONNECTION_SITEID, email=cfg.IP_CONNECTION_EMAIL)
+            self.site_info = self.get_site_info(
+                siteid=cfg.IP_CONNECTION_SITEID, email=cfg.IP_CONNECTION_EMAIL
+            )
 
         if self.site_info is None:
             logger.error("Unable to get site info")
@@ -124,26 +149,30 @@ class IPConnection(Connection):
             logger.debug("Site Info: {}".format(json.dumps(self.site_info, indent=4)))
 
             if cfg.IP_CONNECTION_PANEL_SERIAL is not None:
-                for site in self.site_info['site']:
+                for site in self.site_info["site"]:
                     for module in site:
-                        logger.debug("Found module with panel serial: {}".format(module['panelSerial']))
-                        if module['panelSerial'] == cfg.IP_CONNECTION_PANEL_SERIAL:
+                        logger.debug(
+                            "Found module with panel serial: {}".format(
+                                module["panelSerial"]
+                            )
+                        )
+                        if module["panelSerial"] == cfg.IP_CONNECTION_PANEL_SERIAL:
                             self.module = module
                             break
 
                     if self.module is not None:
                         break
             else:
-                self.module = self.site_info['site'][0]['module'][0]  # Use first
+                self.module = self.site_info["site"][0]["module"][0]  # Use first
 
             if self.module is None:
                 self.site_info = None  # Reset state
                 logger.error("Unable to find module with desired panel serial")
                 return False
 
-            xoraddr = binascii.unhexlify(self.module['xoraddr'])
+            xoraddr = binascii.unhexlify(self.module["xoraddr"])
 
-            stun_host = 'turn.paradoxmyhome.com'
+            stun_host = "turn.paradoxmyhome.com"
 
             logger.debug("STUN TCP Change Request")
             self.stun_control = stun.StunClient(stun_host)
@@ -169,18 +198,22 @@ class IPConnection(Connection):
 
             self.connection_timestamp = time.time()
 
-            connection_id = stun_r[0]['attr_body']
+            connection_id = stun_r[0]["attr_body"]
             raddr = self.stun_control.sock.getpeername()
 
             logger.debug("STUN Connection Bind Request")
             self.stun_tunnel = stun.StunClient(host=raddr[0], port=raddr[1])
-            self.stun_tunnel.send_connection_bind_request(binascii.unhexlify(connection_id))
+            self.stun_tunnel.send_connection_bind_request(
+                binascii.unhexlify(connection_id)
+            )
             stun_r = self.stun_tunnel.receive_response()
             if stun.is_error(stun_r):
                 logger.error(stun.get_error(stun_r))
                 return False
 
-            _, self._protocol = await self.loop.create_connection(self.make_protocol, sock=self.stun_tunnel.sock)
+            _, self._protocol = await self.loop.create_connection(
+                self.make_protocol, sock=self.stun_tunnel.sock
+            )
             logger.info("Connected to Site: {}".format(cfg.IP_CONNECTION_SITEID))
         except Exception:
             logger.exception("Unable to negotiate connection to site")
@@ -192,28 +225,43 @@ class IPConnection(Connection):
         try:
             logger.info("Authenticating with IP Module")
 
-            self.key = self.password  # first request is with initial password, next with generated by panel key
+            self.key = (
+                self.password
+            )  # first request is with initial password, next with generated by panel key
 
             self._protocol.key = self.password
             payload = encrypt(self.password, self.key)
 
             msg = ip_message.build(
-                dict(header=dict(length=len(self.key), unknown0=0x03, flags=0x09, command=0xf0, unknown1=0, encrypt=1),
-                     payload=payload))
+                dict(
+                    header=dict(
+                        length=len(self.key),
+                        unknown0=0x03,
+                        flags=0x09,
+                        command=0xF0,
+                        unknown1=0,
+                        encrypt=1,
+                    ),
+                    payload=payload,
+                )
+            )
             self._protocol.send_raw(msg)
             message_payload = await self.wait_for_message(raw=True)
 
             response = ip_payload_connect_response.parse(message_payload)
 
-            if response.login_status != 'success':
+            if response.login_status != "success":
                 logger.error("Error connecting to IP Module. Wrong IP Module password?")
                 return False
 
-            logger.info("Authentication Success. IP Module version {:02x}, firmware: {}.{}, serial: {}".format(
-                response.hardware_version,
-                response.ip_firmware_major,
-                response.ip_firmware_minor,
-                binascii.hexlify(response.ip_module_serial).decode('utf-8')))
+            logger.info(
+                "Authentication Success. IP Module version {:02x}, firmware: {}.{}, serial: {}".format(
+                    response.hardware_version,
+                    response.ip_firmware_major,
+                    response.ip_firmware_minor,
+                    binascii.hexlify(response.ip_module_serial).decode("utf-8"),
+                )
+            )
 
             self.key = response.key
             self._protocol.key = response.key
@@ -221,8 +269,18 @@ class IPConnection(Connection):
             # F2
             logger.debug("Sending F2")
             msg = ip_message.build(
-                dict(header=dict(length=0, unknown0=0x03, flags=0x09, command=0xf2, unknown1=0, encrypt=1),
-                     payload=encrypt(b'', self.key)))
+                dict(
+                    header=dict(
+                        length=0,
+                        unknown0=0x03,
+                        flags=0x09,
+                        command=0xF2,
+                        unknown1=0,
+                        encrypt=1,
+                    ),
+                    payload=encrypt(b"", self.key),
+                )
+            )
             self._protocol.send_raw(msg)
             message_payload = await self.wait_for_message(raw=True)
             logger.debug("F2 answer: {}".format(binascii.hexlify(message_payload)))
@@ -238,8 +296,18 @@ class IPConnection(Connection):
             # F3
             logger.debug("Sending F3")
             msg = ip_message.build(
-                dict(header=dict(length=0, unknown0=0x03, flags=0x09, command=0xf3, unknown1=0, encrypt=1),
-                     payload=encrypt(b'', self.key)))
+                dict(
+                    header=dict(
+                        length=0,
+                        unknown0=0x03,
+                        flags=0x09,
+                        command=0xF3,
+                        unknown1=0,
+                        encrypt=1,
+                    ),
+                    payload=encrypt(b"", self.key),
+                )
+            )
             self._protocol.send_raw(msg)
             message_payload = await self.wait_for_message(raw=True)
 
@@ -247,12 +315,24 @@ class IPConnection(Connection):
 
             # F8
             logger.debug("Sending F8")
-            payload = binascii.unhexlify('0a500080000000000000000000000000000000000000000000000000000000000000000000d0')
+            payload = binascii.unhexlify(
+                "0a500080000000000000000000000000000000000000000000000000000000000000000000d0"
+            )
             payload_len = len(payload)
             payload = encrypt(payload, self.key)
             msg = ip_message.build(
-                dict(header=dict(length=payload_len, unknown0=0x03, flags=0x09, command=0xf8, unknown1=0, encrypt=1),
-                     payload=payload))
+                dict(
+                    header=dict(
+                        length=payload_len,
+                        unknown0=0x03,
+                        flags=0x09,
+                        command=0xF8,
+                        unknown1=0,
+                        encrypt=1,
+                    ),
+                    payload=payload,
+                )
+            )
             self._protocol.send_raw(msg)
             message_payload = await self.wait_for_message(raw=True)
             logger.debug("F8 answer: {}".format(binascii.hexlify(message_payload)))
@@ -275,7 +355,7 @@ class IPConnection(Connection):
         """Write data to socket"""
 
         if not self.refresh_stun():
-            raise ConnectionError('Failed to refresh STUN')
+            raise ConnectionError("Failed to refresh STUN")
 
         return super(IPConnection, self).write(data)
 
@@ -284,12 +364,17 @@ class IPConnection(Connection):
         logger.info("Getting site info")
         URL = "https://api.insightgoldatpmh.com/v1/site"
 
-        headers = {'User-Agent': 'Mozilla/3.0 (compatible; Indy Library)', 'Accept-Encoding': 'identity',
-                   'Accept': 'text/html, */*'}
+        headers = {
+            "User-Agent": "Mozilla/3.0 (compatible; Indy Library)",
+            "Accept-Encoding": "identity",
+            "Accept": "text/html, */*",
+        }
 
         tries = 5
         while tries > 0:
-            req = requests.get(URL, headers=headers, params={'email': email, 'name': siteid})
+            req = requests.get(
+                URL, headers=headers, params={"email": email, "name": siteid}
+            )
             if req.status_code == 200:
                 return req.json()
 

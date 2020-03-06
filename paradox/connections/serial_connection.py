@@ -4,14 +4,15 @@
 import logging
 import typing
 
-import serial_asyncio
 from serial import SerialException
 
+import serial_asyncio
+
+from ..exceptions import SerialConnectionOpenFailed
 from .connection import Connection
 from .protocols import SerialConnectionProtocol
-from ..exceptions import SerialConnectionOpenFailed
 
-logger = logging.getLogger('PAI').getChild(__name__)
+logger = logging.getLogger("PAI").getChild(__name__)
 
 
 class SerialCommunication(Connection):
@@ -22,13 +23,13 @@ class SerialCommunication(Connection):
         self.connected_future = None
 
     def on_port_closed(self):
-        logger.error('Connection to panel was lost')
+        logger.error("Connection to panel was lost")
         if not self.connected_future.done():
             self.connected_future.set_result(False)
         self.connected = False
 
     def on_port_open(self):
-        logger.info('Serial port open')
+        logger.info("Serial port open")
         if not self.connected_future.done():
             self.connected_future.set_result(True)
         self.connected = True
@@ -42,7 +43,9 @@ class SerialCommunication(Connection):
         self.connected = False
 
     def make_protocol(self):
-        return SerialConnectionProtocol(self.on_message, self.on_port_open, self.on_port_closed)
+        return SerialConnectionProtocol(
+            self.on_message, self.on_port_open, self.on_port_closed
+        )
 
     async def connect(self):
         logger.info("Connecting to serial port {}".format(self.port_path))

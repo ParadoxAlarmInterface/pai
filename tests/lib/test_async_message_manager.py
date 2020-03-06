@@ -1,7 +1,11 @@
-import pytest
 import asyncio
+
+import pytest
 from construct import Container
-from paradox.lib.async_message_manager import AsyncMessageManager, RAWMessageHandler, EventMessageHandler
+from paradox.lib.async_message_manager import (AsyncMessageManager,
+                                               EventMessageHandler,
+                                               RAWMessageHandler)
+
 
 @pytest.mark.asyncio
 async def test_persistent_raw_handler(mocker):
@@ -29,12 +33,13 @@ async def test_persistent_raw_handler(mocker):
 
     assert len(mm.raw_handlers) == 1
 
+
 @pytest.mark.asyncio
 async def test_raw_handler_register_unregister(mocker):
     cb = mocker.MagicMock()
     msg = Container()
 
-    h_name = 'removable'
+    h_name = "removable"
     handler = RAWMessageHandler(cb, name=h_name)
 
     mm = AsyncMessageManager()
@@ -87,18 +92,13 @@ async def test_wait_for_message(mocker):
 async def test_handler_exception(mocker):
     loop = asyncio.get_event_loop()
     msg = Container(
-        fields=Container(
-            value=Container(
-                po=Container(
-                    command=0xe
-                ),
-                event_source=0xff
-            )
-        )
+        fields=Container(value=Container(po=Container(command=0xE), event_source=0xFF))
     )
 
     mm = AsyncMessageManager()
-    eh = EventMessageHandler(callback=mocker.MagicMock(side_effect=Exception('screw it')))
+    eh = EventMessageHandler(
+        callback=mocker.MagicMock(side_effect=Exception("screw it"))
+    )
     mm.register_handler(eh)
 
     with pytest.raises(Exception):

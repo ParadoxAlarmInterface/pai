@@ -4,20 +4,20 @@ import typing
 
 from paradox.lib.async_message_manager import AsyncMessageManager
 
-logger = logging.getLogger('PAI').getChild(__name__)
+logger = logging.getLogger("PAI").getChild(__name__)
 
 
 class ConnectionProtocol(asyncio.Protocol):
     def __init__(self, on_message: typing.Callable[[bytes], None], on_con_lost):
         self.transport = None
         self.use_variable_message_length = True
-        self.buffer = b''
+        self.buffer = b""
 
         self.on_message = on_message
         self.on_con_lost = on_con_lost
 
         self._closed = asyncio.get_event_loop().create_future()
-        self.buffer = b''
+        self.buffer = b""
 
     def connection_made(self, transport):
         self.transport = transport
@@ -36,11 +36,11 @@ class ConnectionProtocol(asyncio.Protocol):
         await asyncio.wait_for(self._closed, timeout=1)
 
     def send_message(self, message):
-        raise NotImplementedError('This function needs to be overridden in a subclass')
+        raise NotImplementedError("This function needs to be overridden in a subclass")
 
     def connection_lost(self, exc):
-        logger.error(f'Connection was closed: {exc}')
-        self.buffer = b''
+        logger.error(f"Connection was closed: {exc}")
+        self.buffer = b""
 
         if not self._closed.done():
             if exc is None:

@@ -1,3 +1,4 @@
+# fmt: off
 xtimetbl = [
     0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
     0x10, 0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e,
@@ -116,10 +117,11 @@ Si = [
 ]
 
 iG = [
-    [0x0e, 0x09, 0x0d, 0x0b],
-    [0x0b, 0x0e, 0x09, 0x0d],
-    [0x0d, 0x0b, 0x0e, 0x09],
-    [0x09, 0x0d, 0x0b, 0x0e]]
+    [0x0E, 0x09, 0x0D, 0x0B],
+    [0x0B, 0x0E, 0x09, 0x0D],
+    [0x0D, 0x0B, 0x0E, 0x09],
+    [0x09, 0x0D, 0x0B, 0x0E],
+]
 
 rcon = [
     0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8,
@@ -129,8 +131,9 @@ rcon = [
 shifts = [
     [[0, 0], [1, 3], [2, 2], [3, 1]],
     [[0, 0], [1, 5], [2, 4], [3, 3]],
-    [[0, 0], [1, 7], [3, 5], [4, 4]]
+    [[0, 0], [1, 7], [3, 5], [4, 4]],
 ]
+# fmt: on
 
 
 def mul(a, b):
@@ -197,19 +200,18 @@ def mix_column(a):
 
 
 def inv_mix_column(a):
-    b = [[0, 0, 0, 0],
-         [0, 0, 0, 0],
-         [0, 0, 0, 0],
-         [0, 0, 0, 0]]
+    b = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
 
     j = 0
     while j < 4:
         i = 0
         while i < 4:
-            b[i][j] = mul(0xe, a[i * 4 + j]) \
-                      ^ mul(0xb, a[((i + 1) % 4) * 4 + j]) \
-                      ^ mul(0xd, a[((i + 2) % 4) * 4 + j]) \
-                      ^ mul(0x9, a[((i + 3) % 4) * 4 + j])
+            b[i][j] = (
+                mul(0xE, a[i * 4 + j])
+                ^ mul(0xB, a[((i + 1) % 4) * 4 + j])
+                ^ mul(0xD, a[((i + 2) % 4) * 4 + j])
+                ^ mul(0x9, a[((i + 3) % 4) * 4 + j])
+            )
             i += 1
         j += 1
 
@@ -242,7 +244,7 @@ def keygen(k, W):
     while i < 60:
         j = 0
         while j < 4:
-            temp[j] = W[(((i - 1) & 0xfc) << 2) + ((i - 1) & 0x03) + j * 4]
+            temp[j] = W[(((i - 1) & 0xFC) << 2) + ((i - 1) & 0x03) + j * 4]
             j += 1
         if i % 8 == 0:
             j = 0
@@ -267,7 +269,9 @@ def keygen(k, W):
 
         j = 0
         while j < 4:
-            W[((i & 0xfc) << 2) + (i & 0x03) + j * 4] = W[(((i - 8) & 0xfc) << 2) + ((i - 8) & 0x03) + j * 4] ^ temp[j]
+            W[((i & 0xFC) << 2) + (i & 0x03) + j * 4] = (
+                W[(((i - 8) & 0xFC) << 2) + ((i - 8) & 0x03) + j * 4] ^ temp[j]
+            )
             j += 1
         i += 1
 
@@ -276,9 +280,9 @@ def encrypt(ctxt, key):
     rk = [0] * 240
     dtxt = []
     if len(key) % 32 != 0:
-        key = list(key + b'\xee' * (32 - (len(key) % 32)))
+        key = list(key + b"\xee" * (32 - (len(key) % 32)))
     if len(ctxt) % 16 != 0:
-        ctxt = list(ctxt + b'\xee' * (16 - (len(ctxt) % 16)))
+        ctxt = list(ctxt + b"\xee" * (16 - (len(ctxt) % 16)))
 
     keygen(key, rk)
 
@@ -286,7 +290,7 @@ def encrypt(ctxt, key):
     ctxt = list(ctxt)
 
     while i < len(ctxt) / 16:
-        a = ctxt[i * 16:(i + 1) * 16].copy()
+        a = ctxt[i * 16 : (i + 1) * 16].copy()
         ROUNDS = 14
         key_addition(a, rk[:16])
 
@@ -295,13 +299,13 @@ def encrypt(ctxt, key):
             s_box(a, S)
             shift_row(a, 0)
             mix_column(a)
-            key_addition(a, rk[r * 16:(r + 1) * 16])
+            key_addition(a, rk[r * 16 : (r + 1) * 16])
 
             r += 1
 
         s_box(a, S)
         shift_row(a, 0)
-        key_addition(a, rk[16 * ROUNDS: (ROUNDS + 1) * 16])
+        key_addition(a, rk[16 * ROUNDS : (ROUNDS + 1) * 16])
 
         dtxt.extend(a)
         i = i + 1
@@ -313,7 +317,7 @@ def decrypt(ctxt, key):
     rk = [0] * 240
     dtxt = []
     if len(key) % 32:
-        key = list(key + b'\xee' * (32 - (len(key) % 32)))
+        key = list(key + b"\xee" * (32 - (len(key) % 32)))
 
     keygen(key, rk)
 
@@ -321,14 +325,14 @@ def decrypt(ctxt, key):
     i = 0
     while i < len(ctxt) / 16:
         ROUNDS = 14
-        a = ctxt[i * 16:(i + 1) * 16].copy()
-        key_addition(a, rk[ROUNDS * 16:(ROUNDS + 1) * 16])
+        a = ctxt[i * 16 : (i + 1) * 16].copy()
+        key_addition(a, rk[ROUNDS * 16 : (ROUNDS + 1) * 16])
         s_box(a, Si)
         shift_row(a, 1)
 
         r = ROUNDS - 1
         while r > 0:
-            key_addition(a, rk[r * 16:(r + 1) * 16])
+            key_addition(a, rk[r * 16 : (r + 1) * 16])
             inv_mix_column(a)
             s_box(a, Si)
             shift_row(a, 1)

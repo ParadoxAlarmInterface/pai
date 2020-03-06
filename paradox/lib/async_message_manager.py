@@ -1,10 +1,10 @@
 import asyncio
 import logging
-from typing import Awaitable, Optional, Callable
+from typing import Awaitable, Callable, Optional
 
 from construct import Container
 
-logger = logging.getLogger('PAI').getChild(__name__)
+logger = logging.getLogger("PAI").getChild(__name__)
 
 
 class FutureMessageHandler(asyncio.Future):
@@ -51,7 +51,9 @@ class EventMessageHandler(MessageHandler):
 
     def can_handle(self, message: Container) -> bool:
         values = message.fields.value
-        return values.po.command == 0xe and (not hasattr(values, "event_source") or values.event_source == 0xff)
+        return values.po.command == 0xE and (
+            not hasattr(values, "event_source") or values.event_source == 0xFF
+        )
 
 
 class ErrorMessageHandler(MessageHandler):
@@ -61,7 +63,9 @@ class ErrorMessageHandler(MessageHandler):
         self.name = name if name is not None else self.__class__.__name__
 
     def can_handle(self, message: Container) -> bool:
-        return message.fields.value.po.command == 0x7 and hasattr(message.fields.value, "message")
+        return message.fields.value.po.command == 0x7 and hasattr(
+            message.fields.value, "message"
+        )
 
 
 class AsyncMessageManager:
@@ -77,7 +81,9 @@ class AsyncMessageManager:
         self.handlers = []
         self.raw_handlers = []
 
-    async def wait_for_message(self, check_fn=None, timeout=2, raw=False) -> Optional[Container]:
+    async def wait_for_message(
+        self, check_fn=None, timeout=2, raw=False
+    ) -> Optional[Container]:
         if raw:
             future = RawFutureMessageHandler(loop=self.loop)
         else:
@@ -111,7 +117,9 @@ class AsyncMessageManager:
                 continue
 
             if not handler.persistent:
-                self.raw_handlers = list(filter(lambda x: x != handler, self.raw_handlers))
+                self.raw_handlers = list(
+                    filter(lambda x: x != handler, self.raw_handlers)
+                )
 
             await self._handle(handler, message)
 
@@ -134,7 +142,11 @@ class AsyncMessageManager:
 
             return await self._handle(handler, message)
         else:
-            logger.error("No handler for message {}\nDetail: {}".format(message.fields.value.po.command, message))
+            logger.error(
+                "No handler for message {}\nDetail: {}".format(
+                    message.fields.value.po.command, message
+                )
+            )
 
     @staticmethod
     async def _handle(handler, message):
@@ -150,5 +162,6 @@ class AsyncMessageManager:
 
     @staticmethod
     def _cleanup_handlers(handlers):
-        return list(filter(lambda x: not (isinstance(x, asyncio.Future) and x.done()),
-                    handlers))  # remove timeouted and done futures
+        return list(
+            filter(lambda x: not (isinstance(x, asyncio.Future) and x.done()), handlers)
+        )  # remove timeouted and done futures

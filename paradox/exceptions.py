@@ -1,6 +1,6 @@
 import logging
 
-logger = logging.getLogger('PAI').getChild(__name__)
+logger = logging.getLogger("PAI").getChild(__name__)
 
 
 class PAIException(Exception):
@@ -17,6 +17,7 @@ class NotConnectedException(PAIException):
 
 class PAICriticalException(PAIException):
     """Should stop PAI"""
+
     pass
 
 
@@ -33,13 +34,15 @@ class SerialConnectionOpenFailed(PAICriticalException):
 
 
 def async_loop_unhandled_exception_handler(loop, context):
-    exception = context.get('exception')
+    exception = context.get("exception")
 
     msg = context.get("exception", context["message"])
 
-    task = context.get('task')
+    task = context.get("task")
     if task:
-        msg += ', task: %s' % task
+        msg += ", task: %s" % task
 
-    logger.exception("Unhandled exception in async loop(%s): %s", loop, msg, exc_info=exception)
+    logger.exception(
+        "Unhandled exception in async loop(%s): %s", loop, msg, exc_info=exception
+    )
     loop.default_exception_handler(context)

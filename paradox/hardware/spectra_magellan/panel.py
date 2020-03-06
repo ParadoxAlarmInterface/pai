@@ -6,19 +6,25 @@ import inspect
 import logging
 import typing
 
-from construct import Construct, Container, ChecksumError
-
+from construct import ChecksumError, Construct, Container
 from paradox.config import config as cfg
-from paradox.exceptions import StatusRequestException, AuthenticationFailed
+from paradox.exceptions import AuthenticationFailed, StatusRequestException
+
+from ..panel import Panel as PanelBase
 from . import parsers
 from .event import event_map
 from .property import property_map
-from ..panel import Panel as PanelBase
 
-logger = logging.getLogger('PAI').getChild(__name__)
+logger = logging.getLogger("PAI").getChild(__name__)
 
 PARTITION_ACTIONS = dict(
-    arm=0x04, disarm=0x05, arm_stay=0x01, arm_sleep=0x03,  arm_stay_stayd=0x06, arm_sleep_stay=0x07, disarm_all=0x08
+    arm=0x04,
+    disarm=0x05,
+    arm_stay=0x01,
+    arm_sleep=0x03,
+    arm_stay_stayd=0x06,
+    arm_sleep_stay=0x07,
+    disarm_all=0x08,
 )
 ZONE_ACTIONS = dict(bypass=0x10, clear_bypass=0x10)
 PGM_ACTIONS = dict(on_override=0x30, off_override=0x31, on=0x32, off=0x33, pulse=0)
@@ -33,28 +39,23 @@ class Panel(PanelBase):
 
     mem_map = {
         "status_base1": 0x8000,
-        "status_base2": 0x1fe0,
-        "definitions": {
-            "zone": {
-                "addresses": [
-                    range(0x730, 0x800, 0x03)
-                ]
-            }
-        },
+        "status_base2": 0x1FE0,
+        "definitions": {"zone": {"addresses": [range(0x730, 0x800, 0x03)]}},
         "labels": {
             "zone": {"label_offset": 0, "addresses": [range(0x010, 0x210, 0x10)]},
-            "pgm": {"label_offset": 0, "addresses": [range(0x210, 0x310, 0x10)], "template": {
-                "on": False,
-                "pulse": False}
-                    },
+            "pgm": {
+                "label_offset": 0,
+                "addresses": [range(0x210, 0x310, 0x10)],
+                "template": {"on": False, "pulse": False},
+            },
             "partition": {"label_offset": 0, "addresses": [range(0x310, 0x330, 0x10)]},
             "user": {"label_offset": 0, "addresses": [range(0x330, 0x530, 0x10)]},
             "bus-module": {"label_offset": 0, "addresses": [range(0x530, 0x620, 0x10)]},
             "repeater": {"label_offset": 0, "addresses": [range(0x620, 0x640, 0x10)]},
-            "keypad": {"label_offset": 0, "addresses": [range(0x640, 0x6c0, 0x10)]},
-            "site": {"label_offset": 0, "addresses": [range(0x6c0, 0x6d0, 0x10)]},
-            "siren": {"label_offset": 0, "addresses": [range(0x6d0, 0x700, 0x10)]}
-        }
+            "keypad": {"label_offset": 0, "addresses": [range(0x640, 0x6C0, 0x10)]},
+            "site": {"label_offset": 0, "addresses": [range(0x6C0, 0x6D0, 0x10)]},
+            "siren": {"label_offset": 0, "addresses": [range(0x6D0, 0x700, 0x10)]},
+        },
     }
 
     async def dump_memory(self):
@@ -62,25 +63,27 @@ class Panel(PanelBase):
         Dumps EEPROM and RAM memory to files
         :return:
         """
-        await self.dump_memory_to_file('eeprom.bin', range(0, 0x0fff, 32))
-        await self.dump_memory_to_file('ram.bin', range(0, 9), ram=True)
+        await self.dump_memory_to_file("eeprom.bin", range(0, 0x0FFF, 32))
+        await self.dump_memory_to_file("ram.bin", range(0, 9), ram=True)
 
     async def dump_memory_to_file(self, file, range_, ram=False):
         mem_type = "RAM" if ram else "EEPROM"
         logger.info("Dump " + mem_type)
 
-        with open(file, 'wb') as fh:
+        with open(file, "wb") as fh:
             for address in range_:
                 if ram:
-                    args = dict(address=address + self.mem_map['status_base1'])
+                    args = dict(address=address + self.mem_map["status_base1"])
                 else:
                     args = dict(address=address)
 
                 logger.info("Dumping %s: address %x" % (mem_type, address))
 
                 reply = await self.core.send_wait(
-                    parsers.ReadEEPROM, args,
-                    reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address
+                    parsers.ReadEEPROM,
+                    args,
+                    reply_expected=lambda m: m.fields.value.po.command == 0x05
+                    and m.fields.value.address == address,
                 )
 
                 if reply is None:
@@ -101,7 +104,9 @@ class Panel(PanelBase):
 
         return super(Panel, self).get_message(name)
 
-    def parse_message(self, message: bytes, direction='topanel') -> typing.Optional[Container]:
+    def parse_message(
+        self, message: bytes, direction="topanel"
+    ) -> typing.Optional[Container]:
         try:
             if message is None or len(message) == 0:
                 return None
@@ -110,7 +115,7 @@ class Panel(PanelBase):
             if parent_parsed:
                 return parent_parsed
 
-            if direction == 'topanel':
+            if direction == "topanel":
                 if message[0] == 0x70 and message[-5] != 0:
                     return parsers.CloseConnection.parse(message)
                 elif message[0] == 0x00:
@@ -121,7 +126,7 @@ class Panel(PanelBase):
                     return parsers.PerformAction.parse(message)
                 elif message[0] == 0x50 and message[2] < 0x80:
                     return parsers.ReadEEPROM.parse(message)
-            
+
             else:
                 if message[0] == 0x10:
                     return parsers.InitializeCommunicationResponse.parse(message)
@@ -136,33 +141,42 @@ class Panel(PanelBase):
                 elif message[0] >> 4 == 0x05 and message[2] < 0x80:
                     return parsers.ReadEEPROMResponse.parse(message)
 
-            #        elif message[0] == 0x60 and message[2] < 0x80:
-            #            return WriteEEPROM.parse(message)
-            #        elif message[0] >> 4 == 0x06 and message[2] < 0x80:
-            #            return WriteEEPROMResponse.parse(message)
-                elif message[0] >> 4 == 0x0e:
+                #        elif message[0] == 0x60 and message[2] < 0x80:
+                #            return WriteEEPROM.parse(message)
+                #        elif message[0] >> 4 == 0x06 and message[2] < 0x80:
+                #            return WriteEEPROMResponse.parse(message)
+                elif message[0] >> 4 == 0x0E:
                     return parsers.LiveEvent.parse(message)
 
         except ChecksumError as e:
-            logger.error("ChecksumError %s, message: %s" % (str(e), binascii.hexlify(message)))
+            logger.error(
+                "ChecksumError %s, message: %s" % (str(e), binascii.hexlify(message))
+            )
         except Exception:
-            logger.exception("Exception parsing message: %s" % (binascii.hexlify(message)))
+            logger.exception(
+                "Exception parsing message: %s" % (binascii.hexlify(message))
+            )
         return None
 
     async def initialize_communication(self, reply: Container, password):
         encoded_password = self.encode_password(password)
 
-        args = dict(product_id=reply.fields.value.product_id,
-                    firmware=reply.fields.value.firmware,
-                    panel_id=reply.fields.value.panel_id,
-                    pc_password=encoded_password,
-                    user_code=0x000000,
-                    _not_used1=0x19,
-                    source_id=0x02
-                    )
+        args = dict(
+            product_id=reply.fields.value.product_id,
+            firmware=reply.fields.value.firmware,
+            panel_id=reply.fields.value.panel_id,
+            pc_password=encoded_password,
+            user_code=0x000000,
+            _not_used1=0x19,
+            source_id=0x02,
+        )
 
         logger.info("Initializing communication")
-        reply = await self.core.send_wait(parsers.InitializeCommunication, args=args, reply_expected=[0x10, 0x70, 0x00])
+        reply = await self.core.send_wait(
+            parsers.InitializeCommunication,
+            args=args,
+            reply_expected=[0x10, 0x70, 0x00],
+        )
 
         if reply is None:
             logger.error("Initialization Failed")
@@ -171,26 +185,28 @@ class Panel(PanelBase):
         if reply.fields.value.po.command == 0x10:
             logger.info("Authentication Success")
             return True
-        elif reply.fields.value.po.command == 0x70 or reply.fields.value.po.command == 0x00:
+        elif (
+            reply.fields.value.po.command == 0x70
+            or reply.fields.value.po.command == 0x00
+        ):
             logger.error("Authentication Failed. Wrong Password?")
-            raise AuthenticationFailed('Wrong PASSWORD')
+            raise AuthenticationFailed("Wrong PASSWORD")
 
     @staticmethod
     def _request_status_reply_check(message: Container, address: int):
         mvars = message.fields.value
 
-        if (
-                mvars.po.command == 0x05
-                and mvars.address == address
-        ):
+        if mvars.po.command == 0x05 and mvars.address == address:
             return True
 
         return False
 
     async def request_status(self, i: int):
-        args = dict(address=self.mem_map['status_base1'] + i)
+        args = dict(address=self.mem_map["status_base1"] + i)
         reply = await self.core.send_wait(
-            parsers.ReadEEPROM, args, reply_expected=lambda m: self._request_status_reply_check(m, i)
+            parsers.ReadEEPROM,
+            args,
+            reply_expected=lambda m: self._request_status_reply_check(m, i),
         )
         if reply is not None:
             logger.debug("Received status response: %d" % i)
@@ -212,7 +228,9 @@ class Panel(PanelBase):
 
         for zone in zones:
             args = dict(action=ZONE_ACTIONS[command], argument=(zone - 1))
-            reply = await self.core.send_wait(parsers.PerformAction, args, reply_expected=0x04)
+            reply = await self.core.send_wait(
+                parsers.PerformAction, args, reply_expected=0x04
+            )
 
             if reply is not None:
                 accepted = True
@@ -233,7 +251,9 @@ class Panel(PanelBase):
 
         for partition in partitions:
             args = dict(action=PARTITION_ACTIONS[command], argument=(partition - 1))
-            reply = await self.core.send_wait(parsers.PerformAction, args, reply_expected=0x04)
+            reply = await self.core.send_wait(
+                parsers.PerformAction, args, reply_expected=0x04
+            )
 
             if reply is not None:
                 accepted = True
@@ -253,20 +273,26 @@ class Panel(PanelBase):
         accepted = False
 
         for output in outputs:
-            if command == 'pulse':
-                args = dict(action=PGM_ACTIONS['on'], argument=(output - 1))
-                reply = await self.core.send_wait(parsers.PerformAction, args, reply_expected=0x04)
+            if command == "pulse":
+                args = dict(action=PGM_ACTIONS["on"], argument=(output - 1))
+                reply = await self.core.send_wait(
+                    parsers.PerformAction, args, reply_expected=0x04
+                )
                 if reply is None:
                     continue
 
                 await asyncio.sleep(cfg.OUTPUT_PULSE_DURATION)
-                args = dict(action=PGM_ACTIONS['off'], argument=(output - 1))
-                reply = await self.core.send_wait(parsers.PerformAction, args, reply_expected=0x04)
+                args = dict(action=PGM_ACTIONS["off"], argument=(output - 1))
+                reply = await self.core.send_wait(
+                    parsers.PerformAction, args, reply_expected=0x04
+                )
                 if reply is not None:
                     accepted = True
             else:
                 args = dict(action=PGM_ACTIONS[command], argument=(output - 1))
-                reply = await self.core.send_wait(parsers.PerformAction, args, reply_expected=0x04)
+                reply = await self.core.send_wait(
+                    parsers.PerformAction, args, reply_expected=0x04
+                )
                 if reply is not None:
                     accepted = True
 

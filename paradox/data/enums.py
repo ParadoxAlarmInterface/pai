@@ -27,7 +27,13 @@ class EventLevel(IntEnum):
         if level in EventLevel.__members__:
             return EventLevel.__members__[level]
 
-        raise (Exception("Invalid log level {}. Valid levels: {}".format(level, list(EventLevel.__members__))))
+        raise (
+            Exception(
+                "Invalid log level {}. Valid levels: {}".format(
+                    level, list(EventLevel.__members__)
+                )
+            )
+        )
 
     def __lt__(self, other):
         if self.__class__ is other.__class__:

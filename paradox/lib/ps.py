@@ -2,14 +2,14 @@ import asyncio
 import logging
 from asyncio import Future
 from collections import defaultdict
-from typing import Callable, List, Mapping, Awaitable, Union
+from typing import Awaitable, Callable, List, Mapping, Union
 
-from paradox.event import Event, Change, Notification
+from paradox.event import Change, Event, Notification
 from paradox.lib.utils import call_soon_in_main_loop
 
 PREFIX = "pai_"
 
-logger = logging.getLogger('PAI').getChild(__name__)
+logger = logging.getLogger("PAI").getChild(__name__)
 loop = asyncio.get_event_loop()
 
 
@@ -55,7 +55,9 @@ class PubSub:
         self.listeners[topicName].remove(Listener(listener))
 
     async def sendMessage(self, topicName: str, **msgData):
-        return await asyncio.gather(*(l.call(**msgData) for l in self.listeners[topicName]))
+        return await asyncio.gather(
+            *(l.call(**msgData) for l in self.listeners[topicName])
+        )
 
 
 pub = PubSub()
@@ -78,4 +80,6 @@ def sendChange(change: Change):
 
 
 def sendNotification(notification: Notification):
-    call_soon_in_main_loop(pub.sendMessage(PREFIX + "notifications", notification=notification))
+    call_soon_in_main_loop(
+        pub.sendMessage(PREFIX + "notifications", notification=notification)
+    )

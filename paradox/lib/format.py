@@ -1,14 +1,13 @@
-import string
-import re
 import logging
+import re
+import string
 
-logger = logging.getLogger('PAI').getChild(__name__)
+logger = logging.getLogger("PAI").getChild(__name__)
 
-re_magick_placeholder = re.compile('@(?P<type>[a-z]+)(:?#(?P<source>[a-z0-9_]+))?')
+re_magick_placeholder = re.compile("@(?P<type>[a-z]+)(:?#(?P<source>[a-z0-9_]+))?")
 
 
 class EventMessageFormatter(string.Formatter):
-
     @staticmethod
     def _hasattr(event, key):
         if key in event.additional_data:
@@ -26,12 +25,14 @@ class EventMessageFormatter(string.Formatter):
 
         if isinstance(key, int) or isinstance(key, float):
             return key
-        elif key.startswith('@'):  # pure magic is happening here
+        elif key.startswith("@"):  # pure magic is happening here
             label_provider = event.label_provider
             m = re_magick_placeholder.match(key)
             if m:
-                element_type = m.group('type')
-                source = m.group('source') or (element_type if self._hasattr(event, element_type) else 'minor')
+                element_type = m.group("type")
+                source = m.group("source") or (
+                    element_type if self._hasattr(event, element_type) else "minor"
+                )
                 key = self._getattr(event, source)
 
                 return label_provider(element_type, key)
