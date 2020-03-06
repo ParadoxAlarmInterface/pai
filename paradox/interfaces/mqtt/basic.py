@@ -3,6 +3,8 @@ import json
 import logging
 import os
 import typing
+import hashlib
+import binascii
 from collections import namedtuple
 
 from paho.mqtt.client import MQTTMessage, Client
@@ -76,7 +78,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         self.partitions = {}
         self.definitions = {}
         self.labels = {}
-
+        self.challenges = None
         self.connected_future = asyncio.Future()  # TODO: do not create it, use some other
         self.labels_future = asyncio.Future()
         self.definitions_future = asyncio.Future()
@@ -126,12 +128,24 @@ class BasicMQTTInterface(AbstractMQTTInterface):
     @mqtt_handle_decorator
     async def _mqtt_handle_zone_control(self, prep: ParsedMessage):
         topics, element, command = prep
+
+        if cfg.MQTT_CHALLENGE_SECRET is not None:
+            command = self._validate_command_with_challenge(command)
+            if command is None:
+                return
+
         if not await self.alarm.control_zone(element, command):
             logger.warning("Zone command refused: {}={}".format(element, command))
 
     @mqtt_handle_decorator
     async def _mqtt_handle_partition_control(self, prep: ParsedMessage):
         topics, element, command = prep
+
+        if cfg.MQTT_CHALLENGE_SECRET is not None:
+            command = self._validate_command_with_challenge(command)
+            if command is None:
+                return
+
         command = cfg.MQTT_COMMAND_ALIAS.get(command, command)
 
         if command.startswith('code_toggle-'):
@@ -183,6 +197,13 @@ class BasicMQTTInterface(AbstractMQTTInterface):
     @mqtt_handle_decorator
     async def _mqtt_handle_output_control(self, prep: ParsedMessage):
         topics, element, command = prep
+
+        if cfg.MQTT_CHALLENGE_SECRET is not None:
+            command = self._validate_command_with_challenge(command)
+
+            if command is None:
+                return
+
         logger.debug("Output command: {} = {}".format(element, command))
 
         if not await self.alarm.control_output(element, command):
@@ -281,6 +302,10 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         if cfg.MQTT_DASH_PUBLISH and len(list(self.labels.get('partition', {}).keys())) >= 2:
             self._publish_dash(cfg.MQTT_DASH_TEMPLATE, self.labels.get('partition', {}))
 
+        if cfg.MQTT_CHALLENGE_SECRET:
+            logger.info("MQTT Commands authentication enabled")
+            self._refresh_challenge()
+
     def _publish_dash(self, fname, partitions):
         # TODO: move to a separate component
         if len(list(partitions.keys())) < 2:
@@ -297,3 +322,36 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                 logger.info("MQTT Dash panel published to {}".format(cfg.MQTT_DASH_TOPIC))
         else:
             logger.warning("MQTT DASH Template not found: {}".format(fname))
+
+    def _refresh_challenge(self):
+        self.challenge = binascii.hexlify(os.urandom(16))
+        self.publish(f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_STATES_TOPIC}/{cfg.MQTT_CHALLENGE_TOPIC}", self.challenge, 2, True)
+
+    def _validate_command_with_challenge(self, command):
+        aux = command.strip().split(' ')
+
+        challenge = self.challenge
+        self._refresh_challenge()
+
+        if challenge is None:
+            logger.warning("No challenge set")
+            return
+
+        if len(aux) == 2:
+            h = hashlib.new('SHA1')
+            i = cfg.MQTT_CHALLENGE_ROUNDS
+            text = f"{challenge}{cfg.MQTT_CHALLENGE_SECRET}".encode('utf-8')
+
+            while i > 0:
+                h.update(text)
+                i -= 1
+
+            if aux[1] == h.hexdigest():
+                logger.info("Authentication success")
+                return aux[0]
+            else:
+                logger.info("Authentication failed")
+                return
+        else:
+            logger.warning("Invalid command format")
+            return
