@@ -58,11 +58,15 @@ class PushoverTextInterface(ConfiguredAbstractTextInterface):
                 )
 
             if devices_raw == "*" or devices_raw is None:
-                user.send_message(
-                    message,
-                    title="Alarm",
-                    priority=_level_2_priority.get(level, chump.NORMAL),
-                )
+                try:
+                    user.send_message(
+                        message,
+                        title="Alarm",
+                        priority=_level_2_priority.get(level, chump.NORMAL),
+                    )
+                except:
+                    logger.exception("pushbullet send message")
+
             else:
                 devices = list(filter(bool, re.split(r"[\s]*,[\s]*", devices_raw)))
 
@@ -73,11 +77,15 @@ class PushoverTextInterface(ConfiguredAbstractTextInterface):
                     )
 
                 for device in devices:
-                    user.send_message(
-                        message,
-                        title="PAI",
-                        device=device,
-                        priority=_level_2_priority.get(level, chump.NORMAL),
-                    )
+                    try:
+                        user.send_message(
+                            message,
+                            title="PAI",
+                            device=device,
+                            priority=_level_2_priority.get(level, chump.NORMAL),
+                        )
+                    except:
+                        logger.exception("pushbullet send message")
+
 
         # TODO: Missing the message reception
