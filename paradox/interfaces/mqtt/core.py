@@ -2,11 +2,12 @@ import asyncio
 import logging
 import os
 import socket
+import sys
 import time
 import typing
 from enum import Enum
 
-from paho.mqtt.client import MQTT_ERR_SUCCESS, Client
+from paho.mqtt.client import MQTT_ERR_SUCCESS, Client, LOGGING_LEVEL
 
 from paradox.config import config as cfg
 from paradox.data.enums import RunState
@@ -79,6 +80,26 @@ class MQTTConnection(Client):
             self.username_pw_set(username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
 
         self.will_set(self.availability_topic, "offline", 0, retain=True)
+
+        self.on_log = self.on_client_log
+
+    def on_client_log(self, client, userdata, level, buf):
+        level = LOGGING_LEVEL[level]
+        exc_info = None
+
+        if 'Connection failed' in buf:
+            exc = sys.exc_info()
+            if exc:
+                level = logging.ERROR
+                exc_msg = str(exc)
+                if 'Invalid argument' in exc_msg:
+                    buf = "Please check MQTT_BIND_ADDRESS and MQTT_BIND_PORT settings"
+                else:
+                    buf = f'{buf}: {exc_msg}'
+            else:
+                level = logging.WARNING
+
+        logger.log(level, buf, exc_info=exc_info)
 
     def on_run_state_change(self, state: RunState):
         v = RUN_STATE_2_PAYLOAD.get(state, "unknown")
