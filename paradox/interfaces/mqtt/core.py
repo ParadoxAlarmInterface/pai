@@ -87,17 +87,20 @@ class MQTTConnection(Client):
         level = LOGGING_LEVEL[level]
         exc_info = None
 
-        if 'Connection failed' in buf:
-            exc = sys.exc_info()
-            if exc:  # Can be (socket.error, OSError, WebsocketConnectionError)
-                level = logging.ERROR
-                exc_msg = str(exc)
-                if 'Invalid argument' in exc_msg:
-                    buf = "Please check MQTT_BIND_ADDRESS and MQTT_BIND_PORT settings"
-                else:
-                    buf = f'{buf}: {exc_msg}'
+        exc = sys.exc_info()
+        if exc:  # Can be (socket.error, OSError, WebsocketConnectionError, ...)
+            if isinstance(exc, socket.error) and hasattr(exc, 'errno'):
+                exc_msg = os.strerror(exc.errno)
             else:
+                exc_msg = str(exc)
+
+            buf = f'{buf}: {exc_msg}'
+            if 'Connection failed' in buf:
                 level = logging.WARNING
+
+            if 'Invalid argument' in exc_msg:
+                level = logging.ERROR
+                buf = f"{buf}: Please check MQTT connection settings. Especially MQTT_BIND_ADDRESS and MQTT_BIND_PORT"
 
         logger.log(level, buf, exc_info=exc_info)
 
