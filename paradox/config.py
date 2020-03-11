@@ -247,11 +247,14 @@ class Config(object):
         elif env_config_path:
             locations = [env_config_path]
         else:
+            filenames = ['pai.conf', 'pai.json', 'pai.yaml']
             locations = [
-                "/etc/pai/pai.conf",
-                "/usr/local/etc/pai/pai.conf",
-                "~/.local/etc/pai.conf",
-                "pai.conf",
+                os.path.join(dir, filename) for dir in [
+                    os.path.realpath(os.getcwd()),
+                    os.path.expanduser("~/.local/etc"),
+                    "/etc/pai",
+                    "/usr/local/etc/pai",
+                ] for filename in filenames
             ]
 
         for location in locations:
@@ -260,9 +263,7 @@ class Config(object):
                 self.CONFIG_FILE_LOCATION = location
                 break
         else:
-            err = "ERROR: Could not find configuration file. Tried: {}".format(
-                locations
-            )
+            err = f"ERROR: Could not find configuration file. Tried: {locations}"
             sys.stderr.write(err + "\n")
             raise (Exception(err))
 

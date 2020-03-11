@@ -84,7 +84,7 @@ class MQTTConnection(Client):
         self.on_log = self.on_client_log
 
     def on_client_log(self, client, userdata, level, buf):
-        level = LOGGING_LEVEL[level]
+        level_std = LOGGING_LEVEL[level]
         exc_info = None
 
         type_, exc, trace = sys.exc_info()
@@ -92,17 +92,17 @@ class MQTTConnection(Client):
             if hasattr(exc, 'errno'):
                 exc_msg = f"{os.strerror(exc.errno)}({exc.errno})"
                 if exc.errno in [22, 49]:
-                    level = logging.ERROR
+                    level_std = logging.ERROR
                     buf = f"{buf}: Please check MQTT connection settings. Especially MQTT_BIND_ADDRESS and MQTT_BIND_PORT"
             else:
                 exc_msg = str(exc)
 
             buf = f'{buf}: {exc_msg}'
             if 'Connection failed' in buf:
-                level = logging.WARNING
+                level_std = logging.WARNING
 
-        if level > logging.DEBUG:
-            logger.log(level, buf, exc_info=exc_info)
+        if level_std > logging.DEBUG:
+            logger.log(level_std, buf, exc_info=exc_info)
 
     def on_run_state_change(self, state: RunState):
         v = RUN_STATE_2_PAYLOAD.get(state, "unknown")
