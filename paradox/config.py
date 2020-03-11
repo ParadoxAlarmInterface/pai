@@ -87,7 +87,7 @@ class Config(object):
         "MQTT_PASSWORD": (None, [str, type(None)]),  # MQTT Password
         "MQTT_RETAIN": True,  # Publish messages with Retain
         "MQTT_BIND_ADDRESS": "",  # MQTT Bind address (Paho default)
-        "MQTT_BIND_PORT": 0,  # MQTT Bind port
+        "MQTT_BIND_PORT": 0,  # MQTT Bind port (Paho default)
         "MQTT_REPUBLISH_INTERVAL": (
             60 * 60 * 12,
             int,

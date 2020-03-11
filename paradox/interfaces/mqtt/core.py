@@ -89,7 +89,7 @@ class MQTTConnection(Client):
 
         if 'Connection failed' in buf:
             exc = sys.exc_info()
-            if exc:
+            if exc:  # Can be (socket.error, OSError, WebsocketConnectionError)
                 level = logging.ERROR
                 exc_msg = str(exc)
                 if 'Invalid argument' in exc_msg:
