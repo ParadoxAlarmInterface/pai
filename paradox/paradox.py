@@ -15,7 +15,7 @@ from paradox.data.memory_storage import MemoryStorage as Storage
 from paradox.data.model import DetectedPanel
 from paradox.event import Change, ChangeEvent, Event, LiveEvent
 from paradox.exceptions import (PanelNotDetected, StatusRequestException,
-                                async_loop_unhandled_exception_handler)
+                                async_loop_unhandled_exception_handler, AuthenticationFailed)
 from paradox.hardware import create_panel
 from paradox.lib import ps
 from paradox.lib.async_message_manager import (ErrorMessageHandler,
@@ -539,6 +539,8 @@ class Paradox:
         else:
             message = self.panel.get_error_message(error_enum)
             logger.error("Got ERROR Message: {}".format(message))
+            if message == "Invalid PC Password":
+                raise AuthenticationFailed()
 
     async def disconnect(self):
         logger.info("Disconnecting from the Alarm Panel")
