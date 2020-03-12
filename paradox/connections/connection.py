@@ -1,7 +1,7 @@
-import asyncio
 import logging
 import typing
 
+from paradox.connections.protocols import ConnectionProtocol
 from paradox.lib.async_message_manager import AsyncMessageManager
 
 logger = logging.getLogger("PAI").getChild(__name__)
@@ -10,18 +10,26 @@ logger = logging.getLogger("PAI").getChild(__name__)
 class Connection(AsyncMessageManager):
     def __init__(self, on_message: typing.Callable[[bytes], None]):
         super().__init__()
-        self.connected = False
+        self._connected = False
         self._protocol = None  # type: ConnectionProtocol
         self.on_message = on_message
+
+    @property
+    def connected(self) -> bool:
+        return self._connected and self._protocol and self._protocol.is_active()
+
+    @connected.setter
+    def connected(self, value: bool):
+        self._connected = value
 
     async def connect(self):
         raise NotImplementedError("Implement in subclass")
 
     def write(self, data: bytes):
         if self.connected:
-            self._protocol.send_message(data)
+            self._protocol.send_message(data)  # throws ConnectionError
         else:
-            raise ConnectionError("Failed to write data to connection")
+            raise ConnectionError("Not connected")
 
     async def close(self):
         if self._protocol:

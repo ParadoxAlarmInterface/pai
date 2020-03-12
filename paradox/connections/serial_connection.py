@@ -59,6 +59,6 @@ class SerialCommunication(Connection):
             )
         except SerialException as e:
             self.connected_future.cancel()
-            raise SerialConnectionOpenFailed from e
+            raise SerialConnectionOpenFailed("Connection to serial port failed") from e
 
         return await self.connected_future

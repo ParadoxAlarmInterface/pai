@@ -7,8 +7,6 @@ from paradox.config import config as cfg
 from paradox.lib.crypto import decrypt, encrypt
 from paradox.parsers.paradox_ip_messages import ip_message
 
-from ..exceptions import NotConnectedException
-
 logger = logging.getLogger("PAI").getChild(__name__)
 
 
@@ -46,7 +44,7 @@ class ConnectionProtocol(asyncio.Protocol):
 
     def check_active(self):
         if not self.is_active():
-            raise NotConnectedException("Not connected")
+            raise ConnectionError("Transport does not exist or is already closed")
 
     async def close(self):
         if self.transport:

@@ -334,12 +334,11 @@ class Paradox:
         if message is None and message_type is not None:
             message = message_type.build(dict(fields=dict(value=args)))
 
-        retry = 0
+        attempt = 1
 
-        while retry <= retries:
-            if retry > 0:
-                logger.debug("Request retry (%d/%d)", retry, retries)
-            retry += 1
+        while attempt <= retries:
+            if attempt >= 2:  # second and further attempts
+                logger.debug("Request retry (attempt %d/%d)", attempt, retries)
 
             t1 = time.time()
             result = "unknown"
@@ -372,11 +371,19 @@ class Paradox:
                             return reply
             except asyncio.TimeoutError:
                 result = "timeout"
+                if attempt == retries:
+                    raise
+            except ConnectionError:
+                result = "connection error"
+                raise
             except Exception:
                 result = "exception"
+                logger.exception("Unexpected exception during send_wait")
                 raise
             finally:
                 logger.debug("send/receive %s in %.4f s", result, time.time() - t1)
+
+            attempt += 1
 
         return None  # Probably it needs to throw an exception instead of returning None
 
