@@ -7,7 +7,7 @@ import time
 import typing
 from enum import Enum
 
-from paho.mqtt.client import MQTT_ERR_SUCCESS, Client, LOGGING_LEVEL
+from paho.mqtt.client import LOGGING_LEVEL, MQTT_ERR_SUCCESS, Client
 
 from paradox.config import config as cfg
 from paradox.data.enums import RunState
@@ -89,7 +89,7 @@ class MQTTConnection(Client):
 
         type_, exc, trace = sys.exc_info()
         if exc:  # Can be (socket.error, OSError, WebsocketConnectionError, ...)
-            if hasattr(exc, 'errno'):
+            if hasattr(exc, "errno"):
                 exc_msg = f"{os.strerror(exc.errno)}({exc.errno})"
                 if exc.errno in [22, 49]:
                     level_std = logging.ERROR
@@ -97,8 +97,8 @@ class MQTTConnection(Client):
             else:
                 exc_msg = str(exc)
 
-            buf = f'{buf}: {exc_msg}'
-            if 'Connection failed' in buf:
+            buf = f"{buf}: {exc_msg}"
+            if "Connection failed" in buf:
                 level_std = logging.WARNING
 
         if level_std > logging.DEBUG:

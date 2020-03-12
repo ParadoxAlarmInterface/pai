@@ -87,5 +87,4 @@ class PushoverTextInterface(ConfiguredAbstractTextInterface):
                     except:
                         logger.exception("pushbullet send message")
 
-
         # TODO: Missing the message reception

@@ -247,14 +247,16 @@ class Config(object):
         elif env_config_path:
             locations = [env_config_path]
         else:
-            filenames = ['pai.conf', 'pai.json', 'pai.yaml']
+            filenames = ["pai.conf", "pai.json", "pai.yaml"]
             locations = [
-                os.path.join(dir, filename) for dir in [
+                os.path.join(dir, filename)
+                for dir in [
                     os.path.realpath(os.getcwd()),
                     os.path.expanduser("~/.local/etc"),
                     "/etc/pai",
                     "/usr/local/etc/pai",
-                ] for filename in filenames
+                ]
+                for filename in filenames
             ]
 
         for location in locations:

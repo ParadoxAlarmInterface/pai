@@ -14,8 +14,9 @@ from paradox.data.enums import RunState
 from paradox.data.memory_storage import MemoryStorage as Storage
 from paradox.data.model import DetectedPanel
 from paradox.event import Change, ChangeEvent, Event, LiveEvent
-from paradox.exceptions import (PanelNotDetected, StatusRequestException,
-                                async_loop_unhandled_exception_handler, AuthenticationFailed)
+from paradox.exceptions import (AuthenticationFailed, PanelNotDetected,
+                                StatusRequestException,
+                                async_loop_unhandled_exception_handler)
 from paradox.hardware import create_panel
 from paradox.lib import ps
 from paradox.lib.async_message_manager import (ErrorMessageHandler,
