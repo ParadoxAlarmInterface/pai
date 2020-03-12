@@ -1,3 +1,4 @@
+import asyncio
 import binascii
 import logging
 import typing
@@ -7,7 +8,6 @@ from paradox.lib.crypto import decrypt, encrypt
 from paradox.parsers.paradox_ip_messages import ip_message
 
 from ..exceptions import NotConnectedException
-from .connection import ConnectionProtocol
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -24,6 +24,71 @@ def checksum(data, min_message_length):
 
     r = (c % 256) == data[-1]
     return r
+
+
+class ConnectionProtocol(asyncio.Protocol):
+    def __init__(self, on_message: typing.Callable[[bytes], None], on_con_lost):
+        self.transport = None
+        self.use_variable_message_length = True
+        self.buffer = b""
+
+        self.on_message = on_message
+        self.on_con_lost = on_con_lost
+
+        self._closed = asyncio.get_event_loop().create_future()
+        self.buffer = b""
+
+    def connection_made(self, transport):
+        self.transport = transport
+
+    def is_active(self) -> bool:
+        return bool(self.transport) and not self._closed.done()
+
+    def check_active(self):
+        if not self.is_active():
+            raise NotConnectedException("Not connected")
+
+    async def close(self):
+        if self.transport:
+            try:
+                self.transport.close()
+            except Exception:
+                logger.exception("Connection transport close raised Exception")
+            self.transport = None
+
+        await asyncio.wait_for(self._closed, timeout=1)
+
+    def send_message(self, message):
+        raise NotImplementedError("This function needs to be overridden in a subclass")
+
+    def connection_lost(self, exc):
+        logger.error(f"Connection was closed: {exc}")
+        self.buffer = b""
+        self.transport = None
+
+        if not self._closed.done():
+            if exc is None:
+                self._closed.set_result(None)
+            else:
+                self._closed.set_exception(exc)
+
+        super().connection_lost(exc)
+
+        # asyncio.get_event_loop().call_soon(self.on_con_lost)
+        self.on_con_lost()
+
+        self.on_message = None
+        self.on_con_lost = None
+
+    def variable_message_length(self, mode):
+        self.use_variable_message_length = mode
+
+    def __del__(self):
+        # Prevent reports about unhandled exceptions.
+        # Better than self._closed._log_traceback = False hack
+        closed = self._closed
+        if closed.done() and not closed.cancelled():
+            closed.exception()
 
 
 class SerialConnectionProtocol(ConnectionProtocol):
@@ -43,8 +108,7 @@ class SerialConnectionProtocol(ConnectionProtocol):
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("PAI -> SER {}".format(binascii.hexlify(message)))
 
-        if self.transport is None:
-            raise NotConnectedException("Not connected")
+        self.check_active()
 
         self.transport.write(message)
 
@@ -102,14 +166,16 @@ class IPConnectionProtocol(ConnectionProtocol):
     def send_raw(self, raw):
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("PAI -> Mod {}".format(binascii.hexlify(raw)))
+
+        self.check_active()
+
         self.transport.write(raw)
 
     def send_message(self, message):
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("PAI -> IPC {}".format(binascii.hexlify(message)))
 
-        if self.transport is None:
-            raise NotConnectedException("Not connected")
+        self.check_active()
 
         payload = encrypt(message, self.key)
         msg = ip_message.build(
@@ -126,6 +192,7 @@ class IPConnectionProtocol(ConnectionProtocol):
         )
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("IPC -> Mod {}".format(binascii.hexlify(msg)))
+
         self.transport.write(msg)
 
     def _get_message_payload(self, data):
