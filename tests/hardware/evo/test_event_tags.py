@@ -53,7 +53,8 @@ def test_arm():
 
     pprint(matches)
 
-    assert "Arming [partition:1] with master code" in matches
+    assert "Arming [partition:1] with [user:0] master code" in matches
+    assert "Arming [partition:1] with [user:0] code" in matches
 
     assert "Special arming [partition:1]: auto arming" in matches
 
@@ -68,8 +69,8 @@ def test_disarm():
 
     pprint(matches)
 
-    assert "[partition:1] disarmed with master" in matches
-    assert "[partition:1] disarmed with user code" in matches
+    assert "[partition:1] disarmed with [user:0] master code" in matches
+    assert "[partition:1] disarmed with [user:0] code" in matches
     assert "[partition:1] disarmed with keyswitch" in matches
 
     assert "[partition:1] disarmed after alarm with master" in matches

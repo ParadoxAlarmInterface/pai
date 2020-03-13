@@ -19,15 +19,19 @@ class DateAdapter(Adapter):
         )
 
     def _encode(self, obj, context, path):
-        return [
-            obj.year / 100,
+        bts = [
+            obj.year // 100,
             obj.year % 100,
             obj.month,
             obj.day,
             obj.hour,
             obj.minute,
-            obj.second,
         ]
+
+        if self.subcon.length == 7:
+            bts.append(obj.second)
+
+        return bytes(bts)
 
 
 class DictArray(Adapter):
@@ -226,6 +230,15 @@ class EventAdapter(Adapter):
             }
         )
 
+    def _encode(self, obj, context, path):
+        return bytes(
+            [
+                obj.major,
+                obj.partition & 0x0F | (obj.minor >> 8 & 3) << 6 | (obj.minor2 >> 8 & 3) << 4,
+                obj.minor & 0xFF,
+                obj.minor2 & 0xFF
+            ]
+        )
 
 # class CompressedEventAdapter(Adapter):
 #     def _decode(self, obj, context, path):

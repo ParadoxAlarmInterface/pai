@@ -125,7 +125,7 @@ event_map = {
             24: dict(type="system", message="IPR512 4 registration status"),
         },
     ),
-    5: dict(
+    5: dict(  # minor = user id
         level=EventLevel.INFO,
         type="user",
         message="User {label} code entered on keypad",
@@ -139,19 +139,19 @@ event_map = {
     ),
     7: dict(level=EventLevel.INFO, type="user", message="Bypass programming access"),
     8: dict(level=EventLevel.WARN, type="zone", message="TX delay zone {label} alarm"),
-    9: dict(
+    9: dict(  # minor = user id, label in message = user name
         level=EventLevel.INFO,
         tags=["arm"],
         change=dict(arm=True),
         type="partition",
-        message="Arming {label} with master code",
+        message="Arming {label} with {@user} master code",
     ),
-    10: dict(
+    10: dict(  # minor = user id, label in message = user name
         level=EventLevel.INFO,
         tags=["arm"],
         change=dict(arm=True),
         type="partition",
-        message="Arming {label} with user code",
+        message="Arming {label} with {@user} code",
     ),
     11: dict(
         level=EventLevel.INFO,
@@ -184,19 +184,19 @@ event_map = {
             10: dict(type="partition", message="Future use 3"),
         },
     ),
-    13: dict(
+    13: dict(  # minor = user id, label in message = user name
         level=EventLevel.INFO,
         tags=["disarm"],
         change=dict(arm=False, current_state="disarmed", audible_alarm=False),
         type="partition",
-        message="{label} disarmed with master",
+        message="{label} disarmed with {@user} master code",
     ),
-    14: dict(
+    14: dict(  # minor = user id, label in message = user name
         level=EventLevel.INFO,
         tags=["disarm"],
         change=dict(arm=False, current_state="disarmed", audible_alarm=False),
         type="partition",
-        message="{label} disarmed with user code",
+        message="{label} disarmed with {@user} code",
     ),
     15: dict(
         level=EventLevel.INFO,
