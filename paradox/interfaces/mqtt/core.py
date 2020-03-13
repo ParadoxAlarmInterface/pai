@@ -148,7 +148,7 @@ class MQTTConnection(Client):
                     getattr(r, method), typing.Callable
                 ):
                     getattr(r, method)(*args, **kwargs)
-            except Exception as e:
+            except:
                 logger.exception(
                     'Failed to call "%s" on "%s"', method, r.__class__.__name__
                 )

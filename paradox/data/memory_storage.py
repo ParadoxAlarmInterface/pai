@@ -57,7 +57,7 @@ class MemoryStorage:
             ):  # function to make new value from the old one
                 try:
                     property_value = property_value(old)
-                except Exception:
+                except:
                     logger.exception(
                         'Exception caught during property "%s" convert. Ignoring',
                         property_name,

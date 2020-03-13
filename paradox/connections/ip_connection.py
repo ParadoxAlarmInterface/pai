@@ -50,13 +50,13 @@ class IPConnection(Connection):
             try:
                 self.stun_control.close()
                 self.stun_control = None
-            except Exception as e:
+            except:
                 logger.exception("stun_control socket close failed")
         if self.stun_tunnel:
             try:
                 self.stun_tunnel.close()
                 self.stun_tunnel = None
-            except Exception as e:
+            except:
                 logger.exception("stun_control socket close failed")
 
     async def close(self):
@@ -94,7 +94,7 @@ class IPConnection(Connection):
                     if r and self.site_info is not None:
                         if await self.connect_to_module():
                             return True
-                except Exception:
+                except:
                     logger.exception(
                         "Try %d/%d. Unable to connect to SITE ID" % (tries, max_tries)
                     )
@@ -117,7 +117,7 @@ class IPConnection(Connection):
                         "Connect to IP Module failed (try %d/%d): %s"
                         % (tries, max_tries, str(e))
                     )
-                except Exception:
+                except:
                     logger.exception(
                         "Unable to connect to IP Module (try %d/%d)"
                         % (tries, max_tries)
@@ -215,7 +215,7 @@ class IPConnection(Connection):
                 self.make_protocol, sock=self.stun_tunnel.sock
             )
             logger.info("Connected to Site: {}".format(cfg.IP_CONNECTION_SITEID))
-        except Exception:
+        except:
             logger.exception("Unable to negotiate connection to site")
             return False
 
@@ -345,7 +345,7 @@ class IPConnection(Connection):
             logger.error(
                 "Unable to establish session with IP Module. Timeout. Only one connection at a time is allowed."
             )
-        except Exception as e:
+        except:
             self.connected = False
             logger.exception("Unable to establish session with IP Module")
 
@@ -402,6 +402,6 @@ class IPConnection(Connection):
                 self.connection_timestamp = time.time()
 
             return True
-        except Exception:
+        except:
             logger.exception("Session refresh")
             return False

@@ -223,7 +223,7 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
             logger.error("No reply from modem")
             return False
 
-        except Exception:
+        except:
             logger.exception("Modem connect error")
             return False
 

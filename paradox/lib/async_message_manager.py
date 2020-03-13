@@ -133,7 +133,7 @@ class AsyncMessageManager:
                 if h.can_handle(message):
                     handler = h
                     break
-            except Exception as e:
+            except:
                 logger.exception("Exception caught during message handling")
 
         if handler:

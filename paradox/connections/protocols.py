@@ -50,7 +50,7 @@ class ConnectionProtocol(asyncio.Protocol):
         if self.transport:
             try:
                 self.transport.close()
-            except Exception:
+            except:
                 logger.exception("Connection transport close raised Exception")
             self.transport = None
 

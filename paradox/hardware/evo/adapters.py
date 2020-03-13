@@ -234,11 +234,14 @@ class EventAdapter(Adapter):
         return bytes(
             [
                 obj.major,
-                obj.partition & 0x0F | (obj.minor >> 8 & 3) << 6 | (obj.minor2 >> 8 & 3) << 4,
+                obj.partition & 0x0F
+                | (obj.minor >> 8 & 3) << 6
+                | (obj.minor2 >> 8 & 3) << 4,
                 obj.minor & 0xFF,
-                obj.minor2 & 0xFF
+                obj.minor2 & 0xFF,
             ]
         )
+
 
 # class CompressedEventAdapter(Adapter):
 #     def _decode(self, obj, context, path):

@@ -128,7 +128,7 @@ class Panel_EVOBase(PanelBase):
             logger.error(
                 "ChecksumError %s, message: %s" % (str(e), binascii.hexlify(message))
             )
-        except Exception:
+        except:
             logger.exception(
                 "Exception parsing message: %s" % (binascii.hexlify(message))
             )

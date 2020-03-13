@@ -165,17 +165,16 @@ def test_partition_armed_by_pai():
     )
     print(event_)
 
+
 def test_partition_armed_by_user():
     payload = binascii.unhexlify(
         "e2ffe8601414030d152d0a0802000000000001546573740000000000000000000000000058"
     )
     raw = LiveEvent.parse(payload)
     event_ = event.LiveEvent(raw, event_map)
-    assert (
-        "Arming [partition:8] with [user:2] code"
-        == event_.message
-    )
+    assert "Arming [partition:8] with [user:2] code" == event_.message
     print(event_)
+
 
 def test_partition_disarmed_by_user():
     payload = binascii.unhexlify(
@@ -183,11 +182,9 @@ def test_partition_disarmed_by_user():
     )
     raw = LiveEvent.parse(payload)
     event_ = event.LiveEvent(raw, event_map)
-    assert (
-        "[partition:8] disarmed with [user:2] code"
-        == event_.message
-    )
+    assert "[partition:8] disarmed with [user:2] code" == event_.message
     print(event_)
+
 
 def test_partition_armed_by_user_master():
     payload = binascii.unhexlify(
@@ -195,11 +192,9 @@ def test_partition_armed_by_user_master():
     )
     raw = LiveEvent.parse(payload)
     event_ = event.LiveEvent(raw, event_map)
-    assert (
-        "Arming [partition:8] with [user:1] master code"
-        == event_.message
-    )
+    assert "Arming [partition:8] with [user:1] master code" == event_.message
     print(event_)
+
 
 def test_partition_disarmed_by_user_master():
     payload = binascii.unhexlify(
@@ -207,11 +202,9 @@ def test_partition_disarmed_by_user_master():
     )
     raw = LiveEvent.parse(payload)
     event_ = event.LiveEvent(raw, event_map)
-    assert (
-        "[partition:8] disarmed with [user:1] master code"
-        == event_.message
-    )
+    assert "[partition:8] disarmed with [user:1] master code" == event_.message
     print(event_)
+
 
 def test_c2():
     payload = binascii.unhexlify("c2001903000b00000001a96c7106152c00200132010000000b")

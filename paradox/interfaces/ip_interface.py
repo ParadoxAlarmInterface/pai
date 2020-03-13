@@ -194,7 +194,7 @@ class ClientConnection:
                     try:
                         async with self.alarm.request_lock, self.alarm.busy:
                             self.alarm.connection.write(in_payload)
-                    except Exception:
+                    except:
                         logger.exception("Send to panel")
                         break
 
@@ -314,7 +314,7 @@ class IPInterface(Interface):
 
         try:
             await connection.handle()
-        except Exception:
+        except:
             logger.exception("Client %d connection raised exception" % self.client_nr)
         finally:
             self.alarm.connection.deregister_handler(handler_name)

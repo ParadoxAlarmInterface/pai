@@ -110,7 +110,7 @@ class PushBulletWSClient(WebSocketBaseClient):
 
         try:
             self.terminate()
-        except Exception:
+        except:
             logger.exception("Closing Pushbullet WS")
 
         self.close()
@@ -128,7 +128,7 @@ class PushBulletWSClient(WebSocketBaseClient):
             if chat.email in cfg.PUSHBULLET_CONTACTS:
                 try:
                     self.pb.push_note(cfg.PUSHBULLET_DEVICE, msg, chat=chat)
-                except Exception:
+                except:
                     logger.exception("Sending message")
                     time.sleep(5)
 

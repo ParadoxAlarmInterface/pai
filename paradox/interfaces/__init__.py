@@ -56,7 +56,7 @@ class ThreadQueueInterface(threading.Thread, Interface):
         except (KeyboardInterrupt, SystemExit):
             logger.debug("Interface loop stopping")
             self.stop()
-        except Exception:
+        except:
             logger.exception("Interface loop")
 
     def _run(self):

@@ -1,4 +1,5 @@
-from construct import Bitwise, Computed, Default, Flag, Struct, this, Bytes, Container
+from construct import (Bitwise, Bytes, Computed, Container, Default, Flag,
+                       Struct, this)
 from paradox.hardware.evo.adapters import DictArray, EventAdapter
 
 TestParser = Bitwise(
@@ -99,9 +100,11 @@ def test_picker_parsing():
 
 
 def test_event_adapter_simple():
-    payload = b'\r\x08\x01\x00'
+    payload = b"\r\x08\x01\x00"
     data = EventAdapter(Bytes(4)).parse(payload)
-    payload_generated = EventAdapter(Bytes(4)).build(Container(major = 13, minor = 1, minor2 = 0, partition = 8))
+    payload_generated = EventAdapter(Bytes(4)).build(
+        Container(major=13, minor=1, minor2=0, partition=8)
+    )
 
     assert payload_generated == payload
 

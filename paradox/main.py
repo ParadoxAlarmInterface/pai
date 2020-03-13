@@ -95,7 +95,7 @@ async def run_loop():
             break
         except (KeyboardInterrupt, SystemExit):
             break  # break exits the retry loop
-        except Exception:
+        except:
             logger.exception("Restarting")
             await asyncio.sleep(retry_time_wait)
 

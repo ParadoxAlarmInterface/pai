@@ -308,7 +308,7 @@ class Panel:
         parser = parser_map[mvars.address]
         try:
             return parser.parse(mvars.data)
-        except Exception:
+        except:
             logger.exception(
                 "Unable to parse RAM Status Block ({})".format(mvars.address)
             )

@@ -59,7 +59,7 @@ class SignalTextInterface(ConfiguredAbstractTextInterface):
 
         try:
             self.signal.sendMessage(str(message), [], cfg.SIGNAL_CONTACTS)
-        except Exception:
+        except:
             logger.exception("Signal send message")
 
     def handle_message(self, timestamp, source, groupID, message, attachments):

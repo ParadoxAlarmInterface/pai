@@ -125,7 +125,7 @@ class Event:
             kwargs["event"] = self
             try:
                 self.hook_fn(*args, **kwargs)
-            except Exception:
+            except:
                 logger.exception("Failed to call event hook")
 
 

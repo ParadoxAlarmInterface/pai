@@ -69,7 +69,7 @@ def mqtt_handle_decorator(
                 element = topics[3]
 
             call_soon_in_main_loop(func(self, ParsedMessage(topics, element, content)))
-        except Exception:
+        except:
             logger.exception("Failed to execute command")
 
     return wrapper

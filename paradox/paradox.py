@@ -244,13 +244,13 @@ class Paradox:
                     replies_missing = max(0, replies_missing - 1)
                 except ConnectionError:
                     raise
-                except StatusRequestException:
+                except (StatusRequestException, asyncio.TimeoutError):
                     replies_missing += 1
                     if replies_missing > 3:
                         logger.error("Lost communication with panel")
                         await self.disconnect()
                         return
-                except Exception:
+                except:
                     logger.exception("Loop")
                 finally:
                     self.busy.release()
@@ -314,7 +314,7 @@ class Paradox:
                 self.connection.schedule_message_handling(
                     recv_message
                 )  # schedule handling in the loop
-        except Exception as e:
+        except:
             logger.exception("Error parsing message")
 
     async def send_wait(
@@ -376,7 +376,7 @@ class Paradox:
             except ConnectionError:
                 result = "connection error"
                 raise
-            except Exception:
+            except:
                 result = "exception"
                 logger.exception("Unexpected exception during send_wait")
                 raise
@@ -535,7 +535,7 @@ class Paradox:
 
             ps.sendEvent(evt)
 
-        except Exception as e:
+        except:
             logger.exception("Handle live event")
 
     def handle_error_message(self, message):
