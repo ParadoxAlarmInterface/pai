@@ -6,7 +6,7 @@ class Panel_EVO48(Panel_EVOBase):
         "labels": {
             "zone": {
                 "label_offset": 0,
-                "addresses": [range(0x00430, 0x00730, 0x10),],  # EVO48
+                "addresses": [range(0x00430, 0x00730, 0x10)],  # EVO48
             },
             "pgm": {
                 "label_offset": 0,
@@ -15,12 +15,12 @@ class Panel_EVO48(Panel_EVOBase):
             },
             "partition": {
                 "label_offset": 0,
-                "addresses": [range(0x03A6B, 0x03C17, 0x6B),],  # EVO48
+                "addresses": [range(0x03A6B, 0x03C17, 0x6B)],  # EVO48
             },
             "user": {"label_offset": 0, "addresses": [range(0x03E47, 0x04447, 0x10)]},
             "bus-module": {  # modules
                 "label_offset": 0,
-                "addresses": [range(0x04E47, 0x05637, 0x10),],  # EVO48
+                "addresses": [range(0x04E47, 0x05637, 0x10)],  # EVO48
             },
             "door": {"label_offset": 0, "addresses": [range(0x0345C, 0x365C, 0x10)]},
         },
@@ -30,5 +30,6 @@ class Panel_EVO48(Panel_EVOBase):
                 "bit_encoded": True,
                 "addresses": [[0x39D8]],  # All 8 partitions as bits
             },
+            "user": {"addresses": [range(0x0BF0, 0x0FA6 + 10, 10),]},  # 96 users
         },
     }

@@ -1,3 +1,4 @@
+import binascii
 from collections.abc import Mapping
 
 from construct import (Array, BitsInteger, BitsSwapped, BitStruct, Bitwise,
@@ -263,6 +264,60 @@ RAMDataParserMap = {
     ),
 }
 
+
+def get_user_definition(settings):
+    if (
+        settings.system_options.user_code_length_6
+        or settings.system_options.user_code_length_flexible
+    ):
+        code = ExprAdapter(
+            Bytes(3),
+            lambda obj, path: binascii.hexlify(obj)
+            .decode()
+            .rstrip("0")
+            .replace("a", "0")
+            or None,
+            lambda obj, path: binascii.unhexlify(obj.replace("0", "a")),
+        )
+    else:
+        code = ExprAdapter(
+            Bytes(3),
+            lambda obj, path: binascii.hexlify(obj)
+            .decode()
+            .rstrip("0")
+            .replace("a", "0")[:4]
+            or None,
+            lambda obj, path: binascii.unhexlify((obj + obj[:2]).replace("0", "a")),
+        )
+
+    return Struct(
+        "code" / code,
+        "options"
+        / BitsSwapped(
+            BitStruct(
+                "type" / Enum(BitsInteger(2), FullMaster=0x3, Master=0x2, Regular=0x0),
+                "duress" / Flag,
+                "bypass" / Flag,
+                "arm_only" / Flag,
+                "stay_instant_arming" / Flag,
+                "force_arming" / Flag,
+                "all_subsystems" / Flag,
+            )
+        ),
+        "partitions" / BitsSwapped(Bitwise(StatusFlags(8))),
+        # "partitions" / BitsSwapped(
+        #     Bitwise(
+        #         EnumerationAdapter(
+        #             Array(8, Flag)
+        #         )
+        #     )
+        # ),
+        "access" / BitStruct("level" / Nibble, "schedule" / Nibble),
+        "_access_control" / Bytes(3),
+        "_end" / Const(0x00, Byte),
+    )
+
+
 DefinitionsParserMap = {
     "zone": BitStruct(
         "definition"
@@ -323,6 +378,7 @@ DefinitionsParserMap = {
             )
         )
     ),
+    "user": get_user_definition,
 }
 
 LiveEvent = Struct(

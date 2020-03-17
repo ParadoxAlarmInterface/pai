@@ -148,7 +148,7 @@ class Paradox:
 
             if reply.fields.value.product_id is not None:
                 self.panel = create_panel(
-                    self, reply.fields.value.product_id
+                    self, reply
                 )  # Now we know what panel it is. Let's
                 # recreate panel object.
                 ps.sendMessage(
@@ -163,7 +163,7 @@ class Paradox:
             else:
                 raise PanelNotDetected("Failed to detect panel")
 
-            result = await self.panel.initialize_communication(reply, cfg.PASSWORD)
+            result = await self.panel.initialize_communication(cfg.PASSWORD)
             if not result:
                 raise ConnectionError("Failed to initialize communication")
 
@@ -198,8 +198,10 @@ class Paradox:
 
             ps.sendMessage("connected")
             return True
-        except asyncio.TimeoutError as e:
-            logger.error("Timeout while connecting to panel: %s" % str(e))
+        except asyncio.TimeoutError:
+            logger.error(
+                "Timeout while connecting to panel. Is an other connection active?"
+            )
         except ConnectionError as e:
             logger.error("Failed to connect: %s" % str(e))
 

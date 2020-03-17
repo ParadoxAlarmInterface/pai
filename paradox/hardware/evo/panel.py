@@ -28,6 +28,17 @@ class Panel_EVOBase(PanelBase):
     max_eeprom_response_data_length = 64
     status_request_addresses = parsers.RAMDataParserMap.keys()
 
+    def __init__(
+        self, core, start_communication_response, variable_message_length=True
+    ):
+        super(Panel_EVOBase, self).__init__(core, variable_message_length)
+
+        raw_data = (
+            start_communication_response.fields.data
+            + start_communication_response.checksum
+        )
+        self.settings = parsers.InitializeCommunication.parse(raw_data).fields.value
+
     def get_message(self, name: str) -> Construct:
         try:
             clsmembers = dict(inspect.getmembers(parsers))
@@ -135,14 +146,12 @@ class Panel_EVOBase(PanelBase):
 
         return None
 
-    async def initialize_communication(self, reply: Container, password) -> bool:
+    async def initialize_communication(self, password) -> bool:
         encoded_password = self.encode_password(password)
 
-        raw_data = reply.fields.data + reply.checksum
-        parsed = parsers.InitializeCommunication.parse(raw_data)
-        parsed.fields.value.pc_password = encoded_password
+        self.settings.pc_password = encoded_password
         payload = parsers.InitializeCommunication.build(
-            dict(fields=dict(value=parsed.fields.value))
+            dict(fields=dict(value=self.settings))
         )
 
         logger.info("Initializing communication")

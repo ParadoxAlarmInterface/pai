@@ -5,6 +5,7 @@ import threading
 import typing
 
 import pytest
+from construct import Container
 from paradox.config import config as cfg
 from paradox.data.enums import RunState
 from paradox.hardware import create_panel
@@ -108,7 +109,12 @@ async def setup_panel(mocker):
     # alarm.work_loop.set_debug(True)
 
     alarm.run_state = RunState.RUN
-    alarm.panel = create_panel(alarm, "MAGELLAN_MG5050")
+
+    start_communication_response = Container(
+        fields=Container(value=Container(product_id="MAGELLAN_MG5050"))
+    )
+
+    alarm.panel = create_panel(alarm, start_communication_response)
 
     await send_initial_status(alarm)
     con = MockConnection(alarm.on_connection_message)

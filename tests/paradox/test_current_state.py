@@ -3,9 +3,9 @@ import binascii
 
 import pytest
 from mock import MagicMock
-from paradox.hardware.evo import Panel_EVO192
 from paradox.hardware.evo.parsers import LiveEvent
 from paradox.paradox import Paradox
+from tests.hardware.evo.test_panel import create_evo192_panel
 
 
 def send_initial_status(alarm):
@@ -89,7 +89,8 @@ async def test_current_arm_stay(alarm):
 async def test_current_alarm(mocker):
     mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_event_loop())
     alarm = Paradox(None)
-    alarm.panel = Panel_EVO192(alarm, 5)
+
+    alarm.panel = create_evo192_panel(alarm)
     mocker.spy(alarm.storage, "update_container_object")
 
     send_initial_status(alarm)

@@ -24,7 +24,7 @@ from paradox.hardware import Panel
     ],
 )
 def test_encode_password(input, expected, mocker):
-    panel = Panel(mocker.MagicMock(), None, None)
+    panel = Panel(mocker.MagicMock(), None)
 
     enc_password = panel.encode_password(input)
     assert binascii.hexlify(enc_password) == expected

@@ -333,6 +333,8 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                     continue
 
                 for attribute in definitions[i]:  # attribute
+                    if element_type == "user" and attribute == "code":
+                        continue
                     self._publish(
                         f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_DEFINITION_TOPIC}",
                         element_type,

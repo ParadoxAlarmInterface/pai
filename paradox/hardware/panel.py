@@ -23,9 +23,9 @@ class Panel:
     max_eeprom_response_data_length = 0  # override in a subclass
     status_request_addresses = []  # override in a subclass
 
-    def __init__(self, core, product_id, variable_message_length=True):
+    def __init__(self, core, variable_message_length=True):
         self.core = core
-        self.product_id = product_id
+        self.settings = {}
         self.variable_message_length = variable_message_length
 
     def parse_message(self, message, direction="topanel") -> typing.Optional[Container]:
@@ -122,7 +122,11 @@ class Panel:
             for elem_type in definitions:
                 if elem_type not in def_parsers:
                     logger.warning("No parser for %s definitions", elem_type)
+                    continue
                 parser = def_parsers[elem_type]
+                if isinstance(parser, typing.Callable):
+                    parser = parser(self.settings)
+
                 assert isinstance(parser, Construct)
                 elem_def = definitions[elem_type]
                 limits = cfg.LIMITS.get(elem_type)
@@ -284,7 +288,7 @@ class Panel:
             properties["label"] = label
             element_dict[index] = properties
 
-    def initialize_communication(self, reply, password):
+    def initialize_communication(self, password):
         raise NotImplementedError("override initialize_communication in a subclass")
 
     def get_status_requests(self) -> typing.Iterable[typing.Awaitable]:
