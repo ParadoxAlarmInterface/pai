@@ -543,7 +543,7 @@ class Paradox:
         error_enum = message.fields.value.message
 
         if error_enum == "panel_not_connected":
-            asyncio.create_task(self.disconnect())
+            asyncio.get_event_loop().create_task(self.disconnect())
         else:
             message = self.panel.get_error_message(error_enum)
             logger.error("Got ERROR Message: {}".format(message))
