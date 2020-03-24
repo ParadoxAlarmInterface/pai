@@ -57,12 +57,11 @@ def test_disarm_partition0():
     print(event_)
 
 
-def test_disarm_partition1():
+def test_disarm_partition1(mocker):
     hex = b"e2141301040b09020b0100000000025858585858585858585858202020202001000000009b"  # {'type': 'Partition', 'minor': (11, 'Disarm partition'), 'major': (2, 'Partition status')}
     payload = binascii.unhexlify(hex)
 
-    # monkey patch
-    event_map[2]["sub"][11]["message"] = "Disarm partition {name}"
+    mocker.patch.dict(event_map[2]["sub"][11], {"message": "Disarm partition {name}"})
 
     def label_provider(type, id):
         assert type == "partition"

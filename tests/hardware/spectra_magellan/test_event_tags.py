@@ -68,7 +68,7 @@ def test_disarm():
 
     pprint(matches)
 
-    assert "Disarm partition [partition:1]" in matches
+    assert "Partition [partition:1] disarmed" in matches
     assert "Disarming by user XXXXXXXXXXX" in matches
 
     assert "Disarming after alarm by user XXXXXXXXXXX" in matches

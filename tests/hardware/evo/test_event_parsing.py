@@ -19,7 +19,7 @@ def label_provider(type, id):
         assert False
 
 
-def test_zone_ok():
+def test_zone_ok(mocker):
     payload = b"\xe2\xff\xad\x06\x14\x13\x01\x04\x0e\x10\x00\x01\x05\x00\x00\x00\x00\x00\x02Living room     \x00\xcc"
 
     raw = LiveEvent.parse(payload)
@@ -29,8 +29,9 @@ def test_zone_ok():
         assert id == 1
         return "First floor"
 
-    # monkey patch
-    event_map[0]["message"] = "Zone {label} OK in partition {@partition}"
+    mocker.patch.dict(
+        event_map[0], {"message": "Zone {label} OK in partition {@partition}"}
+    )
 
     event_ = event.LiveEvent(raw, event_map, label_provider=my_label_provider)
 
@@ -40,13 +41,12 @@ def test_zone_ok():
     print(event_)
 
 
-def test_door_user():
+def test_door_user(mocker):
     payload = b"\xe2\xff\xad\x06\x14\x13\x01\x04\x0e\x10\x06\x01\x05\x01\x00\x00\x00\x00\x02Living room     \x00\xd3"
 
     raw = LiveEvent.parse(payload)
 
-    # monkey patch
-    event_map[6]["message"] = "User {@user} access on door {@door}"
+    mocker.patch.dict(event_map[6], {"message": "User {@user} access on door {@door}"})
 
     event_ = event.LiveEvent(raw, event_map, label_provider=label_provider)
 
@@ -54,7 +54,7 @@ def test_door_user():
     print(event_)
 
 
-def test_door_user2():
+def test_door_user2(mocker):
     payload = b"\xe2\xff\xad\x06\x14\x13\x01\x04\x0e\x10\x06\x01\x05\x01\x00\x00\x00\x00\x02Living room     \x00\xd3"
 
     raw = LiveEvent.parse(payload)
@@ -72,8 +72,9 @@ def test_door_user2():
         else:
             assert False
 
-    # monkey patch
-    event_map[6]["message"] = "User {@user#minor} access on door {@door}"
+    mocker.patch.dict(
+        event_map[6], {"message": "User {@user#minor} access on door {@door}"}
+    )
 
     event_ = event.LiveEvent(raw, event_map, label_provider=label_provider)
 
