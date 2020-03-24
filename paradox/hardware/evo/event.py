@@ -133,8 +133,9 @@ event_map = {
     ),
     6: dict(
         level=EventLevel.INFO,
+        tags=["access"],
         type="door",
-        message="User/card access on door {label}",
+        message="{@user} access on door {label}",
         user=_minor2_provider,
     ),
     7: dict(level=EventLevel.INFO, type="user", message="Bypass programming access"),
@@ -566,8 +567,20 @@ event_map = {
         type="module",
         message="Module manually removed from combus",
     ),
-    62: dict(level=EventLevel.INFO, type="user", message="Access granted to user"),
-    63: dict(level=EventLevel.INFO, type="user", message="Access denied to user"),
+    62: dict(
+        level=EventLevel.INFO,
+        type="user",
+        tags=["access", "granted"],
+        message="{@door} access granted to user {label}",
+        door=_minor2_provider,
+    ),
+    63: dict(
+        level=EventLevel.INFO,
+        type="user",
+        tags=["access", "denied"],
+        message="{@door} access denied to user {label}",
+        door=_minor2_provider,
+    ),
     64: dict(
         level=EventLevel.INFO,
         type="system",

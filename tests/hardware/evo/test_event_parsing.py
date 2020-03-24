@@ -206,6 +206,22 @@ def test_partition_disarmed_by_user_master():
     print(event_)
 
 
+def test_door_access():
+    payload = b"\xe0\xff\xc1d\x14\x13\x0c\x05\x11\x19\x06\x00\x01\n\x00\x00\x00\x00\x03V\x99LIKS DOOR\x00\x00\x00\x00\x00+\x1b"
+    raw = LiveEvent.parse(payload)
+    event_ = event.LiveEvent(raw, event_map)
+    assert "[user:10] access on door VLIKS DOOR" == event_.message
+    print(event_)
+
+
+def test_door_access_granted():
+    payload = b"\xe0\xff\xc1c\x14\x13\x0c\x05\x11\x19>\x00\n\x01\x00\x00\x00\x00\x01First Lastname \x001\x5d"
+    raw = LiveEvent.parse(payload)
+    event_ = event.LiveEvent(raw, event_map)
+    assert "[door:1] access granted to user First Lastname" == event_.message
+    print(event_)
+
+
 def test_c2():
     payload = binascii.unhexlify("c2001903000b00000001a96c7106152c00200132010000000b")
 
