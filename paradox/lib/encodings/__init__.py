@@ -1,3 +1,4 @@
+import codecs
 import logging
 import re
 from importlib import import_module
@@ -19,7 +20,11 @@ def paradox_codec_search(name: str):
             try:
                 module = import_module("." + enc, "paradox.lib.encodings")
                 mod = codec_cache[enc] = module.getregentry()
-                logger.info(f"Loaded {name} encoding")
+                logger.debug(f"Loaded {name} encoding")
                 return mod
             except ImportError:
                 pass
+
+
+def register_encodings():
+    codecs.register(paradox_codec_search)

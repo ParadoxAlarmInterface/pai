@@ -8,6 +8,7 @@ from paradox import VERSION
 from paradox.config import config as cfg
 from paradox.exceptions import PAICriticalException
 from paradox.interfaces.interface_manager import InterfaceManager
+from paradox.lib.encodings import register_encodings
 from paradox.paradox import Paradox
 
 alarm = None
@@ -122,6 +123,9 @@ def main(args):
     logger.info(f"Config loaded from {cfg.CONFIG_FILE_LOCATION}")
 
     logger.info(f"Console Log level set to {cfg.LOGGING_LEVEL_CONSOLE}")
+
+    # Registering additional encodings
+    register_encodings()
 
     # Start interacting with the alarm
     alarm = Paradox()
