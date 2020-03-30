@@ -145,11 +145,11 @@ class Panel_EVOBase(PanelBase):
             dict(fields=dict(value=parsed.fields.value))
         )
 
-        logger.info("Initializing communication")
+        logger.info("Installer login")
         reply = await self.core.send_wait(message=payload, reply_expected=[0x1, 0x0])
 
         if reply is None:
-            logger.error("Initialization Failed")
+            logger.error("Installer login failed")
             return False
 
         if reply.fields.value.po.command == 0x0:

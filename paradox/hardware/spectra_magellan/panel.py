@@ -171,7 +171,7 @@ class Panel(PanelBase):
             source_id=0x02,
         )
 
-        logger.info("Initializing communication")
+        logger.info("Installer login")
         reply = await self.core.send_wait(
             parsers.InitializeCommunication,
             args=args,
@@ -179,7 +179,7 @@ class Panel(PanelBase):
         )
 
         if reply is None:
-            logger.error("Initialization Failed")
+            logger.error("Installer login failed")
             return False
 
         if reply.fields.value.po.command == 0x10:

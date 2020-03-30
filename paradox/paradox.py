@@ -104,15 +104,13 @@ class Paradox:
             logger.error("Failed to connect to interface")
             return False
 
-        logger.info("Connecting to panel")
+        logger.info("Connecting to Panel")
 
         if not self.panel:
             self.panel = create_panel(self)
             self.connection.variable_message_length(self.panel.variable_message_length)
 
         try:
-            logger.info("Initiating communication")
-
             initiate_reply = await self.send_wait(
                 self.panel.get_message("InitiateCommunication"),
                 None,
@@ -132,11 +130,11 @@ class Paradox:
                     initiate_reply.fields.value.serial_number
                 ).decode()
 
-                logger.info("Found Panel {} version {}".format(model, firmware_version))
+                logger.info("Panel Identified {} version {}".format(model, firmware_version))
             else:
                 raise ConnectionError("Panel did not replied to InitiateCommunication")
 
-            logger.info("Starting communication")
+            logger.info("Initiating panel connection")
             reply = await self.send_wait(
                 self.panel.get_message("StartCommunication"),
                 args=dict(source_id=0x02),
