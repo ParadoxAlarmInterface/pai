@@ -130,7 +130,9 @@ class Paradox:
                     initiate_reply.fields.value.serial_number
                 ).decode()
 
-                logger.info("Panel Identified {} version {}".format(model, firmware_version))
+                logger.info(
+                    "Panel Identified {} version {}".format(model, firmware_version)
+                )
             else:
                 raise ConnectionError("Panel did not replied to InitiateCommunication")
 

@@ -2,6 +2,8 @@
 
 
 import logging
+import os
+import stat
 import typing
 
 from serial import SerialException
@@ -48,7 +50,23 @@ class SerialCommunication(Connection):
         )
 
     async def connect(self):
-        logger.info("Connecting to serial port {}".format(self.port_path))
+        logger.info(f"Connecting to serial port {self.port_path}")
+
+        if not os.access(self.port_path, mode=os.R_OK | os.W_OK):
+            logger.info(f"{self.port_path} is not readable/writable. Trying to fix...")
+            try:
+                os.chmod(
+                    self.port_path,
+                    stat.S_IRUSR
+                    | stat.S_IWUSR
+                    | stat.S_IRGRP
+                    | stat.S_IWGRP
+                    | stat.S_IROTH
+                    | stat.S_IWOTH,
+                )
+                logger.info(f"File {self.port_path} permissions changed")
+            except OSError:
+                logger.error(f"Failed to update file {self.port_path} permissions")
 
         self.connected_future = self.loop.create_future()
         self.loop.call_later(5, self.open_timeout)
