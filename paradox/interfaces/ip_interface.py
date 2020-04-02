@@ -8,46 +8,16 @@ import logging
 import os
 from typing import Awaitable
 
-from construct import (Aligned, Bytes, Const, Default, GreedyBytes, Int8ub,
-                       Int16ul, Struct)
+from construct import Container
 from paradox.config import config as cfg
+from paradox.connections.ip.parsers import (IPMessageCommand, IPMessageRequest,
+                                            IPMessageResponse, IPMessageType,
+                                            IPPayloadConnectResponse)
 from paradox.interfaces import Interface
 from paradox.lib.async_message_manager import RAWMessageHandler
 from paradox.lib.crypto import decrypt, encrypt
 
 logger = logging.getLogger("PAI").getChild(__name__)
-
-ip_message = Struct(
-    "header"
-    / Aligned(
-        16,
-        Struct(
-            "sof" / Const(0xAA, Int8ub),
-            "length" / Int16ul,
-            "unknown0" / Default(Int8ub, 0x01),
-            "flags" / Int8ub,
-            "command" / Int8ub,
-            "sub_command" / Default(Int8ub, 0x00),
-            "unknown1" / Default(Int8ub, 0x00),
-            "encrypt" / Default(Int8ub, 0x03),
-        ),
-        b"\xee",
-    ),
-    "payload" / Aligned(16, GreedyBytes, b"\xee"),
-)
-
-ip_payload_connect_response = Struct(
-    "command" / Const(0x00, Int8ub),
-    "key" / Bytes(16),
-    "major" / Int8ub,
-    "minor" / Int8ub,
-    "ip_major" / Default(Int8ub, 5),
-    "ip_minor" / Default(Int8ub, 2),
-    "unknown" / Default(Int8ub, 0x00),
-    "unknown2" / Default(Int8ub, 0x00),
-    "unknown3" / Default(Int8ub, 0x00),
-    "unknown4" / Default(Int8ub, 0xEE),
-)
 
 
 class ClientConnection:
@@ -77,11 +47,15 @@ class ClientConnection:
             payload_len = len(data)
 
             payload = encrypt(data, self.connection_key)
-            flags = 0x73
 
-            m = ip_message.build(
+            m = IPMessageResponse.build(
                 dict(
-                    header=dict(length=payload_len, unknown0=2, flags=flags, command=0),
+                    header=dict(
+                        length=payload_len,
+                        message_type=IPMessageType.serial_passthrough_response,
+                        flags=dict(encrypt=True, other=39),
+                        command=0,
+                    ),
                     payload=payload,
                 )
             )
@@ -110,25 +84,29 @@ class ClientConnection:
                 break
 
             if not data:
+                if not self.alarm.connection.connected:
+                    break
                 continue
 
             if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug("APP -> IPI (raw) {}".format(binascii.hexlify(data)))
 
-            message = ip_message.parse(data)
+            message = IPMessageRequest.parse(data)
             in_payload = message.payload
 
             if (
                 len(in_payload) >= 16
-                and message.header.flags & 0x01 != 0
+                and message.header.flags.encrypt
                 and len(in_payload) % 16 == 0
             ):
-                if message.header.command == 0xF0:
+                if message.header.command == IPMessageCommand.ip_authentication:
                     self.connection_key = next_connection_key = self.interface_password
 
                 in_payload = decrypt(in_payload, self.connection_key)[
                     : message.header.length
                 ]
+            elif message.header.length > 0:
+                logger.debug(f"Unencrypted payload received {message}")
 
             in_payload = in_payload[: message.header.length]
 
@@ -140,55 +118,90 @@ class ClientConnection:
                     "APP -> IPI (payload) {}".format(binascii.hexlify(in_payload))
                 )
 
-            force_plain_text = False
-            response_code = 0x01
-            out_payload = None
-            if message.header.command == 0xF0:
+            out_message = Container(
+                header=Container(
+                    message_type=IPMessageType.ip_response,
+                    command=message.header.command,
+                    flags=Container(encrypt=message.header.flags.encrypt),
+                ),
+                payload=b"",
+            )
+
+            if message.header.command == IPMessageCommand.ip_authentication:
+                logger.info("Authenticating to IP interface")
                 password = in_payload
 
                 if password != self.interface_password:
-                    logger.warning("Authentication Error")
-                    break
+                    logger.warning("Authentication Error: Wrong password")
+                    out_message.header.flags.encrypt = False
+                    out_message.header.flags.other_flags = 0x18
+                    out_message.payload = IPPayloadConnectResponse.build(
+                        dict(
+                            key=b"\00" * 16,
+                            login_status="invalid_password",
+                            hardware_version=0,
+                            ip_firmware_major=0,
+                            ip_firmware_minor=0,
+                            ip_module_serial=b"\x00\x00\x00\x00",
+                        )
+                    )
+                    status = "closing_connection"
                 else:
                     logger.info("Authentication Success")
 
-                # Generate a new key
-                next_connection_key = binascii.hexlify(os.urandom(8)).upper()
+                    # Generate a new key
+                    next_connection_key = binascii.hexlify(os.urandom(8)).upper()
 
-                out_payload = ip_payload_connect_response.build(
-                    dict(
-                        key=next_connection_key,
-                        major=0,
-                        minor=32,
-                        ip_major=1,
-                        ip_minor=50,
-                        unknown=113,
-                        unknown2=6,
-                        unknown3=0x15,
-                        unknown4=44,
+                    out_message.header.flags.other_flags = 0x1C
+                    out_message.payload = IPPayloadConnectResponse.build(
+                        dict(
+                            key=next_connection_key,
+                            login_status="success",
+                            hardware_version=32,
+                            ip_firmware_major=1,
+                            ip_firmware_minor=32,
+                            ip_module_serial=b"\x01\x23\x45\x67",
+                        )
                     )
+            elif message.header.command == IPMessageCommand.F2:
+                out_message.header.flags.other_flags = 0x1C
+                out_message.payload = b"\x00"
+            elif message.header.command == IPMessageCommand.F3:
+                out_message.header.flags.other_flags = 0x1D  # 4 in Babyware
+                out_message.payload = binascii.unhexlify(
+                    "0100000000000000000000000000000000"
                 )
+            elif message.header.command == IPMessageCommand.F4:
+                out_message.header.flags.other_flags = 0x1C
+                out_message.payload = (
+                    b"\x01" if status == "closing_connection" else b"\x00"
+                )
+            elif message.header.command == IPMessageCommand.F8:
+                out_message.header.flags.other_flags = 0x1C  # 3D in Babyware
+                out_message.payload = b"\x01"
+            # elif message.header.command in ["F5", "FB"]:  # Proxy Insite Gold communication
+            #     TODO: Implement
+            #     if not isinstance(self.alarm.connection, IPConnection):
+            #         logger.error(f"Only IP Connection supports '{message.header.command}' command")
+            #         break
+            #
+            #     proxy_message = Container(
+            #         header=message.header,
+            #         payload=in_payload
+            #     )
+            #
+            #     async with self.alarm.request_lock, self.alarm.busy:
+            #         self.alarm.connection.write_with_header(IPMessageRequest(proxy_message))
+            elif message.header.command == IPMessageCommand.panel_communication:
+                out_message.header.message_type = (
+                    IPMessageType.serial_passthrough_response
+                )
+                out_message.header.flags.other_flags = 0x39
 
-                flags = 0x39
-            elif message.header.command == 0xF2:
-                out_payload = b"\x00"
-                flags = 0x39
-            elif message.header.command == 0xF3:
-                out_payload = binascii.unhexlify("0100000000000000000000000000000000")
-                flags = 0x3B
-            elif message.header.command == 0xF4:
-                out_payload = b"\x01" if status == "closing_connection" else b"\x00"
-                flags = 0x39
-            elif message.header.command == 0xF8:
-                out_payload = b"\x01"
-                flags = 0x39
-            elif message.header.command == 0x00:
-                response_code = 0x02
-                flags = 0x73
                 if in_payload[0] == 0x70 and in_payload[2] == 0x05:  # Close connection
-                    out_payload = self.alarm.panel.get_message("CloseConnection").build(
-                        {}
-                    )
+                    out_message.payload = self.alarm.panel.get_message(
+                        "CloseConnection"
+                    ).build({})
                     status = "closing_connection"
                 else:
                     try:
@@ -209,33 +222,27 @@ class ClientConnection:
                 )
                 continue
 
-            if out_payload is not None:
-                payload_length = len(out_payload)
-
-                if message.header.flags & 0x08 != 0:
-                    out_payload = out_payload.ljust(
+            payload_length = len(out_message.payload)
+            if payload_length:
+                if out_message.header.flags.encrypt:
+                    out_message.payload = out_message.payload.ljust(
                         (payload_length // 16) * 16, bytes([0xEE])
                     )
 
                 if cfg.LOGGING_DUMP_PACKETS:
                     logger.debug(
-                        "IPI -> IPI (payload) {}".format(binascii.hexlify(out_payload))
+                        "IPI -> APP (payload) {}".format(
+                            binascii.hexlify(out_message.payload)
+                        )
                     )
 
-                if message.header.flags & 0x01 != 0 and not force_plain_text:
-                    out_payload = encrypt(out_payload, self.connection_key)
-
-                m = ip_message.build(
-                    dict(
-                        header=dict(
-                            length=payload_length,
-                            unknown0=response_code,
-                            flags=flags,
-                            command=message.header.command,
-                        ),
-                        payload=out_payload,
+                if out_message.header.flags.encrypt:
+                    out_message.payload = encrypt(
+                        out_message.payload, self.connection_key
                     )
-                )
+
+                out_message.header.length = payload_length
+                m = IPMessageResponse.build(out_message)
 
                 if cfg.LOGGING_DUMP_PACKETS:
                     logger.debug("IPI -> APP (raw) {}".format(binascii.hexlify(m)))
@@ -319,6 +326,5 @@ class IPInterface(Interface):
         finally:
             self.alarm.connection.deregister_handler(handler_name)
 
-            logger.debug("Resuming")
-            await self.alarm.resume()
+            asyncio.get_event_loop().create_task(self.alarm.resume())
             logger.info("Client %d disconnected" % self.client_nr)

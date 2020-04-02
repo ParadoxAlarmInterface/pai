@@ -4,8 +4,9 @@ import logging
 import typing
 
 from paradox.config import config as cfg
+from paradox.connections.ip.parsers import (IPMessageCommand, IPMessageRequest,
+                                            IPMessageResponse, IPMessageType)
 from paradox.lib.crypto import decrypt, encrypt
-from paradox.parsers.paradox_ip_messages import ip_message
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -176,14 +177,12 @@ class IPConnectionProtocol(ConnectionProtocol):
         self.check_active()
 
         payload = encrypt(message, self.key)
-        msg = ip_message.build(
+        msg = IPMessageRequest.build(
             dict(
                 header=dict(
                     length=len(message),
-                    unknown0=0x04,
-                    flags=0x09,
-                    command=0x00,
-                    encrypt=1,
+                    message_type=IPMessageType.serial_passthrough_request,
+                    command=IPMessageCommand.panel_communication,
                 ),
                 payload=payload,
             )
@@ -194,12 +193,12 @@ class IPConnectionProtocol(ConnectionProtocol):
         self.transport.write(msg)
 
     def _get_message_payload(self, data):
-        message = ip_message.parse(data)
+        message = IPMessageResponse.parse(data)
 
         if (
             len(message.payload) >= 16
             and len(message.payload) % 16 == 0
-            and message.header.flags & 0x01 != 0
+            and message.header.flags.encrypt
         ):
             message_payload = decrypt(data[16:], self.key)[: message.header.length]
         else:

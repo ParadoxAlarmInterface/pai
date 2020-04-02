@@ -8,7 +8,7 @@ from typing import Callable, Iterable, Optional, Sequence
 
 from construct import Container
 from paradox.config import config as cfg
-from paradox.connections.ip_connection import IPConnection
+from paradox.connections.ip.connection import IPConnection
 from paradox.connections.serial_connection import SerialCommunication
 from paradox.data.enums import RunState
 from paradox.data.memory_storage import MemoryStorage as Storage

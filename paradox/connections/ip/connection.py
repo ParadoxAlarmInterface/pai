@@ -10,13 +10,14 @@ import typing
 import requests
 
 from paradox.config import config as cfg
+from paradox.connections.connection import Connection
+from paradox.connections.ip.parsers import (IPMessageCommand, IPMessageRequest,
+                                            IPPayloadConnectResponse)
+from paradox.connections.protocols import (IPConnectionProtocol,
+                                           SerialConnectionProtocol)
+from paradox.exceptions import PAICriticalException
 from paradox.lib import stun
 from paradox.lib.crypto import encrypt
-from paradox.parsers.paradox_ip_messages import (ip_message,
-                                                 ip_payload_connect_response)
-
-from .connection import Connection
-from .protocols import IPConnectionProtocol, SerialConnectionProtocol
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -117,6 +118,8 @@ class IPConnection(Connection):
                         "Connect to IP Module failed (try %d/%d): %s"
                         % (tries, max_tries, str(e))
                     )
+                except PAICriticalException:
+                    raise
                 except:
                     logger.exception(
                         "Unable to connect to IP Module (try %d/%d)"
@@ -232,15 +235,10 @@ class IPConnection(Connection):
             self._protocol.key = self.password
             payload = encrypt(self.password, self.key)
 
-            msg = ip_message.build(
+            msg = IPMessageRequest.build(
                 dict(
                     header=dict(
-                        length=len(self.key),
-                        unknown0=0x03,
-                        flags=0x09,
-                        command=0xF0,
-                        unknown1=0,
-                        encrypt=1,
+                        length=len(self.key), command=IPMessageCommand.ip_authentication
                     ),
                     payload=payload,
                 )
@@ -248,10 +246,13 @@ class IPConnection(Connection):
             self._protocol.send_raw(msg)
             message_payload = await self.wait_for_message(raw=True)
 
-            response = ip_payload_connect_response.parse(message_payload)
+            response = IPPayloadConnectResponse.parse(message_payload)
 
             if response.login_status != "success":
-                logger.error("Error connecting to IP Module. Wrong IP Module password?")
+                logger.error(f"Error connecting to IP Module: {response.login_status}")
+
+                if response.login_status == "invalid_password":
+                    raise PAICriticalException("Invalid IP Module password")
                 return False
 
             logger.info(
@@ -268,16 +269,9 @@ class IPConnection(Connection):
 
             # F2
             logger.debug("Sending F2")
-            msg = ip_message.build(
+            msg = IPMessageRequest.build(
                 dict(
-                    header=dict(
-                        length=0,
-                        unknown0=0x03,
-                        flags=0x09,
-                        command=0xF2,
-                        unknown1=0,
-                        encrypt=1,
-                    ),
+                    header=dict(length=0, command=IPMessageCommand.F2,),
                     payload=encrypt(b"", self.key),
                 )
             )
@@ -295,16 +289,9 @@ class IPConnection(Connection):
 
             # F3
             logger.debug("Sending F3")
-            msg = ip_message.build(
+            msg = IPMessageRequest.build(
                 dict(
-                    header=dict(
-                        length=0,
-                        unknown0=0x03,
-                        flags=0x09,
-                        command=0xF3,
-                        unknown1=0,
-                        encrypt=1,
-                    ),
+                    header=dict(length=0, command=IPMessageCommand.F3,),
                     payload=encrypt(b"", self.key),
                 )
             )
@@ -320,16 +307,9 @@ class IPConnection(Connection):
             )
             payload_len = len(payload)
             payload = encrypt(payload, self.key)
-            msg = ip_message.build(
+            msg = IPMessageRequest.build(
                 dict(
-                    header=dict(
-                        length=payload_len,
-                        unknown0=0x03,
-                        flags=0x09,
-                        command=0xF8,
-                        unknown1=0,
-                        encrypt=1,
-                    ),
+                    header=dict(length=payload_len, command=IPMessageCommand.F8,),
                     payload=payload,
                 )
             )
@@ -345,6 +325,8 @@ class IPConnection(Connection):
             logger.error(
                 "Unable to establish session with IP Module. Timeout. Only one connection at a time is allowed."
             )
+        except PAICriticalException:
+            raise
         except:
             self.connected = False
             logger.exception("Unable to establish session with IP Module")

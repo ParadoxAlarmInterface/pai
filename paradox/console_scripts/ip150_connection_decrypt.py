@@ -5,6 +5,7 @@ from collections import OrderedDict
 
 import yaml
 
+from paradox.connections.ip.parsers import IPMessageRequest, IPMessageResponse
 from paradox.lib.crypto import decrypt
 
 
@@ -31,17 +32,29 @@ def decrypt_file(file, password):
         for key, value in data.items():
             header = value[0:16]
             body = value[16:]
-            decrypted = decrypt(body, password if n < 2 else PASSWORD2)
+
+            if "peer0_" in key:
+                parsed = IPMessageRequest.parse(value)
+            else:
+                parsed = IPMessageResponse.parse(value)
+
+            if parsed.header.flags.encrypt:
+                body = decrypt(body, password if n < 2 else PASSWORD2)
             if n < 2 and "peer1_" in key:
-                PASSWORD2 = decrypted[1:17]
+                PASSWORD2 = body[1:17]
                 print(len(PASSWORD2))
 
             print(
                 "PC->IP: " if "peer0_" in key else "IP->PC: ",
                 binascii.hexlify(header),
-                binascii.hexlify(decrypted),
-                decrypted,
+                binascii.hexlify(body),
+                body,
             )
+
+            if "peer0_" in key:
+                print(IPMessageRequest.parse(value))
+            else:
+                print(IPMessageResponse.parse(value))
 
             if "peer1_" in key:
                 print(
