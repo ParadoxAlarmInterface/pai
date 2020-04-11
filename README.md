@@ -107,6 +107,8 @@ If you want to support Jevgeni Kiski [@yozik04](https://github.com/yozik04), cli
     <img alt="Paypal donation" src="https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif">
 </a>
 
+Raised money will be spent on different hardware required for PAI development.
+
 ## With support from
 
 <a href="https://www.jetbrains.com/?from=PAI-ParadoxAlarmInterface"><img src="/docs/jetbrains.svg" alt="JetBrains"/></a>
