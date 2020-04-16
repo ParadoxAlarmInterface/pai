@@ -6,7 +6,6 @@ import typing
 from paradox.config import config as cfg
 from paradox.connections.ip.parsers import (IPMessageCommand, IPMessageRequest,
                                             IPMessageResponse, IPMessageType)
-from paradox.lib.crypto import decrypt, encrypt
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -176,7 +175,6 @@ class IPConnectionProtocol(ConnectionProtocol):
 
         self.check_active()
 
-        payload = encrypt(message, self.key)
         msg = IPMessageRequest.build(
             dict(
                 header=dict(
@@ -184,8 +182,9 @@ class IPConnectionProtocol(ConnectionProtocol):
                     message_type=IPMessageType.serial_passthrough_request,
                     command=IPMessageCommand.panel_communication,
                 ),
-                payload=payload,
-            )
+                payload=message,
+            ),
+            password=self.key
         )
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("IPC -> Mod {}".format(binascii.hexlify(msg)))
@@ -193,21 +192,12 @@ class IPConnectionProtocol(ConnectionProtocol):
         self.transport.write(msg)
 
     def _get_message_payload(self, data):
-        message = IPMessageResponse.parse(data)
-
-        if (
-            len(message.payload) >= 16
-            and len(message.payload) % 16 == 0
-            and message.header.flags.encrypt
-        ):
-            message_payload = decrypt(data[16:], self.key)[: message.header.length]
-        else:
-            message_payload = message.payload[: message.header.length]
+        message = IPMessageResponse.parse(data, password=self.key)
 
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("IPC -> PAI {}".format(binascii.hexlify(message_payload)))
+            logger.debug("IPC -> PAI {}".format(binascii.hexlify(message.payload)))
 
-        return message_payload
+        return message.payload
 
     def data_received(self, recv_data):
         self.buffer += recv_data

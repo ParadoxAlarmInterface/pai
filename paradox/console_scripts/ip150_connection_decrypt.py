@@ -6,7 +6,6 @@ from collections import OrderedDict
 import yaml
 
 from paradox.connections.ip.parsers import IPMessageRequest, IPMessageResponse
-from paradox.lib.crypto import decrypt
 
 
 def ordered_load(stream, Loader=yaml.loader.SafeLoader, object_pairs_hook=OrderedDict):
@@ -22,7 +21,6 @@ def ordered_load(stream, Loader=yaml.loader.SafeLoader, object_pairs_hook=Ordere
     )
     return yaml.load(stream, OrderedLoader)
 
-
 def decrypt_file(file, password):
     PASSWORD2 = None
     try:
@@ -31,30 +29,26 @@ def decrypt_file(file, password):
         n = 0
         for key, value in data.items():
             header = value[0:16]
-            body = value[16:]
 
             if "peer0_" in key:
-                parsed = IPMessageRequest.parse(value)
+                parsed = IPMessageRequest.parse(value, password=password)
             else:
-                parsed = IPMessageResponse.parse(value)
+                parsed = IPMessageResponse.parse(value, password=password)
 
-            if parsed.header.flags.encrypt:
-                body = decrypt(body, password if n < 2 else PASSWORD2)
-            if n < 2 and "peer1_" in key:
-                PASSWORD2 = body[1:17]
-                print(len(PASSWORD2))
+            if parsed.header.command == 'ip_authentication' and parsed.header.message_type == 'ip_request':
+                assert password == parsed.payload, 'Wrong decryption password'
+
+            if parsed.header.command == 'ip_authentication' and parsed.header.message_type == 'ip_response':
+                password = parsed.payload[1:17]
 
             print(
                 "PC->IP: " if "peer0_" in key else "IP->PC: ",
-                binascii.hexlify(header),
-                binascii.hexlify(body),
-                body,
+                f'header: {binascii.hexlify(header)}',
+                f'body: {binascii.hexlify(parsed.payload)}',
+                f'body_raw: {parsed.payload}'
             )
 
-            if "peer0_" in key:
-                print(IPMessageRequest.parse(value))
-            else:
-                print(IPMessageResponse.parse(value))
+            print(parsed)
 
             if "peer1_" in key:
                 print(

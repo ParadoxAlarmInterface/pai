@@ -1,7 +1,8 @@
 from construct import (Aligned, BitsInteger, BitStruct, Bytes, Const, Default,
                        Enum, Flag, GreedyBytes, Int8ub, Int16ub, Int16ul,
-                       Struct)
+                       Struct, IfThenElse, this, Adapter, len_, Rebuild)
 from paradox.hardware.common import HexInt
+from paradox.lib.crypto import decrypt, encrypt
 
 IPMessageType = Enum(
     Int8ub,
@@ -41,6 +42,19 @@ IPPayloadConnectResponse = Struct(
     "ip_module_serial" / Bytes(4),
 )
 
+class EncryptionAdapter(Adapter):
+    def _decode(self, obj, context, path):
+        try:
+            return decrypt(obj, context._.password)[:context.header.length]
+        except AttributeError:
+            raise
+
+    def _encode(self, obj, context, path):
+        try:
+            return encrypt(obj, context._.password)
+        except AttributeError:
+            raise
+
 
 IPMessageRequest = Struct(
     "header"
@@ -48,7 +62,7 @@ IPMessageRequest = Struct(
         16,
         Struct(
             "sof" / Const(0xAA, Int8ub),
-            "length" / Int16ul,
+            "length" / Rebuild(Int16ul, len_(this._.payload)),
             "message_type" / Default(IPMessageType, 0x03),
             "flags"
             / BitStruct(
@@ -61,7 +75,10 @@ IPMessageRequest = Struct(
         ),
         b"\xee",
     ),
-    "payload" / Aligned(16, GreedyBytes, b"\xee"),
+    "payload" / IfThenElse(this.header.flags.encrypt,
+        EncryptionAdapter(Aligned(16, GreedyBytes, b"\xee")),
+        Bytes(this.header.length)
+    )
 )
 
 
@@ -71,7 +88,7 @@ IPMessageResponse = Struct(
         16,
         Struct(
             "sof" / Const(0xAA, Int8ub),
-            "length" / Int16ul,
+            "length" / Rebuild(Int16ul, len_(this._.payload)),
             "message_type" / Default(IPMessageType, 0x01),
             "flags"
             / BitStruct(
@@ -84,5 +101,8 @@ IPMessageResponse = Struct(
         ),
         b"\xee",
     ),
-    "payload" / Aligned(16, GreedyBytes, b"\xee"),
+    "payload" / IfThenElse(this.header.flags.encrypt,
+        EncryptionAdapter(Aligned(16, GreedyBytes, b"\xee")),
+        Bytes(this.header.length)
+    )
 )
