@@ -10,8 +10,8 @@ from construct import (Array, BitsInteger, BitsSwapped, BitStruct, Bitwise,
 from ..common import (CommunicationSourceIDEnum, PacketChecksum, PacketLength,
                       ProductIdEnum, calculate_checksum)
 from .adapters import (DateAdapter, DictArray, EnumerationAdapter,
-                       EventAdapter, PartitionStatus, StatusFlags,
-                       ZoneFlagBitStruct, ZoneFlags)
+                       EventAdapter, ModuleTroubles, PartitionStatus,
+                       StatusFlags, ZoneFlagBitStruct, ZoneFlags)
 
 LoginConfirmationResponse = Struct(
     "fields"
@@ -258,8 +258,26 @@ RAMDataParserMap = {
         "_free" / Padding(34),
     ),
     5: Struct(
-        "_free" / Padding(1),
-        "bus-module_trouble" / BitsSwapped(Bitwise(StatusFlags(504))),
+        "_not_used" / Int8ub, "bus-module_trouble" / ModuleTroubles(count=63, start_index_from=1)
+    ),
+    6: Struct("bus-module_trouble" / ModuleTroubles(count=64, start_index_from=64)),
+    7: Struct("bus-module_trouble" / ModuleTroubles(count=64, start_index_from=128)),
+    8: Struct(
+        "bus-module_trouble" / ModuleTroubles(count=63, start_index_from=192), "_not_used" / Int8ub
+    ),
+    9: Struct(
+        "zone_open" / BitsSwapped(Bitwise(StatusFlags(96, start_index_from=97))),
+        "zone_tamper" / BitsSwapped(Bitwise(StatusFlags(96, start_index_from=97))),
+        "zone_low_battery" / BitsSwapped(Bitwise(StatusFlags(96, start_index_from=97))),
+        "zone_status" / ZoneFlags(28, start_index_from=97),
+    ),
+    10: Struct("zone_status" / ZoneFlags(64, start_index_from=125),),
+    11: Struct(
+        "zone_status" / ZoneFlags(4, start_index_from=189), "_not_used" / Bytes(60),
+    ),
+    16: Struct(
+        "module_assigned" / BitsSwapped(Bitwise(StatusFlags(256, start_index_from=1))),
+        "module_missing" / BitsSwapped(Bitwise(StatusFlags(256, start_index_from=1))),
     ),
 }
 

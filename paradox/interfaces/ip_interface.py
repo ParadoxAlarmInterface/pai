@@ -55,7 +55,7 @@ class ClientConnection:
                     ),
                     payload=data,
                 ),
-                password = self.connection_key
+                password=self.connection_key,
             )
 
             if cfg.LOGGING_DUMP_PACKETS:
@@ -93,7 +93,9 @@ class ClientConnection:
 
             if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug(
-                    "APP -> IPI (payload) {}".format(binascii.hexlify(in_message.payload))
+                    "APP -> IPI (payload) {}".format(
+                        binascii.hexlify(in_message.payload)
+                    )
                 )
 
             out_message_container = Container(
@@ -176,7 +178,9 @@ class ClientConnection:
                 )
                 out_message_container.header.flags.other_flags = 0x39
 
-                if in_message.payload[0] == 0x70 and in_message.payload[2] == 0x05:  # Close connection
+                if (
+                    in_message.payload[0] == 0x70 and in_message.payload[2] == 0x05
+                ):  # Close connection
                     out_message_container.payload = self.alarm.panel.get_message(
                         "CloseConnection"
                     ).build({})
@@ -200,7 +204,9 @@ class ClientConnection:
                 )
                 continue
 
-            payload_length = len(out_message_container.payload)  # TODO: Why can't payload be empty?
+            payload_length = len(
+                out_message_container.payload
+            )  # TODO: Why can't payload be empty?
             if payload_length:
                 if cfg.LOGGING_DUMP_PACKETS:
                     logger.debug(
@@ -209,7 +215,9 @@ class ClientConnection:
                         )
                     )
 
-                m = IPMessageResponse.build(out_message_container, password=self.connection_key)
+                m = IPMessageResponse.build(
+                    out_message_container, password=self.connection_key
+                )
 
                 if cfg.LOGGING_DUMP_PACKETS:
                     logger.debug("IPI -> APP (raw) {}".format(binascii.hexlify(m)))

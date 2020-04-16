@@ -91,12 +91,33 @@ class EnumerationAdapter(Subconstruct):
         return self.subcon._build(zones, stream, context, path)
 
 
-def StatusFlags(count):
+def StatusFlags(count, start_index_from=1):
     return DictArray(
         count,
-        1,
-        Struct("_index" / Computed(this._index + 1), "flag" / Default(Flag, False)),
+        start_index_from,
+        Struct(
+            "_index" / Computed(this._index + start_index_from),
+            "flag" / Default(Flag, False),
+        ),
         pick_key="flag",
+    )
+
+
+def ModuleTroubles(count, start_index_from=1):
+    return DictArray(
+        count=count,
+        first_index=start_index_from,
+        subcon=BitStruct(
+            "_index" / Computed(this._index + start_index_from),
+            "aux_trouble" / Flag,
+            "battery_fail" / Flag,
+            "ac_trouble" / Flag,
+            "printer_trouble" / Flag,
+            "fail_to_comm" / Flag,
+            "tlm_trouble" / Flag,
+            "rom_error" / Flag,
+            "tamper" / Flag,
+        ),
     )
 
 

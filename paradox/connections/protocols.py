@@ -184,7 +184,7 @@ class IPConnectionProtocol(ConnectionProtocol):
                 ),
                 payload=message,
             ),
-            password=self.key
+            password=self.key,
         )
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("IPC -> Mod {}".format(binascii.hexlify(msg)))

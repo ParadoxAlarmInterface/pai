@@ -2,7 +2,7 @@ from paradox.connections.ip.parsers import IPMessageRequest, IPMessageResponse
 
 
 def test_IPMessageRequest_defaults():
-    key = b'12345abcde'
+    key = b"12345abcde"
     test_payload = b"abcdefg"
 
     a = IPMessageRequest.build(dict(payload=test_payload), password=key)
@@ -21,7 +21,7 @@ def test_IPMessageRequest_defaults():
 
 
 def test_IPMessageResponse_defaults():
-    key = b'12345abcde'
+    key = b"12345abcde"
     test_payload = b"abcdefg"
 
     a = IPMessageResponse.build(dict(payload=test_payload), password=key)

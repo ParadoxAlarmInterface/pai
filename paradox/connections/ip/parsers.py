@@ -1,6 +1,6 @@
-from construct import (Aligned, BitsInteger, BitStruct, Bytes, Const, Default,
-                       Enum, Flag, GreedyBytes, Int8ub, Int16ub, Int16ul,
-                       Struct, IfThenElse, this, Adapter, len_, Rebuild)
+from construct import (Adapter, Aligned, BitsInteger, BitStruct, Bytes, Const,
+                       Default, Enum, Flag, GreedyBytes, IfThenElse, Int8ub,
+                       Int16ub, Int16ul, Rebuild, Struct, len_, this)
 from paradox.hardware.common import HexInt
 from paradox.lib.crypto import decrypt, encrypt
 
@@ -42,10 +42,11 @@ IPPayloadConnectResponse = Struct(
     "ip_module_serial" / Bytes(4),
 )
 
+
 class EncryptionAdapter(Adapter):
     def _decode(self, obj, context, path):
         try:
-            return decrypt(obj, context._.password)[:context.header.length]
+            return decrypt(obj, context._.password)[: context.header.length]
         except AttributeError:
             raise
 
@@ -75,10 +76,12 @@ IPMessageRequest = Struct(
         ),
         b"\xee",
     ),
-    "payload" / IfThenElse(this.header.flags.encrypt,
+    "payload"
+    / IfThenElse(
+        this.header.flags.encrypt,
         EncryptionAdapter(Aligned(16, GreedyBytes, b"\xee")),
-        Bytes(this.header.length)
-    )
+        Bytes(this.header.length),
+    ),
 )
 
 
@@ -101,8 +104,10 @@ IPMessageResponse = Struct(
         ),
         b"\xee",
     ),
-    "payload" / IfThenElse(this.header.flags.encrypt,
+    "payload"
+    / IfThenElse(
+        this.header.flags.encrypt,
         EncryptionAdapter(Aligned(16, GreedyBytes, b"\xee")),
-        Bytes(this.header.length)
-    )
+        Bytes(this.header.length),
+    ),
 )
