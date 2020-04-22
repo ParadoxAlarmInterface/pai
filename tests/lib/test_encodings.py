@@ -8,6 +8,10 @@ def test_en_encoding():
 
     assert b"0".decode(encoding) == "0"
 
+    assert bytes([158]).decode(encoding) == "ä"
+    assert bytes([206]).decode(encoding) == "Õ"
+    assert bytes([131]).decode(encoding) == "Ü"
+
 
 def test_ru_encoding():
     encoding = "paradox-ru"
