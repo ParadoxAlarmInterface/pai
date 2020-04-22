@@ -280,6 +280,22 @@ RAMDataParserMap = {
         "module_missing" / BitsSwapped(Bitwise(StatusFlags(256, start_index_from=1))),
     ),
 }
+# We also need parsers for:
+# 17 ram address
+# 32 ram address
+# 33 ram address
+# 34 ram address
+# 35 ram address
+# 37 ram address
+# 38 ram address
+# 39 ram address
+# 48 ram address
+# 49 ram address
+# 50 ram address
+# 51 ram address
+# 56 ram address
+# 57 ram address
+# 58 ram address
 
 DefinitionsParserMap = {
     "zone": BitStruct(
