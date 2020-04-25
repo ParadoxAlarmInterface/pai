@@ -1,4 +1,8 @@
-from paradox.hardware.evo.parsers import DefinitionsParserMap
+import binascii
+
+from construct import Container
+from paradox.hardware.evo.parsers import (DefinitionsParserMap,
+                                          get_user_definition)
 
 
 def test_zone_definition_test():
@@ -71,3 +75,66 @@ def test_partition_definition_test():
     assert data[1]["definition"] == "enabled"
     assert data[3]["definition"] == "disabled"
     assert len(data) == 8
+
+
+def test_user_definition_test():
+    settings = Container(
+        system_options=Container(
+            user_code_length_6=False, user_code_length_flexible=False
+        )
+    )
+
+    parser = get_user_definition(settings)
+
+    assert parser.sizeof() == 10
+
+    data = parser.parse(binascii.unhexlify("00000048000000000000"))
+    assert data.code is None
+
+    # master
+    data = parser.parse(binascii.unhexlify("123412ebff00af000000"))
+
+    assert data.code == "1234"
+    assert data.options == dict(
+        type="FullMaster",
+        duress=False,
+        bypass=True,
+        arm_only=False,
+        stay_instant_arming=True,
+        force_arming=True,
+        all_subsystems=True,
+    )
+    assert data.partitions == {
+        1: True,
+        2: True,
+        3: True,
+        4: True,
+        5: True,
+        6: True,
+        7: True,
+        8: True,
+    }
+
+    # regular
+    data = parser.parse(binascii.unhexlify("a123a140cb0000000000"))
+
+    assert data.code == "0123"
+    assert data.options == dict(
+        type="Regular",
+        duress=False,
+        bypass=False,
+        arm_only=False,
+        stay_instant_arming=False,
+        force_arming=True,
+        all_subsystems=False,
+    )
+    assert data.partitions == {
+        1: True,
+        2: True,
+        3: False,
+        4: True,
+        5: False,
+        6: False,
+        7: True,
+        8: True,
+    }

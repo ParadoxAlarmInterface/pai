@@ -1,25 +1,32 @@
+from construct import Container
+
 from .panel import Panel
 
 
-def create_panel(core, product_id=None) -> Panel:
+def create_panel(core, start_communication_response: Container = None) -> Panel:
+    product_id = (
+        start_communication_response.fields.value.product_id
+        if start_communication_response
+        else None
+    )
     if product_id is None:
-        return Panel(core, product_id, True)
+        return Panel(core, True)
     elif product_id == "DIGIPLEX_EVO_48":
         from . import evo
 
-        return evo.Panel_EVO48(core, product_id, True)
+        return evo.Panel_EVO48(core, start_communication_response, True)
     elif product_id == "DIGIPLEX_EVO_96":
         from . import evo
 
-        return evo.Panel_EVO96(core, product_id, True)
+        return evo.Panel_EVO96(core, start_communication_response, True)
     elif product_id == "DIGIPLEX_EVO_192":
         from . import evo
 
-        return evo.Panel_EVO192(core, product_id, True)
+        return evo.Panel_EVO192(core, start_communication_response, True)
     elif product_id == "DIGIPLEX_EVO_HD":
         from . import evo
 
-        return evo.Panel_EVOHD(core, product_id, True)
+        return evo.Panel_EVOHD(core, start_communication_response, True)
     elif product_id in [
         "SPECTRA_SP4000",
         "SPECTRA_SP5500",
@@ -31,7 +38,7 @@ def create_panel(core, product_id=None) -> Panel:
     ]:
         from . import spectra_magellan
 
-        return spectra_magellan.Panel(core, product_id, False)
+        return spectra_magellan.Panel(core, start_communication_response, False)
     else:
         raise NotImplementedError(
             "We are not sure what panel you have (product_id: {}). \

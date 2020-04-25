@@ -113,6 +113,7 @@ class Config(object):
         "MQTT_RAW_TOPIC": "raw",
         "MQTT_NOTIFICATIONS_TOPIC": "notifications",
         "MQTT_PUBLISH_RAW_EVENTS": True,
+        "MQTT_PUBLISH_DEFINITIONS": False,  # Publish definitions of partitions/zones/users to mqtt.
         "MQTT_INTERFACE_TOPIC": "interface",
         "MQTT_TOGGLE_CODES": {},
         "MQTT_USE_NUMERIC_STATES": False,  # use 0 and 1 instead of True and False

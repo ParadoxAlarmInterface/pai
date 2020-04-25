@@ -58,6 +58,13 @@ class Panel(PanelBase):
         },
     }
 
+    def __init__(
+        self, core, start_communication_response, variable_message_length=True
+    ):
+        super(Panel, self).__init__(core, variable_message_length)
+
+        self.settings = start_communication_response.fields.value
+
     async def dump_memory(self):
         """
         Dumps EEPROM and RAM memory to files
@@ -158,13 +165,13 @@ class Panel(PanelBase):
             )
         return None
 
-    async def initialize_communication(self, reply: Container, password):
+    async def initialize_communication(self, password):
         encoded_password = self.encode_password(password)
 
         args = dict(
-            product_id=reply.fields.value.product_id,
-            firmware=reply.fields.value.firmware,
-            panel_id=reply.fields.value.panel_id,
+            product_id=self.settings.product_id,
+            firmware=self.settings.firmware,
+            panel_id=self.settings.panel_id,
             pc_password=encoded_password,
             user_code=0x000000,
             _not_used1=0x19,

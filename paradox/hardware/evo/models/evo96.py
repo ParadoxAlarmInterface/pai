@@ -43,5 +43,6 @@ class Panel_EVO96(Panel_EVOBase):
                 "bit_encoded": True,
                 "addresses": [[0x39D8]],  # All 8 partitions as bits
             },
+            "user": {"addresses": [range(0x0BF0, 0x32EC + 10, 10),]},  # 999 users
         },
     }

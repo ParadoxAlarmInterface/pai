@@ -3,10 +3,10 @@ import json
 
 import pytest
 from paradox.data.model import DetectedPanel
-from paradox.hardware import create_panel
 from paradox.hardware.common import ProductIdEnum
 from paradox.interfaces.mqtt.homeassistant import HomeAssistantMQTTInterface
 from paradox.lib.ps import sendMessage
+from tests.hardware.evo.test_panel import create_evo192_panel
 
 
 @pytest.mark.asyncio
@@ -17,7 +17,8 @@ async def test_hass(mocker):
     con.get_instance.return_value.run_status_topic = "paradox/interface/run_status"
 
     alarm = mocker.MagicMock()
-    alarm.panel = create_panel(alarm, "DIGIPLEX_EVO_192")
+
+    alarm.panel = create_evo192_panel(alarm)
     interface = HomeAssistantMQTTInterface(alarm)
     interface.start()
     interface.on_connect(None, None, None, None)

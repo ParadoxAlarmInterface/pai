@@ -71,7 +71,8 @@ async def test_label_loading(mocker):
 
     core = mocker.MagicMock()
     core.send_wait = send_wait
-    panel = Panel(core=core, product_id=0)
+
+    panel = Panel(core, mocker.MagicMock())
 
     labels = await panel.load_labels()
 
