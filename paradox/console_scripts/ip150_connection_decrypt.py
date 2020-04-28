@@ -55,7 +55,7 @@ class PayloadParser:
                     if parsed_payload.fields.value.po.command == 5:  # eeprom/ram read
                         if (
                             parsed_payload.fields.value.control.ram_access
-                            and parsed_payload.fields.value.control.eeprom_address_bits
+                            and parsed_payload.fields.value.control._eeprom_address_bits
                             == 0
                             and parsed_payload.fields.value.bus_address == 0
                         ):

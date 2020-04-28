@@ -557,12 +557,13 @@ class EvoEEPROMAddressAdapter(Subconstruct):
                 raise ValidationError("EEPROM address is out of range")
             eeprom_address_high_bits = (obj["address"] & 0x30000) >> 16
             self.deep_update(
-                obj, dict(control=dict(eeprom_address_bits=eeprom_address_high_bits))
+                obj, dict(control=dict(_eeprom_address_bits=eeprom_address_high_bits))
             )
         return self.subcon._build(obj, stream, context, path)
 
     def _parse(self, stream, context, path):
         obj = self.subcon._parsereport(stream, context, path)
+        obj.address += obj.control._eeprom_address_bits << 16
         return obj
 
 
@@ -583,7 +584,7 @@ ReadEEPROM = Struct(
                     "Winload_connected" / Default(Flag, False),
                     "NeWare_connected" / Default(Flag, False),
                     "_not_used" / Default(BitsInteger(2), 0),
-                    "eeprom_address_bits" / Default(BitsInteger(2), 0),
+                    "_eeprom_address_bits" / Default(BitsInteger(2), 0),
                 ),
                 "bus_address" / Default(Int8ub, 0x00),  # 00 - Panel, 01-FF - Modules
                 "address" / ExprSymmetricAdapter(Int16ub, obj_ & 0xFFFF),
@@ -597,28 +598,30 @@ ReadEEPROM = Struct(
 ReadEEPROMResponse = Struct(
     "fields"
     / RawCopy(
-        Struct(
-            "po"
-            / BitStruct(
-                "command" / Const(0x5, Nibble),
-                "status"
-                / Struct(
-                    "reserved" / Flag,
-                    "alarm_reporting_pending" / Flag,
-                    "Winload_connected" / Flag,
-                    "NeWare_connected" / Flag,
+        EvoEEPROMAddressAdapter(
+            Struct(
+                "po"
+                / BitStruct(
+                    "command" / Const(0x5, Nibble),
+                    "status"
+                    / Struct(
+                        "reserved" / Flag,
+                        "alarm_reporting_pending" / Flag,
+                        "Winload_connected" / Flag,
+                        "NeWare_connected" / Flag,
+                    ),
                 ),
-            ),
-            "packet_length" / PacketLength(Int8ub),
-            "control"
-            / BitStruct(
-                "ram_access" / Flag,  # RAM = 0 or EEPROM = 1
-                "_not_used" / Padding(5),
-                "eeprom_address_bits" / BitsInteger(2),  # EEPROM address bit 17 and 16
-            ),
-            "bus_address" / Int8ub,  # 00 - Panel, 01-FE - Modules
-            "address" / Int16ub,
-            "data" / Bytes(lambda x: x.packet_length - 7),
+                "packet_length" / PacketLength(Int8ub),
+                "control"
+                / BitStruct(
+                    "ram_access" / Flag,  # RAM = 0 or EEPROM = 1
+                    "_not_used" / Padding(5),
+                    "_eeprom_address_bits" / BitsInteger(2),  # EEPROM address bit 17 and 16
+                ),
+                "bus_address" / Default(Int8ub, 0x00),  # 00 - Panel, 01-FE - Modules
+                "address" / ExprSymmetricAdapter(Int16ub, obj_ & 0xFFFF),
+                "data" / Bytes(lambda x: x.packet_length - 7),
+            )
         )
     ),
     "checksum" / PacketChecksum(Bytes(1)),

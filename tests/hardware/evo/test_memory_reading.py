@@ -46,6 +46,16 @@ def test_build_read_eeprom():
     )
 
 
+def test_build_read_eeprom_high_address():
+    address = 131072
+    a = ReadEEPROM.build(dict(fields=dict(value=dict(address=address, length=64))))
+    b = ReadEEPROM.parse(a)
+
+    print(binascii.hexlify(a))
+
+    assert b.fields.value.address == address
+
+
 def test_build_read_ram():
     assert (
         ReadEEPROM.build(

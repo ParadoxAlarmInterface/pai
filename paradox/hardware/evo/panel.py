@@ -183,7 +183,6 @@ class Panel_EVOBase(PanelBase):
         if (
             mvars.po.command == 0x5
             and mvars.control.ram_access is True
-            and mvars.control.eeprom_address_bits == 0x0
             and mvars.bus_address == 0x00  # panel
             and mvars.address == address
         ):
