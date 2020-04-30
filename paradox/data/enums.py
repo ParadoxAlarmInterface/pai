@@ -5,9 +5,10 @@ from enum import IntEnum
 class RunState(IntEnum):
     STOP = 0
     INIT = 1
-    RUN = 2
-    PAUSE = 3
-    ERROR = 4
+    CONNECTED = 2
+    RUN = 3
+    PAUSE = 4
+    ERROR = 5
 
 
 class EventLevel(IntEnum):

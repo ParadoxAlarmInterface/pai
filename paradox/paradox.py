@@ -7,6 +7,7 @@ from binascii import hexlify
 from typing import Callable, Iterable, Optional, Sequence
 
 from construct import Container
+
 from paradox.config import config as cfg
 from paradox.connections.ip.connection import IPConnection
 from paradox.connections.serial_connection import SerialCommunication
@@ -50,7 +51,7 @@ class Paradox:
         ps.subscribe(self._on_property_change, "changes")
 
     @property
-    def run_state(self):
+    def run_state(self) -> RunState:
         return self._run_state
 
     @run_state.setter
@@ -92,7 +93,7 @@ class Paradox:
         self.connection.register_handler(EventMessageHandler(self.handle_event_message))
         self.connection.register_handler(ErrorMessageHandler(self.handle_error_message))
 
-    async def connect(self):
+    async def connect(self) -> bool:
         if self._connection:
             await self.disconnect()  # socket needs to be also closed
         self.panel = None
@@ -167,22 +168,27 @@ class Paradox:
             if not result:
                 raise ConnectionError("Failed to initialize communication")
 
+            self.run_state = RunState.CONNECTED
+            logger.info("Connection OK")
+            return True
+        except asyncio.TimeoutError:
+            logger.error(
+                "Timeout while connecting to panel. Is an other connection active?"
+            )
+        except ConnectionError as e:
+            logger.error("Failed to connect: %s" % str(e))
+
+        self.run_state = RunState.ERROR
+
+        return False
+
+    async def full_connect(self) -> bool:
+        try:
+            if not await self.connect():
+                return False
+
             if cfg.SYNC_TIME:
                 await self.sync_time()
-
-            if cfg.DEVELOPMENT_DUMP_MEMORY:
-                if hasattr(self.panel, "dump_memory") and callable(
-                    self.panel.dump_memory
-                ):
-                    logger.warning("Requested memory dump. Dumping...")
-
-                    await self.panel.dump_memory()
-                    logger.warning("Memory dump completed. Exiting pai.")
-                    raise SystemExit()
-                else:
-                    logger.warning(
-                        "Requested memory dump, but current panel type does not support it yet."
-                    )
 
             logger.info("Loading definitions")
             definitions = await self.panel.load_definitions()
@@ -192,7 +198,7 @@ class Paradox:
             labels = await self.panel.load_labels()
             ps.sendMessage("labels_loaded", data=labels)
 
-            logger.info("Connection OK")
+            logger.info("Running")
             self.run_state = RunState.RUN
             self.request_status_refresh()  # Trigger status update
 
@@ -208,6 +214,18 @@ class Paradox:
         self.run_state = RunState.ERROR
 
         return False
+
+    async def dump_memory(self, file, memory_type):
+        if hasattr(self.panel, "dump_memory") and callable(self.panel.dump_memory):
+            logger.warning("Requested memory dump. Dumping...")
+
+            await self.panel.dump_memory(file, memory_type)
+            logger.warning("Memory dump completed. Exiting pai.")
+            raise SystemExit()
+        else:
+            logger.warning(
+                "Requested memory dump, but current panel type does not support it yet."
+            )
 
     async def sync_time(self):
         logger.debug("Synchronizing panel time")
@@ -572,7 +590,7 @@ class Paradox:
     async def resume(self):
         logger.info("Resuming PAI")
         if self.run_state == RunState.PAUSE:
-            await self.connect()
+            await self.full_connect()
 
     def _clean_session(self):
         logger.info("Clean Session")

@@ -77,7 +77,7 @@ async def run_loop():
         retry_time_wait = 30 if retry_time_wait > 30 else retry_time_wait
 
         try:
-            if await alarm.connect():
+            if await alarm.full_connect():
                 retry = 1
                 await alarm.loop()
             else:

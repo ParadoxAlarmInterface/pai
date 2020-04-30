@@ -45,6 +45,7 @@ setup(
         "console_scripts": [
             "ip150-connection-decrypt = paradox.console_scripts.ip150_connection_decrypt:main [YAML]",
             "pai-service = paradox.console_scripts.pai_run:main",
+            "pai-dump-memory = paradox.console_scripts.pai_dump_memory:main",
         ]
     },
     license="EPL",

@@ -6,6 +6,7 @@ from collections import defaultdict, namedtuple
 from itertools import chain
 
 from construct import Construct, Container, EnumIntegerString
+
 from paradox.config import config as cfg
 from paradox.lib.utils import construct_free, sanitize_key
 
@@ -327,5 +328,5 @@ class Panel:
     def control_outputs(self, outputs, command) -> bool:
         raise NotImplementedError("override control_outputs in a subclass")
 
-    def dump_memory(self):
+    def dump_memory(self, file, memory_type):
         raise NotImplementedError("override dump_memory in a subclass")

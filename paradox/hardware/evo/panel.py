@@ -6,6 +6,7 @@ import logging
 import typing
 
 from construct import ChecksumError, Construct, Container, MappingError
+
 from paradox.exceptions import AuthenticationFailed, StatusRequestException
 
 from ..panel import Panel as PanelBase
@@ -49,39 +50,42 @@ class Panel_EVOBase(PanelBase):
 
         return super(Panel_EVOBase, self).get_message(name)
 
-    async def dump_memory(self):
+    async def dump_memory(self, file, memory_type):
         """
         Dumps EEPROM and RAM memory to files
         :return:
         """
-        await self.dump_memory_to_file("eeprom.bin", range(0, 0xFFFF, 64))
-        await self.dump_memory_to_file("ram.bin", range(0, 59), True)
+        if memory_type == "ram":
+            await self.dump_memory_to_file(file, range(0, 59), True)
+        elif memory_type == "eeprom":
+            await self.dump_memory_to_file(file, range(0, 0xFFFF, 64))
+        else:
+            raise AttributeError(f"Unknown memory type: {memory_type}")
 
     async def dump_memory_to_file(self, file, range_, ram=False):
         mem_type = "RAM" if ram else "EEPROM"
         logger.info("Dump " + mem_type)
 
         packet_length = 64  # 64 is max
-        with open(file, "wb") as fh:
-            for address in range_:
-                args = dict(
-                    address=address, length=packet_length, control=dict(ram_access=ram)
-                )
-                logger.info("Dumping %s: address %d" % (mem_type, address))
-                reply = await self.core.send_wait(
-                    parsers.ReadEEPROM,
-                    args,
-                    reply_expected=lambda m: m.fields.value.po.command == 0x05
-                    and m.fields.value.address == address,
-                )
+        for address in range_:
+            args = dict(
+                address=address, length=packet_length, control=dict(ram_access=ram)
+            )
+            logger.info("Dumping %s: address %d" % (mem_type, address))
+            reply = await self.core.send_wait(
+                parsers.ReadEEPROM,
+                args,
+                reply_expected=lambda m: m.fields.value.po.command == 0x05
+                and m.fields.value.address == address,
+            )
 
-                if reply is None:
-                    logger.error("Could not read %s: address %d" % (mem_type, address))
-                    return
+            if reply is None:
+                logger.error("Could not read %s: address %d" % (mem_type, address))
+                return
 
-                data = reply.fields.value.data
+            data = reply.fields.value.data
 
-                fh.write(data)
+            file.write(data)
 
     def parse_message(
         self, message: bytes, direction="topanel"
