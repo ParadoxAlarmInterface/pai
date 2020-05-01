@@ -1,6 +1,7 @@
 from construct import (Adapter, Aligned, BitsInteger, BitStruct, Bytes, Const,
                        Default, Enum, Flag, GreedyBytes, IfThenElse, Int8ub,
                        Int16ub, Int16ul, Rebuild, Struct, len_, this)
+
 from paradox.hardware.common import HexInt
 from paradox.lib.crypto import decrypt, encrypt
 

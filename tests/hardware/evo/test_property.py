@@ -1,6 +1,7 @@
 import os
 
 import pytest
+
 from paradox.event import Change, ChangeEvent
 from paradox.hardware.evo import Panel_EVO192
 

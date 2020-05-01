@@ -1,4 +1,5 @@
 from construct import Struct
+
 from paradox.hardware.common import HexInt
 
 

@@ -68,7 +68,9 @@ class PayloadParser:
                                     ram_parser.parse(parsed_payload.fields.value.data)
                                 )
                             else:
-                                print(f"No parser for {ram_address} ram address, data: {binascii.hexlify(parsed_payload.fields.value.data)}")
+                                print(
+                                    f"No parser for {ram_address} ram address, data: {binascii.hexlify(parsed_payload.fields.value.data)}"
+                                )
 
 
 def decrypt_file(file, password):

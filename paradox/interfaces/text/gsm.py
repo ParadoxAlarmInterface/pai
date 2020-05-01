@@ -8,6 +8,7 @@ import os
 from concurrent import futures
 
 import serial_asyncio
+
 from paradox.config import config as cfg
 from paradox.connections.connection import ConnectionProtocol
 from paradox.event import EventLevel, Notification

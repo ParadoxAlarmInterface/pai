@@ -2,6 +2,7 @@ import os
 import time
 
 import pytest
+
 from paradox.event import Change, ChangeEvent
 from paradox.hardware.spectra_magellan import Panel
 

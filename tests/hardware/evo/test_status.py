@@ -2,6 +2,7 @@ import asyncio
 import json
 
 import pytest
+
 from paradox.paradox import Paradox
 from paradox.parsers.status import convert_raw_status
 

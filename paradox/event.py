@@ -7,6 +7,7 @@ from copy import copy
 from enum import Enum
 
 from construct import Container
+
 from paradox.config import config as cfg
 from paradox.data.enums import EventLevel
 from paradox.lib.format import EventMessageFormatter

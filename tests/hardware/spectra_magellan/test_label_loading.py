@@ -1,6 +1,7 @@
 import binascii
 
 import pytest
+
 from paradox.hardware.spectra_magellan.panel import Panel
 from paradox.hardware.spectra_magellan.parsers import ReadEEPROMResponse
 

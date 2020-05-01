@@ -2,6 +2,7 @@ import asyncio
 
 import pytest
 from construct import Container
+
 from paradox.lib.async_message_manager import (AsyncMessageManager,
                                                EventMessageHandler,
                                                RAWMessageHandler)

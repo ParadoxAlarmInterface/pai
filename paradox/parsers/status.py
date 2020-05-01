@@ -3,7 +3,7 @@ from collections import defaultdict
 from typing import Dict
 
 from construct import Container
-from paradox.config import config as cfg
+
 from paradox.data.element_type_container import ElementTypeContainer
 
 logger = logging.getLogger("PAI").getChild(__name__)

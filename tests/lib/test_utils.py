@@ -1,4 +1,5 @@
 from construct import Container, ListContainer
+
 from paradox.lib.utils import construct_free, deep_merge, sanitize_key
 
 

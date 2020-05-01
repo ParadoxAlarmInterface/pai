@@ -2,9 +2,9 @@ import asyncio
 import datetime
 import json
 
+import pytest
 from paho.mqtt.client import MQTTMessage
 
-import pytest
 from paradox.event import Event
 from paradox.interfaces.mqtt.basic import BasicMQTTInterface
 

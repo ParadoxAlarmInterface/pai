@@ -3,9 +3,9 @@ import datetime
 import hashlib
 import json
 
+import pytest
 from paho.mqtt.client import MQTTMessage
 
-import pytest
 from paradox.config import config as cfg
 from paradox.event import Event
 from paradox.interfaces.mqtt.basic import BasicMQTTInterface

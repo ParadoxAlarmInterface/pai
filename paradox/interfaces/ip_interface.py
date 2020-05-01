@@ -9,6 +9,7 @@ import os
 from typing import Awaitable
 
 from construct import Container
+
 from paradox.config import config as cfg
 from paradox.connections.ip.parsers import (IPMessageCommand, IPMessageRequest,
                                             IPMessageResponse, IPMessageType,

@@ -4,13 +4,14 @@ import json
 import logging
 import time
 
+from pushbullet import Pushbullet
+from ws4py.client import WebSocketBaseClient
+from ws4py.manager import WebSocketManager
+
 from paradox.config import config as cfg
 from paradox.event import EventLevel, Notification
 from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
 from paradox.lib import ps
-from pushbullet import Pushbullet
-from ws4py.client import WebSocketBaseClient
-from ws4py.manager import WebSocketManager
 
 # Pushbullet interface.
 # Only exposes critical status changes and accepts commands

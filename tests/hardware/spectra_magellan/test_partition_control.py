@@ -6,6 +6,7 @@ import typing
 
 import pytest
 from construct import Container
+
 from paradox.config import config as cfg
 from paradox.data.enums import RunState
 from paradox.hardware import create_panel

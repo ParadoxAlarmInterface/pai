@@ -1,4 +1,5 @@
 import pytest
+
 from paradox.data.element_type_container import ElementTypeContainer
 
 

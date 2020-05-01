@@ -1,6 +1,7 @@
 import asyncio
 
 import pytest
+
 from paradox.data.element_type_container import ElementTypeContainer
 from paradox.lib.ps import sendMessage
 from paradox.paradox import Paradox

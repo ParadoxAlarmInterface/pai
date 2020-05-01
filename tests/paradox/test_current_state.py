@@ -3,6 +3,7 @@ import binascii
 
 import pytest
 from mock import MagicMock
+
 from paradox.hardware.evo.parsers import LiveEvent
 from paradox.paradox import Paradox
 from tests.hardware.evo.test_panel import create_evo192_panel

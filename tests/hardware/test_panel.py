@@ -1,6 +1,7 @@
 import binascii
 
 import pytest
+
 from paradox.hardware import Panel
 
 

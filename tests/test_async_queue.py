@@ -3,6 +3,7 @@ import binascii
 
 import mock
 from construct import Container
+
 from paradox.hardware.evo.parsers import LiveEvent, ReadEEPROMResponse
 from paradox.lib.async_message_manager import (AsyncMessageManager,
                                                MessageHandler)

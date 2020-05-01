@@ -6,9 +6,8 @@ import os
 import stat
 import typing
 
-from serial import SerialException
-
 import serial_asyncio
+from serial import SerialException
 
 from ..exceptions import SerialConnectionOpenFailed
 from .connection import Connection

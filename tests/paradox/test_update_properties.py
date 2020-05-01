@@ -1,6 +1,7 @@
 import asyncio
 
 import pytest
+
 from paradox.event import Change, EventLevel
 from paradox.paradox import Paradox, ps
 

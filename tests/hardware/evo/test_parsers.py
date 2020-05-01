@@ -1,6 +1,7 @@
 import binascii
 
 from construct import Container
+
 from paradox.hardware.evo.parsers import (DefinitionsParserMap,
                                           get_user_definition)
 

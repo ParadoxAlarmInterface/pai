@@ -1,6 +1,7 @@
 import binascii
 
 import pytest
+
 from paradox.event import Event, EventLevel, LiveEvent
 from paradox.hardware.evo.event import event_map
 from paradox.hardware.evo.parsers import LiveEvent as LiveEventMessage

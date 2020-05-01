@@ -2,6 +2,7 @@ import asyncio
 import json
 
 import pytest
+
 from paradox.data.model import DetectedPanel
 from paradox.hardware.common import ProductIdEnum
 from paradox.interfaces.mqtt.homeassistant import HomeAssistantMQTTInterface

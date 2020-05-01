@@ -4,6 +4,7 @@ import logging
 import re
 
 import chump
+
 from paradox.config import config as cfg
 from paradox.event import EventLevel
 from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
