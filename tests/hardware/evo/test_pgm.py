@@ -78,7 +78,7 @@ def test_pgm_flags_1():
 
     print(a)
 
-    assert a[1].enabled is True
+    assert a[1].disabled is False
     assert a[1].on is False
     assert a[1].normally_closed is False
     assert a[1].timer_active is False
@@ -94,7 +94,7 @@ def test_pgm_flags_2():
 
     print(a)
 
-    assert a[1].enabled is False
+    assert a[1].disabled is True
     assert a[1].on is True
     assert a[1].normally_closed is False
     assert a[1].timer_active is False
@@ -110,11 +110,11 @@ def test_pgm_flags_3():
 
     print(a)
 
-    assert a[1].enabled is True
+    assert a[1].disabled is False
     assert a[1].on is True
     assert a[1].normally_closed is True
     assert a[1].timer_active is True
-    assert a[1].time_left == 9*60+48
+    assert a[1].time_left == 9 * 60 + 48
     assert a[1].fire_2_wires is False
 
 

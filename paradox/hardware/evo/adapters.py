@@ -3,8 +3,10 @@
 import datetime
 
 from construct import (Adapter, Array, BitsInteger, BitStruct, Bitwise, Bytes,
-                       Bytewise, Computed, Construct, Container, Default, Flag,
-                       Int24ub, ListContainer, Struct, Subconstruct, this, ByteSwapped)
+                       ByteSwapped, Bytewise, Computed, Construct, Container,
+                       Default, ExprSymmetricAdapter, Flag, Int24ub,
+                       ListContainer, Struct, Subconstruct, SymmetricAdapter,
+                       obj_, this)
 
 
 class DateAdapter(Adapter):
@@ -149,11 +151,15 @@ def PGMFlags(count, start_index_from=1):
                 "fire_2_wires" / Default(Flag, False),
                 "normally_closed" / Default(Flag, False),
                 "_unknown1" / BitsInteger(1),
-                "enabled" / Default(Flag, False),  # Means a relay is assigned
+                "disabled"
+                / ExprSymmetricAdapter(
+                    Default(Flag, False), lambda obj, ctx: not obj
+                ),  #  False when a relay is assigned
                 "_unknown2" / BitsInteger(2),
                 "timer_active" / Default(Flag, False),  # when timer is active
                 "on" / Default(Flag, False),  # when is activated
-                "time_left" / Bytewise(ByteSwapped(Default(Int24ub, 0))),  # byte in seconds
+                "time_left"
+                / Bytewise(ByteSwapped(Default(Int24ub, 0))),  # byte in seconds
             ),
         ),
     )
