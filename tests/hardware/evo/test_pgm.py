@@ -1,6 +1,9 @@
 from binascii import hexlify, unhexlify
 
-from paradox.hardware.evo.parsers import PerformPGMAction
+from paradox.hardware.evo.adapters import PGMFlags
+from paradox.hardware.evo.parsers import (BroadcastRequest, BroadcastResponse,
+                                          PerformPGMAction,
+                                          PGMBroadcastCommand)
 
 
 def test_pgm3_activate_and_monitor():
@@ -65,6 +68,54 @@ def test_pgm4_deactivate_and_monitor():
     a = PerformPGMAction.build({"fields": {"value": {"pgms": pgms, "command": "off"}}})
 
     assert a == expected_out
+
+
+def test_pgm_flags_1():
+    parser = PGMFlags(1)
+    assert parser.sizeof() == 4
+
+    a = parser.parse(unhexlify("90000000"))
+
+    print(a)
+
+    assert a[1].enabled is True
+    assert a[1].on is False
+    assert a[1].normally_closed is False
+    assert a[1].timer_active is False
+    assert a[1].time_left == 0
+    assert a[1].fire_2_wires is True
+
+
+def test_pgm_flags_2():
+    parser = PGMFlags(1)
+    assert parser.sizeof() == 4
+
+    a = parser.parse(unhexlify("21000000"))
+
+    print(a)
+
+    assert a[1].enabled is False
+    assert a[1].on is True
+    assert a[1].normally_closed is False
+    assert a[1].timer_active is False
+    assert a[1].time_left == 0
+    assert a[1].fire_2_wires is False
+
+
+def test_pgm_flags_3():
+    parser = PGMFlags(1)
+    assert parser.sizeof() == 4
+
+    a = parser.parse(unhexlify("534c0200"))
+
+    print(a)
+
+    assert a[1].enabled is True
+    assert a[1].on is True
+    assert a[1].normally_closed is True
+    assert a[1].timer_active is True
+    assert a[1].time_left == 9*60+48
+    assert a[1].fire_2_wires is False
 
 
 def test_pgm_confirmation():

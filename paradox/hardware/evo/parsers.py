@@ -11,7 +11,7 @@ from construct import (Array, BitsInteger, BitsSwapped, BitStruct, Bitwise,
 from ..common import (CommunicationSourceIDEnum, PacketChecksum, PacketLength,
                       ProductIdEnum, calculate_checksum)
 from .adapters import (DateAdapter, DictArray, EnumerationAdapter,
-                       EventAdapter, ModuleTroubles, PartitionStatus,
+                       EventAdapter, ModuleTroubles, PartitionStatus, PGMFlags,
                        StatusFlags, ZoneFlagBitStruct, ZoneFlags)
 
 LoginConfirmationResponse = Struct(
@@ -259,12 +259,14 @@ RAMDataParserMap = {
         "_free" / Padding(34),
     ),
     5: Struct(
-        "_not_used" / Int8ub, "bus-module_trouble" / ModuleTroubles(count=63, start_index_from=1)
+        "_not_used" / Int8ub,
+        "bus-module_trouble" / ModuleTroubles(count=63, start_index_from=1),
     ),
     6: Struct("bus-module_trouble" / ModuleTroubles(count=64, start_index_from=64)),
     7: Struct("bus-module_trouble" / ModuleTroubles(count=64, start_index_from=128)),
     8: Struct(
-        "bus-module_trouble" / ModuleTroubles(count=63, start_index_from=192), "_not_used" / Int8ub
+        "bus-module_trouble" / ModuleTroubles(count=63, start_index_from=192),
+        "_not_used" / Int8ub,
     ),
     9: Struct(
         "zone_open" / BitsSwapped(Bitwise(StatusFlags(96, start_index_from=97))),
@@ -280,6 +282,7 @@ RAMDataParserMap = {
         "module_assigned" / BitsSwapped(Bitwise(StatusFlags(256, start_index_from=1))),
         "module_missing" / BitsSwapped(Bitwise(StatusFlags(256, start_index_from=1))),
     ),
+    57: Struct("pgm_status" / PGMFlags(16)),
 }
 # We also need parsers for:
 # 17 ram address
@@ -616,7 +619,8 @@ ReadEEPROMResponse = Struct(
                 / BitStruct(
                     "ram_access" / Flag,  # RAM = 0 or EEPROM = 1
                     "_not_used" / Padding(5),
-                    "_eeprom_address_bits" / BitsInteger(2),  # EEPROM address bit 17 and 16
+                    "_eeprom_address_bits"
+                    / BitsInteger(2),  # EEPROM address bit 17 and 16
                 ),
                 "bus_address" / Default(Int8ub, 0x00),  # 00 - Panel, 01-FE - Modules
                 "address" / ExprSymmetricAdapter(Int16ub, obj_ & 0xFFFF),
