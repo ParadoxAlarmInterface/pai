@@ -790,6 +790,83 @@ PerformPGMAction = Struct(
     "checksum" / PacketChecksum(Bytes(1)),
 )
 
+_PGMBroadcastCommandEnum = Enum(
+    Int8ub,
+    no_change=0,
+    override_off=1,  # deactivate
+    override_on=2,  # activate
+    release_off=3,  # My brain breaks while I am trying to understand this
+    release=4,  # activate and follow events
+)
+
+PGMBroadcastCommand = DictArray(
+    16,
+    1,
+    Struct(
+        "_index" / Computed(this._index + 1),
+        "command" / Default(_PGMBroadcastCommandEnum, "no_change"),
+    ),
+    pick_key="command",
+)
+
+BroadcastRequest = Struct(
+    "fields"
+    / RawCopy(
+        Struct(
+            "po"
+            / BitStruct(
+                "command" / Const(0xA, Nibble),
+                "module_type" / Default(Flag, False),
+                "sub_command"
+                / Enum(
+                    BitsInteger(3),
+                    general_broadcast=0,
+                    lcd_message_off=1,
+                    lcd_message_low_prority=2,
+                    lcd_message_high_prority=3,
+                    pgm_override=4,
+                ),
+            ),
+            "packet_length" / PacketLength(Int8ub),
+            "bus_address" / Default(Int8ub, 0x00),  # 00 - Panel, 01-FE - Modules
+            "_not_used" / Padding(3),
+            "data" / Bytes(16),
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
+
+BroadcastResponse = Struct(
+    "fields"
+    / RawCopy(
+        EvoEEPROMAddressAdapter(
+            Struct(
+                "po"
+                / BitStruct(
+                    "command" / Const(0xA, Nibble),
+                    "status"
+                    / Struct(
+                        "reserved" / Flag,
+                        "alarm_reporting_pending" / Flag,
+                        "Winload_connected" / Flag,
+                        "NeWare_connected" / Flag,
+                    ),
+                ),
+                "packet_length" / PacketLength(Int8ub),
+                "bus_address" / Default(Int8ub, 0x00),  # 00 - Panel, 01-FE - Modules
+                "control"
+                / BitStruct(
+                    "ram_access" / Default(Flag, False),
+                    "_not_used" / Default(BitsInteger(5), 0),
+                    "_eeprom_address_bits" / Default(BitsInteger(2), 0),
+                ),
+                "address" / ExprSymmetricAdapter(Int16ub, obj_ & 0xFFFF),
+            )
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
+
 ErrorMessage = Struct(
     "fields"
     / RawCopy(
