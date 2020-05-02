@@ -283,6 +283,7 @@ RAMDataParserMap = {
         "module_missing" / BitsSwapped(Bitwise(StatusFlags(256, start_index_from=1))),
     ),
     57: Struct("pgm_status" / PGMFlags(16)),
+    58: Struct("pgm_status" / PGMFlags(16, start_index_from=17)),
 }
 # We also need parsers for:
 # 17 ram address
@@ -298,7 +299,6 @@ RAMDataParserMap = {
 # 50 ram address
 # 51 ram address
 # 56 ram address
-# 57 ram address
 # 58 ram address
 
 
