@@ -22,6 +22,7 @@ PARTITION_ACTIONS = dict(
     arm=0x04,
     disarm=0x05,
     arm_stay=0x01,
+    arm_force=0x02,
     arm_sleep=0x03,
     arm_stay_stayd=0x06,
     arm_sleep_stay=0x07,
