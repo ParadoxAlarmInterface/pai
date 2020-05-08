@@ -22,8 +22,8 @@ MODULES = {
         desc="the Pushbullet interface",
         install_name="pushbullet.py=>0.11.0",
     ),
-    "aiohttp": dict(
-        mandatory=False, desc="the IP150 connection", install_name="aiohttp~=3.6.2"
+    "requests": dict(
+        mandatory=False, desc="the IP150 connection", install_name="requests>=2.20.0"
     ),
     "ws4py": dict(
         mandatory=False, desc="the Pushbullet interface", install_name="ws4py>=0.4.2"

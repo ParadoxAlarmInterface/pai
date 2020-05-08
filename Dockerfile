@@ -11,7 +11,6 @@ ENV PAI_CONFIG_FILE=${PAI_CONFIG_PATH}/pai.conf \
   PAI_LOGGING_FILE=${PAI_LOGGING_PATH}/paradox.log
 
 RUN apk add --no-cache tzdata \
-  && apk add --no-cache --virtual .build-deps gcc \
   && mkdir -p ${PAI_CONFIG_PATH} ${WORK_DIR} ${PAI_LOGGING_PATH} \
   && addgroup pai && adduser -S pai -G pai \
   && chown -R pai ${WORK_DIR} ${PAI_LOGGING_PATH} ${PAI_CONFIG_PATH}
@@ -28,8 +27,6 @@ RUN cd ${WORK_DIR} \
   && pip install --no-cache-dir -r requirements.txt \
   && pip install --no-cache-dir . \
   && rm -fr ${WORK_DIR}
-
-RUN apk del .build-deps
 
 # process run as paradox user
 USER pai
