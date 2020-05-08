@@ -297,8 +297,8 @@ RAMDataParserMap = {
 # 48 ram address
 # 49 ram address
 # 50 ram address
-# 51 ram address
-# 56 ram address
+# 51 ram address - doorUnlockType, open status
+# 56 ram address - disarm delay value, timer and flag
 # 58 ram address
 
 

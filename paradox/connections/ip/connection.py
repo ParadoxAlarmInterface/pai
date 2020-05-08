@@ -7,7 +7,7 @@ import logging
 import time
 import typing
 
-import requests
+import aiohttp
 
 from paradox.config import config as cfg
 from paradox.connections.connection import Connection
@@ -133,7 +133,7 @@ class IPConnection(Connection):
         self.connection_timestamp = 0
         logger.info("Connecting to Site: {}".format(cfg.IP_CONNECTION_SITEID))
         if self.site_info is None:
-            self.site_info = self.get_site_info(
+            self.site_info = await self.get_site_info(
                 siteid=cfg.IP_CONNECTION_SITEID, email=cfg.IP_CONNECTION_EMAIL
             )
 
@@ -331,7 +331,7 @@ class IPConnection(Connection):
         return super(IPConnection, self).write(data)
 
     @staticmethod
-    def get_site_info(email, siteid):
+    async def get_site_info(email, siteid):
         logger.info("Getting site info")
         URL = "https://api.insightgoldatpmh.com/v1/site"
 
@@ -342,16 +342,17 @@ class IPConnection(Connection):
         }
 
         tries = 5
-        while tries > 0:
-            req = requests.get(
-                URL, headers=headers, params={"email": email, "name": siteid}
-            )
-            if req.status_code == 200:
-                return req.json()
+        async with aiohttp.ClientSession() as session:
+            while tries > 0:
+                async with session.get(
+                    URL, headers=headers, params={"email": email, "name": siteid}
+                ) as response:
+                    if response.status == 200:
+                        return response.json()
 
-            logger.warning("Unable to get site info. Retrying...")
-            tries -= 1
-            time.sleep(5)
+                logger.warning("Unable to get site info. Retrying...")
+                tries -= 1
+                await asyncio.sleep(5)
 
         return None
 

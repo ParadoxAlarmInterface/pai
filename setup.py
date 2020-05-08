@@ -23,7 +23,7 @@ setup(
     url="https://github.com/ParadoxAlarmInterface/pai",
     download_url=f"https://github.com/ParadoxAlarmInterface/pai/archive/{VERSION}.tar.gz",
     packages=find_packages(exclude=["tests", "tests.*", "config.*", "docs.*"]),
-    install_requires=["construct~=2.9.43", "argparse>=1.4.0"],
+    install_requires=["construct~=2.9.43", "argparse>=1.4.0", "aiohttp~=3.6.2"],
     python_requires=">=3.6",
     setup_requires=["wheel"] + pytest_runner,
     tests_require=["pytest", "pytest-asyncio", "pytest-env", "pytest-mock", "mock"],
