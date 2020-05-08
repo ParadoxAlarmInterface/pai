@@ -344,9 +344,12 @@ class IPConnection(Connection):
         tries = 5
         loop = asyncio.get_event_loop()
         while tries > 0:
-            req = await loop.run_in_executor(None, lambda: requests.get(
-                URL, headers=headers, params={"email": email, "name": siteid}
-            ))
+            req = await loop.run_in_executor(
+                None,
+                lambda: requests.get(
+                    URL, headers=headers, params={"email": email, "name": siteid}
+                ),
+            )
             if req.status_code == 200:
                 return req.json()
 

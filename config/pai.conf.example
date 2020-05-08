@@ -99,7 +99,7 @@ import logging
 # MQTT_TOGGLE_CODES = {}
 # MQTT_USE_NUMERIC_STATES = False         # use 0 and 1 instead of True and False
 #
-### MQTT Homeassistant Auto Discovery
+### MQTT Home Assistant Auto Discovery
 # MQTT_HOMEASSISTANT_AUTODISCOVERY_ENABLE = False
 #
 ### Dash App
@@ -121,6 +121,23 @@ import logging
 #     'disarmed': 'disarm'
 # }
 #
+#
+### Home Assistant Notifications (HASS.io required)
+# HOMEASSISTANT_NOTIFICATIONS_ENABLE = False
+# HOMEASSISTANT_NOTIFICATIONS_NOTIFIER_NAME = 'notify'
+# HOMEASSISTANT_NOTIFICATIONS_MIN_EVENT_LEVEL = 'INFO'
+## Event filtering by tags:
+# HOMEASSISTANT_NOTIFICATIONS_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
+#     'live,alarm,-restore', # or
+#     'live,trouble,-clock', # or
+#     'live,tamper'
+# ]
+## - OR - event filtering using regexp. Cannot be used together with _EVENT_FILTERS
+# HOMEASSISTANT_NOTIFICATIONS_ALLOW_EVENTS = [r".*"] # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+# HOMEASSISTANT_NOTIFICATIONS_IGNORE_EVENTS = [ # Same as previous but to ignore some specific events that matched in _ALLOW_EVENTS
+#     r"zone,[\w]+,no_delay=True",
+#     r"zone,[\w]+,exit_delay=.*"
+# ]
 #
 ### Pushbullet
 # PUSHBULLET_ENABLE = False

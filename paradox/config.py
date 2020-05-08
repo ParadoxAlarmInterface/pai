@@ -139,6 +139,17 @@ class Config(object):
             "armed_away": "arm",
             "disarmed": "disarm",
         },
+        # Home Assistant Notifications (HASS.io required)
+        "HOMEASSISTANT_NOTIFICATIONS_ENABLE": False,
+        "HOMEASSISTANT_NOTIFICATIONS_NOTIFIER_NAME": "notify",
+        "HOMEASSISTANT_NOTIFICATIONS_MIN_EVENT_LEVEL": "notify",
+        "HOMEASSISTANT_NOTIFICATIONS_IGNORE_EVENTS": [],  # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
+        "HOMEASSISTANT_NOTIFICATIONS_ALLOW_EVENTS": [],  # Same as before but as a white list. Default is use EVENT_FILTERS
+        "HOMEASSISTANT_NOTIFICATIONS_EVENT_FILTERS": [  # list of tags, property changes to include or exclude. See event.py for tag list
+            "live,alarm,-restore",
+            "live,trouble,-clock",
+            "live,tamper",
+        ],
         # Pushbullet
         "PUSHBULLET_ENABLE": False,
         "PUSHBULLET_KEY": "",  # Authentication key used for Pushbullet
