@@ -133,7 +133,7 @@ class IPConnection(Connection):
         self.connection_timestamp = 0
         logger.info("Connecting to Site: {}".format(cfg.IP_CONNECTION_SITEID))
         if self.site_info is None:
-            self.site_info = self.get_site_info(
+            self.site_info = await self.get_site_info(
                 siteid=cfg.IP_CONNECTION_SITEID, email=cfg.IP_CONNECTION_EMAIL
             )
 
@@ -331,7 +331,7 @@ class IPConnection(Connection):
         return super(IPConnection, self).write(data)
 
     @staticmethod
-    def get_site_info(email, siteid):
+    async def get_site_info(email, siteid):
         logger.info("Getting site info")
         URL = "https://api.insightgoldatpmh.com/v1/site"
 
@@ -342,10 +342,11 @@ class IPConnection(Connection):
         }
 
         tries = 5
+        loop = asyncio.get_event_loop()
         while tries > 0:
-            req = requests.get(
+            req = await loop.run_in_executor(None, lambda: requests.get(
                 URL, headers=headers, params={"email": email, "name": siteid}
-            )
+            ))
             if req.status_code == 200:
                 return req.json()
 
