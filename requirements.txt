@@ -22,7 +22,7 @@ ws4py>=0.4.2
 chump>=1.6.0
 #
 # IP150 >4.0 Support
-requests>=2.20.0
+aiohttp~=3.6.2
 #
 # Signal support
 # pygobject>=3.20.0
