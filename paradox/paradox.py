@@ -688,7 +688,7 @@ class Paradox:
                 change["target_state"] = change["current_state"] = "disarmed"
 
             if properties.get("exit_delay"):  # Redefine if pending
-                change["current_state"] = "pending"
+                change["current_state"] = "arming"
 
             self.storage.update_container_object("partition", properties["key"], change)
 

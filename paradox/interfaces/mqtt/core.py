@@ -39,6 +39,7 @@ RUN_STATE_2_PAYLOAD = {
     RunState.ERROR: "error",
     RunState.INIT: "initializing",
     RunState.PAUSE: "paused",
+    RunState.CONNECTED: "connected",
     RunState.RUN: "online",
     RunState.STOP: "stopped",
 }
