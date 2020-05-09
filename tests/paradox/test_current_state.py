@@ -61,7 +61,7 @@ async def test_current_state_armed_away(alarm):
 
 
 @pytest.mark.asyncio
-async def test_current_state_pending(alarm):
+async def test_current_state_arming(alarm):
     send_initial_status(alarm)
 
     alarm._on_status_update(status=dict(partition={1: dict(arm=True, exit_delay=True)}))
@@ -69,7 +69,7 @@ async def test_current_state_pending(alarm):
     alarm.storage.update_container_object.assert_any_call(
         "partition",
         "Partition_1",
-        {"current_state": "pending", "target_state": "armed_away"},
+        {"current_state": "arming", "target_state": "armed_away"},
     )
 
 
