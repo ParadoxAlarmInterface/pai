@@ -1,4 +1,3 @@
-sudo: required
 dist: xenial
 language: python
 cache: pip
@@ -12,7 +11,7 @@ install:
 script: python setup.py test
 deploy:
   provider: pypi
-  user: __token__
+  username: __token__
   distributions: "sdist bdist_wheel"
   skip_existing: true
   on:
