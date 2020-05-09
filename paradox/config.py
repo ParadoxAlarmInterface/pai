@@ -142,7 +142,11 @@ class Config(object):
         # Home Assistant Notifications (HASS.io required)
         "HOMEASSISTANT_NOTIFICATIONS_ENABLE": False,
         "HOMEASSISTANT_NOTIFICATIONS_NOTIFIER_NAME": "notify",
-        "HOMEASSISTANT_NOTIFICATIONS_MIN_EVENT_LEVEL": "notify",
+        "HOMEASSISTANT_NOTIFICATIONS_MIN_EVENT_LEVEL": (
+            "INFO",
+            str,
+            ["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"],
+        ),
         "HOMEASSISTANT_NOTIFICATIONS_IGNORE_EVENTS": [],  # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
         "HOMEASSISTANT_NOTIFICATIONS_ALLOW_EVENTS": [],  # Same as before but as a white list. Default is use EVENT_FILTERS
         "HOMEASSISTANT_NOTIFICATIONS_EVENT_FILTERS": [  # list of tags, property changes to include or exclude. See event.py for tag list
