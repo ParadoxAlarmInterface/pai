@@ -4,6 +4,7 @@ import logging
 import typing
 from collections import defaultdict, namedtuple
 from itertools import chain
+from time import time
 
 from construct import Construct, Container, EnumIntegerString
 
@@ -124,6 +125,8 @@ class Panel:
                 if elem_type not in def_parsers:
                     logger.warning("No parser for %s definitions", elem_type)
                     continue
+
+                start_time = time()
                 parser = def_parsers[elem_type]
                 if isinstance(parser, typing.Callable):
                     parser = parser(self.settings)
@@ -131,7 +134,7 @@ class Panel:
                 assert isinstance(parser, Construct)
                 elem_def = definitions[elem_type]
                 limits = cfg.LIMITS.get(elem_type)
-                enabled_indexes = []
+                enabled_indexes = set()
 
                 addresses = enumerate(
                     chain.from_iterable(elem_def["addresses"]), start=1
@@ -147,15 +150,23 @@ class Panel:
                             data_index = (index - 1) * len(element) + elem_index
                             data[elem_type][data_index] = elem_data
                             if definition != "disabled":
-                                enabled_indexes.append(data_index)
+                                enabled_indexes.add(data_index)
                     else:
                         data[elem_type][index] = element
                         definition = element.get("definition")
                         if definition != "disabled":
-                            enabled_indexes.append(index)
+                            enabled_indexes.add(index)
 
                 if limits is None:
                     cfg.LIMITS[elem_type] = enabled_indexes
+                else:
+                    cfg.LIMITS[elem_type] = list(
+                        set(cfg.LIMITS[elem_type]).intersection(enabled_indexes)
+                    )
+
+                logger.info(
+                    f"{elem_type.title()} definitions loaded ({round(time() - start_time, 2)}s)"
+                )
 
         except ResourceWarning:
             pass
@@ -168,6 +179,7 @@ class Panel:
         data = defaultdict(dict)
 
         for elem_type in self.mem_map["labels"]:
+            start_time = time()
             elem_def = self.mem_map["labels"][elem_type]
 
             addresses = enumerate(chain.from_iterable(elem_def["addresses"]), start=1)
@@ -180,10 +192,8 @@ class Panel:
             )
 
             logger.info(
-                "{}: {}".format(
-                    elem_type.title(),
-                    ", ".join([v["label"] for v in data[elem_type].values()]),
-                )
+                f"{elem_type.title()} labels loaded ({round(time()-start_time, 2)}s): "
+                + f"{', '.join([v['label'] for v in data[elem_type].values()])}"
             )
 
         return data

@@ -32,9 +32,9 @@ LoginConfirmationResponse = Struct(
             "length" / PacketLength(Int8ub),
             "result"
             / BitStruct(
-                "_not_used0" / BitsInteger(4),
-                "partition_2" / Flag,
-                "_not_used1" / BitsInteger(3),
+                "_not_used0" / BitsInteger(3),
+                "neware_answer" / Flag,
+                "_not_used1" / BitsInteger(4),
             ),
             "callback" / Int16ub,
         )
@@ -896,6 +896,22 @@ ErrorMessage = Struct(
                 incorrect_number_of_users=0x1B,
                 invalid_label_number=0x1C,
             ),
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
+
+SendPanicAction = Struct(  # Supported on firmware versions 7.15+
+    "fields"
+    / RawCopy(
+        Struct(
+            "po" / Struct("command" / Const(0x40, Int8ub)),
+            "packet_length" / PacketLength(Int8ub),
+            "unknown0" / Const(0x09, Int8ub),
+            "_not_used" / Padding(3),
+            "user_id" / Int16ub,
+            "panic_type" / Enum(Int8ub, emergency=0, medical=1, fire=2,),  # wild guess
+            "partition" / Int8ub,
         )
     ),
     "checksum" / PacketChecksum(Bytes(1)),

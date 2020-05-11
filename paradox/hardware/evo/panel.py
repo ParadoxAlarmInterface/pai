@@ -7,6 +7,7 @@ import typing
 
 from construct import ChecksumError, Construct, Container, MappingError
 
+from paradox.config import config as cfg
 from paradox.exceptions import AuthenticationFailed, StatusRequestException
 
 from ..panel import Panel as PanelBase
@@ -39,6 +40,17 @@ class Panel_EVOBase(PanelBase):
             + start_communication_response.checksum
         )
         self.settings = parsers.InitializeCommunication.parse(raw_data).fields.value
+
+        enabled_partitions = list(
+            (key for key, val in self.settings.system_options.partitions.items() if val)
+        )
+        partition_limits = cfg.LIMITS.get("partition")
+        if partition_limits is None:
+            cfg.LIMITS["partition"] = enabled_partitions
+        else:
+            cfg.LIMITS["partition"] = list(
+                set(cfg.LIMITS["partition"]).intersection(enabled_partitions)
+            )
 
     def get_message(self, name: str) -> Construct:
         try:

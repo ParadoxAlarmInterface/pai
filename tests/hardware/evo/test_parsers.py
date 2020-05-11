@@ -89,6 +89,7 @@ def test_user_definition_test():
 
     assert parser.sizeof() == 10
 
+    # empty
     data = parser.parse(binascii.unhexlify("00000048000000000000"))
     assert data.code is None
 
