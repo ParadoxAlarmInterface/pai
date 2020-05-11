@@ -79,7 +79,9 @@ class SerialCommunication(Connection):
             return await self.connected_future
         except SerialException as e:
             self.connected_future.cancel()
-            raise SerialConnectionOpenFailed("Connection to serial port failed") from e  # PAICriticalException
+            raise SerialConnectionOpenFailed(
+                "Connection to serial port failed"
+            ) from e  # PAICriticalException
         except:
             logger.exception("Unable to connect to Serial")
         finally:

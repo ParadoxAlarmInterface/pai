@@ -342,16 +342,9 @@ def get_user_definition(settings):
             )
         ),
         "partitions" / BitsSwapped(Bitwise(StatusFlags(8))),
-        # "partitions" / BitsSwapped(
-        #     Bitwise(
-        #         EnumerationAdapter(
-        #             Array(8, Flag)
-        #         )
-        #     )
-        # ),
         "access" / BitStruct("level" / Nibble, "schedule" / Nibble),
-        "_access_control" / Bytes(3),
-        "_end" / Const(0x00, Byte),
+        "access_options" / Bytes(1),
+        "card_serial_number" / Bytes(3),
     )
 
 
