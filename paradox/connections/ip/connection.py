@@ -78,7 +78,7 @@ class IPConnection(Connection):
         logger.info("Serial port open")
         self.connected = True
 
-    async def connect(self):
+    async def connect(self) -> bool:
         tries = 1
         max_tries = 3
 
@@ -241,7 +241,7 @@ class IPConnection(Connection):
                 password=self.password,
             )
             self._protocol.send_raw(msg)
-            message_payload = await self.wait_for_message(raw=True)
+            message_payload = await self.wait_for_raw_message()
 
             response = IPPayloadConnectResponse.parse(message_payload)
 
@@ -271,7 +271,7 @@ class IPConnection(Connection):
                 password=self.key,
             )
             self._protocol.send_raw(msg)
-            message_payload = await self.wait_for_message(raw=True)
+            message_payload = await self.wait_for_raw_message()
             logger.debug("F2 answer: {}".format(binascii.hexlify(message_payload)))
 
             # # F4
@@ -289,7 +289,7 @@ class IPConnection(Connection):
                 password=self.key,
             )
             self._protocol.send_raw(msg)
-            message_payload = await self.wait_for_message(raw=True)
+            message_payload = await self.wait_for_raw_message()
 
             # logger.debug("F3 answer: {}".format(binascii.hexlify(message_payload)))
 
@@ -303,7 +303,7 @@ class IPConnection(Connection):
                 password=self.key,
             )
             self._protocol.send_raw(msg)
-            message_payload = await self.wait_for_message(raw=True)
+            message_payload = await self.wait_for_raw_message()
             logger.debug("F8 answer: {}".format(binascii.hexlify(message_payload)))
 
             logger.info("Session Established with IP Module")

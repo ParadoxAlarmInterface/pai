@@ -387,8 +387,7 @@ class Paradox:
                             )
 
                         result = "ok"
-                        if reply:
-                            return reply
+                        return reply
             except asyncio.TimeoutError:
                 result = "timeout"
                 if attempt == retries:

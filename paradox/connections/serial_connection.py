@@ -25,30 +25,30 @@ class SerialCommunication(Connection):
 
     def on_port_closed(self):
         logger.error("Connection to panel was lost")
-        if not self.connected_future.done():
-            self.connected_future.set_result(False)
         self.connected = False
+        if not self.connected_future.done():
+            self.connected_future.set_result(self.connected)
 
     def on_port_open(self):
         logger.info("Serial port open")
-        if not self.connected_future.done():
-            self.connected_future.set_result(True)
         self.connected = True
+        if not self.connected_future.done():
+            self.connected_future.set_result(self.connected)
 
     def open_timeout(self):
         if self.connected_future.done():
             return
 
         logger.error("Serial Port Timeout")
-        self.connected_future.set_result(False)
         self.connected = False
+        self.connected_future.set_result(self.connected)
 
     def make_protocol(self):
         return SerialConnectionProtocol(
             self.on_message, self.on_port_open, self.on_port_closed
         )
 
-    async def connect(self):
+    async def connect(self) -> bool:
         logger.info(f"Connecting to serial port {self.port_path}")
 
         if not os.access(self.port_path, mode=os.R_OK | os.W_OK):
@@ -66,16 +66,23 @@ class SerialCommunication(Connection):
                 logger.info(f"File {self.port_path} permissions changed")
             except OSError:
                 logger.error(f"Failed to update file {self.port_path} permissions")
+                return False
 
         self.connected_future = self.loop.create_future()
-        self.loop.call_later(5, self.open_timeout)
+        open_timeout_handler = self.loop.call_later(5, self.open_timeout)
 
         try:
             _, self._protocol = await serial_asyncio.create_serial_connection(
                 self.loop, self.make_protocol, self.port_path, self.baud
             )
+
+            return await self.connected_future
         except SerialException as e:
             self.connected_future.cancel()
-            raise SerialConnectionOpenFailed("Connection to serial port failed") from e
+            raise SerialConnectionOpenFailed("Connection to serial port failed") from e  # PAICriticalException
+        except:
+            logger.exception("Unable to connect to Serial")
+        finally:
+            open_timeout_handler.cancel()
 
-        return await self.connected_future
+        return False

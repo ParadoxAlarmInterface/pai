@@ -8,7 +8,12 @@ logger = logging.getLogger("PAI").getChild(__name__)
 
 
 class FutureMessageHandler(asyncio.Future):
-    def __init__(self, check_fn=None, loop=None, name=None):
+    def __init__(
+        self,
+        check_fn: Optional[Callable[[Container], bool]] = None,
+        loop=None,
+        name=None,
+    ):
         super(FutureMessageHandler, self).__init__(loop=loop)
         self.persistent = False
         self._check_fn = check_fn
@@ -82,15 +87,17 @@ class AsyncMessageManager:
         self.raw_handlers = []
 
     async def wait_for_message(
-        self, check_fn=None, timeout=2, raw=False
-    ) -> Optional[Container]:
-        if raw:
-            future = RawFutureMessageHandler(loop=self.loop)
-        else:
-            future = FutureMessageHandler(check_fn, loop=self.loop)
+        self, check_fn: Optional[Callable[[Container], bool]] = None, timeout=2
+    ) -> Container:
+        future = FutureMessageHandler(check_fn, loop=self.loop)
 
         self.register_handler(future)
 
+        return await asyncio.wait_for(future, timeout=timeout, loop=self.loop)
+
+    async def wait_for_raw_message(self, timeout=2) -> bytes:
+        future = RawFutureMessageHandler(loop=self.loop)
+        self.register_handler(future)
         return await asyncio.wait_for(future, timeout=timeout, loop=self.loop)
 
     def register_handler(self, handler):

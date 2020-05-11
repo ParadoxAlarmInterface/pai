@@ -22,7 +22,7 @@ class Connection(AsyncMessageManager):
     def connected(self, value: bool):
         self._connected = value
 
-    async def connect(self):
+    async def connect(self) -> bool:
         raise NotImplementedError("Implement in subclass")
 
     def write(self, data: bytes):
