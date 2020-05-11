@@ -286,7 +286,7 @@ RAMDataParserMap = {
     58: Struct("pgm_status" / PGMFlags(16, start_index_from=17)),
 }
 # We also need parsers for:
-# 17 ram address
+# 17 ram address - EBUS Troubles 24 bytes
 # 32 ram address
 # 33 ram address
 # 34 ram address
@@ -297,7 +297,7 @@ RAMDataParserMap = {
 # 48 ram address
 # 49 ram address
 # 50 ram address
-# 51 ram address
+# 51 ram address - Door Status
 # 56 ram address
 # 58 ram address
 
@@ -774,10 +774,10 @@ PerformPGMAction = Struct(
             "packet_length" / PacketLength(Int8ub),
             "unknown0" / Const(0x06, Int8ub),
             "_not_used0" / Padding(3),
-            "pgms" / BitsSwapped(Bitwise(EnumerationAdapter(Array(8, Flag)))),
-            "_not_used1" / Padding(7),
+            "pgms" / BitsSwapped(Bitwise(EnumerationAdapter(Array(32, Flag)))),
+            "_not_used1" / Padding(4),
             "command" / _PGMCommandEnum,
-            "_not_used1" / Padding(3),
+            "_not_used2" / Padding(3),
         )
     ),
     "checksum" / PacketChecksum(Bytes(1)),
