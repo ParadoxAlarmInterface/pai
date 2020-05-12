@@ -44,13 +44,15 @@ class Panel_EVOBase(PanelBase):
         enabled_partitions = list(
             (key for key, val in self.settings.system_options.partitions.items() if val)
         )
-        partition_limits = cfg.LIMITS.get("partition")
-        if partition_limits is None:
-            cfg.LIMITS["partition"] = enabled_partitions
-        else:
-            cfg.LIMITS["partition"] = list(
-                set(cfg.LIMITS["partition"]).intersection(enabled_partitions)
-            )
+
+        if hasattr(cfg, 'LIMITS'):
+            partition_limits = cfg.LIMITS.get("partition")
+            if partition_limits is None:
+                cfg.LIMITS["partition"] = enabled_partitions
+            else:
+                cfg.LIMITS["partition"] = list(
+                    set(cfg.LIMITS["partition"]).intersection(enabled_partitions)
+                )
 
     def get_message(self, name: str) -> Construct:
         try:

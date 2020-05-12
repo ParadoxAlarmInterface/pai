@@ -391,23 +391,23 @@ DefinitionsParserMap = {
             )
         ),
     ),
-    "partition": BitsSwapped(
-        Bitwise(
-            DictArray(
-                8,
-                1,
-                Struct(
-                    "_index" / Computed(this._index + 1),
-                    "definition"
-                    / ExprAdapter(
-                        Default(Flag, False),
-                        lambda obj, context: "enabled" if obj else "disabled",
-                        lambda obj, context: obj == "enabled",
-                    ),
-                ),
-            )
-        )
-    ),
+    # "partition": BitsSwapped(  # No need as we get this data during connect in InitializeCommunication system_options
+    #     Bitwise(
+    #         DictArray(
+    #             8,
+    #             1,
+    #             Struct(
+    #                 "_index" / Computed(this._index + 1),
+    #                 "definition"
+    #                 / ExprAdapter(
+    #                     Default(Flag, False),
+    #                     lambda obj, context: "enabled" if obj else "disabled",
+    #                     lambda obj, context: obj == "enabled",
+    #                 ),
+    #             ),
+    #         )
+    #     )
+    # ),
     "user": get_user_definition,
 }
 

@@ -50,8 +50,7 @@ class PayloadParser:
                         print("No parser available for the message")
 
                     if parsed_payload.fields.value.po.command == 0:  # panel detection
-                        product_id = parsed_payload.fields.value.product_id
-                        self.panel = create_panel(None, product_id)
+                        self.panel = create_panel(None, parsed_payload)
                     if parsed_payload.fields.value.po.command == 5:  # eeprom/ram read
                         if (
                             parsed_payload.fields.value.control.ram_access
