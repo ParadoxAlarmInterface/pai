@@ -1,6 +1,6 @@
 from construct import (Adapter, Aligned, BitsInteger, BitStruct, Bytes, Const,
                        Default, Enum, Flag, GreedyBytes, IfThenElse, Int8ub,
-                       Int16ub, Int16ul, Rebuild, Struct, len_, this)
+                       Int16ub, Int16ul, Rebuild, Struct, len_, this, Padding)
 
 from paradox.hardware.common import HexInt
 from paradox.lib.crypto import decrypt, encrypt
@@ -69,11 +69,16 @@ IPMessageRequest = Struct(
             "flags"
             / BitStruct(
                 "other" / Default(BitsInteger(7), 4), "encrypt" / Default(Flag, True),
+                # 8 - installer mode (4 in other)
+                # 1 | 8 | 16 | 64
             ),
             "command" / Default(IPMessageCommand, 0x00),
             "sub_command" / Default(Int8ub, 0x00),
-            "unknown1" / Default(Int8ub, 0x00),
-            "unknown2" / Default(Int8ub, 0x00),
+            "wt" / Default(Int8ub, 0x00),  # WT - 14
+            "sb" / Default(Int8ub, 0x00),  # SB: 0
+            "cryptor_code" / Default(Int8ub, 0x00),
+            "not_used" / Padding(1),
+            "sequence_id" / Default(Int8ub, 0x00),
         ),
         b"\xee",
     ),
@@ -100,8 +105,9 @@ IPMessageResponse = Struct(
             ),
             "command" / Default(IPMessageCommand, 0x00),
             "sub_command" / Default(Int8ub, 0x00),
-            "unknown1" / Default(Int8ub, 0x00),
-            "unknown2" / Default(Int8ub, 0x03),
+            "wt" / Default(Int8ub, 0x00),  # WT
+            "sb" / Default(Int8ub, 0x03),  # SB
+            "cryptor_code" / Default(Int8ub, 0x00),
         ),
         b"\xee",
     ),

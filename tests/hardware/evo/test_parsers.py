@@ -66,16 +66,16 @@ def test_zone_definition_test():
     assert data.options.bypass_enabled is True
 
 
-def test_partition_definition_test():
-    parser = DefinitionsParserMap["partition"]
-
-    assert parser.sizeof() == 1
-
-    data = parser.parse(b"\xcb")
-
-    assert data[1]["definition"] == "enabled"
-    assert data[3]["definition"] == "disabled"
-    assert len(data) == 8
+# def test_partition_definition_test():
+#     parser = DefinitionsParserMap["partition"]
+#
+#     assert parser.sizeof() == 1
+#
+#     data = parser.parse(b"\xcb")
+#
+#     assert data[1]["definition"] == "enabled"
+#     assert data[3]["definition"] == "disabled"
+#     assert len(data) == 8
 
 
 def test_user_definition_test():

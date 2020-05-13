@@ -375,7 +375,8 @@ PerformAction = Struct(
             / Enum(
                 Int8ub, One_Beep=0x04, Fail_Beep=0x08, Beep_Twice=0x0C, Accept_Beep=0x10
             ),
-            "_not_used1" / Padding(29),
+            "instant" / Default(Flag, False),
+            "_not_used1" / Padding(28),
             "source_id" / Default(CommunicationSourceIDEnum, 1),
             "user_id" / Default(Int16ul, 0),
         )
