@@ -9,8 +9,6 @@ from typing import Callable, Iterable, Optional, Sequence
 from construct import Container
 
 from paradox.config import config as cfg
-from paradox.connections.ip.connection import IPConnection
-from paradox.connections.serial_connection import SerialCommunication
 from paradox.data.enums import RunState
 from paradox.data.memory_storage import MemoryStorage as Storage
 from paradox.data.model import DetectedPanel
@@ -66,6 +64,8 @@ class Paradox:
             if cfg.CONNECTION_TYPE == "Serial":
                 logger.info("Using Serial Connection")
 
+                from paradox.connections.serial_connection import SerialCommunication
+
                 self._connection = SerialCommunication(
                     self.on_connection_message,
                     port=cfg.SERIAL_PORT,
@@ -73,6 +73,8 @@ class Paradox:
                 )
             elif cfg.CONNECTION_TYPE == "IP":
                 logger.info("Using IP Connection")
+
+                from paradox.connections.ip.connection import IPConnection
 
                 self._connection = IPConnection(
                     self.on_connection_message,
@@ -190,13 +192,8 @@ class Paradox:
             if cfg.SYNC_TIME:
                 await self.sync_time()
 
-            logger.info("Loading definitions")
-            definitions = await self.panel.load_definitions()
-            ps.sendMessage("definitions_loaded", data=definitions)
-
-            logger.info("Loading labels")
-            labels = await self.panel.load_labels()
-            ps.sendMessage("labels_loaded", data=labels)
+            logger.info("Loading data from panel memory")
+            await self.panel.load_memory()
 
             logger.info("Running")
             self.run_state = RunState.RUN

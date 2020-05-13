@@ -12,6 +12,7 @@ from paradox.config import config as cfg
 from paradox.lib.utils import construct_free, sanitize_key
 
 from . import parsers
+from ..lib import ps
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -110,6 +111,15 @@ class Panel:
             password = password.encode()
 
         return binascii.a2b_hex(password.zfill(4))
+
+    async def load_memory(self):
+        logger.info("Loading definitions")
+        definitions = await self.load_definitions()
+        ps.sendMessage("definitions_loaded", data=definitions)
+
+        logger.info("Loading labels")
+        labels = await self.load_labels()
+        ps.sendMessage("labels_loaded", data=labels)
 
     async def load_definitions(self):
         if "definitions" not in self.mem_map:
