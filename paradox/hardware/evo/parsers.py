@@ -6,7 +6,7 @@ from construct import (Array, BitsInteger, BitsSwapped, BitStruct, Bitwise,
                        Default, Embedded, Enum, ExprAdapter,
                        ExprSymmetricAdapter, Flag, Int8ub, Int16ub, Int24ub,
                        Nibble, Padding, RawCopy, Struct, Subconstruct,
-                       ValidationError, obj_, this)
+                       ValidationError, obj_, this, Int16ul)
 
 from ..common import (CommunicationSourceIDEnum, PacketChecksum, PacketLength,
                       ProductIdEnum, calculate_checksum)
@@ -909,9 +909,27 @@ SendPanicAction = Struct(  # Supported on firmware versions 7.15+
             "packet_length" / PacketLength(Int8ub),
             "unknown0" / Const(0x09, Int8ub),
             "_not_used" / Padding(3),
-            "user_id" / Int16ub,
+            "user_id" / Int16ul,
             "panic_type" / Enum(Int8ub, emergency=0, medical=1, fire=2,),  # wild guess
             "partition" / Int8ub,
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
+
+PerformDoorAction = Struct(
+    "fields"
+    / RawCopy(
+        Struct(
+            "po" / Struct("command" / Const(0x40, Int8ub)),
+            "packet_length" / PacketLength(Int8ub),
+            "unknown0" / Const(0x2, Int8ub),
+            "_not_used0" / Padding(3),
+            "doors" / BitsSwapped(Bitwise(EnumerationAdapter(Array(32, Flag)))),
+            "command" / Enum(Int8ub, lock=1, unlock=2),
+            "_not_used1" / Padding(2),
+            "unknown1" / Const(0x55, Int8ub),
+            "user_id" / Default(Int16ul, 0),
         )
     ),
     "checksum" / PacketChecksum(Bytes(1)),
