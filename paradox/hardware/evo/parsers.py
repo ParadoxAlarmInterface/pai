@@ -694,7 +694,8 @@ PerformPartitionAction = Struct(
                     pick_key="command",
                 )
             ),
-            "_not_used1" / Padding(4),
+            "instant" / Default(Flag, False),
+            "_not_used1" / Padding(3),
         )
     ),
     "checksum" / PacketChecksum(Bytes(1)),

@@ -17,6 +17,18 @@ def test_partition_action():
     assert len(a) == 15
 
 
+def test_partition_action_instant():
+    commands = {8: "arm"}
+
+    a = PerformPartitionAction.build({"fields": {"value": {"partitions": commands, "instant": True}}})
+
+    print(hexlify(a))
+
+    assert a == unhexlify(b"400f00000000000000020100000052")
+
+    assert len(a) == 15
+
+
 def test_zone_bypass_zone_5():
     expected = b"d01f080800001000000000000000000000000000000000000000000000000f"
 
