@@ -1,6 +1,6 @@
 from construct import (BitsInteger, BitStruct, Byte, Bytes, Const, Default,
                        Enum, ExprAdapter, Flag, Int8ub, Int8ul, Int16ub,
-                       Int32ub, Nibble, Padding, RawCopy, Struct, obj_)
+                       Int32ub, Nibble, Padding, RawCopy, Struct, obj_, Int16ul)
 
 from ..common import CommunicationSourceIDEnum, PacketChecksum, ProductIdEnum
 from .adapters import (DateAdapter, ModuleSerialAdapter,
@@ -26,7 +26,7 @@ InitializeCommunication = Struct(
             "user_code" / Default(Int32ub, 0x00000000),
             "_not_used2" / Padding(15),
             "source_id" / Default(CommunicationSourceIDEnum, 1),
-            "user_id" / Struct("high" / Default(Int8ub, 0), "low" / Default(Int8ub, 0)),
+            "user_id" / Default(Int16ul, 0),
         )
     ),
     "checksum" / PacketChecksum(Bytes(1)),
@@ -59,8 +59,7 @@ PanelStatus = Struct(
             "status_request" / Default(Int8ub, 0x00),
             "_not_used1" / Padding(29),
             "source_id" / Default(CommunicationSourceIDEnum, 1),
-            "user_high" / Default(Int8ub, 0),
-            "user_low" / Default(Int8ub, 0),
+            "user_id" / Default(Int16ul, 0),
         )
     ),
     Padding(31),
@@ -192,8 +191,7 @@ CloseConnection = Struct(
                 0x05,
             ),
             "source_id" / Default(CommunicationSourceIDEnum, 1),
-            "user_high" / Default(Int8ub, 0),
-            "user_low" / Default(Int8ub, 0),
+            "user_id" / Default(Int16ul, 0),
         )
     ),
     "checksum" / PacketChecksum(Bytes(1)),
@@ -250,8 +248,7 @@ ReadEEPROM = Struct(
             "address" / Default(Int16ub, 0),
             "_not_used1" / Padding(29),
             "source_id" / Default(CommunicationSourceIDEnum, 1),
-            "user_high" / Default(Int8ub, 0),
-            "user_low" / Default(Int8ub, 0),
+            "user_id" / Default(Int16ul, 0),
         )
     ),
     "checksum" / PacketChecksum(Bytes(1)),
@@ -319,8 +316,7 @@ SetTimeDate = Struct(
             "minute" / Int8ub,
             "_not_used1" / Padding(23),
             "source_id" / Default(CommunicationSourceIDEnum, 1),
-            "user_high" / Default(Int8ub, 0),
-            "user_low" / Default(Int8ub, 0),
+            "user_id" / Default(Int16ul, 0),
         )
     ),
     "checksum" / PacketChecksum(Bytes(1)),
@@ -380,8 +376,7 @@ PerformAction = Struct(
             ),
             "_not_used1" / Padding(29),
             "source_id" / Default(CommunicationSourceIDEnum, 1),
-            "user_high" / Default(Int8ub, 0),
-            "user_low" / Default(Int8ub, 0),
+            "user_id" / Default(Int16ul, 0),
         )
     ),
     "checksum" / PacketChecksum(Bytes(1)),
@@ -488,3 +483,22 @@ DefinitionsParserMap = {
         ),
     )
 }
+
+SendPanicAction = Struct(  # Supported on firmware versions 7.15+
+    "fields"
+    / RawCopy(
+        Struct(
+            "po" / Struct("command" / Const(0x40, Int8ub)),
+            "packet_length" / Const(37, Int8ub),
+            "unknown0" / Const(0x1a, Int8ub),
+            "partition" / Int8ub,
+            "panic_type" / Enum(Int8ub, emergency=0, medical=1, fire=2,),  # wild guess
+            "user_id" / Int8ub,
+            "_not_used" / Padding(26),
+            "unknown1" / Const(0x06, Int8ub),
+            "_not_used" / Padding(1),
+            "user_id" / Int16ul,
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
