@@ -154,6 +154,8 @@ class Panel:
                     addresses, parser.sizeof()
                 ):
                     element = parser.parse(raw_data)
+                    if cfg.LOGGING_DUMP_MESSAGES:
+                        logger.debug(f"EEPROM parsed ({elem_type}/{index}): {element}")
                     if elem_def.get("bit_encoded"):
                         for elem_index, elem_data in element.items():
                             definition = elem_data.get("definition")
@@ -332,7 +334,10 @@ class Panel:
 
         parser = parser_map[mvars.address]
         try:
-            return parser.parse(mvars.data)
+            res = parser.parse(mvars.data)
+            if cfg.LOGGING_DUMP_MESSAGES:
+                logger.debug(f"Status parsed({mvars.address}): {res}", )
+            return res
         except:
             logger.exception(
                 "Unable to parse RAM Status Block ({})".format(mvars.address)
