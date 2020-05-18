@@ -26,7 +26,7 @@ class Panel_EVO96(Panel_EVOBase):
                 ],
             },
             "user": {"label_offset": 0, "addresses": [range(0x03E47, 0x04E47, 0x10)]},
-            "bus-module": {  # modules
+            "module": {  # modules
                 "label_offset": 0,
                 "addresses": [
                     range(0x04E47, 0x05637, 0x10),  # EVO48

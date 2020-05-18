@@ -23,6 +23,7 @@ ELEMENT_TOPIC_MAP = dict(
     pgm=cfg.MQTT_OUTPUT_TOPIC,
     repeater=cfg.MQTT_REPEATER_TOPIC,
     bus=cfg.MQTT_BUS_TOPIC,
+    module=cfg.MQTT_MODULE_TOPIC,
     keypad=cfg.MQTT_KEYPAD_TOPIC,
     system=cfg.MQTT_SYSTEM_TOPIC,
     user=cfg.MQTT_USER_TOPIC,

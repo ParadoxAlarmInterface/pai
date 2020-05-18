@@ -62,7 +62,7 @@ async def test_label_loading(mocker):
         "pgm": [],
         "partition": [],
         "user": [],
-        "bus-module": [],
+        "module": [],
         "repeater": [],
         "keypad": [],
         "site": [],

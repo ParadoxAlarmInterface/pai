@@ -52,7 +52,7 @@ class Panel(PanelBase):
             },
             "partition": {"label_offset": 0, "addresses": [range(0x310, 0x330, 0x10)]},
             "user": {"label_offset": 0, "addresses": [range(0x330, 0x530, 0x10)]},
-            "bus-module": {"label_offset": 0, "addresses": [range(0x530, 0x620, 0x10)]},
+            "module": {"label_offset": 0, "addresses": [range(0x530, 0x620, 0x10)]},
             "repeater": {"label_offset": 0, "addresses": [range(0x620, 0x640, 0x10)]},
             "keypad": {"label_offset": 0, "addresses": [range(0x640, 0x6C0, 0x10)]},
             "site": {"label_offset": 0, "addresses": [range(0x6C0, 0x6D0, 0x10)]},

@@ -99,6 +99,7 @@ class Config(object):
         "MQTT_ZONE_TOPIC": "zones",  # Base for zone states
         "MQTT_PARTITION_TOPIC": "partitions",  # Base for partition states
         "MQTT_BUS_TOPIC": "buses",  # Base for buses states
+        "MQTT_MODULE_TOPIC": "bus-module",  # Base for bus module states
         "MQTT_SYSTEM_TOPIC": "system",  # Base for panel states
         "MQTT_REPEATER_TOPIC": "repeaters",  # Base for repeater states
         "MQTT_USER_TOPIC": "users",  # Base for user states

@@ -260,12 +260,12 @@ RAMDataParserMap = {
     ),
     5: Struct(
         "_not_used" / Int8ub,
-        "bus-module_trouble" / ModuleTroubles(count=63, start_index_from=1),
+        "module_trouble" / ModuleTroubles(count=63, start_index_from=1),
     ),
-    6: Struct("bus-module_trouble" / ModuleTroubles(count=64, start_index_from=64)),
-    7: Struct("bus-module_trouble" / ModuleTroubles(count=64, start_index_from=128)),
+    6: Struct("module_trouble" / ModuleTroubles(count=64, start_index_from=64)),
+    7: Struct("module_trouble" / ModuleTroubles(count=64, start_index_from=128)),
     8: Struct(
-        "bus-module_trouble" / ModuleTroubles(count=63, start_index_from=192),
+        "module_trouble" / ModuleTroubles(count=63, start_index_from=192),
         "_not_used" / Int8ub,
     ),
     9: Struct(
