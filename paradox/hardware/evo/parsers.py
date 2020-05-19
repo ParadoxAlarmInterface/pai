@@ -4,9 +4,9 @@ from collections.abc import Mapping
 from construct import (Array, BitsInteger, BitsSwapped, BitStruct, Bitwise,
                        Byte, Bytes, ByteSwapped, Checksum, Computed, Const,
                        Default, Embedded, Enum, ExprAdapter,
-                       ExprSymmetricAdapter, Flag, Int8ub, Int16ub, Int24ub,
-                       Nibble, Padding, RawCopy, Struct, Subconstruct,
-                       ValidationError, obj_, this, Int16ul)
+                       ExprSymmetricAdapter, Flag, Int8ub, Int16ub, Int16ul,
+                       Int24ub, Nibble, Padding, RawCopy, Struct, Subconstruct,
+                       ValidationError, obj_, this)
 
 from ..common import (CommunicationSourceIDEnum, PacketChecksum, PacketLength,
                       ProductIdEnum, calculate_checksum)

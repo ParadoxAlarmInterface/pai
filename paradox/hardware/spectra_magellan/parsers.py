@@ -1,6 +1,7 @@
 from construct import (BitsInteger, BitStruct, Byte, Bytes, Const, Default,
                        Enum, ExprAdapter, Flag, Int8ub, Int8ul, Int16ub,
-                       Int32ub, Nibble, Padding, RawCopy, Struct, obj_, Int16ul)
+                       Int16ul, Int32ub, Nibble, Padding, RawCopy, Struct,
+                       obj_)
 
 from ..common import CommunicationSourceIDEnum, PacketChecksum, ProductIdEnum
 from .adapters import (DateAdapter, ModuleSerialAdapter,
@@ -362,7 +363,7 @@ PerformAction = Struct(
                 Disarm_Both_Disable_StayD=0x08,
                 Bypass=0x10,
                 # Beep=0x10,
-                Clear_Alarm_In_Memory=0x1b,
+                Clear_Alarm_In_Memory=0x1B,
                 PGM_On_Override=0x30,
                 PGM_Off_Override=0x31,
                 PGM_On=0x32,
@@ -492,7 +493,7 @@ SendPanicAction = Struct(  # Supported on firmware versions 7.15+
         Struct(
             "po" / Struct("command" / Const(0x40, Int8ub)),
             "packet_length" / Const(37, Int8ub),
-            "unknown0" / Const(0x1a, Int8ub),
+            "unknown0" / Const(0x1A, Int8ub),
             "partition" / Int8ub,
             "panic_type" / Enum(Int8ub, emergency=0, medical=1, fire=2,),  # wild guess
             "user_id" / Int8ub,

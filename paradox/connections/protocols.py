@@ -180,7 +180,7 @@ class IPConnectionProtocol(ConnectionProtocol):
                 header=dict(
                     length=len(message),
                     message_type=IPMessageType.serial_passthrough_request,
-                    command=IPMessageCommand.panel_communication,
+                    command=IPMessageCommand.passthrough,
                 ),
                 payload=message,
             ),

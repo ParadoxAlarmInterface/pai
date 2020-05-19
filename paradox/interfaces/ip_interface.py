@@ -92,6 +92,9 @@ class ClientConnection:
 
             in_message = IPMessageRequest.parse(data, password=self.connection_key)
 
+            if cfg.LOGGING_DUMP_MESSAGES:
+                logger.debug("APP -> IPI (message) {}".format(in_message))
+
             if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug(
                     "APP -> IPI (payload) {}".format(
@@ -108,102 +111,138 @@ class ClientConnection:
                 payload=b"",
             )
 
-            if in_message.header.command == IPMessageCommand.ip_authentication:
-                logger.info("Authenticating to IP interface")
-                password = in_message.payload
+            if in_message.header.message_type == IPMessageType.ip_request:
+                if in_message.header.command == IPMessageCommand.connect:
+                    logger.info("Authenticating to IP interface")
+                    password = in_message.payload
 
-                if password != self.interface_password:
-                    logger.warning("Authentication Error: Wrong password")
-                    out_message_container.header.flags.encrypt = False
-                    out_message_container.header.flags.other_flags = 0x18
-                    out_message_container.payload = IPPayloadConnectResponse.build(
-                        dict(
-                            key=b"\00" * 16,
-                            login_status="invalid_password",
-                            hardware_version=0,
-                            ip_firmware_major=0,
-                            ip_firmware_minor=0,
-                            ip_module_serial=b"\x00\x00\x00\x00",
+                    if password != self.interface_password:
+                        logger.warning("Authentication Error: Wrong password")
+                        out_message_container.header.flags.encrypt = False
+                        out_message_container.header.flags.installer_mode = True
+                        out_message_container.header.flags.neware = True
+                        out_message_container.payload = IPPayloadConnectResponse.build(
+                            dict(
+                                key=b"\00" * 16,
+                                login_status="invalid_password",
+                                hardware_version=0,
+                                ip_firmware_major=0,
+                                ip_firmware_minor=0,
+                                ip_module_serial=b"\x00\x00\x00\x00",
+                            )
                         )
-                    )
-                    status = "closing_connection"
-                else:
-                    logger.info("Authentication Success")
+                        status = "closing_connection"
+                    else:
+                        logger.info("Authentication Success")
 
-                    # Generate a new key
-                    next_connection_key = binascii.hexlify(os.urandom(8)).upper()
+                        # Generate a new key
+                        next_connection_key = binascii.hexlify(os.urandom(8)).upper()
 
-                    out_message_container.header.flags.other_flags = 0x1C
-                    out_message_container.payload = IPPayloadConnectResponse.build(
-                        dict(
-                            key=next_connection_key,
-                            login_status="success",
-                            hardware_version=32,
-                            ip_firmware_major=1,
-                            ip_firmware_minor=32,
-                            ip_module_serial=b"\x01\x23\x45\x67",
+                        out_message_container.header.flags.installer_mode = True
+                        out_message_container.header.flags.neware = True
+                        out_message_container.header.flags.live_events = True
+                        out_message_container.payload = IPPayloadConnectResponse.build(
+                            dict(
+                                key=next_connection_key,
+                                login_status="success",
+                                hardware_version=32,
+                                ip_firmware_major=1,
+                                ip_firmware_minor=32,
+                                ip_module_serial=b"\x71\x23\x45\x67",  # 0x71 = IP150
+                            )
                         )
+                elif in_message.header.command == IPMessageCommand.keep_alive:
+                    out_message_container.header.flags.installer_mode = True
+                    out_message_container.header.flags.neware = True
+                    out_message_container.header.flags.live_events = True
+                    out_message_container.payload = b"\x00"
+                elif (
+                    in_message.header.command
+                    == IPMessageCommand.upload_download_connection
+                ):
+                    out_message_container.header.flags.installer_mode = True
+                    out_message_container.header.flags.upload_download = True
+                    out_message_container.header.flags.neware = True
+                    out_message_container.header.flags.live_events = True
+                    out_message_container.payload = binascii.unhexlify(
+                        "0100000000000000000000000000000000"
                     )
-            elif in_message.header.command == IPMessageCommand.F2:
-                out_message_container.header.flags.other_flags = 0x1C
-                out_message_container.payload = b"\x00"
-            elif in_message.header.command == IPMessageCommand.F3:
-                out_message_container.header.flags.other_flags = 0x1D  # 4 in Babyware
-                out_message_container.payload = binascii.unhexlify(
-                    "0100000000000000000000000000000000"
-                )
-            elif in_message.header.command == IPMessageCommand.F4:
-                out_message_container.header.flags.other_flags = 0x1C
-                out_message_container.payload = (
-                    b"\x01" if status == "closing_connection" else b"\x00"
-                )
-            elif in_message.header.command == IPMessageCommand.F8:
-                out_message_container.header.flags.other_flags = 0x1C  # 3D in Babyware
-                out_message_container.payload = b"\x01"
-            # elif message.header.command in ["F5", "FB"]:  # Proxy Insite Gold communication
-            #     TODO: Implement
-            #     if not isinstance(self.alarm.connection, IPConnection):
-            #         logger.error(f"Only IP Connection supports '{message.header.command}' command")
-            #         break
-            #
-            #     proxy_message = Container(
-            #         header=message.header,
-            #         payload=in_payload
-            #     )
-            #
-            #     async with self.alarm.request_lock, self.alarm.busy:
-            #         self.alarm.connection.write_with_header(IPMessageRequest(proxy_message))
-            elif in_message.header.command == IPMessageCommand.panel_communication:
-                out_message_container.header.message_type = (
-                    IPMessageType.serial_passthrough_response
-                )
-                out_message_container.header.flags.other_flags = 0x39
+                elif (
+                    in_message.header.command
+                    == IPMessageCommand.upload_download_disconnection
+                ):
+                    out_message_container.header.flags.upload_download = True
+                    out_message_container.header.flags.neware = True
+                    out_message_container.header.flags.live_events = True
+                    out_message_container.header.flags.keep_alive = True
+                    out_message_container.payload = (
+                        b"\x01" if status == "closing_connection" else b"\x00"
+                    )
+                elif in_message.header.command == IPMessageCommand.toggle_keep_alive:
+                    out_message_container.header.flags.installer_mode = True
+                    out_message_container.header.flags.upload_download = True
+                    out_message_container.header.flags.neware = True
+                    out_message_container.header.flags.live_events = True
+                    out_message_container.header.flags.keep_alive = True
+                    out_message_container.payload = b"\x01"
 
-                if (
-                    in_message.payload[0] == 0x70 and in_message.payload[2] == 0x05
-                ):  # Close connection
-                    out_message_container.payload = self.alarm.panel.get_message(
-                        "CloseConnection"
-                    ).build({})
-                    status = "closing_connection"
+                # FB - Multicommand
+                # F5 - no idea
+                # elif message.header.command in ["F5", "FB"]:  # Proxy Insite Gold communication
+                #     TODO: Implement
+                #     if not isinstance(self.alarm.connection, IPConnection):
+                #         logger.error(f"Only IP Connection supports '{message.header.command}' command")
+                #         break
+                #
+                #     proxy_message = Container(
+                #         header=message.header,
+                #         payload=in_payload
+                #     )
+                #
+                #     async with self.alarm.request_lock, self.alarm.busy:
+                #         self.alarm.connection.write_with_header(IPMessageRequest(proxy_message))
+
                 else:
-                    try:
-                        async with self.alarm.request_lock, self.alarm.busy:
-                            self.alarm.connection.write(in_message.payload)
-                    except:
-                        logger.exception("Send to panel")
-                        break
-
-                if in_message.payload[0] == 0x00:  # Just a status update
-                    status = "connected"
-
-            else:
-                logger.warning(
-                    "UNKNOWN: raw: {}, payload: {}".format(
-                        binascii.hexlify(data), binascii.hexlify(in_message.payload)
+                    logger.warning(
+                        f"Unknown ip_request: raw: {binascii.hexlify(data)}, message: {in_message}"
                     )
-                )
-                continue
+                    continue
+            elif (
+                in_message.header.message_type
+                == IPMessageType.serial_passthrough_request
+            ):
+                if in_message.header.command == IPMessageCommand.passthrough:
+                    out_message_container.header.message_type = (
+                        IPMessageType.serial_passthrough_response
+                    )
+                    out_message_container.header.flags.upload_download = True
+                    out_message_container.header.flags.neware = True
+                    out_message_container.header.flags.live_events = True
+                    out_message_container.header.flags.keep_alive = True
+
+                    if (
+                        in_message.payload[0] == 0x70 and in_message.payload[2] == 0x05
+                    ):  # Close connection
+                        out_message_container.payload = self.alarm.panel.get_message(
+                            "CloseConnection"
+                        ).build({})
+                        status = "closing_connection"
+                    else:
+                        try:
+                            async with self.alarm.request_lock, self.alarm.busy:
+                                self.alarm.connection.write(in_message.payload)
+                        except:
+                            logger.exception("Send to panel")
+                            break
+
+                    if in_message.payload[0] == 0x00:  # Just a status update
+                        status = "connected"
+
+                else:
+                    logger.warning(
+                        f"Unknown serial_passthrough_request: raw: {binascii.hexlify(data)}, message: {in_message}"
+                    )
+                    continue
 
             payload_length = len(
                 out_message_container.payload

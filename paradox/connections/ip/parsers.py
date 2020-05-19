@@ -1,6 +1,7 @@
-from construct import (Adapter, Aligned, BitsInteger, BitStruct, Bytes, Const,
-                       Default, Enum, Flag, GreedyBytes, IfThenElse, Int8ub,
-                       Int16ub, Int16ul, Rebuild, Struct, len_, this, Padding)
+from construct import (Adapter, Aligned, BitStruct, Bytes,
+                       Const, Default, Enum, Flag, GreedyBytes,
+                       IfThenElse, Int8ub, Int16ub, Int16ul, Padding, Pointer,
+                       Rebuild, Struct, len_, this)
 
 from paradox.hardware.common import HexInt
 from paradox.lib.crypto import decrypt, encrypt
@@ -16,14 +17,23 @@ IPMessageType = Enum(
 
 IPMessageCommand = Enum(
     Int8ub,
-    ip_authentication=0xF0,
-    F2=0xF2,
-    F3=0xF3,
-    F4=0xF4,
-    F5=0xF5,
-    F8=0xF8,
-    FB=0xFB,
-    panel_communication=0x00,
+    connect=0xF0,
+    send_user_label=0xF1,
+    keep_alive=0xF2,
+    upload_download_connection=0xF3,
+    upload_download_disconnection=0xF4,
+    boot_loader=0xF5,
+    web_page_connect=0xF6,
+    web_page_disconnect=0xF7,
+    toggle_keep_alive=0xF8,
+    reset=0xF9,
+    set_baud_rate=0xFA,
+    multicommand=0xFB,
+    single_panel=0xFC,
+    unsupported_request=0xFD,
+    boot_ip=0xFE,
+    disconnect=0xFF,
+    passthrough=0x00,
 )
 
 
@@ -41,6 +51,11 @@ IPPayloadConnectResponse = Struct(
     "ip_firmware_major" / Default(HexInt, 5),
     "ip_firmware_minor" / Default(HexInt, 2),
     "ip_module_serial" / Bytes(4),
+    "ip_type"
+    / Default(
+        Pointer(21, Enum(Int8ub, IP150=0x71, IP100=0x70)),
+        lambda ctx: ctx.ip_module_serial[0],
+    ),
 )
 
 
@@ -68,7 +83,14 @@ IPMessageRequest = Struct(
             "message_type" / Default(IPMessageType, 0x03),
             "flags"
             / BitStruct(
-                "other" / Default(BitsInteger(7), 4), "encrypt" / Default(Flag, True),
+                "bit8" / Default(Flag, False),
+                "keep_alive" / Default(Flag, False),
+                "live_events" / Default(Flag, False),
+                "bit5" / Default(Flag, False),
+                "installer_mode" / Default(Flag, False),
+                "bit3" / Default(Flag, False),
+                "upload_download" / Default(Flag, False),
+                "encrypt" / Default(Flag, True),
                 # 8 - installer mode (4 in other)
                 # 1 | 8 | 16 | 64
             ),
@@ -101,7 +123,14 @@ IPMessageResponse = Struct(
             "message_type" / Default(IPMessageType, 0x01),
             "flags"
             / BitStruct(
-                "other" / Default(BitsInteger(7), 4), "encrypt" / Default(Flag, True),
+                "bit8" / Default(Flag, False),
+                "keep_alive" / Default(Flag, False),
+                "live_events" / Default(Flag, False),
+                "neware" / Default(Flag, False),
+                "installer_mode" / Default(Flag, False),
+                "bit3" / Default(Flag, False),
+                "upload_download" / Default(Flag, False),
+                "encrypt" / Default(Flag, True),
             ),
             "command" / Default(IPMessageCommand, 0x00),
             "sub_command" / Default(Int8ub, 0x00),
