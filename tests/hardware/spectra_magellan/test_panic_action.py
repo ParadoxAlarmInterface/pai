@@ -1,9 +1,12 @@
 from paradox.hardware.spectra_magellan.parsers import SendPanicAction
 
+
 def test_panic_action():
     assert SendPanicAction.sizeof() == 37
 
-    raw = SendPanicAction.build({"fields":{"value":{"user_id":1, "partition":1, "panic_type": "medical"}}})
+    raw = SendPanicAction.build(
+        {"fields": {"value": {"user_id": 1, "partition": 1, "panic_type": "medical"}}}
+    )
 
     print(raw)
 

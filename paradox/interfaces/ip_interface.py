@@ -107,8 +107,7 @@ class ClientConnection:
                     message_type=IPMessageType.ip_response,
                     command=in_message.header.command,
                     flags=Container(encrypt=in_message.header.flags.encrypt),
-                ),
-                payload=b"",
+                )
             )
 
             if in_message.header.message_type == IPMessageType.ip_request:
@@ -244,29 +243,25 @@ class ClientConnection:
                     )
                     continue
 
-            payload_length = len(
-                out_message_container.payload
-            )  # TODO: Why can't payload be empty?
-            if payload_length:
-                if cfg.LOGGING_DUMP_PACKETS:
-                    logger.debug(
-                        "IPI -> APP (payload) {}".format(
-                            binascii.hexlify(out_message_container.payload)
-                        )
+            if cfg.LOGGING_DUMP_PACKETS:
+                logger.debug(
+                    "IPI -> APP (payload) {}".format(
+                        binascii.hexlify(out_message_container.payload)
                     )
-
-                m = IPMessageResponse.build(
-                    out_message_container, password=self.connection_key
                 )
 
-                if cfg.LOGGING_DUMP_PACKETS:
-                    logger.debug("IPI -> APP (raw) {}".format(binascii.hexlify(m)))
+            m = IPMessageResponse.build(
+                out_message_container, password=self.connection_key
+            )
 
-                self.client_writer.write(m)
-                await self.client_writer.drain()
+            if cfg.LOGGING_DUMP_PACKETS:
+                logger.debug("IPI -> APP (raw) {}".format(binascii.hexlify(m)))
 
-                if self.connection_key != next_connection_key:
-                    self.connection_key = next_connection_key
+            self.client_writer.write(m)
+            await self.client_writer.drain()
+
+            if self.connection_key != next_connection_key:
+                self.connection_key = next_connection_key
 
             if status == "closing_connection":
                 break

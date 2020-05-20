@@ -20,7 +20,9 @@ def test_partition_action():
 def test_partition_action_instant():
     commands = {8: "arm"}
 
-    a = PerformPartitionAction.build({"fields": {"value": {"partitions": commands, "instant": True}}})
+    a = PerformPartitionAction.build(
+        {"fields": {"value": {"partitions": commands, "instant": True}}}
+    )
 
     print(hexlify(a))
 

@@ -272,7 +272,7 @@ class IPConnection(Connection):
             # F2
             logger.debug("Sending keep alive")
             msg = IPMessageRequest.build(
-                dict(header=dict(command=IPMessageCommand.keep_alive), payload=b"",),
+                dict(header=dict(command=IPMessageCommand.keep_alive)),
                 password=self.key,
             )
             self._protocol.send_raw(msg)
@@ -292,10 +292,7 @@ class IPConnection(Connection):
             # F3
             logger.debug("Sending upload_download_connection")
             msg = IPMessageRequest.build(
-                dict(
-                    header=dict(command=IPMessageCommand.upload_download_connection,),
-                    payload=b"",
-                ),
+                dict(header=dict(command=IPMessageCommand.upload_download_connection,)),
                 password=self.key,
             )
             self._protocol.send_raw(msg)

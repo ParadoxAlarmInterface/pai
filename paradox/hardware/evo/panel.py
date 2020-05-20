@@ -45,7 +45,7 @@ class Panel_EVOBase(PanelBase):
             (key for key, val in self.settings.system_options.partitions.items() if val)
         )
 
-        if hasattr(cfg, 'LIMITS'):
+        if hasattr(cfg, "LIMITS"):
             partition_limits = cfg.LIMITS.get("partition")
             if partition_limits is None:
                 cfg.LIMITS["partition"] = enabled_partitions

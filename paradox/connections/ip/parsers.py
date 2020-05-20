@@ -1,7 +1,6 @@
-from construct import (Adapter, Aligned, BitStruct, Bytes,
-                       Const, Default, Enum, Flag, GreedyBytes,
-                       IfThenElse, Int8ub, Int16ub, Int16ul, Padding, Pointer,
-                       Rebuild, Struct, len_, this)
+from construct import (Adapter, Aligned, BitStruct, Bytes, Const, Default,
+                       Enum, Flag, GreedyBytes, IfThenElse, Int8ub, Int16ub,
+                       Int16ul, Padding, Pointer, Rebuild, Struct, len_, this)
 
 from paradox.hardware.common import HexInt
 from paradox.lib.crypto import decrypt, encrypt
@@ -79,7 +78,10 @@ IPMessageRequest = Struct(
         16,
         Struct(
             "sof" / Const(0xAA, Int8ub),
-            "length" / Rebuild(Int16ul, len_(this._.payload)),
+            "length"
+            / Rebuild(
+                Int16ul, lambda ctx: len(ctx._.payload) if "payload" in ctx._ else 0
+            ),
             "message_type" / Default(IPMessageType, 0x03),
             "flags"
             / BitStruct(
@@ -91,8 +93,6 @@ IPMessageRequest = Struct(
                 "bit3" / Default(Flag, False),
                 "upload_download" / Default(Flag, False),
                 "encrypt" / Default(Flag, True),
-                # 8 - installer mode (4 in other)
-                # 1 | 8 | 16 | 64
             ),
             "command" / Default(IPMessageCommand, 0x00),
             "sub_command" / Default(Int8ub, 0x00),
@@ -105,10 +105,13 @@ IPMessageRequest = Struct(
         b"\xee",
     ),
     "payload"
-    / IfThenElse(
-        this.header.flags.encrypt,
-        EncryptionAdapter(Aligned(16, GreedyBytes, b"\xee")),
-        Bytes(this.header.length),
+    / Default(
+        IfThenElse(
+            this.header.flags.encrypt,
+            EncryptionAdapter(Aligned(16, GreedyBytes, b"\xee")),
+            Bytes(this.header.length),
+        ),
+        b"",
     ),
 )
 
@@ -119,7 +122,10 @@ IPMessageResponse = Struct(
         16,
         Struct(
             "sof" / Const(0xAA, Int8ub),
-            "length" / Rebuild(Int16ul, len_(this._.payload)),
+            "length"
+            / Rebuild(
+                Int16ul, lambda ctx: len(ctx._.payload) if "payload" in ctx._ else 0
+            ),
             "message_type" / Default(IPMessageType, 0x01),
             "flags"
             / BitStruct(
@@ -141,9 +147,12 @@ IPMessageResponse = Struct(
         b"\xee",
     ),
     "payload"
-    / IfThenElse(
-        this.header.flags.encrypt,
-        EncryptionAdapter(Aligned(16, GreedyBytes, b"\xee")),
-        Bytes(this.header.length),
+    / Default(
+        IfThenElse(
+            this.header.flags.encrypt,
+            EncryptionAdapter(Aligned(16, GreedyBytes, b"\xee")),
+            Bytes(this.header.length),
+        ),
+        b"",
     ),
 )

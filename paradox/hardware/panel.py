@@ -11,8 +11,8 @@ from construct import Construct, Container, EnumIntegerString
 from paradox.config import config as cfg
 from paradox.lib.utils import construct_free, sanitize_key
 
-from . import parsers
 from ..lib import ps
+from . import parsers
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -336,7 +336,7 @@ class Panel:
         try:
             res = parser.parse(mvars.data)
             if cfg.LOGGING_DUMP_MESSAGES:
-                logger.debug(f"Status parsed({mvars.address}): {res}", )
+                logger.debug(f"Status parsed({mvars.address}): {res}")
             return res
         except:
             logger.exception(
