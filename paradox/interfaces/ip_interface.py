@@ -107,6 +107,8 @@ class ClientConnection:
                     message_type=IPMessageType.ip_response,
                     command=in_message.header.command,
                     flags=Container(encrypt=in_message.header.flags.encrypt),
+                    sb=3,
+                    wt=0
                 )
             )
 
@@ -127,7 +129,7 @@ class ClientConnection:
                                 hardware_version=0,
                                 ip_firmware_major=0,
                                 ip_firmware_minor=0,
-                                ip_module_serial=b"\x00\x00\x00\x00",
+                                ip_module_serial=b"\x71\x00\x00\x00",
                             )
                         )
                         status = "closing_connection"
@@ -170,10 +172,9 @@ class ClientConnection:
                     in_message.header.command
                     == IPMessageCommand.upload_download_disconnection
                 ):
-                    out_message_container.header.flags.upload_download = True
+                    out_message_container.header.flags.installer_mode = True
                     out_message_container.header.flags.neware = True
                     out_message_container.header.flags.live_events = True
-                    out_message_container.header.flags.keep_alive = True
                     out_message_container.payload = (
                         b"\x01" if status == "closing_connection" else b"\x00"
                     )

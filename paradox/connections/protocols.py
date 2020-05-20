@@ -181,6 +181,8 @@ class IPConnectionProtocol(ConnectionProtocol):
                     length=len(message),
                     message_type=IPMessageType.serial_passthrough_request,
                     command=IPMessageCommand.passthrough,
+                    wt=100,
+                    cryptor_code=1
                 ),
                 payload=message,
             ),

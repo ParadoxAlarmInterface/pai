@@ -88,7 +88,7 @@ IPMessageRequest = Struct(
                 "bit8" / Default(Flag, False),
                 "keep_alive" / Default(Flag, False),
                 "live_events" / Default(Flag, False),
-                "bit5" / Default(Flag, False),
+                "neware" / Default(Flag, False),
                 "installer_mode" / Default(Flag, False),
                 "bit3" / Default(Flag, False),
                 "upload_download" / Default(Flag, False),
@@ -99,7 +99,7 @@ IPMessageRequest = Struct(
             "wt" / Default(Int8ub, 0x00),  # WT - 14
             "sb" / Default(Int8ub, 0x00),  # SB: 0
             "cryptor_code" / Default(Int8ub, 0x00),
-            "not_used" / Padding(1),
+            "_not_used" / Padding(1),
             "sequence_id" / Default(Int8ub, 0x00),
         ),
         b"\xee",

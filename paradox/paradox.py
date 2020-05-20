@@ -357,10 +357,10 @@ class Paradox:
             if attempt >= 2:  # second and further attempts
                 logger.debug("Request retry (attempt %d/%d)", attempt, retries)
 
-            t1 = time.time()
-            result = "unknown"
-            try:
-                async with self.request_lock:
+            async with self.request_lock:
+                t1 = time.time()
+                result = "unknown"
+                try:
                     if message is not None:
                         self.connection.write(message)
 
@@ -385,19 +385,19 @@ class Paradox:
 
                         result = "ok"
                         return reply
-            except asyncio.TimeoutError:
-                result = "timeout"
-                if attempt == retries:
+                except asyncio.TimeoutError:
+                    result = "timeout"
+                    if attempt == retries:
+                        raise
+                except ConnectionError:
+                    result = "connection error"
                     raise
-            except ConnectionError:
-                result = "connection error"
-                raise
-            except:
-                result = "exception"
-                logger.exception("Unexpected exception during send_wait")
-                raise
-            finally:
-                logger.debug("send/receive %s in %.4f s", result, time.time() - t1)
+                except:
+                    result = "exception"
+                    logger.exception("Unexpected exception during send_wait")
+                    raise
+                finally:
+                    logger.debug("send/receive %s in %.4f s", result, time.time() - t1)
 
             attempt += 1
 

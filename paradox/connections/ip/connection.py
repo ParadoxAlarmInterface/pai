@@ -270,7 +270,7 @@ class IPConnection(Connection):
             self._protocol.key = response.key
 
             # F2
-            logger.debug("Sending keep alive")
+            logger.debug("Sending keep alive request")
             msg = IPMessageRequest.build(
                 dict(header=dict(command=IPMessageCommand.keep_alive)),
                 password=self.key,
@@ -278,7 +278,7 @@ class IPConnection(Connection):
             self._protocol.send_raw(msg)
             message_payload = await self.wait_for_raw_message()
             logger.debug(
-                "Keep alive answer: {}".format(binascii.hexlify(message_payload))
+                "Keep alive response: {}".format(binascii.hexlify(message_payload))
             )
 
             # # F4
@@ -290,18 +290,19 @@ class IPConnection(Connection):
             # logger.debug("F4 answer: {}".format(binascii.hexlify(message_payload)))
 
             # F3
-            logger.debug("Sending upload_download_connection")
+            logger.debug("Sending upload download connection request")
             msg = IPMessageRequest.build(
                 dict(header=dict(command=IPMessageCommand.upload_download_connection,)),
                 password=self.key,
+                cryptor_code=1
             )
             self._protocol.send_raw(msg)
             message_payload = await self.wait_for_raw_message()
 
-            # logger.debug("F3 answer: {}".format(binascii.hexlify(message_payload)))
+            logger.debug("Upload download connection response: {}".format(binascii.hexlify(message_payload)))
 
             # F8
-            logger.debug("Sending toggle keep alive")
+            logger.debug("Sending toggle keep alive request")
             payload = binascii.unhexlify(
                 "0a500080000000000000000000000000000000000000000000000000000000000000000000d0"
             )
@@ -315,7 +316,7 @@ class IPConnection(Connection):
             self._protocol.send_raw(msg)
             message_payload = await self.wait_for_raw_message()
             logger.debug(
-                "Toggle keep alive answer: {}".format(binascii.hexlify(message_payload))
+                "Toggle keep alive response: {}".format(binascii.hexlify(message_payload))
             )
 
             logger.info("Session Established with IP Module")
