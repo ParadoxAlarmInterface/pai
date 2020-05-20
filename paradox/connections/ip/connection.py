@@ -238,7 +238,8 @@ class IPConnection(Connection):
                     header=dict(
                         command=IPMessageCommand.connect,
                         # sub_command=3,
-                        sequence_id=1,
+                        flags=dict(installer_mode=True),
+                        cryptor_code=1,
                     ),
                     payload=self.password,
                 ),
@@ -272,7 +273,14 @@ class IPConnection(Connection):
             # F2
             logger.debug("Sending keep alive request")
             msg = IPMessageRequest.build(
-                dict(header=dict(command=IPMessageCommand.keep_alive)),
+                dict(
+                    header=dict(
+                        command=IPMessageCommand.keep_alive,
+                        flags=dict(installer_mode=True),
+                        cryptor_code=1,
+                    ),
+                    payload=b"\x00\x00\x00\x00",
+                ),
                 password=self.key,
             )
             self._protocol.send_raw(msg)
@@ -292,14 +300,24 @@ class IPConnection(Connection):
             # F3
             logger.debug("Sending upload download connection request")
             msg = IPMessageRequest.build(
-                dict(header=dict(command=IPMessageCommand.upload_download_connection,)),
+                dict(
+                    header=dict(
+                        command=IPMessageCommand.upload_download_connection,
+                        flags=dict(installer_mode=True),
+                        cryptor_code=1,
+                    )
+                ),
                 password=self.key,
-                cryptor_code=1
+                cryptor_code=1,
             )
             self._protocol.send_raw(msg)
             message_payload = await self.wait_for_raw_message()
 
-            logger.debug("Upload download connection response: {}".format(binascii.hexlify(message_payload)))
+            logger.debug(
+                "Upload download connection response: {}".format(
+                    binascii.hexlify(message_payload)
+                )
+            )
 
             # F8
             logger.debug("Sending toggle keep alive request")
@@ -308,7 +326,11 @@ class IPConnection(Connection):
             )
             msg = IPMessageRequest.build(
                 dict(
-                    header=dict(command=IPMessageCommand.toggle_keep_alive,),
+                    header=dict(
+                        command=IPMessageCommand.toggle_keep_alive,
+                        flags=dict(installer_mode=True),
+                        cryptor_code=1,
+                    ),
                     payload=payload,
                 ),
                 password=self.key,
@@ -316,7 +338,9 @@ class IPConnection(Connection):
             self._protocol.send_raw(msg)
             message_payload = await self.wait_for_raw_message()
             logger.debug(
-                "Toggle keep alive response: {}".format(binascii.hexlify(message_payload))
+                "Toggle keep alive response: {}".format(
+                    binascii.hexlify(message_payload)
+                )
             )
 
             logger.info("Session Established with IP Module")

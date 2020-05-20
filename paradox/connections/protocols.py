@@ -180,9 +180,10 @@ class IPConnectionProtocol(ConnectionProtocol):
                 header=dict(
                     length=len(message),
                     message_type=IPMessageType.serial_passthrough_request,
+                    flags=dict(installer_mode=True),
                     command=IPMessageCommand.passthrough,
                     wt=100,
-                    cryptor_code=1
+                    cryptor_code=1,
                 ),
                 payload=message,
             ),

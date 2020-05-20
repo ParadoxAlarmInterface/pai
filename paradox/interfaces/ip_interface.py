@@ -108,7 +108,7 @@ class ClientConnection:
                     command=in_message.header.command,
                     flags=Container(encrypt=in_message.header.flags.encrypt),
                     sb=3,
-                    wt=0
+                    wt=0,
                 )
             )
 
