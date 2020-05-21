@@ -51,7 +51,8 @@ class PayloadParser:
                     self.panel = create_panel(None, parsed_payload)
                 if parsed_payload.fields.value.po.command == 5:  # eeprom/ram read
                     if (
-                        parsed_payload.fields.value.control.ram_access
+                        "control" in parsed_payload.fields.value
+                        and parsed_payload.fields.value.control.ram_access
                         and parsed_payload.fields.value.control._eeprom_address_bits
                         == 0
                         and parsed_payload.fields.value.bus_address == 0

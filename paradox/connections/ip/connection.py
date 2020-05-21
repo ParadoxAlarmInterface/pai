@@ -307,8 +307,7 @@ class IPConnection(Connection):
                         cryptor_code=1,
                     )
                 ),
-                password=self.key,
-                cryptor_code=1,
+                password=self.key
             )
             self._protocol.send_raw(msg)
             message_payload = await self.wait_for_raw_message()

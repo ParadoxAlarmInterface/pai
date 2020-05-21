@@ -15,7 +15,7 @@ def test_IPMessageRequest_defaults():
     assert data.header.flags.encrypt is True
     assert data.header.flags.installer_mode is False
     assert data.header.cryptor_code == 0
-    assert data.header.sequence_id == 0
+    assert data.header.sequence_id == 0xee
     assert data.header.command == "passthrough"
     assert data.header.wt == 0
     assert data.header.sb == 0
