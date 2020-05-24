@@ -1,6 +1,6 @@
 from time import time
 
-from paradox.lib.crypto import decrypt, encrypt, shift_row
+from paradox.lib.crypto import decrypt, encrypt, shift_row, inv_mix_column, mix_column
 
 # from Crypto import Random
 # from Crypto.Cipher import AES
@@ -12,13 +12,28 @@ password = b"test123456"
 
 
 def test_shift_row():
-    for i in range(10000):
-        a = bytearray(b"\x93 \xa0\x88n\xbe[\xde\xf0}\xb8=\xfe\t\x8b\xb8")
+    a = bytearray(b"\x93 \xa0\x88n\xbe[\xde\xf0}\xb8=\xfe\t\x8b\xb8")
 
-        shift_row(a, False)
+    shift_row(a, False)
 
-        assert a == b"\x93 \xa0\x88\xbe[\xden\xb8=\xf0}\xb8\xfe\t\x8b"
+    assert a == b"\x93 \xa0\x88\xbe[\xden\xb8=\xf0}\xb8\xfe\t\x8b"
 
+
+def test_mix_column():
+    a = bytearray(b'\x93 \xa0\x88\xbe[\xden\xb8=\xf0}\xb8\xfe\t\x8b')
+
+    mix_column(a)
+
+    assert a == bytearray(b'\xe4n\xdbO\x9f/\x05X\x95\x18\x9e\x9a\xc3\xe1\xc7\x9d')
+
+
+def test_mix_column_inv():
+    for i in range(100000):
+        a = bytearray(b'\xe4n\xdbO\x9f/\x05X\x95\x18\x9e\x9a\xc3\xe1\xc7\x9d')
+
+        inv_mix_column(a)
+
+        assert a == bytearray(b'\x93 \xa0\x88\xbe[\xden\xb8=\xf0}\xb8\xfe\t\x8b')
 
 def test_encrypt():
     e = encrypt(txt, password)
