@@ -28,12 +28,11 @@ def test_mix_column():
 
 
 def test_mix_column_inv():
-    for i in range(100000):
-        a = bytearray(b'\xe4n\xdbO\x9f/\x05X\x95\x18\x9e\x9a\xc3\xe1\xc7\x9d')
+    a = bytearray(b'\xe4n\xdbO\x9f/\x05X\x95\x18\x9e\x9a\xc3\xe1\xc7\x9d')
 
-        inv_mix_column(a)
+    inv_mix_column(a)
 
-        assert a == bytearray(b'\x93 \xa0\x88\xbe[\xden\xb8=\xf0}\xb8\xfe\t\x8b')
+    assert a == bytearray(b'\x93 \xa0\x88\xbe[\xden\xb8=\xf0}\xb8\xfe\t\x8b')
 
 def test_encrypt():
     e = encrypt(txt, password)
