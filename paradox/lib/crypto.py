@@ -1,5 +1,7 @@
 # fmt: off
-xtimetbl = [
+from paradox.lib.utils import memoized
+
+xtimetbl = (
     0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
     0x10, 0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e,
     0x20, 0x22, 0x24, 0x26, 0x28, 0x2a, 0x2c, 0x2e,
@@ -32,9 +34,9 @@ xtimetbl = [
     0xcb, 0xc9, 0xcf, 0xcd, 0xc3, 0xc1, 0xc7, 0xc5,
     0xfb, 0xf9, 0xff, 0xfd, 0xf3, 0xf1, 0xf7, 0xf5,
     0xeb, 0xe9, 0xef, 0xed, 0xe3, 0xe1, 0xe7, 0xe5
-]
+)
 
-Logtable = [
+Logtable = (
     0, 0, 25, 1, 50, 2, 26, 198, 75, 199, 27, 104, 51, 238, 223, 3,
     100, 4, 224, 14, 52, 141, 129, 239, 76, 113, 8, 200, 248, 105, 28,
     193, 125, 194, 29, 181, 249, 185, 39, 106, 77, 228, 166, 114, 154, 201,
@@ -52,9 +54,9 @@ Logtable = [
     60, 65, 162, 109, 71, 20, 42, 158, 93, 86, 242, 211, 171, 68, 17,
     146, 217, 35, 32, 46, 137, 180, 124, 184, 38, 119, 153, 227, 165, 103,
     74, 237, 222, 197, 49, 254, 24, 13, 99, 140, 128, 192, 247, 112, 7,
-]
+)
 
-Alogtable = [
+Alogtable = (
     1, 3, 5, 15, 17, 51, 85, 255, 26, 46, 114, 150, 161, 248, 19,
     53, 95, 225, 56, 72, 216, 115, 149, 164, 247, 2, 6, 10, 30, 34,
     102, 170, 229, 52, 92, 228, 55, 89, 235, 38, 106, 190, 217, 112, 144,
@@ -72,9 +74,9 @@ Alogtable = [
     74, 222, 121, 139, 134, 145, 168, 227, 62, 66, 198, 81, 243, 14, 18,
     54, 90, 238, 41, 123, 141, 140, 143, 138, 133, 148, 167, 242, 13, 23,
     57, 75, 221, 124, 132, 151, 162, 253, 28, 36, 108, 180, 199, 82, 246, 1,
-]
+)
 
-S = [
+S = (
     99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171,
     118, 202, 130, 201, 125, 250, 89, 71, 240, 173, 212, 162, 175, 156, 164,
     114, 192, 183, 253, 147, 38, 54, 63, 247, 204, 52, 165, 229, 241, 113,
@@ -93,9 +95,9 @@ S = [
     248, 152, 17, 105, 217, 142, 148, 155, 30, 135, 233, 206, 85, 40, 223,
     140, 161, 137, 13, 191, 230, 66, 104, 65, 153, 45, 15, 176, 84, 187,
     22,
-]
+)
 
-Si = [
+Si = (
     82, 9, 106, 213, 48, 54, 165, 56, 191, 64, 163, 158, 129, 243, 215,
     251, 124, 227, 57, 130, 155, 47, 255, 135, 52, 142, 67, 68, 196, 222,
     233, 203, 84, 123, 148, 50, 166, 194, 35, 61, 238, 76, 149, 11, 66,
@@ -114,25 +116,25 @@ Si = [
     224, 59, 77, 174, 42, 245, 176, 200, 235, 187, 60, 131, 83, 153, 97,
     23, 43, 4, 126, 186, 119, 214, 38, 225, 105, 20, 99, 85, 33, 12,
     125,
-]
+)
 
-iG = [
-    [0x0E, 0x09, 0x0D, 0x0B],
-    [0x0B, 0x0E, 0x09, 0x0D],
-    [0x0D, 0x0B, 0x0E, 0x09],
-    [0x09, 0x0D, 0x0B, 0x0E],
-]
+iG = (
+    (0x0E, 0x09, 0x0D, 0x0B),
+    (0x0B, 0x0E, 0x09, 0x0D),
+    (0x0D, 0x0B, 0x0E, 0x09),
+    (0x09, 0x0D, 0x0B, 0x0E),
+)
 
-rcon = [
+rcon = (
     0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8,
     0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4,
-    0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91]
+    0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91)
 
-shifts = [
-    [[0, 0], [1, 3], [2, 2], [3, 1]],
-    [[0, 0], [1, 5], [2, 4], [3, 3]],
-    [[0, 0], [1, 7], [3, 5], [4, 4]],
-]
+shifts = (
+    ((0, 0), (1, 3), (2, 2), (3, 1)),
+    ((0, 0), (1, 5), (2, 4), (3, 3)),
+    ((0, 0), (1, 7), (3, 5), (4, 4)),
+)
 # fmt: on
 
 
@@ -144,203 +146,166 @@ def mul(a, b):
 
 
 def key_addition(a, rk):
-    i = 0
-    while i < 16:
+    """
+
+    :param a: 16 bytes
+    :param rk: 16 bytes
+    :return: None. Changes a in place
+    """
+    for i in range(16):
         a[i] ^= rk[i]
-        i += 1
 
 
-def shift_row(a, d):
-    tmp = [0, 0, 0, 0]
-
-    i = 1
-    while i < 4:
-        j = 0
-        while j < 4:
-            tmp[j] = a[i * 4 + (j + shifts[0][i][d]) % 4]
-            j += 1
-
-        j = 0
-        while j < 4:
-            a[i * 4 + j] = tmp[j]
-            j += 1
-
-        i += 1
+# iterate over the 4 rows and call shiftRow() with that row
+def shift_row(state, isInv):
+    for nbr in range(4):
+        statePointer = nbr * 4
+        for _ in range(nbr):
+            # each iteration shifts the row to the left by 1
+            if isInv:
+                state[statePointer : statePointer + 4] = (
+                    state[statePointer + 3 : statePointer + 4]
+                    + state[statePointer : statePointer + 3]
+                )
+            else:
+                state[statePointer : statePointer + 4] = (
+                    state[statePointer + 1 : statePointer + 4]
+                    + state[statePointer : statePointer + 1]
+                )
 
 
 def s_box(a, box):
-    i = 0
-    while i < 16:
+    for i in range(16):
         a[i] = box[a[i]]
-        i += 1
 
 
 def mix_column(a):
-    b = [0] * 4
+    b = bytearray(4)
 
-    j = 0
-    while j < 4:
+    for j in range(4):
         tmp = a[j] ^ a[j + 4] ^ a[j + 8] ^ a[j + 12]
-        i = 0
-        while i < 4:
+        for i in range(4):
             b[i] = a[i * 4 + j]
-            i += 1
 
         b[0] ^= xtimetbl[a[j] ^ a[j + 4]] ^ tmp
         b[1] ^= xtimetbl[a[j + 4] ^ a[j + 8]] ^ tmp
         b[2] ^= xtimetbl[a[j + 8] ^ a[j + 12]] ^ tmp
         b[3] ^= xtimetbl[a[j + 12] ^ a[j]] ^ tmp
 
-        i = 0
-        while i < 4:
+        for i in range(4):
             a[i * 4 + j] = b[i]
-            i += 1
-
-        j += 1
 
 
 def inv_mix_column(a):
     b = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
 
-    j = 0
-    while j < 4:
-        i = 0
-        while i < 4:
+    for j in range(4):
+        for i in range(4):
             b[i][j] = (
                 mul(0xE, a[i * 4 + j])
                 ^ mul(0xB, a[((i + 1) % 4) * 4 + j])
                 ^ mul(0xD, a[((i + 2) % 4) * 4 + j])
                 ^ mul(0x9, a[((i + 3) % 4) * 4 + j])
             )
-            i += 1
-        j += 1
 
-    i = 0
-    while i < 4:
-        j = 0
-        while j < 4:
+    for i in range(4):
+        for j in range(4):
             a[i * 4 + j] = b[i][j]
-            j += 1
-
-        i += 1
 
 
-def keygen(k, W):
-    temp = [0, 0, 0, 0]
+@memoized
+def keygen(key):
+    if len(key) % 32 != 0:
+        key = key + b"\xee" * (32 - (len(key) % 32))
 
-    i = 0
-    while i < 4:
-        j = 0
-        while j < 4:
-            W[j * 4 + i] = k[i * 4 + j]
-            j += 1
-        j = 0
-        while j < 4:
-            W[j * 4 + i + 16] = k[i * 4 + j + 16]
-            j += 1
-        i += 1
+    W = bytearray(240)
 
-    i = 8
-    while i < 60:
-        j = 0
-        while j < 4:
+    temp = bytearray(4)
+
+    for i in range(4):
+        for j in range(4):
+            W[j * 4 + i] = key[i * 4 + j]
+        for j in range(4):
+            W[j * 4 + i + 16] = key[i * 4 + j + 16]
+
+    for i in range(8, 60):
+        for j in range(4):
             temp[j] = W[(((i - 1) & 0xFC) << 2) + ((i - 1) & 0x03) + j * 4]
-            j += 1
         if i % 8 == 0:
-            j = 0
-            while j < 4:
+            for j in range(4):
                 temp[j] = S[temp[j]]
-                j += 1
             tmp = temp[0]
 
-            j = 1
-            while j < 4:
+            for j in range(1, 4):
                 temp[j - 1] = temp[j]
-                j += 1
 
             temp[3] = tmp
             temp[0] ^= rcon[int(i / 8 - 1)]
 
         elif i % 8 == 4:
-            j = 0
-            while j < 4:
+            for j in range(4):
                 temp[j] = S[temp[j]]
-                j += 1
 
-        j = 0
-        while j < 4:
+        for j in range(4):
             W[((i & 0xFC) << 2) + (i & 0x03) + j * 4] = (
                 W[(((i - 8) & 0xFC) << 2) + ((i - 8) & 0x03) + j * 4] ^ temp[j]
             )
-            j += 1
-        i += 1
+
+    return W
 
 
-def encrypt(ctxt, key):
-    rk = [0] * 240
-    dtxt = []
-    if len(key) % 32 != 0:
-        key = list(key + b"\xee" * (32 - (len(key) % 32)))
+def encrypt(ctxt: bytes, key: bytes) -> bytes:
+    rk = keygen(key)
+
+    dtxt = bytearray()
+
     if len(ctxt) % 16 != 0:
-        ctxt = list(ctxt + b"\xee" * (16 - (len(ctxt) % 16)))
+        ctxt = ctxt + b"\xee" * (16 - (len(ctxt) % 16))
 
-    keygen(key, rk)
+    ctxt = bytearray(ctxt)
 
-    i = 0
-    ctxt = list(ctxt)
-
-    while i < len(ctxt) / 16:
-        a = ctxt[i * 16 : (i + 1) * 16].copy()
+    for i in range(len(ctxt) // 16):
+        a = ctxt[i * 16 : (i + 1) * 16]
         ROUNDS = 14
         key_addition(a, rk[:16])
 
-        r = 1
-        while r < ROUNDS:
+        for r in range(1, ROUNDS):
             s_box(a, S)
             shift_row(a, 0)
             mix_column(a)
             key_addition(a, rk[r * 16 : (r + 1) * 16])
-
-            r += 1
 
         s_box(a, S)
         shift_row(a, 0)
         key_addition(a, rk[16 * ROUNDS : (ROUNDS + 1) * 16])
 
         dtxt.extend(a)
-        i = i + 1
 
     return bytes(dtxt)
 
 
-def decrypt(ctxt, key):
-    rk = [0] * 240
-    dtxt = []
-    if len(key) % 32:
-        key = list(key + b"\xee" * (32 - (len(key) % 32)))
+def decrypt(ctxt: bytes, key: bytes) -> bytes:
+    rk = keygen(key)
 
-    keygen(key, rk)
+    dtxt = bytearray()
 
-    ctxt = list(ctxt)
-    i = 0
-    while i < len(ctxt) / 16:
+    ctxt = bytearray(ctxt)
+
+    for i in range(len(ctxt) // 16):
         ROUNDS = 14
-        a = ctxt[i * 16 : (i + 1) * 16].copy()
+        a = ctxt[i * 16 : (i + 1) * 16]
         key_addition(a, rk[ROUNDS * 16 : (ROUNDS + 1) * 16])
         s_box(a, Si)
         shift_row(a, 1)
 
-        r = ROUNDS - 1
-        while r > 0:
+        for r in range(ROUNDS - 1, 0, -1):
             key_addition(a, rk[r * 16 : (r + 1) * 16])
             inv_mix_column(a)
             s_box(a, Si)
             shift_row(a, 1)
-            r -= 1
 
         key_addition(a, rk)
 
         dtxt.extend(a)
-        i += 1
 
     return bytes(dtxt)
