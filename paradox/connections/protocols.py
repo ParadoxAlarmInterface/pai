@@ -183,7 +183,7 @@ class IPConnectionProtocol(ConnectionProtocol):
                     flags=dict(installer_mode=True),
                     command=IPMessageCommand.passthrough,
                     wt=100,
-                    cryptor_code=1,
+                    cryptor_code="aes_256_ecb",
                 ),
                 payload=message,
             ),

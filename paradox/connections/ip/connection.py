@@ -239,7 +239,7 @@ class IPConnection(Connection):
                         command=IPMessageCommand.connect,
                         # sub_command=3,
                         flags=dict(installer_mode=True),
-                        cryptor_code=1,
+                        cryptor_code="aes_256_ecb",
                     ),
                     payload=self.password,
                 ),
@@ -277,7 +277,7 @@ class IPConnection(Connection):
                     header=dict(
                         command=IPMessageCommand.keep_alive,
                         flags=dict(installer_mode=True),
-                        cryptor_code=1,
+                        cryptor_code="aes_256_ecb",
                     ),
                     payload=b"\x00\x00\x00\x00",
                 ),
@@ -304,10 +304,10 @@ class IPConnection(Connection):
                     header=dict(
                         command=IPMessageCommand.upload_download_connection,
                         flags=dict(installer_mode=True),
-                        cryptor_code=1,
+                        cryptor_code="aes_256_ecb",
                     )
                 ),
-                password=self.key
+                password=self.key,
             )
             self._protocol.send_raw(msg)
             message_payload = await self.wait_for_raw_message()
@@ -328,7 +328,7 @@ class IPConnection(Connection):
                     header=dict(
                         command=IPMessageCommand.toggle_keep_alive,
                         flags=dict(installer_mode=True),
-                        cryptor_code=1,
+                        cryptor_code="aes_256_ecb",
                     ),
                     payload=payload,
                 ),

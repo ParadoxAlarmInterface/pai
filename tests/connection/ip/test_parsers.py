@@ -14,8 +14,8 @@ def test_IPMessageRequest_defaults():
     assert data.header.length == len(test_payload)
     assert data.header.flags.encrypt is True
     assert data.header.flags.installer_mode is False
-    assert data.header.cryptor_code == 0
-    assert data.header.sequence_id == 0xee
+    assert data.header.cryptor_code == "none"
+    assert data.header.sequence_id == 0xEE
     assert data.header.command == "passthrough"
     assert data.header.wt == 0
     assert data.header.sb == 0
@@ -27,11 +27,11 @@ def test_IPMessageRequest_cryptor_sequence():
     test_payload = b"abcdefg"
 
     a = IPMessageRequest.build(
-        dict(payload=test_payload, header=dict(sequence_id=1, cryptor_code=2)),
+        dict(payload=test_payload, header=dict(sequence_id=1, cryptor_code="none")),
         password=key,
     )
     print(a)
-    assert a[9] == 2
+    assert a[9] == 0
     assert a[11] == 1
 
     data = IPMessageRequest.parse(a, password=key)

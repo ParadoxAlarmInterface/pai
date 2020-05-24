@@ -98,9 +98,10 @@ IPMessageRequest = Struct(
             "sub_command" / Default(Int8ub, 0x00),
             "wt" / Default(Int8ub, 0x00),  # WT - 14
             "sb" / Default(Int8ub, 0x00),  # SB: 0
-            "cryptor_code" / Default(Int8ub, 0x00),
-            "_not_used" / Padding(1, b'\xee'),
-            "sequence_id" / Default(Int8ub, 0xee),
+            "cryptor_code"
+            / Default(Enum(Int8ub, none=0, aes_256_ecb=1, old_module=0xEE), "none"),
+            "_not_used" / Padding(1, b"\xee"),
+            "sequence_id" / Default(Int8ub, 0xEE),
         ),
         b"\xee",
     ),
@@ -142,7 +143,8 @@ IPMessageResponse = Struct(
             "sub_command" / Default(Int8ub, 0x00),
             "wt" / Default(Int8ub, 0x00),  # WT
             "sb" / Default(Int8ub, 0x03),  # SB
-            "cryptor_code" / Default(Int8ub, 0xee),
+            "cryptor_code"
+            / Default(Enum(Int8ub, none=0, aes_256_ecb=1, old_module=0xEE), "none"),
         ),
         b"\xee",
     ),
