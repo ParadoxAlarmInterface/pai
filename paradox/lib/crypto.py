@@ -143,18 +143,25 @@ si2 = 2
 si3 = 1
     
 @memoized
-def keygen(k, W):
+def keygen(k):
+    rk = [0] * 240
+
+    k = list(k)
+    
+    if len(k) % 32:
+        k.extend([0xee] * (32 - (len(k) % 32)))
+
     temp = [0, 0, 0, 0]
 
     i = 0
     while i < 4:
         j = 0
         while j < 4:
-            W[j * 4 + i] = k[i * 4 + j]
+            rk[j * 4 + i] = k[i * 4 + j]
             j += 1
         j = 0
         while j < 4:
-            W[j * 4 + i + 16] = k[i * 4 + j + 16]
+            rk[j * 4 + i + 16] = k[i * 4 + j + 16]
             j += 1
         i += 1
 
@@ -162,7 +169,7 @@ def keygen(k, W):
     while i < 60:
         j = 0
         while j < 4:
-            temp[j] = W[(((i - 1) & 0xFC) << 2) + ((i - 1) & 0x03) + j * 4]
+            temp[j] = rk[(((i - 1) & 0xFC) << 2) + ((i - 1) & 0x03) + j * 4]
             j += 1
         if i % 8 == 0:
             j = 0
@@ -187,12 +194,13 @@ def keygen(k, W):
 
         j = 0
         while j < 4:
-            W[((i & 0xFC) << 2) + (i & 0x03) + j * 4] = (
-                W[(((i - 8) & 0xFC) << 2) + ((i - 8) & 0x03) + j * 4] ^ temp[j]
+            rk[((i & 0xFC) << 2) + (i & 0x03) + j * 4] = (
+                rk[(((i - 8) & 0xFC) << 2) + ((i - 8) & 0x03) + j * 4] ^ temp[j]
             )
             j += 1
         i += 1
 
+    return rk
     
 def encrypt(ctxt, key):
     dtxt = []
@@ -202,12 +210,7 @@ def encrypt(ctxt, key):
     if len(ctxt) % 16 != 0:
         ctxt.extend([0xee] * (16 - (len(ctxt) % 16)))
     
-    rk = [0] * 240
-
-    if len(key) % 32:
-        keygen(list(key).extend([0xee] * (32 - (len(key) % 32))), rk)
-    else:
-        keygen(key, rk)
+    rk = keygen(key)
 
     blocks = len(ctxt) // 16
 
@@ -365,13 +368,8 @@ def encrypt(ctxt, key):
 def decrypt(ctxt, key):
     dtxt = []
 
-    rk = [0] * 240
-
-    if len(key) % 32:
-        keygen(list(key).extend([0xee] * (32 - (len(key) % 32))), rk)
-    else:
-        keygen(key, rk)
-
+    rk = keygen(key)
+    
     ctxt = list(ctxt)
     
     blocks = len(ctxt) // 16
