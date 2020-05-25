@@ -130,182 +130,448 @@ rcon = (
     0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4,
     0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91)
 
-shifts = (
-    ((0, 0), (1, 3), (2, 2), (3, 1)),
-    ((0, 0), (1, 5), (2, 4), (3, 3)),
-    ((0, 0), (1, 7), (3, 5), (4, 4)),
-)
-# fmt: on
+# Shifts
+s0 = 0
+s1 = 1
+s2 = 2
+s3 = 3
 
-
-def mul(a, b):
-    if a and b:
-        return Alogtable[(Logtable[a] + Logtable[b]) % 255]
-    else:
-        return 0
-
-
-def key_addition(a, rk):
-    """
-
-    :param a: 16 bytes
-    :param rk: 16 bytes
-    :return: None. Changes a in place
-    """
-    for i in range(16):
-        a[i] ^= rk[i]
-
-
-# iterate over the 4 rows and call shiftRow() with that row
-def shift_row(state, isInv):
-    for nbr in range(4):
-        statePointer = nbr * 4
-        for _ in range(nbr):
-            # each iteration shifts the row to the left by 1
-            if isInv:
-                state[statePointer : statePointer + 4] = (
-                    state[statePointer + 3 : statePointer + 4]
-                    + state[statePointer : statePointer + 3]
-                )
-            else:
-                state[statePointer : statePointer + 4] = (
-                    state[statePointer + 1 : statePointer + 4]
-                    + state[statePointer : statePointer + 1]
-                )
-
-
-def s_box(a, box):
-    for i in range(16):
-        a[i] = box[a[i]]
-
-
-def mix_column(a):
-    b = bytearray(4)
-
-    for j in range(4):
-        tmp = a[j] ^ a[j + 4] ^ a[j + 8] ^ a[j + 12]
-        for i in range(4):
-            b[i] = a[i * 4 + j]
-
-        b[0] ^= xtimetbl[a[j] ^ a[j + 4]] ^ tmp
-        b[1] ^= xtimetbl[a[j + 4] ^ a[j + 8]] ^ tmp
-        b[2] ^= xtimetbl[a[j + 8] ^ a[j + 12]] ^ tmp
-        b[3] ^= xtimetbl[a[j + 12] ^ a[j]] ^ tmp
-
-        for i in range(4):
-            a[i * 4 + j] = b[i]
-
-
-def inv_mix_column(a):
-    b = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
-
-    for j in range(4):
-        for i in range(4):
-            b[i][j] = (
-                mul(0xE, a[i * 4 + j])
-                ^ mul(0xB, a[((i + 1) % 4) * 4 + j])
-                ^ mul(0xD, a[((i + 2) % 4) * 4 + j])
-                ^ mul(0x9, a[((i + 3) % 4) * 4 + j])
-            )
-
-    for i in range(4):
-        for j in range(4):
-            a[i * 4 + j] = b[i][j]
-
-
+# Inv Shifts
+si0 = 0
+si1 = 3
+si2 = 2
+si3 = 1
+    
 @memoized
-def keygen(key):
-    if len(key) % 32 != 0:
-        key = key + b"\xee" * (32 - (len(key) % 32))
+def keygen(k, W):
+    temp = [0, 0, 0, 0]
 
-    W = bytearray(240)
+    i = 0
+    while i < 4:
+        j = 0
+        while j < 4:
+            W[j * 4 + i] = k[i * 4 + j]
+            j += 1
+        j = 0
+        while j < 4:
+            W[j * 4 + i + 16] = k[i * 4 + j + 16]
+            j += 1
+        i += 1
 
-    temp = bytearray(4)
-
-    for i in range(4):
-        for j in range(4):
-            W[j * 4 + i] = key[i * 4 + j]
-        for j in range(4):
-            W[j * 4 + i + 16] = key[i * 4 + j + 16]
-
-    for i in range(8, 60):
-        for j in range(4):
+    i = 8
+    while i < 60:
+        j = 0
+        while j < 4:
             temp[j] = W[(((i - 1) & 0xFC) << 2) + ((i - 1) & 0x03) + j * 4]
+            j += 1
         if i % 8 == 0:
-            for j in range(4):
+            j = 0
+            while j < 4:
                 temp[j] = S[temp[j]]
+                j += 1
             tmp = temp[0]
 
-            for j in range(1, 4):
+            j = 1
+            while j < 4:
                 temp[j - 1] = temp[j]
+                j += 1
 
             temp[3] = tmp
             temp[0] ^= rcon[int(i / 8 - 1)]
 
         elif i % 8 == 4:
-            for j in range(4):
+            j = 0
+            while j < 4:
                 temp[j] = S[temp[j]]
+                j += 1
 
-        for j in range(4):
+        j = 0
+        while j < 4:
             W[((i & 0xFC) << 2) + (i & 0x03) + j * 4] = (
                 W[(((i - 8) & 0xFC) << 2) + ((i - 8) & 0x03) + j * 4] ^ temp[j]
             )
+            j += 1
+        i += 1
 
-    return W
+    
+def encrypt(ctxt, key):
+    dtxt = []
 
-
-def encrypt(ctxt: bytes, key: bytes) -> bytes:
-    rk = keygen(key)
-
-    dtxt = bytearray()
+    ctxt = list(ctxt)
 
     if len(ctxt) % 16 != 0:
-        ctxt = ctxt + b"\xee" * (16 - (len(ctxt) % 16))
+        ctxt.extend([0xee] * (16 - (len(ctxt) % 16)))
+    
+    rk = [0] * 240
 
-    ctxt = bytearray(ctxt)
+    if len(key) % 32:
+        keygen(list(key).extend([0xee] * (32 - (len(key) % 32))), rk)
+    else:
+        keygen(key, rk)
 
-    for i in range(len(ctxt) // 16):
+    blocks = len(ctxt) // 16
+
+    i = 0
+    
+    extend = dtxt.extend
+
+    while i < blocks:
         a = ctxt[i * 16 : (i + 1) * 16]
         ROUNDS = 14
-        key_addition(a, rk[:16])
 
-        for r in range(1, ROUNDS):
-            s_box(a, S)
-            shift_row(a, 0)
-            mix_column(a)
-            key_addition(a, rk[r * 16 : (r + 1) * 16])
+        a = (a[0] ^ rk[0],
+                a[1] ^ rk[1],
+                a[2] ^ rk[2],
+                a[3] ^ rk[3],
+                a[4] ^ rk[4],
+                a[5] ^ rk[5],
+                a[6] ^ rk[6],
+                a[7] ^ rk[7],
+                a[8] ^ rk[8],
+                a[9] ^ rk[9],
+                a[10] ^ rk[10],
+                a[11] ^ rk[11],
+                a[12] ^ rk[12],
+                a[13] ^ rk[13],
+                a[14] ^ rk[14],
+                a[15] ^ rk[15])
 
-        s_box(a, S)
-        shift_row(a, 0)
-        key_addition(a, rk[16 * ROUNDS : (ROUNDS + 1) * 16])
+        r = 1
+        while r < ROUNDS:
+            r16 = r * 16
 
-        dtxt.extend(a)
+            # S BOX
+            a = (
+                S[a[0]], S[a[1]], S[a[2]], S[a[3]], 
+                S[a[4]], S[a[5]], S[a[6]], S[a[7]],
+                S[a[8]], S[a[9]], S[a[10]], S[a[11]],
+                S[a[12]], S[a[13]], S[a[14]], S[a[15]]
+               )
+
+            # Shift Row
+            a = (a[s0 % 4], 
+                    a[(1 + s0) % 4],
+                    a[(2 + s0) % 4],
+                    a[(3 + s0) % 4],
+                    a[4 + s1 % 4],
+                    a[4 + (1 + s1) % 4],
+                    a[4 + (2 + s1) % 4],
+                    a[4 + (3 + s1) % 4],
+                    a[8 + s2 % 4],
+                    a[8 + (1 + s2) % 4],
+                    a[8 + (2 + s2) % 4],
+                    a[8 + (3 + s2) % 4],
+                    a[12 + s3 % 4],
+                    a[12 + (1 + s3) % 4],
+                    a[12 + (2 + s3) % 4],
+                    a[12 + (3 + s3) % 4]
+                    )
+
+            # Mix Column
+            tmp0 = a[0] ^ a[4] ^ a[8] ^ a[12]
+            tmp1 = a[1] ^ a[5] ^ a[9] ^ a[13]
+            tmp2 = a[2] ^ a[6] ^ a[10] ^ a[14]
+            tmp3 = a[3] ^ a[7] ^ a[11] ^ a[15]
+
+            a = (
+                a[0] ^ (xtimetbl[a[0] ^ a[4]] ^ tmp0),
+                a[1] ^ (xtimetbl[a[1] ^ a[5]] ^ tmp1),
+                a[2] ^ (xtimetbl[a[2] ^ a[6]] ^ tmp2),
+                a[3] ^ (xtimetbl[a[3] ^ a[7]] ^ tmp3),
+                a[4] ^ (xtimetbl[a[4] ^ a[8]] ^ tmp0),
+                a[5] ^ (xtimetbl[a[5] ^ a[9]] ^ tmp1),
+                a[6] ^ (xtimetbl[a[6] ^ a[10]] ^ tmp2),
+                a[7] ^ (xtimetbl[a[7] ^ a[11]] ^ tmp3),
+                a[8] ^ (xtimetbl[a[8] ^ a[12]] ^ tmp0),
+                a[9] ^ (xtimetbl[a[9] ^ a[13]] ^ tmp1),
+                a[10] ^ (xtimetbl[a[10] ^ a[14]] ^ tmp2),
+                a[11] ^ (xtimetbl[a[11] ^ a[15]] ^ tmp3),
+                a[12] ^ (xtimetbl[a[12] ^ a[0]] ^ tmp0),
+                a[13] ^ (xtimetbl[a[13] ^ a[1]] ^ tmp1),
+                a[14] ^ (xtimetbl[a[14] ^ a[2]] ^ tmp2),
+                a[15] ^ (xtimetbl[a[15] ^ a[3]] ^ tmp3),
+            )
+
+            # Key Addition
+            a = ( a[0] ^ rk[r16],
+                    a[1] ^ rk[1 + r16],
+                    a[2] ^ rk[2 + r16],
+                    a[3] ^ rk[3 + r16],
+                    a[4] ^ rk[4 + r16],
+                    a[5] ^ rk[5 + r16],
+                    a[6] ^ rk[6 + r16],
+                    a[7] ^ rk[7 + r16],
+                    a[8] ^ rk[8 + r16],
+                    a[9] ^ rk[9 + r16],
+                    a[10] ^ rk[10 + r16],
+                    a[11] ^ rk[11 + r16],
+                    a[12] ^ rk[12 + r16],
+                    a[13] ^ rk[13 + r16],
+                    a[14] ^ rk[14 + r16],
+                    a[15] ^ rk[15 + r16])
+
+            r += 1
+
+        # S BOX
+        a = (
+            S[a[0]], S[a[1]], S[a[2]], S[a[3]], 
+            S[a[4]], S[a[5]], S[a[6]], S[a[7]],
+            S[a[8]], S[a[9]], S[a[10]], S[a[11]],
+            S[a[12]], S[a[13]], S[a[14]], S[a[15]]
+           )
+
+        # Shift Row
+        a = (a[s0 % 4], 
+                a[(1 + s0) % 4],
+                a[(2 + s0) % 4],
+                a[(3 + s0) % 4],
+                a[4 + s1 % 4],
+                a[4 + (1 + s1) % 4],
+                a[4 + (2 + s1) % 4],
+                a[4 + (3 + s1) % 4],
+                a[8 + (s2) % 4],
+                a[8 + (1 + s2) % 4],
+                a[8 + (2 + s2) % 4],
+                a[8 + (3 + s2) % 4],
+                a[12 + (s3) % 4],
+                a[12 + (1 + s3) % 4],
+                a[12 + (2 + s3) % 4],
+                a[12 + (3 + s3) % 4]
+                )
+        
+        # Key addition
+        a = (a[0] ^rk[224],
+            a[1] ^ rk[225],
+            a[2] ^ rk[226],
+            a[3] ^ rk[227],
+            a[4] ^ rk[228],
+            a[5] ^ rk[229],
+            a[6] ^ rk[230],
+            a[7] ^ rk[231],
+            a[8] ^ rk[232],
+            a[9] ^ rk[233],
+            a[10] ^ rk[234],
+            a[11] ^ rk[235],
+            a[12] ^ rk[236],
+            a[13] ^ rk[237],
+            a[14] ^ rk[238],
+            a[15] ^ rk[239])
+
+        extend(a)
+        i = i + 1
 
     return bytes(dtxt)
 
+def decrypt(ctxt, key):
+    dtxt = []
 
-def decrypt(ctxt: bytes, key: bytes) -> bytes:
-    rk = keygen(key)
+    rk = [0] * 240
 
-    dtxt = bytearray()
+    if len(key) % 32:
+        keygen(list(key).extend([0xee] * (32 - (len(key) % 32))), rk)
+    else:
+        keygen(key, rk)
 
-    ctxt = bytearray(ctxt)
+    ctxt = list(ctxt)
+    
+    blocks = len(ctxt) // 16
 
-    for i in range(len(ctxt) // 16):
+    extend = dtxt.extend
+
+    i = 0
+    while i < blocks:
         ROUNDS = 14
         a = ctxt[i * 16 : (i + 1) * 16]
-        key_addition(a, rk[ROUNDS * 16 : (ROUNDS + 1) * 16])
-        s_box(a, Si)
-        shift_row(a, 1)
 
-        for r in range(ROUNDS - 1, 0, -1):
-            key_addition(a, rk[r * 16 : (r + 1) * 16])
-            inv_mix_column(a)
-            s_box(a, Si)
-            shift_row(a, 1)
+        # Key Addition
+        a = (a[0] ^rk[224],
+            a[1] ^ rk[225],
+            a[2] ^ rk[226],
+            a[3] ^ rk[227],
+            a[4] ^ rk[228],
+            a[5] ^ rk[229],
+            a[6] ^ rk[230],
+            a[7] ^ rk[231],
+            a[8] ^ rk[232],
+            a[9] ^ rk[233],
+            a[10] ^ rk[234],
+            a[11] ^ rk[235],
+            a[12] ^ rk[236],
+            a[13] ^ rk[237],
+            a[14] ^ rk[238],
+            a[15] ^ rk[239])
 
-        key_addition(a, rk)
+        # Si Box
+        a = (
+            Si[a[0]], Si[a[1]], Si[a[2]], Si[a[3]], 
+            Si[a[4]], Si[a[5]], Si[a[6]], Si[a[7]],
+            Si[a[8]], Si[a[9]], Si[a[10]], Si[a[11]],
+            Si[a[12]], Si[a[13]], Si[a[14]], Si[a[15]]
+           )
 
-        dtxt.extend(a)
+        # Shift Row
+        a = (a[si0 % 4], 
+                a[(1 + si0) % 4],
+                a[(2 + si0) % 4],
+                a[(3 + si0) % 4],
+                a[4 + si1 % 4],
+                a[4 + (1 + si1) % 4],
+                a[4 + (2 + si1) % 4],
+                a[4 + (3 + si1) % 4],
+                a[8 + (si2) % 4],
+                a[8 + (1 + si2) % 4],
+                a[8 + (2 + si2) % 4],
+                a[8 + (3 + si2) % 4],
+                a[12 + (si3) % 4],
+                a[12 + (1 + si3) % 4],
+                a[12 + (2 + si3) % 4],
+                a[12 + (3 + si3) % 4]
+                )
+
+        r = ROUNDS - 1
+        while r > 0:
+            r16 = r * 16
+            # Key Addition
+            a = (a[0] ^ rk[r16],
+                    a[1] ^ rk[1 + r16],
+                    a[2] ^ rk[2 + r16],
+                    a[3] ^ rk[3 + r16],
+                    a[4] ^ rk[4 + r16],
+                    a[5] ^ rk[5 + r16],
+                    a[6] ^ rk[6 + r16],
+                    a[7] ^ rk[7 + r16],
+                    a[8] ^ rk[8 + r16],
+                    a[9] ^ rk[9 + r16],
+                    a[10] ^ rk[10 + r16],
+                    a[11] ^ rk[11 + r16],
+                    a[12] ^ rk[12 + r16],
+                    a[13] ^ rk[13 + r16],
+                    a[14] ^ rk[14 + r16],
+                    a[15] ^ rk[15 + r16])
+
+
+            # Inv Mix Column
+            lt_e = Logtable[0xE]
+            lt_b = Logtable[0xB]
+            lt_d = Logtable[0xD]
+            lt_9 = Logtable[0x9]
+
+            a = (
+                (Alogtable[(lt_e + Logtable[a[0]]) % 255]) ^
+                (Alogtable[(lt_b + Logtable[a[4]]) % 255]) ^
+                (Alogtable[(lt_d + Logtable[a[8]]) % 255]) ^
+                (Alogtable[(lt_9 + Logtable[a[12]]) % 255]),
+                (Alogtable[(lt_e + Logtable[a[1]]) % 255]) ^
+                (Alogtable[(lt_b + Logtable[a[5]]) % 255]) ^
+                (Alogtable[(lt_d + Logtable[a[9]]) % 255]) ^
+                (Alogtable[(lt_9 + Logtable[a[13]]) % 255]),
+                (Alogtable[(lt_e + Logtable[a[2]]) % 255]) ^
+                (Alogtable[(lt_b + Logtable[a[6]]) % 255]) ^
+                (Alogtable[(lt_d + Logtable[a[10]]) % 255]) ^
+                (Alogtable[(lt_9 + Logtable[a[14]]) % 255]),
+                (Alogtable[(lt_e + Logtable[a[3]]) % 255]) ^
+                (Alogtable[(lt_b + Logtable[a[7]]) % 255]) ^
+                (Alogtable[(lt_d + Logtable[a[11]]) % 255]) ^
+                (Alogtable[(lt_9 + Logtable[a[15]]) % 255]),
+                (Alogtable[(lt_e + Logtable[a[4]]) % 255]) ^
+                (Alogtable[(lt_b + Logtable[a[8]]) % 255]) ^
+                (Alogtable[(lt_d + Logtable[a[12]]) % 255]) ^
+                (Alogtable[(lt_9 + Logtable[a[0]]) % 255]),
+                (Alogtable[(lt_e + Logtable[a[5]]) % 255]) ^
+                (Alogtable[(lt_b + Logtable[a[9]]) % 255]) ^
+                (Alogtable[(lt_d + Logtable[a[13]]) % 255]) ^
+                (Alogtable[(lt_9 + Logtable[a[1]]) % 255]),
+                (Alogtable[(lt_e + Logtable[a[6]]) % 255]) ^
+                (Alogtable[(lt_b + Logtable[a[10]]) % 255]) ^
+                (Alogtable[(lt_d + Logtable[a[14]]) % 255]) ^
+                (Alogtable[(lt_9 + Logtable[a[2]]) % 255]),
+                (Alogtable[(lt_e + Logtable[a[7]]) % 255]) ^
+                (Alogtable[(lt_b + Logtable[a[11]]) % 255]) ^
+                (Alogtable[(lt_d + Logtable[a[15]]) % 255]) ^
+                (Alogtable[(lt_9 + Logtable[a[3]]) % 255]),
+                (Alogtable[(lt_e + Logtable[a[8]]) % 255]) ^
+                (Alogtable[(lt_b + Logtable[a[12]]) % 255]) ^
+                (Alogtable[(lt_d + Logtable[a[0]]) % 255]) ^
+                (Alogtable[(lt_9 + Logtable[a[4]]) % 255]),
+                (Alogtable[(lt_e + Logtable[a[9]]) % 255]) ^
+                (Alogtable[(lt_b + Logtable[a[13]]) % 255]) ^
+                (Alogtable[(lt_d + Logtable[a[1]]) % 255]) ^
+                (Alogtable[(lt_9 + Logtable[a[5]]) % 255]),
+                (Alogtable[(lt_e + Logtable[a[10]]) % 255]) ^
+                (Alogtable[(lt_b + Logtable[a[14]]) % 255]) ^
+                (Alogtable[(lt_d + Logtable[a[2]]) % 255]) ^
+                (Alogtable[(lt_9 + Logtable[a[6]]) % 255]),
+                (Alogtable[(lt_e + Logtable[a[11]]) % 255]) ^
+                (Alogtable[(lt_b + Logtable[a[15]]) % 255]) ^
+                (Alogtable[(lt_d + Logtable[a[3]]) % 255]) ^
+                (Alogtable[(lt_9 + Logtable[a[7]]) % 255]),
+                (Alogtable[(lt_e + Logtable[a[12]]) % 255]) ^
+                (Alogtable[(lt_b + Logtable[a[0]]) % 255]) ^
+                (Alogtable[(lt_d + Logtable[a[4]]) % 255]) ^
+                (Alogtable[(lt_9 + Logtable[a[8]]) % 255]),
+                (Alogtable[(lt_e + Logtable[a[13]]) % 255]) ^
+                (Alogtable[(lt_b + Logtable[a[1]]) % 255]) ^
+                (Alogtable[(lt_d + Logtable[a[5]]) % 255]) ^
+                (Alogtable[(lt_9 + Logtable[a[9]]) % 255]),
+                (Alogtable[(lt_e + Logtable[a[14]]) % 255]) ^
+                (Alogtable[(lt_b + Logtable[a[2]]) % 255]) ^
+                (Alogtable[(lt_d + Logtable[a[6]]) % 255]) ^
+                (Alogtable[(lt_9 + Logtable[a[10]]) % 255]),
+                (Alogtable[(lt_e + Logtable[a[15]]) % 255]) ^
+                (Alogtable[(lt_b + Logtable[a[3]]) % 255]) ^
+                (Alogtable[(lt_d + Logtable[a[7]]) % 255]) ^
+                (Alogtable[(lt_9 + Logtable[a[11]]) % 255])
+            )
+                                 
+            # Si Box
+            a = (
+                Si[a[0]], Si[a[1]], Si[a[2]], Si[a[3]], 
+                Si[a[4]], Si[a[5]], Si[a[6]], Si[a[7]],
+                Si[a[8]], Si[a[9]], Si[a[10]], Si[a[11]],
+                Si[a[12]], Si[a[13]], Si[a[14]], Si[a[15]]
+            )
+
+            # Shift Row
+            a = (
+                a[si0 % 4], 
+                a[(1 + si0) % 4],
+                a[(2 + si0) % 4],
+                a[(3 + si0) % 4],
+                a[4 + si1 % 4],
+                a[4 + (1 + si1) % 4],
+                a[4 + (2 + si1) % 4],
+                a[4 + (3 + si1) % 4],
+                a[8 + (si2) % 4],
+                a[8 + (1 + si2) % 4],
+                a[8 + (2 + si2) % 4],
+                a[8 + (3 + si2) % 4],
+                a[12 + (si3) % 4],
+                a[12 + (1 + si3) % 4],
+                a[12 + (2 + si3) % 4],
+                a[12 + (3 + si3) % 4]
+                )
+
+            r -= 1
+
+        # Key addition
+        a = (a[0] ^rk[0],
+            a[1] ^ rk[1],
+            a[2] ^ rk[2],
+            a[3] ^ rk[3],
+            a[4] ^ rk[4],
+            a[5] ^ rk[5],
+            a[6] ^ rk[6],
+            a[7] ^ rk[7],
+            a[8] ^ rk[8],
+            a[9] ^ rk[9],
+            a[10] ^ rk[10],
+            a[11] ^ rk[11],
+            a[12] ^ rk[12],
+            a[13] ^ rk[13],
+            a[14] ^ rk[14],
+            a[15] ^ rk[15])
+
+        extend(a)
+        i += 1
 
     return bytes(dtxt)
