@@ -1,9 +1,21 @@
-from typing import Mapping, Sequence
+from typing import Sequence
 
 from paradox.lib.utils import deep_merge
 
 
 class ElementTypeContainer(dict):
+    def __init__(self, *args, **kwargs):
+        super(ElementTypeContainer, self).__init__(*args, **kwargs)
+
+        self.key_index = {}
+
+        self.reindex()
+
+    def reindex(self):
+        for key, value in self.items():
+            if isinstance(value, dict) and "key" in value:
+                self.key_index[value["key"]] = value
+
     def filter(self, id_arr):
         remove_keys = set(self.keys()) - set(id_arr)
         for i in remove_keys:
@@ -42,27 +54,30 @@ class ElementTypeContainer(dict):
             return default
 
     def __contains__(self, key):
-        for k, v in self.items():
-            if isinstance(v, Mapping) and "key" in v and v["key"] == key:
-                return True
-        return super(ElementTypeContainer, self).__contains__(
-            self.__keytransform__(key)
-        )
+        item = self.get(key)
+        return item is not None
 
     def __getitem__(self, key):
+        key = self.__keytransform__(key)
         if isinstance(key, str):
-            for k, v in self.items():
-                if isinstance(v, Mapping) and "key" in v and v["key"] == key:
-                    return v
-        return super(ElementTypeContainer, self).__getitem__(self.__keytransform__(key))
+            e = self.key_index.get(key)
+            if e is not None:
+                return e
+        return super(ElementTypeContainer, self).__getitem__(key)
 
     def __setitem__(self, key, value):
-        super(ElementTypeContainer, self).__setitem__(self.__keytransform__(key), value)
+        key = self.__keytransform__(key)
+        super(ElementTypeContainer, self).__setitem__(key, value)
+
+        if isinstance(value, dict) and "key" in value:
+            self.key_index[value["key"]] = value
 
     def __delitem__(self, key):
+        key = self.__keytransform__(key)
         if isinstance(key, str):
             for k, v in self.items():
-                if isinstance(v, Mapping) and "key" in v and v["key"] == key:
+                if isinstance(v, dict) and "key" in v and v["key"] == key:
+                    del self.key_index[key]
                     key = k
                     break
         super(ElementTypeContainer, self).__delitem__(self.__keytransform__(key))
