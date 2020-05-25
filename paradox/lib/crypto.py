@@ -1,6 +1,8 @@
 # fmt: off
 from paradox.lib.utils import memoized
 
+ROUNDS = 14
+
 xtimetbl = (
     0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
     0x10, 0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e,
@@ -145,11 +147,9 @@ si3 = 1
 @memoized
 def keygen(k):
     rk = [0] * 240
-
-    k = list(k)
     
     if len(k) % 32:
-        k.extend([0xee] * (32 - (len(k) % 32)))
+        k += b'\xee' * (32 - (len(k) % 32))
 
     temp = [0, 0, 0, 0]
 
@@ -214,14 +214,9 @@ def encrypt(ctxt, key):
 
     blocks = len(ctxt) // 16
 
-    i = 0
-    
     extend = dtxt.extend
-
-    while i < blocks:
+    for i in range(blocks):
         a = ctxt[i * 16 : (i + 1) * 16]
-        ROUNDS = 14
-
         a = (a[0] ^ rk[0],
                 a[1] ^ rk[1],
                 a[2] ^ rk[2],
@@ -239,8 +234,7 @@ def encrypt(ctxt, key):
                 a[14] ^ rk[14],
                 a[15] ^ rk[15])
 
-        r = 1
-        while r < ROUNDS:
+        for r in range(1, ROUNDS):
             r16 = r * 16
 
             # S BOX
@@ -252,23 +246,11 @@ def encrypt(ctxt, key):
                )
 
             # Shift Row
-            a = (a[s0 % 4], 
-                    a[(1 + s0) % 4],
-                    a[(2 + s0) % 4],
-                    a[(3 + s0) % 4],
-                    a[4 + s1 % 4],
-                    a[4 + (1 + s1) % 4],
-                    a[4 + (2 + s1) % 4],
-                    a[4 + (3 + s1) % 4],
-                    a[8 + s2 % 4],
-                    a[8 + (1 + s2) % 4],
-                    a[8 + (2 + s2) % 4],
-                    a[8 + (3 + s2) % 4],
-                    a[12 + s3 % 4],
-                    a[12 + (1 + s3) % 4],
-                    a[12 + (2 + s3) % 4],
-                    a[12 + (3 + s3) % 4]
-                    )
+            a = (a[0], a[1], a[2], a[3],
+                 a[5], a[6], a[7], a[4],
+                 a[10], a[11], a[8], a[9],
+                 a[15], a[12], a[13], a[14]
+                )
 
             # Mix Column
             tmp0 = a[0] ^ a[4] ^ a[8] ^ a[12]
@@ -324,26 +306,14 @@ def encrypt(ctxt, key):
            )
 
         # Shift Row
-        a = (a[s0 % 4], 
-                a[(1 + s0) % 4],
-                a[(2 + s0) % 4],
-                a[(3 + s0) % 4],
-                a[4 + s1 % 4],
-                a[4 + (1 + s1) % 4],
-                a[4 + (2 + s1) % 4],
-                a[4 + (3 + s1) % 4],
-                a[8 + (s2) % 4],
-                a[8 + (1 + s2) % 4],
-                a[8 + (2 + s2) % 4],
-                a[8 + (3 + s2) % 4],
-                a[12 + (s3) % 4],
-                a[12 + (1 + s3) % 4],
-                a[12 + (2 + s3) % 4],
-                a[12 + (3 + s3) % 4]
+        a = (a[0], a[1], a[2], a[3],
+                 a[5], a[6], a[7], a[4],
+                 a[10], a[11], a[8], a[9],
+                 a[15], a[12], a[13], a[14]
                 )
         
         # Key addition
-        a = (a[0] ^rk[224],
+        a = (a[0] ^ rk[224],
             a[1] ^ rk[225],
             a[2] ^ rk[226],
             a[3] ^ rk[227],
@@ -361,7 +331,7 @@ def encrypt(ctxt, key):
             a[15] ^ rk[239])
 
         extend(a)
-        i = i + 1
+        
 
     return bytes(dtxt)
 
@@ -369,16 +339,15 @@ def decrypt(ctxt, key):
     dtxt = []
 
     rk = keygen(key)
-    
+
     ctxt = list(ctxt)
     
     blocks = len(ctxt) // 16
 
     extend = dtxt.extend
 
-    i = 0
-    while i < blocks:
-        ROUNDS = 14
+    for i in range(blocks):
+
         a = ctxt[i * 16 : (i + 1) * 16]
 
         # Key Addition
@@ -407,27 +376,13 @@ def decrypt(ctxt, key):
             Si[a[12]], Si[a[13]], Si[a[14]], Si[a[15]]
            )
 
-        # Shift Row
-        a = (a[si0 % 4], 
-                a[(1 + si0) % 4],
-                a[(2 + si0) % 4],
-                a[(3 + si0) % 4],
-                a[4 + si1 % 4],
-                a[4 + (1 + si1) % 4],
-                a[4 + (2 + si1) % 4],
-                a[4 + (3 + si1) % 4],
-                a[8 + (si2) % 4],
-                a[8 + (1 + si2) % 4],
-                a[8 + (2 + si2) % 4],
-                a[8 + (3 + si2) % 4],
-                a[12 + (si3) % 4],
-                a[12 + (1 + si3) % 4],
-                a[12 + (2 + si3) % 4],
-                a[12 + (3 + si3) % 4]
-                )
+        # Shift Row Invert
+        a = (a[0], a[1], a[2], a[3], 
+             a[7], a[4], a[5], a[6], 
+             a[10], a[11], a[8], a[9], 
+             a[13], a[14], a[15], a[12] )
 
-        r = ROUNDS - 1
-        while r > 0:
+        for r in range(13, 0, -1):
             r16 = r * 16
             # Key Addition
             a = (a[0] ^ rk[r16],
@@ -529,47 +484,20 @@ def decrypt(ctxt, key):
                 Si[a[12]], Si[a[13]], Si[a[14]], Si[a[15]]
             )
 
-            # Shift Row
-            a = (
-                a[si0 % 4], 
-                a[(1 + si0) % 4],
-                a[(2 + si0) % 4],
-                a[(3 + si0) % 4],
-                a[4 + si1 % 4],
-                a[4 + (1 + si1) % 4],
-                a[4 + (2 + si1) % 4],
-                a[4 + (3 + si1) % 4],
-                a[8 + (si2) % 4],
-                a[8 + (1 + si2) % 4],
-                a[8 + (2 + si2) % 4],
-                a[8 + (3 + si2) % 4],
-                a[12 + (si3) % 4],
-                a[12 + (1 + si3) % 4],
-                a[12 + (2 + si3) % 4],
-                a[12 + (3 + si3) % 4]
-                )
-
-            r -= 1
+            # Shift Row Invert
+            a = (a[0], a[1], a[2], a[3], 
+                 a[7], a[4], a[5], a[6], 
+                 a[10], a[11], a[8], a[9], 
+                 a[13], a[14], a[15], a[12] )
 
         # Key addition
-        a = (a[0] ^rk[0],
-            a[1] ^ rk[1],
-            a[2] ^ rk[2],
-            a[3] ^ rk[3],
-            a[4] ^ rk[4],
-            a[5] ^ rk[5],
-            a[6] ^ rk[6],
-            a[7] ^ rk[7],
-            a[8] ^ rk[8],
-            a[9] ^ rk[9],
-            a[10] ^ rk[10],
-            a[11] ^ rk[11],
-            a[12] ^ rk[12],
-            a[13] ^ rk[13],
-            a[14] ^ rk[14],
+        a = (a[0] ^rk[0], a[1] ^ rk[1], a[2] ^ rk[2],
+            a[3] ^ rk[3], a[4] ^ rk[4], a[5] ^ rk[5],
+            a[6] ^ rk[6], a[7] ^ rk[7], a[8] ^ rk[8],
+            a[9] ^ rk[9], a[10] ^ rk[10], a[11] ^ rk[11],
+            a[12] ^ rk[12], a[13] ^ rk[13], a[14] ^ rk[14],
             a[15] ^ rk[15])
 
         extend(a)
-        i += 1
 
     return bytes(dtxt)
