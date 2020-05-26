@@ -1,4 +1,6 @@
 # fmt: off
+import itertools
+
 from paradox.lib.utils import memoized
 
 ROUNDS = 14
@@ -143,9 +145,14 @@ si0 = 0
 si1 = 3
 si2 = 2
 si3 = 1
-    
+
+
 @memoized
 def keygen(k):
+    return _keygen(k)
+
+
+def _keygen(k):
     rk = [0] * 240
     
     if len(k) % 32:
@@ -153,55 +160,35 @@ def keygen(k):
 
     temp = [0, 0, 0, 0]
 
-    i = 0
-    while i < 4:
-        j = 0
-        while j < 4:
-            rk[j * 4 + i] = k[i * 4 + j]
-            j += 1
-        j = 0
-        while j < 4:
-            rk[j * 4 + i + 16] = k[i * 4 + j + 16]
-            j += 1
-        i += 1
+    for i, j, h in itertools.product(range(4), range(4), (0, 16)):
+        rk[j * 4 + i + h] = k[i * 4 + j + h]
 
-    i = 8
-    while i < 60:
-        j = 0
-        while j < 4:
+    for i in range(8, 60):
+        for j in range(4):
             temp[j] = rk[(((i - 1) & 0xFC) << 2) + ((i - 1) & 0x03) + j * 4]
-            j += 1
         if i % 8 == 0:
-            j = 0
-            while j < 4:
+            for j in range(4):
                 temp[j] = S[temp[j]]
-                j += 1
             tmp = temp[0]
 
-            j = 1
-            while j < 4:
+            for j in range(1, 4):
                 temp[j - 1] = temp[j]
-                j += 1
 
             temp[3] = tmp
             temp[0] ^= rcon[int(i / 8 - 1)]
 
         elif i % 8 == 4:
-            j = 0
-            while j < 4:
+            for j in range(4):
                 temp[j] = S[temp[j]]
-                j += 1
 
-        j = 0
-        while j < 4:
+        for j in range(4):
             rk[((i & 0xFC) << 2) + (i & 0x03) + j * 4] = (
                 rk[(((i - 8) & 0xFC) << 2) + ((i - 8) & 0x03) + j * 4] ^ temp[j]
             )
-            j += 1
-        i += 1
 
     return rk
-    
+
+
 def encrypt(ctxt, key):
     dtxt = []
 
@@ -334,6 +321,7 @@ def encrypt(ctxt, key):
         
 
     return bytes(dtxt)
+
 
 def decrypt(ctxt, key):
     dtxt = []
