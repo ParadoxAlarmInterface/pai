@@ -1,5 +1,9 @@
 # fmt: off
+import itertools
+
 from paradox.lib.utils import memoized
+
+ROUNDS = 14
 
 xtimetbl = (
     0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
@@ -36,201 +40,165 @@ xtimetbl = (
     0xeb, 0xe9, 0xef, 0xed, 0xe3, 0xe1, 0xe7, 0xe5
 )
 
-Logtable = (
-    0, 0, 25, 1, 50, 2, 26, 198, 75, 199, 27, 104, 51, 238, 223, 3,
-    100, 4, 224, 14, 52, 141, 129, 239, 76, 113, 8, 200, 248, 105, 28,
-    193, 125, 194, 29, 181, 249, 185, 39, 106, 77, 228, 166, 114, 154, 201,
-    9, 120, 101, 47, 138, 5, 33, 15, 225, 36, 18, 240, 130, 69, 53,
-    147, 218, 142, 150, 143, 219, 189, 54, 208, 206, 148, 19, 92, 210, 241,
-    64, 70, 131, 56, 102, 221, 253, 48, 191, 6, 139, 98, 179, 37, 226,
-    152, 34, 136, 145, 16, 126, 110, 72, 195, 163, 182, 30, 66, 58, 107,
-    40, 84, 250, 133, 61, 186, 43, 121, 10, 21, 155, 159, 94, 202, 78,
-    212, 172, 229, 243, 115, 167, 87, 175, 88, 168, 80, 244, 234, 214, 116,
-    79, 174, 233, 213, 231, 230, 173, 232, 44, 215, 117, 122, 235, 22, 11,
-    245, 89, 203, 95, 176, 156, 169, 81, 160, 127, 12, 246, 111, 23, 196,
-    73, 236, 216, 67, 31, 45, 164, 118, 123, 183, 204, 187, 62, 90, 251,
-    96, 177, 134, 59, 82, 161, 108, 170, 85, 41, 157, 151, 178, 135, 144,
-    97, 190, 220, 252, 188, 149, 207, 205, 55, 63, 91, 209, 83, 57, 132,
-    60, 65, 162, 109, 71, 20, 42, 158, 93, 86, 242, 211, 171, 68, 17,
-    146, 217, 35, 32, 46, 137, 180, 124, 184, 38, 119, 153, 227, 165, 103,
-    74, 237, 222, 197, 49, 254, 24, 13, 99, 140, 128, 192, 247, 112, 7,
-)
+Logtable = (0x00, 0x00, 0x19, 0x01, 0x32, 0x02, 0x1a, 0xc6,
+            0x4b, 0xc7, 0x1b, 0x68, 0x33, 0xee, 0xdf, 0x03,
+            0x64, 0x04, 0xe0, 0x0e, 0x34, 0x8d, 0x81, 0xef,
+            0x4c, 0x71, 0x08, 0xc8, 0xf8, 0x69, 0x1c, 0xc1,
+            0x7d, 0xc2, 0x1d, 0xb5, 0xf9, 0xb9, 0x27, 0x6a,
+            0x4d, 0xe4, 0xa6, 0x72, 0x9a, 0xc9, 0x09, 0x78,
+            0x65, 0x2f, 0x8a, 0x05, 0x21, 0x0f, 0xe1, 0x24,
+            0x12, 0xf0, 0x82, 0x45, 0x35, 0x93, 0xda, 0x8e,
+            0x96, 0x8f, 0xdb, 0xbd, 0x36, 0xd0, 0xce, 0x94,
+            0x13, 0x5c, 0xd2, 0xf1, 0x40, 0x46, 0x83, 0x38,
+            0x66, 0xdd, 0xfd, 0x30, 0xbf, 0x06, 0x8b, 0x62,
+            0xb3, 0x25, 0xe2, 0x98, 0x22, 0x88, 0x91, 0x10,
+            0x7e, 0x6e, 0x48, 0xc3, 0xa3, 0xb6, 0x1e, 0x42,
+            0x3a, 0x6b, 0x28, 0x54, 0xfa, 0x85, 0x3d, 0xba,
+            0x2b, 0x79, 0x0a, 0x15, 0x9b, 0x9f, 0x5e, 0xca,
+            0x4e, 0xd4, 0xac, 0xe5, 0xf3, 0x73, 0xa7, 0x57,
+            0xaf, 0x58, 0xa8, 0x50, 0xf4, 0xea, 0xd6, 0x74,
+            0x4f, 0xae, 0xe9, 0xd5, 0xe7, 0xe6, 0xad, 0xe8,
+            0x2c, 0xd7, 0x75, 0x7a, 0xeb, 0x16, 0x0b, 0xf5,
+            0x59, 0xcb, 0x5f, 0xb0, 0x9c, 0xa9, 0x51, 0xa0,
+            0x7f, 0x0c, 0xf6, 0x6f, 0x17, 0xc4, 0x49, 0xec,
+            0xd8, 0x43, 0x1f, 0x2d, 0xa4, 0x76, 0x7b, 0xb7,
+            0xcc, 0xbb, 0x3e, 0x5a, 0xfb, 0x60, 0xb1, 0x86,
+            0x3b, 0x52, 0xa1, 0x6c, 0xaa, 0x55, 0x29, 0x9d,
+            0x97, 0xb2, 0x87, 0x90, 0x61, 0xbe, 0xdc, 0xfc,
+            0xbc, 0x95, 0xcf, 0xcd, 0x37, 0x3f, 0x5b, 0xd1,
+            0x53, 0x39, 0x84, 0x3c, 0x41, 0xa2, 0x6d, 0x47,
+            0x14, 0x2a, 0x9e, 0x5d, 0x56, 0xf2, 0xd3, 0xab,
+            0x44, 0x11, 0x92, 0xd9, 0x23, 0x20, 0x2e, 0x89,
+            0xb4, 0x7c, 0xb8, 0x26, 0x77, 0x99, 0xe3, 0xa5,
+            0x67, 0x4a, 0xed, 0xde, 0xc5, 0x31, 0xfe, 0x18,
+            0x0d, 0x63, 0x8c, 0x80, 0xc0, 0xf7, 0x70, 0x07)
 
-Alogtable = (
-    1, 3, 5, 15, 17, 51, 85, 255, 26, 46, 114, 150, 161, 248, 19,
-    53, 95, 225, 56, 72, 216, 115, 149, 164, 247, 2, 6, 10, 30, 34,
-    102, 170, 229, 52, 92, 228, 55, 89, 235, 38, 106, 190, 217, 112, 144,
-    171, 230, 49, 83, 245, 4, 12, 20, 60, 68, 204, 79, 209, 104, 184,
-    211, 110, 178, 205, 76, 212, 103, 169, 224, 59, 77, 215, 98, 166, 241,
-    8, 24, 40, 120, 136, 131, 158, 185, 208, 107, 189, 220, 127, 129, 152,
-    179, 206, 73, 219, 118, 154, 181, 196, 87, 249, 16, 48, 80, 240, 11,
-    29, 39, 105, 187, 214, 97, 163, 254, 25, 43, 125, 135, 146, 173, 236,
-    47, 113, 147, 174, 233, 32, 96, 160, 251, 22, 58, 78, 210, 109, 183,
-    194, 93, 231, 50, 86, 250, 21, 63, 65, 195, 94, 226, 61, 71, 201,
-    64, 192, 91, 237, 44, 116, 156, 191, 218, 117, 159, 186, 213, 100, 172,
-    239, 42, 126, 130, 157, 188, 223, 122, 142, 137, 128, 155, 182, 193, 88,
-    232, 35, 101, 175, 234, 37, 111, 177, 200, 67, 197, 84, 252, 31, 33,
-    99, 165, 244, 7, 9, 27, 45, 119, 153, 176, 203, 70, 202, 69, 207,
-    74, 222, 121, 139, 134, 145, 168, 227, 62, 66, 198, 81, 243, 14, 18,
-    54, 90, 238, 41, 123, 141, 140, 143, 138, 133, 148, 167, 242, 13, 23,
-    57, 75, 221, 124, 132, 151, 162, 253, 28, 36, 108, 180, 199, 82, 246, 1,
-)
+Alogtable = (0x01, 0x03, 0x05, 0x0f, 0x11, 0x33, 0x55, 0xff,
+             0x1a, 0x2e, 0x72, 0x96, 0xa1, 0xf8, 0x13, 0x35,
+             0x5f, 0xe1, 0x38, 0x48, 0xd8, 0x73, 0x95, 0xa4,
+             0xf7, 0x02, 0x06, 0x0a, 0x1e, 0x22, 0x66, 0xaa,
+             0xe5, 0x34, 0x5c, 0xe4, 0x37, 0x59, 0xeb, 0x26,
+             0x6a, 0xbe, 0xd9, 0x70, 0x90, 0xab, 0xe6, 0x31,
+             0x53, 0xf5, 0x04, 0x0c, 0x14, 0x3c, 0x44, 0xcc,
+             0x4f, 0xd1, 0x68, 0xb8, 0xd3, 0x6e, 0xb2, 0xcd,
+             0x4c, 0xd4, 0x67, 0xa9, 0xe0, 0x3b, 0x4d, 0xd7,
+             0x62, 0xa6, 0xf1, 0x08, 0x18, 0x28, 0x78, 0x88,
+             0x83, 0x9e, 0xb9, 0xd0, 0x6b, 0xbd, 0xdc, 0x7f,
+             0x81, 0x98, 0xb3, 0xce, 0x49, 0xdb, 0x76, 0x9a,
+             0xb5, 0xc4, 0x57, 0xf9, 0x10, 0x30, 0x50, 0xf0,
+             0x0b, 0x1d, 0x27, 0x69, 0xbb, 0xd6, 0x61, 0xa3,
+             0xfe, 0x19, 0x2b, 0x7d, 0x87, 0x92, 0xad, 0xec,
+             0x2f, 0x71, 0x93, 0xae, 0xe9, 0x20, 0x60, 0xa0,
+             0xfb, 0x16, 0x3a, 0x4e, 0xd2, 0x6d, 0xb7, 0xc2,
+             0x5d, 0xe7, 0x32, 0x56, 0xfa, 0x15, 0x3f, 0x41,
+             0xc3, 0x5e, 0xe2, 0x3d, 0x47, 0xc9, 0x40, 0xc0,
+             0x5b, 0xed, 0x2c, 0x74, 0x9c, 0xbf, 0xda, 0x75,
+             0x9f, 0xba, 0xd5, 0x64, 0xac, 0xef, 0x2a, 0x7e,
+             0x82, 0x9d, 0xbc, 0xdf, 0x7a, 0x8e, 0x89, 0x80,
+             0x9b, 0xb6, 0xc1, 0x58, 0xe8, 0x23, 0x65, 0xaf,
+             0xea, 0x25, 0x6f, 0xb1, 0xc8, 0x43, 0xc5, 0x54,
+             0xfc, 0x1f, 0x21, 0x63, 0xa5, 0xf4, 0x07, 0x09,
+             0x1b, 0x2d, 0x77, 0x99, 0xb0, 0xcb, 0x46, 0xca,
+             0x45, 0xcf, 0x4a, 0xde, 0x79, 0x8b, 0x86, 0x91,
+             0xa8, 0xe3, 0x3e, 0x42, 0xc6, 0x51, 0xf3, 0x0e,
+             0x12, 0x36, 0x5a, 0xee, 0x29, 0x7b, 0x8d, 0x8c,
+             0x8f, 0x8a, 0x85, 0x94, 0xa7, 0xf2, 0x0d, 0x17,
+             0x39, 0x4b, 0xdd, 0x7c, 0x84, 0x97, 0xa2, 0xfd,
+             0x1c, 0x24, 0x6c, 0xb4, 0xc7, 0x52, 0xf6, 0x01)
 
-S = (
-    99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171,
-    118, 202, 130, 201, 125, 250, 89, 71, 240, 173, 212, 162, 175, 156, 164,
-    114, 192, 183, 253, 147, 38, 54, 63, 247, 204, 52, 165, 229, 241, 113,
-    216, 49, 21, 4, 199, 35, 195, 24, 150, 5, 154, 7, 18, 128, 226,
-    235, 39, 178, 117, 9, 131, 44, 26, 27, 110, 90, 160, 82, 59, 214,
-    179, 41, 227, 47, 132, 83, 209, 0, 237, 32, 252, 177, 91, 106, 203,
-    190, 57, 74, 76, 88, 207, 208, 239, 170, 251, 67, 77, 51, 133, 69,
-    249, 2, 127, 80, 60, 159, 168, 81, 163, 64, 143, 146, 157, 56, 245,
-    188, 182, 218, 33, 16, 255, 243, 210, 205, 12, 19, 236, 95, 151, 68,
-    23, 196, 167, 126, 61, 100, 93, 25, 115, 96, 129, 79, 220, 34, 42,
-    144, 136, 70, 238, 184, 20, 222, 94, 11, 219, 224, 50, 58, 10, 73,
-    6, 36, 92, 194, 211, 172, 98, 145, 149, 228, 121, 231, 200, 55, 109,
-    141, 213, 78, 169, 108, 86, 244, 234, 101, 122, 174, 8, 186, 120, 37,
-    46, 28, 166, 180, 198, 232, 221, 116, 31, 75, 189, 139, 138, 112, 62,
-    181, 102, 72, 3, 246, 14, 97, 53, 87, 185, 134, 193, 29, 158, 225,
-    248, 152, 17, 105, 217, 142, 148, 155, 30, 135, 233, 206, 85, 40, 223,
-    140, 161, 137, 13, 191, 230, 66, 104, 65, 153, 45, 15, 176, 84, 187,
-    22,
-)
+S = (0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5,
+     0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
+     0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0,
+     0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
+     0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc,
+     0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15,
+     0x04, 0xc7, 0x23, 0xc3, 0x18, 0x96, 0x05, 0x9a,
+     0x07, 0x12, 0x80, 0xe2, 0xeb, 0x27, 0xb2, 0x75,
+     0x09, 0x83, 0x2c, 0x1a, 0x1b, 0x6e, 0x5a, 0xa0,
+     0x52, 0x3b, 0xd6, 0xb3, 0x29, 0xe3, 0x2f, 0x84,
+     0x53, 0xd1, 0x00, 0xed, 0x20, 0xfc, 0xb1, 0x5b,
+     0x6a, 0xcb, 0xbe, 0x39, 0x4a, 0x4c, 0x58, 0xcf,
+     0xd0, 0xef, 0xaa, 0xfb, 0x43, 0x4d, 0x33, 0x85,
+     0x45, 0xf9, 0x02, 0x7f, 0x50, 0x3c, 0x9f, 0xa8,
+     0x51, 0xa3, 0x40, 0x8f, 0x92, 0x9d, 0x38, 0xf5,
+     0xbc, 0xb6, 0xda, 0x21, 0x10, 0xff, 0xf3, 0xd2,
+     0xcd, 0x0c, 0x13, 0xec, 0x5f, 0x97, 0x44, 0x17,
+     0xc4, 0xa7, 0x7e, 0x3d, 0x64, 0x5d, 0x19, 0x73,
+     0x60, 0x81, 0x4f, 0xdc, 0x22, 0x2a, 0x90, 0x88,
+     0x46, 0xee, 0xb8, 0x14, 0xde, 0x5e, 0x0b, 0xdb,
+     0xe0, 0x32, 0x3a, 0x0a, 0x49, 0x06, 0x24, 0x5c,
+     0xc2, 0xd3, 0xac, 0x62, 0x91, 0x95, 0xe4, 0x79,
+     0xe7, 0xc8, 0x37, 0x6d, 0x8d, 0xd5, 0x4e, 0xa9,
+     0x6c, 0x56, 0xf4, 0xea, 0x65, 0x7a, 0xae, 0x08,
+     0xba, 0x78, 0x25, 0x2e, 0x1c, 0xa6, 0xb4, 0xc6,
+     0xe8, 0xdd, 0x74, 0x1f, 0x4b, 0xbd, 0x8b, 0x8a,
+     0x70, 0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e,
+     0x61, 0x35, 0x57, 0xb9, 0x86, 0xc1, 0x1d, 0x9e,
+     0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94,
+     0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf,
+     0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68,
+     0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16)
 
-Si = (
-    82, 9, 106, 213, 48, 54, 165, 56, 191, 64, 163, 158, 129, 243, 215,
-    251, 124, 227, 57, 130, 155, 47, 255, 135, 52, 142, 67, 68, 196, 222,
-    233, 203, 84, 123, 148, 50, 166, 194, 35, 61, 238, 76, 149, 11, 66,
-    250, 195, 78, 8, 46, 161, 102, 40, 217, 36, 178, 118, 91, 162, 73,
-    109, 139, 209, 37, 114, 248, 246, 100, 134, 104, 152, 22, 212, 164, 92,
-    204, 93, 101, 182, 146, 108, 112, 72, 80, 253, 237, 185, 218, 94, 21,
-    70, 87, 167, 141, 157, 132, 144, 216, 171, 0, 140, 188, 211, 10, 247,
-    228, 88, 5, 184, 179, 69, 6, 208, 44, 30, 143, 202, 63, 15, 2,
-    193, 175, 189, 3, 1, 19, 138, 107, 58, 145, 17, 65, 79, 103, 220,
-    234, 151, 242, 207, 206, 240, 180, 230, 115, 150, 172, 116, 34, 231, 173,
-    53, 133, 226, 249, 55, 232, 28, 117, 223, 110, 71, 241, 26, 113, 29,
-    41, 197, 137, 111, 183, 98, 14, 170, 24, 190, 27, 252, 86, 62, 75,
-    198, 210, 121, 32, 154, 219, 192, 254, 120, 205, 90, 244, 31, 221, 168,
-    51, 136, 7, 199, 49, 177, 18, 16, 89, 39, 128, 236, 95, 96, 81,
-    127, 169, 25, 181, 74, 13, 45, 229, 122, 159, 147, 201, 156, 239, 160,
-    224, 59, 77, 174, 42, 245, 176, 200, 235, 187, 60, 131, 83, 153, 97,
-    23, 43, 4, 126, 186, 119, 214, 38, 225, 105, 20, 99, 85, 33, 12,
-    125,
-)
+Si = (0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38,
+      0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb,
+      0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87,
+      0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb,
+      0x54, 0x7b, 0x94, 0x32, 0xa6, 0xc2, 0x23, 0x3d,
+      0xee, 0x4c, 0x95, 0x0b, 0x42, 0xfa, 0xc3, 0x4e,
+      0x08, 0x2e, 0xa1, 0x66, 0x28, 0xd9, 0x24, 0xb2,
+      0x76, 0x5b, 0xa2, 0x49, 0x6d, 0x8b, 0xd1, 0x25,
+      0x72, 0xf8, 0xf6, 0x64, 0x86, 0x68, 0x98, 0x16,
+      0xd4, 0xa4, 0x5c, 0xcc, 0x5d, 0x65, 0xb6, 0x92,
+      0x6c, 0x70, 0x48, 0x50, 0xfd, 0xed, 0xb9, 0xda,
+      0x5e, 0x15, 0x46, 0x57, 0xa7, 0x8d, 0x9d, 0x84,
+      0x90, 0xd8, 0xab, 0x00, 0x8c, 0xbc, 0xd3, 0x0a,
+      0xf7, 0xe4, 0x58, 0x05, 0xb8, 0xb3, 0x45, 0x06,
+      0xd0, 0x2c, 0x1e, 0x8f, 0xca, 0x3f, 0x0f, 0x02,
+      0xc1, 0xaf, 0xbd, 0x03, 0x01, 0x13, 0x8a, 0x6b,
+      0x3a, 0x91, 0x11, 0x41, 0x4f, 0x67, 0xdc, 0xea,
+      0x97, 0xf2, 0xcf, 0xce, 0xf0, 0xb4, 0xe6, 0x73,
+      0x96, 0xac, 0x74, 0x22, 0xe7, 0xad, 0x35, 0x85,
+      0xe2, 0xf9, 0x37, 0xe8, 0x1c, 0x75, 0xdf, 0x6e,
+      0x47, 0xf1, 0x1a, 0x71, 0x1d, 0x29, 0xc5, 0x89,
+      0x6f, 0xb7, 0x62, 0x0e, 0xaa, 0x18, 0xbe, 0x1b,
+      0xfc, 0x56, 0x3e, 0x4b, 0xc6, 0xd2, 0x79, 0x20,
+      0x9a, 0xdb, 0xc0, 0xfe, 0x78, 0xcd, 0x5a, 0xf4,
+      0x1f, 0xdd, 0xa8, 0x33, 0x88, 0x07, 0xc7, 0x31,
+      0xb1, 0x12, 0x10, 0x59, 0x27, 0x80, 0xec, 0x5f,
+      0x60, 0x51, 0x7f, 0xa9, 0x19, 0xb5, 0x4a, 0x0d,
+      0x2d, 0xe5, 0x7a, 0x9f, 0x93, 0xc9, 0x9c, 0xef,
+      0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5, 0xb0,
+      0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61,
+      0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26,
+      0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d)
 
-iG = (
-    (0x0E, 0x09, 0x0D, 0x0B),
-    (0x0B, 0x0E, 0x09, 0x0D),
-    (0x0D, 0x0B, 0x0E, 0x09),
-    (0x09, 0x0D, 0x0B, 0x0E),
-)
+rcon = (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 
+        0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8,
+        0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 
+        0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4,
+        0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91)
 
-rcon = (
-    0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8,
-    0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4,
-    0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91)
-
-shifts = (
-    ((0, 0), (1, 3), (2, 2), (3, 1)),
-    ((0, 0), (1, 5), (2, 4), (3, 3)),
-    ((0, 0), (1, 7), (3, 5), (4, 4)),
-)
-# fmt: on
-
-
-def mul(a, b):
-    if a and b:
-        return Alogtable[(Logtable[a] + Logtable[b]) % 255]
-    else:
-        return 0
-
-
-def key_addition(a, rk):
-    """
-
-    :param a: 16 bytes
-    :param rk: 16 bytes
-    :return: None. Changes a in place
-    """
-    for i in range(16):
-        a[i] ^= rk[i]
-
-
-# iterate over the 4 rows and call shiftRow() with that row
-def shift_row(state, isInv):
-    for nbr in range(4):
-        statePointer = nbr * 4
-        for _ in range(nbr):
-            # each iteration shifts the row to the left by 1
-            if isInv:
-                state[statePointer : statePointer + 4] = (
-                    state[statePointer + 3 : statePointer + 4]
-                    + state[statePointer : statePointer + 3]
-                )
-            else:
-                state[statePointer : statePointer + 4] = (
-                    state[statePointer + 1 : statePointer + 4]
-                    + state[statePointer : statePointer + 1]
-                )
-
-
-def s_box(a, box):
-    for i in range(16):
-        a[i] = box[a[i]]
-
-
-def mix_column(a):
-    b = bytearray(4)
-
-    for j in range(4):
-        tmp = a[j] ^ a[j + 4] ^ a[j + 8] ^ a[j + 12]
-        for i in range(4):
-            b[i] = a[i * 4 + j]
-
-        b[0] ^= xtimetbl[a[j] ^ a[j + 4]] ^ tmp
-        b[1] ^= xtimetbl[a[j + 4] ^ a[j + 8]] ^ tmp
-        b[2] ^= xtimetbl[a[j + 8] ^ a[j + 12]] ^ tmp
-        b[3] ^= xtimetbl[a[j + 12] ^ a[j]] ^ tmp
-
-        for i in range(4):
-            a[i * 4 + j] = b[i]
-
-
-def inv_mix_column(a):
-    b = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
-
-    for j in range(4):
-        for i in range(4):
-            b[i][j] = (
-                mul(0xE, a[i * 4 + j])
-                ^ mul(0xB, a[((i + 1) % 4) * 4 + j])
-                ^ mul(0xD, a[((i + 2) % 4) * 4 + j])
-                ^ mul(0x9, a[((i + 3) % 4) * 4 + j])
-            )
-
-    for i in range(4):
-        for j in range(4):
-            a[i * 4 + j] = b[i][j]
-
+# LT fixed lookups
+lt_e = Logtable[0xE]
+lt_b = Logtable[0xB]
+lt_d = Logtable[0xD]
+lt_9 = Logtable[0x9]
 
 @memoized
-def keygen(key):
-    if len(key) % 32 != 0:
-        key = key + b"\xee" * (32 - (len(key) % 32))
+def _keygen(k):
+    rk = [0] * 240
+    
+    if len(k) % 32:
+        k += b'\xee' * (32 - (len(k) % 32))
 
-    W = bytearray(240)
+    temp = [0, 0, 0, 0]
 
-    temp = bytearray(4)
-
-    for i in range(4):
-        for j in range(4):
-            W[j * 4 + i] = key[i * 4 + j]
-        for j in range(4):
-            W[j * 4 + i + 16] = key[i * 4 + j + 16]
+    for i, j, h in itertools.product(range(4), range(4), (0, 16)):
+        rk[j * 4 + i + h] = k[i * 4 + j + h]
 
     for i in range(8, 60):
         for j in range(4):
-            temp[j] = W[(((i - 1) & 0xFC) << 2) + ((i - 1) & 0x03) + j * 4]
+            temp[j] = rk[(((i - 1) & 0xFC) << 2) + ((i - 1) & 0x03) + j * 4]
         if i % 8 == 0:
             for j in range(4):
                 temp[j] = S[temp[j]]
@@ -247,65 +215,291 @@ def keygen(key):
                 temp[j] = S[temp[j]]
 
         for j in range(4):
-            W[((i & 0xFC) << 2) + (i & 0x03) + j * 4] = (
-                W[(((i - 8) & 0xFC) << 2) + ((i - 8) & 0x03) + j * 4] ^ temp[j]
+            rk[((i & 0xFC) << 2) + (i & 0x03) + j * 4] = (
+                rk[(((i - 8) & 0xFC) << 2) + ((i - 8) & 0x03) + j * 4] ^ temp[j]
             )
 
-    return W
+    return rk
 
 
-def encrypt(ctxt: bytes, key: bytes) -> bytes:
-    rk = keygen(key)
+def encrypt(ctxt, key):
+    dtxt = []
 
-    dtxt = bytearray()
+    ctxt = list(ctxt)
 
     if len(ctxt) % 16 != 0:
-        ctxt = ctxt + b"\xee" * (16 - (len(ctxt) % 16))
+        ctxt.extend([0xee] * (16 - (len(ctxt) % 16)))
+    
+    rk = _keygen(key)
 
-    ctxt = bytearray(ctxt)
+    blocks = len(ctxt) // 16
 
-    for i in range(len(ctxt) // 16):
+    extend = dtxt.extend
+    for i in range(blocks):
         a = ctxt[i * 16 : (i + 1) * 16]
-        ROUNDS = 14
-        key_addition(a, rk[:16])
+        a = (a[0]  ^ rk[0],
+             a[1]  ^ rk[1],
+             a[2]  ^ rk[2],
+             a[3]  ^ rk[3],
+             a[4]  ^ rk[4],
+             a[5]  ^ rk[5],
+             a[6]  ^ rk[6],
+             a[7]  ^ rk[7],
+             a[8]  ^ rk[8],
+             a[9]  ^ rk[9],
+             a[10] ^ rk[10],
+             a[11] ^ rk[11],
+             a[12] ^ rk[12],
+             a[13] ^ rk[13],
+             a[14] ^ rk[14],
+             a[15] ^ rk[15])
 
         for r in range(1, ROUNDS):
-            s_box(a, S)
-            shift_row(a, 0)
-            mix_column(a)
-            key_addition(a, rk[r * 16 : (r + 1) * 16])
+            r16 = r * 16
 
-        s_box(a, S)
-        shift_row(a, 0)
-        key_addition(a, rk[16 * ROUNDS : (ROUNDS + 1) * 16])
+            # S BOX
+            a = (S[a[0]],  S[a[1]],  S[a[2]],  S[a[3]], 
+                 S[a[4]],  S[a[5]],  S[a[6]],  S[a[7]],
+                 S[a[8]],  S[a[9]],  S[a[10]], S[a[11]],
+                 S[a[12]], S[a[13]], S[a[14]], S[a[15]])
 
-        dtxt.extend(a)
+            # Shift Row
+            a = (a[0],  a[1],  a[2],  a[3],
+                 a[5],  a[6],  a[7],  a[4],
+                 a[10], a[11], a[8],  a[9],
+                 a[15], a[12], a[13], a[14])
+
+            # Mix Column
+            tmp0 = a[0] ^ a[4] ^ a[8]  ^ a[12]
+            tmp1 = a[1] ^ a[5] ^ a[9]  ^ a[13]
+            tmp2 = a[2] ^ a[6] ^ a[10] ^ a[14]
+            tmp3 = a[3] ^ a[7] ^ a[11] ^ a[15]
+
+            a = (a[0]  ^ (xtimetbl[a[0]  ^ a[4]]  ^ tmp0),
+                 a[1]  ^ (xtimetbl[a[1]  ^ a[5]]  ^ tmp1),
+                 a[2]  ^ (xtimetbl[a[2]  ^ a[6]]  ^ tmp2),
+                 a[3]  ^ (xtimetbl[a[3]  ^ a[7]]  ^ tmp3),
+                 a[4]  ^ (xtimetbl[a[4]  ^ a[8]]  ^ tmp0),
+                 a[5]  ^ (xtimetbl[a[5]  ^ a[9]]  ^ tmp1),
+                 a[6]  ^ (xtimetbl[a[6]  ^ a[10]] ^ tmp2),
+                 a[7]  ^ (xtimetbl[a[7]  ^ a[11]] ^ tmp3),
+                 a[8]  ^ (xtimetbl[a[8]  ^ a[12]] ^ tmp0),
+                 a[9]  ^ (xtimetbl[a[9]  ^ a[13]] ^ tmp1),
+                 a[10] ^ (xtimetbl[a[10] ^ a[14]] ^ tmp2),
+                 a[11] ^ (xtimetbl[a[11] ^ a[15]] ^ tmp3),
+                 a[12] ^ (xtimetbl[a[12] ^ a[0]]  ^ tmp0),
+                 a[13] ^ (xtimetbl[a[13] ^ a[1]]  ^ tmp1),
+                 a[14] ^ (xtimetbl[a[14] ^ a[2]]  ^ tmp2),
+                 a[15] ^ (xtimetbl[a[15] ^ a[3]]  ^ tmp3))
+
+            # Key Addition
+            a = (a[0]  ^ rk[r16],
+                 a[1]  ^ rk[1  + r16],
+                 a[2]  ^ rk[2  + r16],
+                 a[3]  ^ rk[3  + r16],
+                 a[4]  ^ rk[4  + r16],
+                 a[5]  ^ rk[5  + r16],
+                 a[6]  ^ rk[6  + r16],
+                 a[7]  ^ rk[7  + r16],
+                 a[8]  ^ rk[8  + r16],
+                 a[9]  ^ rk[9  + r16],
+                 a[10] ^ rk[10 + r16],
+                 a[11] ^ rk[11 + r16],
+                 a[12] ^ rk[12 + r16],
+                 a[13] ^ rk[13 + r16],
+                 a[14] ^ rk[14 + r16],
+                 a[15] ^ rk[15 + r16])
+
+            r += 1
+
+        # S BOX
+        a = (S[a[0]],  S[a[1]],  S[a[2]],  S[a[3]], 
+             S[a[4]],  S[a[5]],  S[a[6]],  S[a[7]],
+             S[a[8]],  S[a[9]],  S[a[10]], S[a[11]],
+             S[a[12]], S[a[13]], S[a[14]], S[a[15]])
+
+        # Shift Row
+        a = (a[0],  a[1],  a[2],  a[3],
+             a[5],  a[6],  a[7],  a[4],
+             a[10], a[11], a[8],  a[9],
+             a[15], a[12], a[13], a[14])
+        
+        # Key addition
+        a = (a[0]  ^ rk[224],
+             a[1]  ^ rk[225],
+             a[2]  ^ rk[226],
+             a[3]  ^ rk[227],
+             a[4]  ^ rk[228],
+             a[5]  ^ rk[229],
+             a[6]  ^ rk[230],
+             a[7]  ^ rk[231],
+             a[8]  ^ rk[232],
+             a[9]  ^ rk[233],
+             a[10] ^ rk[234],
+             a[11] ^ rk[235],
+             a[12] ^ rk[236],
+             a[13] ^ rk[237],
+             a[14] ^ rk[238],
+             a[15] ^ rk[239])
+
+        extend(a)
 
     return bytes(dtxt)
 
 
-def decrypt(ctxt: bytes, key: bytes) -> bytes:
-    rk = keygen(key)
+def decrypt(ctxt, key):
+    dtxt = []
 
-    dtxt = bytearray()
+    rk = _keygen(key)
 
-    ctxt = bytearray(ctxt)
+    ctxt = list(ctxt)
+    
+    blocks = len(ctxt) // 16
 
-    for i in range(len(ctxt) // 16):
-        ROUNDS = 14
+    extend = dtxt.extend
+
+    for i in range(blocks):
         a = ctxt[i * 16 : (i + 1) * 16]
-        key_addition(a, rk[ROUNDS * 16 : (ROUNDS + 1) * 16])
-        s_box(a, Si)
-        shift_row(a, 1)
 
-        for r in range(ROUNDS - 1, 0, -1):
-            key_addition(a, rk[r * 16 : (r + 1) * 16])
-            inv_mix_column(a)
-            s_box(a, Si)
-            shift_row(a, 1)
+        # Key Addition
+        a = (a[0] ^ rk[224],
+            a[1]  ^ rk[225],
+            a[2]  ^ rk[226],
+            a[3]  ^ rk[227],
+            a[4]  ^ rk[228],
+            a[5]  ^ rk[229],
+            a[6]  ^ rk[230],
+            a[7]  ^ rk[231],
+            a[8]  ^ rk[232],
+            a[9]  ^ rk[233],
+            a[10] ^ rk[234],
+            a[11] ^ rk[235],
+            a[12] ^ rk[236],
+            a[13] ^ rk[237],
+            a[14] ^ rk[238],
+            a[15] ^ rk[239])
+      
+        # Si Box
+        a = (Si[a[0]],  Si[a[1]],  Si[a[2]],  Si[a[3]], 
+             Si[a[4]],  Si[a[5]],  Si[a[6]],  Si[a[7]],
+             Si[a[8]],  Si[a[9]],  Si[a[10]], Si[a[11]],
+             Si[a[12]], Si[a[13]], Si[a[14]], Si[a[15]])
 
-        key_addition(a, rk)
+        # Shift Row Invert
+        a = (a[0],  a[1],  a[2],  a[3], 
+             a[7],  a[4],  a[5],  a[6], 
+             a[10], a[11], a[8],  a[9], 
+             a[13], a[14], a[15], a[12])
 
-        dtxt.extend(a)
+        for r in range(13, 0, -1):
+            r16 = r * 16
+            
+            # Key Addition
+            a = (a[0] ^ rk[r16],
+                    a[1]  ^ rk[1  + r16],
+                    a[2]  ^ rk[2  + r16],
+                    a[3]  ^ rk[3  + r16],
+                    a[4]  ^ rk[4  + r16],
+                    a[5]  ^ rk[5  + r16],
+                    a[6]  ^ rk[6  + r16],
+                    a[7]  ^ rk[7  + r16],
+                    a[8]  ^ rk[8  + r16],
+                    a[9]  ^ rk[9  + r16],
+                    a[10] ^ rk[10 + r16],
+                    a[11] ^ rk[11 + r16],
+                    a[12] ^ rk[12 + r16],
+                    a[13] ^ rk[13 + r16],
+                    a[14] ^ rk[14 + r16],
+                    a[15] ^ rk[15 + r16])
+
+            # Inv Mix Column
+            a = (
+                (Alogtable[(lt_e + Logtable[a[0]])  % 255] if a[0]  else 0) ^
+                (Alogtable[(lt_b + Logtable[a[4]])  % 255] if a[4]  else 0) ^
+                (Alogtable[(lt_d + Logtable[a[8]])  % 255] if a[8]  else 0) ^
+                (Alogtable[(lt_9 + Logtable[a[12]]) % 255] if a[12] else 0),
+                (Alogtable[(lt_e + Logtable[a[1]])  % 255] if a[1]  else 0) ^
+                (Alogtable[(lt_b + Logtable[a[5]])  % 255] if a[5]  else 0) ^
+                (Alogtable[(lt_d + Logtable[a[9]])  % 255] if a[9]  else 0) ^
+                (Alogtable[(lt_9 + Logtable[a[13]]) % 255] if a[13] else 0),
+                (Alogtable[(lt_e + Logtable[a[2]])  % 255] if a[2]  else 0) ^
+                (Alogtable[(lt_b + Logtable[a[6]])  % 255] if a[6]  else 0) ^
+                (Alogtable[(lt_d + Logtable[a[10]]) % 255] if a[10] else 0) ^
+                (Alogtable[(lt_9 + Logtable[a[14]]) % 255] if a[14] else 0),
+                (Alogtable[(lt_e + Logtable[a[3]])  % 255] if a[3]  else 0) ^
+                (Alogtable[(lt_b + Logtable[a[7]])  % 255] if a[7]  else 0) ^
+                (Alogtable[(lt_d + Logtable[a[11]]) % 255] if a[11] else 0) ^
+                (Alogtable[(lt_9 + Logtable[a[15]]) % 255] if a[15] else 0),
+                (Alogtable[(lt_e + Logtable[a[4]])  % 255] if a[4]  else 0) ^
+                (Alogtable[(lt_b + Logtable[a[8]])  % 255] if a[8]  else 0) ^
+                (Alogtable[(lt_d + Logtable[a[12]]) % 255] if a[12] else 0) ^
+                (Alogtable[(lt_9 + Logtable[a[0]])  % 255] if a[0]  else 0),
+                (Alogtable[(lt_e + Logtable[a[5]])  % 255] if a[5]  else 0) ^
+                (Alogtable[(lt_b + Logtable[a[9]])  % 255] if a[9]  else 0) ^
+                (Alogtable[(lt_d + Logtable[a[13]]) % 255] if a[13] else 0) ^
+                (Alogtable[(lt_9 + Logtable[a[1]])  % 255] if a[1]  else 0),
+                (Alogtable[(lt_e + Logtable[a[6]])  % 255] if a[6]  else 0) ^
+                (Alogtable[(lt_b + Logtable[a[10]]) % 255] if a[10] else 0) ^
+                (Alogtable[(lt_d + Logtable[a[14]]) % 255] if a[14] else 0) ^
+                (Alogtable[(lt_9 + Logtable[a[2]])  % 255] if a[2]  else 0),
+                (Alogtable[(lt_e + Logtable[a[7]])  % 255] if a[7]  else 0) ^
+                (Alogtable[(lt_b + Logtable[a[11]]) % 255] if a[11] else 0) ^
+                (Alogtable[(lt_d + Logtable[a[15]]) % 255] if a[15] else 0) ^
+                (Alogtable[(lt_9 + Logtable[a[3]])  % 255] if a[3]  else 0),
+                (Alogtable[(lt_e + Logtable[a[8]])  % 255] if a[8]  else 0) ^
+                (Alogtable[(lt_b + Logtable[a[12]]) % 255] if a[12] else 0) ^
+                (Alogtable[(lt_d + Logtable[a[0]])  % 255] if a[0]  else 0) ^
+                (Alogtable[(lt_9 + Logtable[a[4]])  % 255] if a[4]  else 0),
+                (Alogtable[(lt_e + Logtable[a[9]])  % 255] if a[9]  else 0) ^
+                (Alogtable[(lt_b + Logtable[a[13]]) % 255] if a[13] else 0) ^
+                (Alogtable[(lt_d + Logtable[a[1]])  % 255] if a[1]  else 0) ^
+                (Alogtable[(lt_9 + Logtable[a[5]])  % 255] if a[5]  else 0),
+                (Alogtable[(lt_e + Logtable[a[10]]) % 255] if a[10] else 0) ^
+                (Alogtable[(lt_b + Logtable[a[14]]) % 255] if a[14] else 0) ^
+                (Alogtable[(lt_d + Logtable[a[2]])  % 255] if a[2]  else 0) ^
+                (Alogtable[(lt_9 + Logtable[a[6]])  % 255] if a[6]  else 0),
+                (Alogtable[(lt_e + Logtable[a[11]]) % 255] if a[11] else 0) ^
+                (Alogtable[(lt_b + Logtable[a[15]]) % 255] if a[15] else 0) ^
+                (Alogtable[(lt_d + Logtable[a[3]])  % 255] if a[3]  else 0) ^
+                (Alogtable[(lt_9 + Logtable[a[7]])  % 255] if a[7]  else 0),
+                (Alogtable[(lt_e + Logtable[a[12]]) % 255] if a[12] else 0) ^
+                (Alogtable[(lt_b + Logtable[a[0]])  % 255] if a[0]  else 0) ^
+                (Alogtable[(lt_d + Logtable[a[4]])  % 255] if a[4]  else 0) ^
+                (Alogtable[(lt_9 + Logtable[a[8]])  % 255] if a[8]  else 0),
+                (Alogtable[(lt_e + Logtable[a[13]]) % 255] if a[13] else 0) ^
+                (Alogtable[(lt_b + Logtable[a[1]])  % 255] if a[1]  else 0) ^
+                (Alogtable[(lt_d + Logtable[a[5]])  % 255] if a[5]  else 0) ^
+                (Alogtable[(lt_9 + Logtable[a[9]])  % 255] if a[9]  else 0),
+                (Alogtable[(lt_e + Logtable[a[14]]) % 255] if a[14] else 0) ^
+                (Alogtable[(lt_b + Logtable[a[2]])  % 255] if a[2]  else 0) ^
+                (Alogtable[(lt_d + Logtable[a[6]])  % 255] if a[6]  else 0) ^
+                (Alogtable[(lt_9 + Logtable[a[10]]) % 255] if a[10] else 0),
+                (Alogtable[(lt_e + Logtable[a[15]]) % 255] if a[15] else 0) ^
+                (Alogtable[(lt_b + Logtable[a[3]])  % 255] if a[3]  else 0) ^
+                (Alogtable[(lt_d + Logtable[a[7]])  % 255] if a[7]  else 0) ^
+                (Alogtable[(lt_9 + Logtable[a[11]]) % 255] if a[11] else 0))
+
+            # Si Box
+            a = (Si[a[0]],  Si[a[1]],  Si[a[2]],  Si[a[3]], 
+                 Si[a[4]],  Si[a[5]],  Si[a[6]],  Si[a[7]],
+                 Si[a[8]],  Si[a[9]],  Si[a[10]], Si[a[11]],
+                 Si[a[12]], Si[a[13]], Si[a[14]], Si[a[15]])
+
+            # Shift Row Invert
+            a = (a[0],  a[1],  a[2],  a[3], 
+                 a[7],  a[4],  a[5],  a[6], 
+                 a[10], a[11], a[8],  a[9], 
+                 a[13], a[14], a[15], a[12])
+
+
+        # Key addition
+        a = (a[0]  ^ rk[0],  a[1]  ^ rk[1],  a[2]  ^ rk[2],
+             a[3]  ^ rk[3],  a[4]  ^ rk[4],  a[5]  ^ rk[5],
+             a[6]  ^ rk[6],  a[7]  ^ rk[7],  a[8]  ^ rk[8],
+             a[9]  ^ rk[9],  a[10] ^ rk[10], a[11] ^ rk[11],
+             a[12] ^ rk[12], a[13] ^ rk[13], a[14] ^ rk[14],
+             a[15] ^ rk[15])
+
+        extend(a)
 
     return bytes(dtxt)
