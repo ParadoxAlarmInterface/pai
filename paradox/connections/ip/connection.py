@@ -8,9 +8,11 @@ import time
 import typing
 
 import requests
+from construct import Container
 
 from paradox.config import config as cfg
 from paradox.connections.connection import Connection
+from paradox.connections.handler import IPConnectionHandler
 from paradox.connections.ip.parsers import (IPMessageCommand, IPMessageRequest,
                                             IPPayloadConnectResponse)
 from paradox.connections.protocols import (IPConnectionProtocol,
@@ -21,7 +23,7 @@ from paradox.lib import stun
 logger = logging.getLogger("PAI").getChild(__name__)
 
 
-class IPConnection(Connection):
+class IPConnection(Connection, IPConnectionHandler):
     def __init__(
         self,
         on_message: typing.Callable[[bytes], None],
@@ -43,7 +45,17 @@ class IPConnection(Connection):
         self.stun_control = None
         self.stun_tunnel = None
 
-    def on_connection_lost(self):
+    def on_ip_message(self, container: Container):
+        self.schedule_ip_message_handling(container)
+
+    def on_connection(self):
+        if cfg.IP_CONNECTION_BARE:
+            logger.info("Serial port open")
+            self.connected = True
+        else:
+            logger.info("Socket connection established")
+
+    def on_connection_loss(self):
         logger.error("Connection to panel was lost")
 
         if self.stun_control:
@@ -66,17 +78,9 @@ class IPConnection(Connection):
 
     def make_protocol(self):
         if cfg.IP_CONNECTION_BARE:
-            return SerialConnectionProtocol(
-                self.on_message, self.on_bare_connection_open, self.on_connection_lost
-            )
+            return SerialConnectionProtocol(self)
         else:
-            return IPConnectionProtocol(
-                self.on_message, self.on_connection_lost, self.key
-            )
-
-    def on_bare_connection_open(self):
-        logger.info("Serial port open")
-        self.connected = True
+            return IPConnectionProtocol(self, self.key)
 
     async def connect(self) -> bool:
         tries = 1
@@ -92,7 +96,7 @@ class IPConnection(Connection):
                     r = await self.connect_to_site()
 
                     if r and self.site_info is not None:
-                        if await self.connect_to_module():
+                        if await self.connect_to_ip_module():
                             return True
                 except:
                     logger.exception(
@@ -110,7 +114,7 @@ class IPConnection(Connection):
                     if cfg.IP_CONNECTION_BARE:
                         return True
 
-                    if await self.connect_to_module():
+                    if await self.connect_to_ip_module():
                         return True
                 except OSError as e:
                     logger.error(
@@ -223,7 +227,7 @@ class IPConnection(Connection):
 
         return True
 
-    async def connect_to_module(self):
+    async def connect_to_ip_module(self):
         try:
             logger.info("Authenticating with IP Module")
 
@@ -246,9 +250,9 @@ class IPConnection(Connection):
                 password=self.password,
             )
             self._protocol.send_raw(msg)
-            message_payload = await self.wait_for_raw_message()
+            in_message = await self.wait_for_ip_message()
 
-            response = IPPayloadConnectResponse.parse(message_payload)
+            response = IPPayloadConnectResponse.parse(in_message.payload)
 
             if response.login_status != "success":
                 logger.error(f"Error connecting to IP Module: {response.login_status}")
@@ -284,9 +288,9 @@ class IPConnection(Connection):
                 password=self.key,
             )
             self._protocol.send_raw(msg)
-            message_payload = await self.wait_for_raw_message()
+            in_message = await self.wait_for_ip_message()
             logger.debug(
-                "Keep alive response: {}".format(binascii.hexlify(message_payload))
+                "Keep alive response: {}".format(binascii.hexlify(in_message.payload))
             )
 
             # # F4
@@ -310,11 +314,11 @@ class IPConnection(Connection):
                 password=self.key,
             )
             self._protocol.send_raw(msg)
-            message_payload = await self.wait_for_raw_message()
+            in_message = await self.wait_for_ip_message()
 
             logger.debug(
                 "Upload download connection response: {}".format(
-                    binascii.hexlify(message_payload)
+                    binascii.hexlify(in_message.payload)
                 )
             )
 
@@ -335,14 +339,14 @@ class IPConnection(Connection):
                 password=self.key,
             )
             self._protocol.send_raw(msg)
-            message_payload = await self.wait_for_raw_message()
+            in_message = await self.wait_for_ip_message()
             logger.debug(
                 "Toggle keep alive response: {}".format(
-                    binascii.hexlify(message_payload)
+                    binascii.hexlify(in_message.payload)
                 )
             )
 
-            logger.info("Session Established with IP Module")
+            logger.info("Session successfully established with IP Module")
 
             self.connected = True
         except asyncio.TimeoutError:

@@ -11,6 +11,7 @@ import serial_asyncio
 
 from paradox.config import config as cfg
 from paradox.connections.connection import ConnectionProtocol
+from paradox.connections.handler import ConnectionHandler
 from paradox.event import EventLevel, Notification
 from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
 from paradox.lib import ps
@@ -22,18 +23,15 @@ logger = logging.getLogger("PAI").getChild(__name__)
 
 
 class SerialConnectionProtocol(ConnectionProtocol):
-    def __init__(self, on_port_open, on_con_lost, on_recv_data):
-        super(SerialConnectionProtocol, self).__init__(
-            on_message=on_recv_data, on_con_lost=on_con_lost
-        )
+    def __init__(self, handler: ConnectionHandler):
+        super(SerialConnectionProtocol, self).__init__(handler)
         self.buffer = b""
-        self.on_port_open = on_port_open
         self.loop = asyncio.get_event_loop()
         self.last_message = b""
 
     def connection_made(self, transport):
         super(SerialConnectionProtocol, self).connection_made(transport)
-        self.on_port_open()
+        self.handler.on_connection()
 
     async def send_message(self, message):
         self.last_message = message
@@ -63,7 +61,7 @@ class SerialConnectionProtocol(ConnectionProtocol):
             if self.last_message == frame:
                 self.last_message = b""
             elif len(frame) > 0:
-                self.loop.create_task(self.on_message(frame))  # Callback
+                self.loop.create_task(self.handler.on_message(frame))  # Callback
 
     def connection_lost(self, exc):
         logger.error("The serial port was closed")
@@ -72,7 +70,7 @@ class SerialConnectionProtocol(ConnectionProtocol):
         super(SerialConnectionProtocol, self).connection_lost(exc)
 
 
-class SerialCommunication:
+class SerialCommunication(ConnectionHandler):
     def __init__(self, loop, port, baud=9600, timeout=5, recv_callback=None):
         self.port_path = port
         self.baud = baud
@@ -87,23 +85,25 @@ class SerialCommunication:
     def clear(self):
         self.queue = asyncio.Queue()
 
-    def on_port_closed(self):
+    def on_connection_loss(self):
         logger.error("Connection was lost")
         self.connected_future.set_result(False)
         self.connected = False
 
-    def on_port_open(self):
+    def on_connection(self):
         logger.info("Serial port open")
         self.connected_future.set_result(True)
         self.connected = True
 
-    async def on_data_received(self, message):
+    def on_message(self, message: bytes):
         logger.debug("M->I: {}".format(message))
 
         if self.recv_callback is not None:
-            return await self.recv_callback(message)  # Callback
+            return asyncio.get_event_loop().call_soon(
+                self.recv_callback(message)
+            )  # Callback
         else:
-            return await self.queue.put(message)
+            return self.queue.put_nowait(message)
 
     def set_recv_callback(self, callback):
         self.recv_callback = callback
@@ -117,9 +117,7 @@ class SerialCommunication:
         self.connected = False
 
     def make_protocol(self):
-        return SerialConnectionProtocol(
-            self.on_port_open, self.on_port_closed, self.on_data_received
-        )
+        return SerialConnectionProtocol(self)
 
     async def write(self, message, timeout=15):
         logger.debug("I->M: {}".format(message))

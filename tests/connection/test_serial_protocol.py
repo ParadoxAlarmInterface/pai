@@ -6,30 +6,30 @@ from paradox.connections.serial_connection import SerialConnectionProtocol
 
 
 def test_6byte_message():
-    on_message = MagicMock()
-    cp = SerialConnectionProtocol(on_message, None, None)
+    handler = MagicMock()
+    cp = SerialConnectionProtocol(handler)
 
     payload = binascii.unhexlify("120600000018")
 
     cp.data_received(payload)
 
-    on_message.assert_called_with(payload)
+    handler.on_message.assert_called_with(payload)
 
 
 def test_37byte_message():
-    on_message = MagicMock()
-    cp = SerialConnectionProtocol(on_message, None, None)
+    handler = MagicMock()
+    cp = SerialConnectionProtocol(handler)
 
     payload = b"\xe2\xff\xad\x06\x14\x13\x01\x04\x0e\x10\x00\x01\x05\x00\x00\x00\x00\x00\x02Living room     \x00\xcc"
 
     cp.data_received(payload)
 
-    on_message.assert_called_with(payload)
+    handler.on_message.assert_called_with(payload)
 
 
 def test_37byte_message_in_chunks():
-    on_message = MagicMock()
-    cp = SerialConnectionProtocol(on_message, None, None)
+    handler = MagicMock()
+    cp = SerialConnectionProtocol(handler)
 
     payload = b"\xe2\xff\xad\x06\x14\x13\x01\x04\x0e\x10\x00\x01\x05\x00"
     payload1 = b"\x00\x00\x00\x00\x02Living room     \x00\xcc"
@@ -37,12 +37,12 @@ def test_37byte_message_in_chunks():
     cp.data_received(payload)
     cp.data_received(payload1)
 
-    on_message.assert_called_with(payload + payload1)
+    handler.on_message.assert_called_with(payload + payload1)
 
 
 def test_37byte_message_in_many_chunks():
-    on_message = MagicMock()
-    cp = SerialConnectionProtocol(on_message, None, None)
+    handler = MagicMock()
+    cp = SerialConnectionProtocol(handler)
 
     payloads = [
         b"\xe2\xff\xad\x06\x14",
@@ -55,12 +55,12 @@ def test_37byte_message_in_many_chunks():
     for p in payloads:
         cp.data_received(p)
 
-    on_message.assert_called_with(b"".join(payloads))
+    handler.on_message.assert_called_with(b"".join(payloads))
 
 
 def test_37byte_message_in_many_chunks_with_junk_in_front():
-    on_message = MagicMock()
-    cp = SerialConnectionProtocol(on_message, None, None)
+    handler = MagicMock()
+    cp = SerialConnectionProtocol(handler)
 
     payloads = [
         b"\x01\x02\x03\x04\x05\x06\x07",
@@ -74,12 +74,12 @@ def test_37byte_message_in_many_chunks_with_junk_in_front():
     for p in payloads:
         cp.data_received(p)
 
-    on_message.assert_called_with(b"".join(payloads)[9:])
+    handler.on_message.assert_called_with(b"".join(payloads)[9:])
 
 
 def test_sequential_6byte_and_37byte_with_junk_in_front_and_between():
-    on_message = MagicMock()
-    cp = SerialConnectionProtocol(on_message, None, None)
+    handler = MagicMock()
+    cp = SerialConnectionProtocol(handler)
 
     payloads = [
         b"\x01\x02\x03\x04\x05\x06\x07\x12",
@@ -96,8 +96,8 @@ def test_sequential_6byte_and_37byte_with_junk_in_front_and_between():
     for p in payloads:
         cp.data_received(p)
 
-    on_message.call_count = 2
-    on_message.assert_has_calls(
+    handler.call_count = 2
+    handler.on_message.assert_has_calls(
         [
             call(b"\x12\x06\x00\x00\x00\x18"),
             call(
@@ -108,19 +108,19 @@ def test_sequential_6byte_and_37byte_with_junk_in_front_and_between():
 
 
 def test_error_message():
-    on_message = MagicMock()
-    cp = SerialConnectionProtocol(on_message, None, None)
+    handler = MagicMock()
+    cp = SerialConnectionProtocol(handler)
 
     payload = b"\x70\x04\x10\x84"
 
     cp.data_received(payload)
 
-    on_message.assert_called_with(payload)
+    handler.on_message.assert_called_with(payload)
 
 
 def test_evo_eeprom_reading():
-    on_message = MagicMock()
-    cp = SerialConnectionProtocol(on_message, None, None)
+    handler = MagicMock()
+    cp = SerialConnectionProtocol(handler)
 
     payload = binascii.unhexlify(
         "524700009f0041133e001e0e0400000000060a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000121510010705004e"
@@ -128,12 +128,12 @@ def test_evo_eeprom_reading():
 
     cp.data_received(payload)
 
-    on_message.assert_called_with(payload)
+    handler.on_message.assert_called_with(payload)
 
 
 def test_evo_eeprom_reading_in_chunks():
-    on_message = MagicMock()
-    cp = SerialConnectionProtocol(on_message, None, None)
+    handler = MagicMock()
+    cp = SerialConnectionProtocol(handler)
 
     payload = binascii.unhexlify(
         "524700009f0041133e001e0e0400000000060a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000121510010705004e"
@@ -148,12 +148,12 @@ def test_evo_eeprom_reading_in_chunks():
         # print(binascii.hexlify(p))
         cp.data_received(p)
 
-    on_message.assert_called_with(payload)
+    handler.on_message.assert_called_with(payload)
 
 
 def test_evo_ram_reading():
-    on_message = MagicMock()
-    cp = SerialConnectionProtocol(on_message, None, None)
+    handler = MagicMock()
+    cp = SerialConnectionProtocol(handler)
 
     payload = binascii.unhexlify(
         "524780000010040200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002f"
@@ -161,4 +161,4 @@ def test_evo_ram_reading():
 
     cp.data_received(payload)
 
-    on_message.assert_called_with(payload)
+    handler.on_message.assert_called_with(payload)

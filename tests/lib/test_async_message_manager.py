@@ -21,9 +21,9 @@ async def test_persistent_raw_handler(mocker):
 
     assert len(mm.raw_handlers) == 1
 
-    task1 = mm.schedule_raw_message_handling(msg1)
+    task1 = mm.schedule_ip_message_handling(msg1)
     await task1
-    task2 = mm.schedule_raw_message_handling(msg2)
+    task2 = mm.schedule_ip_message_handling(msg2)
     await task2
 
     assert task1.done()
@@ -60,8 +60,8 @@ async def test_wait_for_raw_message(mocker):
 
     mm = AsyncMessageManager()
 
-    task1 = loop.create_task(mm.wait_for_raw_message())
-    s = mm.schedule_raw_message_handling(msg)
+    task1 = loop.create_task(mm.wait_for_ip_message())
+    s = mm.schedule_ip_message_handling(msg)
 
     assert await task1 == msg
     assert task1.done()

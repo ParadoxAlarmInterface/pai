@@ -12,7 +12,10 @@ class Connection(AsyncMessageManager):
         super().__init__()
         self._connected = False
         self._protocol = None  # type: ConnectionProtocol
-        self.on_message = on_message
+        self._on_message = on_message
+
+    def on_message(self, raw: bytes):
+        self._on_message(raw)
 
     @property
     def connected(self) -> bool:

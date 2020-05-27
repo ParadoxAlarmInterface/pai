@@ -95,7 +95,7 @@ class AsyncMessageManager:
 
         return await asyncio.wait_for(future, timeout=timeout, loop=self.loop)
 
-    async def wait_for_raw_message(self, timeout=2) -> bytes:
+    async def wait_for_ip_message(self, timeout=2) -> Container:
         future = RawFutureMessageHandler(loop=self.loop)
         self.register_handler(future)
         return await asyncio.wait_for(future, timeout=timeout, loop=self.loop)
@@ -113,7 +113,7 @@ class AsyncMessageManager:
     def schedule_message_handling(self, message: Container):
         return self.loop.create_task(self._handle_message(message))
 
-    def schedule_raw_message_handling(self, message):
+    def schedule_ip_message_handling(self, message):
         return self.loop.create_task(self._handle_raw_message(message))
 
     async def _handle_raw_message(self, message: Container):

@@ -104,7 +104,7 @@ class memoized(object):
         self.func = func
         self.cache = {}
 
-    def __call__(self, *args):    
+    def __call__(self, *args):
         if args in self.cache:
             return self.cache[args]
         else:

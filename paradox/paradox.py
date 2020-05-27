@@ -309,8 +309,6 @@ class Paradox:
         self.loop_wait_event.set()
 
     def on_connection_message(self, message: bytes):
-        self.connection.schedule_raw_message_handling(message)
-
         if not self.panel:
             return
         try:

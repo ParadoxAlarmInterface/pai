@@ -11,25 +11,26 @@ from serial import SerialException
 
 from ..exceptions import SerialConnectionOpenFailed
 from .connection import Connection
+from .handler import ConnectionHandler
 from .protocols import SerialConnectionProtocol
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
 
-class SerialCommunication(Connection):
+class SerialCommunication(Connection, ConnectionHandler):
     def __init__(self, on_message: typing.Callable[[bytes], None], port, baud=9600):
         super().__init__(on_message=on_message)
         self.port_path = port
         self.baud = baud
         self.connected_future = None
 
-    def on_port_closed(self):
+    def on_connection_loss(self):
         logger.error("Connection to panel was lost")
         self.connected = False
         if not self.connected_future.done():
             self.connected_future.set_result(self.connected)
 
-    def on_port_open(self):
+    def on_connection(self):
         logger.info("Serial port open")
         self.connected = True
         if not self.connected_future.done():
@@ -44,9 +45,7 @@ class SerialCommunication(Connection):
         self.connected_future.set_result(self.connected)
 
     def make_protocol(self):
-        return SerialConnectionProtocol(
-            self.on_message, self.on_port_open, self.on_port_closed
-        )
+        return SerialConnectionProtocol(self)
 
     async def connect(self) -> bool:
         logger.info(f"Connecting to serial port {self.port_path}")

@@ -1,9 +1,9 @@
 import asyncio
 import binascii
 import logging
-import typing
 
 from paradox.config import config as cfg
+from paradox.connections.handler import ConnectionHandler, IPConnectionHandler
 from paradox.connections.ip.parsers import (IPMessageCommand, IPMessageRequest,
                                             IPMessageResponse, IPMessageType)
 
@@ -25,19 +25,20 @@ def checksum(data, min_message_length):
 
 
 class ConnectionProtocol(asyncio.Protocol):
-    def __init__(self, on_message: typing.Callable[[bytes], None], on_con_lost):
+    def __init__(self, handler: ConnectionHandler):
         self.transport = None
         self.use_variable_message_length = True
         self.buffer = b""
 
-        self.on_message = on_message
-        self.on_con_lost = on_con_lost
+        self.handler = handler
 
         self._closed = asyncio.get_event_loop().create_future()
         self.buffer = b""
 
     def connection_made(self, transport):
         self.transport = transport
+
+        self.handler.on_connection()
 
     def is_active(self) -> bool:
         return bool(self.transport) and not self._closed.done()
@@ -73,10 +74,9 @@ class ConnectionProtocol(asyncio.Protocol):
         super().connection_lost(exc)
 
         # asyncio.get_event_loop().call_soon(self.on_con_lost)
-        self.on_con_lost()
+        self.handler.on_connection_loss()
 
-        self.on_message = None
-        self.on_con_lost = None
+        self.handler = None
 
     def variable_message_length(self, mode):
         self.use_variable_message_length = mode
@@ -90,18 +90,6 @@ class ConnectionProtocol(asyncio.Protocol):
 
 
 class SerialConnectionProtocol(ConnectionProtocol):
-    def __init__(
-        self, on_message: typing.Callable[[bytes], None], on_port_open, on_con_lost
-    ):
-        super(SerialConnectionProtocol, self).__init__(
-            on_message=on_message, on_con_lost=on_con_lost
-        )
-        self.on_port_open = on_port_open
-
-    def connection_made(self, transport):
-        super(SerialConnectionProtocol, self).connection_made(transport)
-        self.on_port_open()
-
     def send_message(self, message):
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("PAI -> SER {}".format(binascii.hexlify(message)))
@@ -149,16 +137,16 @@ class SerialConnectionProtocol(ConnectionProtocol):
                 if cfg.LOGGING_DUMP_PACKETS:
                     logger.debug("SER -> PAI {}".format(binascii.hexlify(frame)))
 
-                self.on_message(frame)
+                self.handler.on_message(frame)
             else:
                 self.buffer = self.buffer[1:]
 
 
 class IPConnectionProtocol(ConnectionProtocol):
-    def __init__(self, on_message: typing.Callable[[bytes], None], on_con_lost, key):
-        super(IPConnectionProtocol, self).__init__(
-            on_message=on_message, on_con_lost=on_con_lost
-        )
+    def __init__(self, handler: IPConnectionHandler, key):
+        super(IPConnectionProtocol, self).__init__(handler)
+
+        self.handler = handler
         self.key = key
 
     def send_raw(self, raw):
@@ -194,13 +182,18 @@ class IPConnectionProtocol(ConnectionProtocol):
 
         self.transport.write(msg)
 
-    def _get_message_payload(self, data):
+    def _process_message(self, data):
         message = IPMessageResponse.parse(data, password=self.key)
 
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("IPC -> PAI {}".format(binascii.hexlify(message.payload)))
 
-        return message.payload
+        if message.header.message_type == IPMessageType.serial_passthrough_response:
+            self.handler.on_message(message.payload)
+        elif message.header.message_type == IPMessageType.ip_response:
+            self.handler.on_ip_message(message)
+        else:
+            logger.error(f"Wrong message detected: {message}")
 
     def data_received(self, recv_data):
         self.buffer += recv_data
@@ -223,5 +216,5 @@ class IPConnectionProtocol(ConnectionProtocol):
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug("Mod -> IPC {}".format(binascii.hexlify(self.buffer)))
 
-        self.on_message(self._get_message_payload(self.buffer))
+        self._process_message(self.buffer)
         self.buffer = b""
