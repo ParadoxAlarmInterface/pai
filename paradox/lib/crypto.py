@@ -1,4 +1,6 @@
 # fmt: off
+import itertools
+
 from paradox.lib.utils import memoized
 
 ROUNDS = 14
@@ -170,28 +172,11 @@ Si = (0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38,
       0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26,
       0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d)
 
-iG = ((0x0E, 0x09, 0x0D, 0x0B),
-      (0x0B, 0x0E, 0x09, 0x0D),
-      (0x0D, 0x0B, 0x0E, 0x09),
-      (0x09, 0x0D, 0x0B, 0x0E))
-
 rcon = (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 
         0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8,
         0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 
         0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4,
         0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91)
-
-# Shifts
-s0 = 0
-s1 = 1
-s2 = 2
-s3 = 3
-
-# Inv Shifts
-is0 = 0
-is1 = 3
-is2 = 2
-is3 = 1
 
 # LT fixed lookups
 lt_e = Logtable[0xE]
@@ -200,7 +185,7 @@ lt_d = Logtable[0xD]
 lt_9 = Logtable[0x9]
 
 @memoized
-def keygen(k):
+def _keygen(k):
     rk = [0] * 240
     
     if len(k) % 32:
@@ -208,55 +193,35 @@ def keygen(k):
 
     temp = [0, 0, 0, 0]
 
-    i = 0
-    while i < 4:
-        j = 0
-        while j < 4:
-            rk[j * 4 + i] = k[i * 4 + j]
-            j += 1
-        j = 0
-        while j < 4:
-            rk[j * 4 + i + 16] = k[i * 4 + j + 16]
-            j += 1
-        i += 1
+    for i, j, h in itertools.product(range(4), range(4), (0, 16)):
+        rk[j * 4 + i + h] = k[i * 4 + j + h]
 
-    i = 8
-    while i < 60:
-        j = 0
-        while j < 4:
+    for i in range(8, 60):
+        for j in range(4):
             temp[j] = rk[(((i - 1) & 0xFC) << 2) + ((i - 1) & 0x03) + j * 4]
-            j += 1
         if i % 8 == 0:
-            j = 0
-            while j < 4:
+            for j in range(4):
                 temp[j] = S[temp[j]]
-                j += 1
             tmp = temp[0]
 
-            j = 1
-            while j < 4:
+            for j in range(1, 4):
                 temp[j - 1] = temp[j]
-                j += 1
 
             temp[3] = tmp
             temp[0] ^= rcon[int(i / 8 - 1)]
 
         elif i % 8 == 4:
-            j = 0
-            while j < 4:
+            for j in range(4):
                 temp[j] = S[temp[j]]
-                j += 1
 
-        j = 0
-        while j < 4:
+        for j in range(4):
             rk[((i & 0xFC) << 2) + (i & 0x03) + j * 4] = (
                 rk[(((i - 8) & 0xFC) << 2) + ((i - 8) & 0x03) + j * 4] ^ temp[j]
             )
-            j += 1
-        i += 1
 
     return rk
-    
+
+
 def encrypt(ctxt, key):
     dtxt = []
 
@@ -265,7 +230,7 @@ def encrypt(ctxt, key):
     if len(ctxt) % 16 != 0:
         ctxt.extend([0xee] * (16 - (len(ctxt) % 16)))
     
-    rk = keygen(key)
+    rk = _keygen(key)
 
     blocks = len(ctxt) // 16
 
@@ -381,10 +346,11 @@ def encrypt(ctxt, key):
 
     return bytes(dtxt)
 
+
 def decrypt(ctxt, key):
     dtxt = []
 
-    rk = keygen(key)
+    rk = _keygen(key)
 
     ctxt = list(ctxt)
     
