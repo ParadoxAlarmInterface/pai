@@ -1,6 +1,7 @@
 import asyncio
 import binascii
 import logging
+from abc import abstractmethod
 
 from paradox.config import config as cfg
 from paradox.connections.handler import ConnectionHandler, IPConnectionHandler
@@ -57,6 +58,7 @@ class ConnectionProtocol(asyncio.Protocol):
 
         await asyncio.wait_for(self._closed, timeout=1)
 
+    @abstractmethod
     def send_message(self, message):
         raise NotImplementedError("This function needs to be overridden in a subclass")
 

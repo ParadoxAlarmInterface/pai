@@ -19,6 +19,8 @@ from paradox.connections.protocols import (IPConnectionProtocol,
                                            SerialConnectionProtocol)
 from paradox.exceptions import PAICriticalException
 from paradox.lib import stun
+from paradox.lib.async_message_manager import (FutureMessageHandler,
+                                               HandlerRegistry)
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -45,8 +47,14 @@ class IPConnection(Connection, IPConnectionHandler):
         self.stun_control = None
         self.stun_tunnel = None
 
+        self.ip_handler_registry = HandlerRegistry()
+
+    async def wait_for_ip_message(self, timeout=2) -> Container:
+        future = FutureMessageHandler()
+        return await self.ip_handler_registry.wait_until_complete(future, timeout)
+
     def on_ip_message(self, container: Container):
-        self.schedule_ip_message_handling(container)
+        return self.loop.create_task(self.ip_handler_registry.handle(container))
 
     def on_connection(self):
         if cfg.IP_CONNECTION_BARE:

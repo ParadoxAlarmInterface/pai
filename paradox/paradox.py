@@ -9,6 +9,7 @@ from typing import Callable, Iterable, Optional, Sequence
 from construct import Container
 
 from paradox.config import config as cfg
+from paradox.connections.connection import Connection
 from paradox.data.enums import RunState
 from paradox.data.memory_storage import MemoryStorage as Storage
 from paradox.data.model import DetectedPanel
@@ -16,7 +17,7 @@ from paradox.event import Change, ChangeEvent, Event, LiveEvent
 from paradox.exceptions import (AuthenticationFailed, PanelNotDetected,
                                 StatusRequestException,
                                 async_loop_unhandled_exception_handler)
-from paradox.hardware import create_panel
+from paradox.hardware import Panel, create_panel
 from paradox.lib import ps
 from paradox.lib.async_message_manager import (ErrorMessageHandler,
                                                EventMessageHandler)
@@ -28,12 +29,11 @@ logger = logging.getLogger("PAI").getChild(__name__)
 
 class Paradox:
     def __init__(self, retries=3):
-        self.panel = None  # type: Panel
-        self._connection = None
+        self.panel: Panel = None
+        self._connection: Connection = None
         self.retries = retries
         self.work_loop = asyncio.get_event_loop()  # type: asyncio.AbstractEventLoop
         self.work_loop.set_exception_handler(async_loop_unhandled_exception_handler)
-        self.receive_worker_task = None
 
         self.storage = Storage()
 
@@ -419,11 +419,11 @@ class Paradox:
         try:
             accepted = await self.panel.control_zones(zones_selected, command)
         except NotImplementedError:
-            logger.error("control_zones is not implemented for this alarm type")
+            logger.error("control_zone is not implemented for this alarm type")
         except asyncio.CancelledError:
-            logger.error("control_zones canceled")
+            logger.error("control_zone canceled")
         except asyncio.TimeoutError:
-            logger.error("control_zones timeout")
+            logger.error("control_zone timeout")
 
         # Refresh status
         self.request_status_refresh()  # Trigger status update
@@ -448,11 +448,11 @@ class Paradox:
         try:
             accepted = await self.panel.control_partitions(partitions_selected, command)
         except NotImplementedError:
-            logger.error("control_partitions is not implemented for this alarm type")
+            logger.error("control_partition is not implemented for this alarm type")
         except asyncio.CancelledError:
-            logger.error("control_partitions canceled")
+            logger.error("control_partition canceled")
         except asyncio.TimeoutError:
-            logger.error("control_partitions timeout")
+            logger.error("control_partition timeout")
 
         # Refresh status
         self.request_status_refresh()  # Trigger status update
@@ -475,11 +475,11 @@ class Paradox:
         try:
             accepted = await self.panel.control_outputs(outputs_selected, command)
         except NotImplementedError:
-            logger.error("control_outputs is not implemented for this alarm type")
+            logger.error("control_output is not implemented for this alarm type")
         except asyncio.CancelledError:
-            logger.error("control_outputs canceled")
+            logger.error("control_output canceled")
         except asyncio.TimeoutError:
-            logger.error("control_outputs timeout")
+            logger.error("control_output timeout")
         # Apply state changes
 
         # Refresh status

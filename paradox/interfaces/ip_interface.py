@@ -15,7 +15,7 @@ from paradox.connections.ip.parsers import (IPMessageCommand, IPMessageRequest,
                                             IPMessageResponse, IPMessageType,
                                             IPPayloadConnectResponse)
 from paradox.interfaces import Interface
-from paradox.lib.async_message_manager import RAWMessageHandler
+from paradox.lib.async_message_manager import PersistentMessageHandler
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -324,7 +324,7 @@ class IPInterface(Interface):
         self.client_nr = (self.client_nr + 1) % 256
         handler_name = "%s_%d" % (self.name, self.client_nr)
         self.alarm.connection.register_handler(
-            RAWMessageHandler(connection.handle_panel_message, name=handler_name)
+            PersistentMessageHandler(connection.handle_panel_message, name=handler_name)
         )
 
         logger.info("Client %d connected" % self.client_nr)

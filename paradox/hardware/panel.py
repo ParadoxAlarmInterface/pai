@@ -2,6 +2,7 @@ import binascii
 import inspect
 import logging
 import typing
+from abc import abstractmethod
 from collections import defaultdict, namedtuple
 from itertools import chain
 from time import time
@@ -311,12 +312,14 @@ class Panel:
             properties["label"] = label
             element_dict[index] = properties
 
+    @abstractmethod
     def initialize_communication(self, password):
         raise NotImplementedError("override initialize_communication in a subclass")
 
     def get_status_requests(self) -> typing.Iterable[typing.Awaitable]:
         return (self.request_status(i) for i in self.status_request_addresses)
 
+    @abstractmethod
     async def request_status(self, nr) -> typing.Optional[Container]:
         raise NotImplementedError("override request_status in a subclass")
 
@@ -344,14 +347,18 @@ class Panel:
             )
             return
 
+    @abstractmethod
     def control_zones(self, zones, command) -> bool:
         raise NotImplementedError("override control_zones in a subclass")
 
+    @abstractmethod
     def control_partitions(self, partitions, command) -> bool:
         raise NotImplementedError("override control_partitions in a subclass")
 
+    @abstractmethod
     def control_outputs(self, outputs, command) -> bool:
         raise NotImplementedError("override control_outputs in a subclass")
 
+    @abstractmethod
     def dump_memory(self, file, memory_type):
         raise NotImplementedError("override dump_memory in a subclass")

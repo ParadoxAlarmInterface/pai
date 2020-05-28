@@ -1,5 +1,6 @@
 import logging
 import typing
+from abc import abstractmethod
 
 from paradox.connections.protocols import ConnectionProtocol
 from paradox.lib.async_message_manager import AsyncMessageManager
@@ -11,7 +12,7 @@ class Connection(AsyncMessageManager):
     def __init__(self, on_message: typing.Callable[[bytes], None]):
         super().__init__()
         self._connected = False
-        self._protocol = None  # type: ConnectionProtocol
+        self._protocol: ConnectionProtocol = None
         self._on_message = on_message
 
     def on_message(self, raw: bytes):
@@ -25,8 +26,9 @@ class Connection(AsyncMessageManager):
     def connected(self, value: bool):
         self._connected = value
 
+    @abstractmethod
     async def connect(self) -> bool:
-        raise NotImplementedError("Implement in subclass")
+        raise NotImplementedError("Implement in a subclass")
 
     def write(self, data: bytes):
         if self.connected:
