@@ -107,13 +107,13 @@ docker buildx inspect --bootstrap
 # Build ARMv6
 NAME_BASE='arm32v6/python'
 NAME_TAG="${DOCKER_IMAGE_TAG}-armv6"
-NAME_PLATFORM='linux/arm/v6'
+NAME_PLATFORM='linux/arm'
 build_push_pull_image
 
 # Build ARMv7
 NAME_BASE='arm32v7/python'
 NAME_TAG="${DOCKER_IMAGE_TAG}-armv7"
-NAME_PLATFORM='linux/arm/v7'
+NAME_PLATFORM='linux/arm'
 build_push_pull_image
 
 # Build ARM64
@@ -135,17 +135,17 @@ NAME_PLATFORM='linux/386'
 build_push_pull_image
 
 echo "- Inspect built image of: ${NAME_IMAGE}"
-docker buildx imagetools inspect $NAME_IMAGE
+docker buildx imagetools inspect "$NAME_IMAGE"
 
 # Create manifest
 LIST_IMAGE_INCLUDE="$NAME_IMAGE:${DOCKER_IMAGE_TAG}-armv6 $NAME_IMAGE:${DOCKER_IMAGE_TAG}-armv7 $NAME_IMAGE:${DOCKER_IMAGE_TAG}-arm64 $NAME_IMAGE:${DOCKER_IMAGE_TAG}-amd64 $NAME_IMAGE:${DOCKER_IMAGE_TAG}-i386"
 
 echo "- Creating manifest for image: ${NAME_IMAGE} with: ${DOCKER_IMAGE_TAG} tag"
 NAME_IMAGE_AND_TAG="${NAME_IMAGE}:${DOCKER_IMAGE_TAG}"
-create_manifest  $NAME_IMAGE_AND_TAG "$LIST_IMAGE_INCLUDE"
+create_manifest "$NAME_IMAGE_AND_TAG" "$LIST_IMAGE_INCLUDE"
 
-rewrite_variant_manifest $NAME_IMAGE_AND_TAG $NAME_IMAGE:armv6 v6l
-rewrite_variant_manifest $NAME_IMAGE_AND_TAG $NAME_IMAGE:armv7 v7l
+rewrite_variant_manifest "$NAME_IMAGE_AND_TAG" "$NAME_IMAGE:${DOCKER_IMAGE_TAG}-armv6" v6l
+rewrite_variant_manifest "$NAME_IMAGE_AND_TAG" "$NAME_IMAGE:${DOCKER_IMAGE_TAG}-armv7" v7l
 
-docker manifest inspect $NAME_IMAGE_AND_TAG && \
-docker manifest push $NAME_IMAGE_AND_TAG --purge
+docker manifest inspect "$NAME_IMAGE_AND_TAG" && \
+docker manifest push "$NAME_IMAGE_AND_TAG" --purge
