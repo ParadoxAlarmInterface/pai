@@ -108,13 +108,13 @@ docker buildx inspect --bootstrap
 # Build ARMv6
 NAME_BASE='arm32v6/python'
 NAME_TAG="${DOCKER_IMAGE_TAG}-armv6"
-NAME_PLATFORM='linux/arm'
+NAME_PLATFORM='linux/arm/v6'
 build_push_pull_image
 
 # Build ARMv7
 NAME_BASE='arm32v7/python'
 NAME_TAG="${DOCKER_IMAGE_TAG}-armv7"
-NAME_PLATFORM='linux/arm'
+NAME_PLATFORM='linux/arm/v7'
 build_push_pull_image
 
 # Build ARM64
