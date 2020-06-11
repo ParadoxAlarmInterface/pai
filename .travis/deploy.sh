@@ -64,9 +64,10 @@ function create_builder () {
     docker buildx ls | grep $1 1>/dev/null
     [ $? -ne 0 ] && {
         docker buildx create --name $1
+        return $?
     }
 
-    return $?
+    return 0
 }
 
 function create_manifest () {
