@@ -8,7 +8,7 @@ if [ "$TRAVIS_PULL_REQUEST" == "true" ]; then
 fi
 
 cat <<'HEREDOC'
-Build great build script is taken from https://github.com/KEINOS/Dockerfile_of_Alpine/blob/master/build-image.sh
+This great build script is taken from https://github.com/KEINOS/Dockerfile_of_Alpine/blob/master/build-image.sh
 ===============================================================================
   Image builder for Paradox Alarm Interface Alpine image.
 ===============================================================================
@@ -99,6 +99,7 @@ fi
 
 login_docker
 
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 docker buildx create --use
 
 echo '- Start build:'
