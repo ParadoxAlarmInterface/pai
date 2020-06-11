@@ -81,11 +81,9 @@ function create_manifest () {
 
 function login_docker () {
     echo -n '- Login to Docker: '
-    docker login 2>/dev/null 1>/dev/null || {
-        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin || {
-            echo 'You need to login Docker Cloud/Hub first.'
-            exit 1
-        }
+    echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin || {
+        echo 'You need to login Docker Cloud/Hub first.'
+        exit 1
     }
     echo 'OK'
 }
