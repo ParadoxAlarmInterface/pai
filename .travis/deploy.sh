@@ -36,7 +36,6 @@ export DOCKER_CLI_EXPERIMENTAL=enabled
 #  Common Variables
 # -----------------------------------------------------------------------------
 NAME_IMAGE='paradoxalarminterface/pai'
-NAME_BUILDER=mybuilder
 VERSION_ALPINE=3.11
 VERSION_PYTHON=3.7
 
@@ -57,17 +56,6 @@ function build_push_pull_image () {
     docker pull "${NAME_IMAGE}:${NAME_TAG}"
 
     return $?
-}
-
-function create_builder () {
-    echo '- Create builder: ' $1
-    docker buildx ls | grep $1 1>/dev/null
-    [ $? -ne 0 ] && {
-        docker buildx create --name $1
-        return $?
-    }
-
-    return 0
 }
 
 function create_manifest () {
@@ -111,10 +99,9 @@ fi
 
 login_docker
 
-create_builder $NAME_BUILDER
+docker buildx create --use
 
 echo '- Start build:'
-docker buildx use $NAME_BUILDER
 docker buildx inspect --bootstrap
 
 # Build ARMv6
@@ -149,10 +136,6 @@ build_push_pull_image
 
 echo "- Inspect built image of: ${NAME_IMAGE}"
 docker buildx imagetools inspect $NAME_IMAGE
-
-echo '- Switch back builder to default:'
-docker buildx stop $NAME_BUILDER
-docker buildx use default
 
 # Create manifest
 LIST_IMAGE_INCLUDE="$NAME_IMAGE:${DOCKER_IMAGE_TAG}-armv6 $NAME_IMAGE:${DOCKER_IMAGE_TAG}-armv7 $NAME_IMAGE:${DOCKER_IMAGE_TAG}-arm64 $NAME_IMAGE:${DOCKER_IMAGE_TAG}-amd64 $NAME_IMAGE:${DOCKER_IMAGE_TAG}-i386"
