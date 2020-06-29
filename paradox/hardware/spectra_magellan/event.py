@@ -116,14 +116,14 @@ event_map = {
                 message="Partition {label} armed",
             ),
             13: dict(
-                level=EventLevel.DEBUG,
+                level=EventLevel.INFO,
                 change=dict(entry_delay=True),
-                message="Partition {label} entry delay started",
+                message="Partition {label} in entry delay",
             ),
             14: dict(
-                level=EventLevel.DEBUG,
+                level=EventLevel.INFO,
                 change=dict(exit_delay=True),
-                message="Partition {label} exit delay started",
+                message="Partition {label} in exit delay",
             ),
             15: dict(level=EventLevel.DEBUG, message="Pre-alarm delay"),
             16: dict(level=EventLevel.DEBUG, message="Report confirmation"),
