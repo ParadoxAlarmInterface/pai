@@ -35,6 +35,16 @@ def test_set():
     assert a["El 1"]["test"] == "two"
 
 
+def test_delete():
+    a = ElementTypeContainer({1: {"key": "El 1"}, 2: {"key": "El 2"}})
+
+    del a["El 1"]
+
+    assert a["El 2"]["key"] == "El 2"
+    with pytest.raises(KeyError):
+        a["El 1"]
+
+
 def test_contains():
     a = ElementTypeContainer({1: {"key": "El 1"}, 2: {"key": "El 2"}})
     assert "El 1" in a
@@ -53,3 +63,49 @@ def test_select():
     assert a.select("2") == [2]
     assert len(a.select("El 2")) == 1
     assert a.select("El 2") == [2]
+
+    assert len(a.select([1, 2])) == 2
+    assert a.select([1, 2]) == [1, 2]
+    assert a.select(["El 1", "El 2"]) == [1, 2]
+
+
+def test_filter():
+    a = ElementTypeContainer({1: {"key": "El 1"}, 2: {"key": "El 2"}})
+
+    a.filter(["El 1", "El 2"])
+
+    assert len(a) == 2
+
+    a.filter(["El 1"])  # drops El 2
+
+    assert len(a) == 1
+
+    a.filter([1])
+
+    assert len(a) == 1
+
+    a.filter([2])  # 2 does not exist
+
+    assert len(a) == 0
+
+def test_text_index_updates():
+    a = ElementTypeContainer({1: {"key": "El 1"}, 2: {"key": "El 2"}})
+    assert len(a.key_index) == 2
+
+    a[3] = {"key": "El 3"}
+    assert len(a.key_index) == 3
+
+    a.filter([1,3])
+
+    assert len(a.key_index) == 2
+
+    assert a["El 1"]["key"] == "El 1"
+    assert a["El 3"]["key"] == "El 3"
+    with pytest.raises(KeyError):
+        a[2]
+
+    del a["El 1"]
+    assert len(a.key_index) == 1
+
+    with pytest.raises(KeyError):
+        a[1]
