@@ -32,24 +32,25 @@ class ElementTypeContainer(dict):
         if needle == "all" or needle == "0":
             selected = list(self)
         else:
-            if needle.isdigit() and 0 < int(needle) < len(self):
-                el = self.get(int(needle))
-            else:
-                el = self.get(needle)
-
-            if el:
-                if "id" not in el:
-                    raise Exception("Invalid dictionary of elements provided")
-                selected = [el["id"]]
+            index = self.get_index(needle)
+            if index:
+                selected = [index]
 
         return selected
 
     def deep_merge(self, *dicts):
         deep_merge(self, *dicts)
 
-    def get(self, k, default=None):
+    def get_index(self, key):
+        e = self.get(key)
+        if e:
+            for k, v in self.items():
+                if v == e:
+                    return k
+
+    def get(self, key, default=None):
         try:
-            return self.__getitem__(k)
+            return self.__getitem__(key)
         except KeyError:
             return default
 
