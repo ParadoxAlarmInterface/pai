@@ -4,6 +4,7 @@ import asyncio
 import logging
 import time
 from binascii import hexlify
+from datetime import datetime
 from typing import Callable, Iterable, Optional, Sequence
 
 from construct import Container
@@ -188,9 +189,6 @@ class Paradox:
         try:
             if not await self.connect():
                 return False
-
-            if cfg.SYNC_TIME:
-                await self.sync_time()
 
             logger.info("Loading data from panel memory")
             await self.panel.load_memory()
@@ -635,6 +633,10 @@ class Paradox:
 
         self._update_partition_states()
 
+        if cfg.SYNC_TIME:
+            if self._check_if_time_sync_required():
+                self.work_loop.create_task(self.sync_time())
+
     def _process_trouble_statuses(self, trouble_statuses):
         global_trouble = False
         for t_key, t_status in trouble_statuses.items():
@@ -651,6 +653,21 @@ class Paradox:
         self.storage.update_container_object(
             "system", "troubles", {"trouble": global_trouble}
         )
+
+    def _check_if_time_sync_required(self):
+        try:
+            drift = (
+                datetime.now() - self.storage.get_container("system")["date"]["time"]
+            ).total_seconds()
+
+            if abs(drift) > cfg.SYNC_TIME_MIN_DRIFT:
+                logger.info(f"Time drifted more than allowed: {drift} seconds")
+                return True
+            else:
+                logger.debug(f"Time drifted within allowed range: {drift} seconds")
+
+        except KeyError:
+            return False
 
     def _update_partition_states(self):
         """

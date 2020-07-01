@@ -26,9 +26,14 @@ class ElementTypeContainer(dict):
         id_arr = self.select(keys)
         remove_keys = set(self.keys()) - set(id_arr)
         for i in remove_keys:
-            self.__delitem__(i)
+            try:
+                self.__delitem__(i)
+            except KeyError:
+                pass
 
-    def select(self, needle: Union[str, int, Sequence[Union[int, str]]]) -> Sequence[int]:
+    def select(
+        self, needle: Union[str, int, Sequence[Union[int, str]]]
+    ) -> Sequence[int]:
         """
         Helper function to select objects from provided dictionary
 
@@ -40,14 +45,14 @@ class ElementTypeContainer(dict):
             return list(self)
 
         else:
-            if not isinstance(needle, list):
+            if not isinstance(needle, (list, set)):
                 needle = [needle]
 
             selected = []
 
             for n in needle:
                 index = self.get_index(n)
-                if index:
+                if index is not None:
                     selected.append(index)
 
             return selected
@@ -59,7 +64,7 @@ class ElementTypeContainer(dict):
         if isinstance(key, int):
             return key
         e = self.get(key)
-        if e:
+        if e is not None:
             for k, v in self.items():
                 if v == e:
                     return k
@@ -80,6 +85,7 @@ class ElementTypeContainer(dict):
             e = self.key_index.get(key)
             if e is not None:
                 return e
+
         return super(ElementTypeContainer, self).__getitem__(key)
 
     def __setitem__(self, key: Union[str, int], value):
@@ -91,11 +97,14 @@ class ElementTypeContainer(dict):
 
     def __delitem__(self, key: Union[str, int]):
         key = self.get_index(key)
-        el = self[key]
-        if isinstance(el, dict) and "key" in el:
-            text_key = el["key"]
+        try:
+            el = self[key]
+            if isinstance(el, dict) and "key" in el:
+                text_key = el["key"]
 
-            del self.key_index[text_key]
+                del self.key_index[text_key]
+        except KeyError:
+            pass
 
         super(ElementTypeContainer, self).__delitem__(self.__keytransform__(key))
 

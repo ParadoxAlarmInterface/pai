@@ -54,7 +54,8 @@ import logging
 # LABEL_ENCODING = 'utf-8'                # Encoding to use when decoding labels
 # LABEL_REFRESH_INTERVAL = 15 * 60        # Interval between refresh of labels
 # OUTPUT_PULSE_DURATION = 1               # Duration of a PGM pulse in seconds
-# SYNC_TIME = False    			# Update panel time
+# SYNC_TIME = False    			# Update panel time periodically when time drifts more than SYNC_TIME_MIN_DRIFT
+# SYNC_TIME_MIN_DRIFT = 60    	# Minimum time drift in seconds to initiate time sync
 # PASSWORD = '0000'   			# PC Password. Set to None if Panel has no Password.
 #                                 # In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) ->
 #                                 # PC Communication (Babyware) Tab.

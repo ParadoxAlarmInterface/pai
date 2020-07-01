@@ -4,7 +4,9 @@ import pytest
 from construct import Container
 
 from paradox.lib.async_message_manager import (AsyncMessageManager,
-                                               EventMessageHandler, PersistentMessageHandler)
+                                               EventMessageHandler,
+                                               PersistentMessageHandler)
+
 
 @pytest.mark.asyncio
 async def test_persistent_handler(mocker):
@@ -101,5 +103,3 @@ async def test_handler_exception(mocker):
         await mm.schedule_message_handling(msg)
 
     assert len(mm.handler_registry.handlers) == 1
-
-
