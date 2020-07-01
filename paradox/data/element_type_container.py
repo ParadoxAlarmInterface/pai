@@ -40,7 +40,7 @@ class ElementTypeContainer(dict):
             return list(self)
 
         else:
-            if not isinstance(needle, Sequence):
+            if not isinstance(needle, list):
                 needle = [needle]
 
             selected = []
