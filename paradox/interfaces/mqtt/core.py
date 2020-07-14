@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import ssl
 import socket
 import sys
 import time
@@ -82,6 +83,15 @@ class MQTTConnection(Client):
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
             self.username_pw_set(username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
 
+        if cfg.MQTT_TLS_CERT_PATH is not None and cfg.MQTT_TLS_PORT is not None:
+            self.tls_set(ca_certs=cfg.MQTT_TLS_CERT_PATH,
+                certfile=None,
+                keyfile=None,
+                cert_reqs=ssl.CERT_REQUIRED,
+                tls_version=ssl.PROTOCOL_TLSv1_2,
+                ciphers=None)
+            self.tls_insecure_set(False)
+
         self.will_set(self.availability_topic, "offline", 0, retain=True)
 
         self.on_log = self.on_client_log
@@ -113,13 +123,17 @@ class MQTTConnection(Client):
 
     def start(self):
         if self.state == ConnectionState.NEW:
+            if cfg.MQTT_TLS_CERT_PATH is not None and cfg.MQTT_TLS_PORT is not None:
+                PORT = cfg.MQTT_TLS_PORT
+            else:
+                PORT = cfg.MQTT_PORT
             self.loop_start()
 
             # TODO: Some initial connection retry mechanism required
             try:
                 self.connect_async(
                     host=cfg.MQTT_HOST,
-                    port=cfg.MQTT_PORT,
+                    port=PORT,
                     keepalive=cfg.MQTT_KEEPALIVE,
                     bind_address=cfg.MQTT_BIND_ADDRESS,
                     bind_port=cfg.MQTT_BIND_PORT,

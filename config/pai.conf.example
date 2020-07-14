@@ -68,6 +68,8 @@ import logging
 # MQTT_ENABLE = False			# Enable MQTT Interface
 # MQTT_HOST = '127.0.0.1' 		# Hostname or address
 # MQTT_PORT = 1883        		# TCP Port
+# MQTT_TLS_PORT = 8883 			# TLS Port
+# MQTT_TLS_CERT_PATH = None		# Path to ca cert (/etc/pai/certs/ca.pem)
 # MQTT_KEEPALIVE = 60     		# Keep alive
 # MQTT_USERNAME = None    		# MQTT Username for authentication
 # MQTT_PASSWORD = None    		# MQTT Password
