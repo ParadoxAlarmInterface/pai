@@ -6,7 +6,8 @@ import pytest
 from construct import Container
 
 from paradox.hardware.evo.parsers import LiveEvent, ReadEEPROMResponse
-from paradox.lib.async_message_manager import (AsyncMessageManager, PersistentMessageHandler)
+from paradox.lib.async_message_manager import (AsyncMessageManager,
+                                               PersistentMessageHandler)
 
 
 class EventMessageHandler(PersistentMessageHandler):
@@ -15,7 +16,7 @@ class EventMessageHandler(PersistentMessageHandler):
 
 
 def print_beer(m):
-    print('beer')
+    print("beer")
 
 
 def test_event_handler():
@@ -88,9 +89,13 @@ def test_handler_two_messages():
     # running
     task_handle_wait = loop.create_task(asyncio.sleep(0.1))
     task_get_eeprom = loop.create_task(get_eeprom_result(mh))
-    task_handle_event1 = mh.schedule_message_handling(LiveEvent.parse(event_response_bin))
+    task_handle_event1 = mh.schedule_message_handling(
+        LiveEvent.parse(event_response_bin)
+    )
     mh.schedule_message_handling(ReadEEPROMResponse.parse(eeprom_response_bin))
-    task_handle_event2 = mh.schedule_message_handling(LiveEvent.parse(event_response_bin))
+    task_handle_event2 = mh.schedule_message_handling(
+        LiveEvent.parse(event_response_bin)
+    )
 
     # assert 2 == len(mh.handlers)
 
@@ -122,7 +127,9 @@ def test_handler_timeout():
             "524700009f0041133e001e0e0400000000060a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000121510010705004e85"
         )
 
-        return await mhm.schedule_message_handling(ReadEEPROMResponse.parse(eeprom_response_bin))
+        return await mhm.schedule_message_handling(
+            ReadEEPROMResponse.parse(eeprom_response_bin)
+        )
 
     loop = asyncio.get_event_loop()
     mh = AsyncMessageManager(loop)
