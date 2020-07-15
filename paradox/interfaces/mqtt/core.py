@@ -83,7 +83,7 @@ class MQTTConnection(Client):
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
             self.username_pw_set(username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
 
-        if cfg.MQTT_TLS_CERT_PATH is not None and cfg.MQTT_TLS_PORT is not None:
+        if cfg.MQTT_TLS_CERT_PATH is not None:
             self.tls_set(ca_certs=cfg.MQTT_TLS_CERT_PATH,
                 certfile=None,
                 keyfile=None,
