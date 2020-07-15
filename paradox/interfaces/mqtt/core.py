@@ -123,17 +123,13 @@ class MQTTConnection(Client):
 
     def start(self):
         if self.state == ConnectionState.NEW:
-            if cfg.MQTT_TLS_CERT_PATH is not None and cfg.MQTT_TLS_PORT is not None:
-                PORT = cfg.MQTT_TLS_PORT
-            else:
-                PORT = cfg.MQTT_PORT
             self.loop_start()
 
             # TODO: Some initial connection retry mechanism required
             try:
                 self.connect_async(
                     host=cfg.MQTT_HOST,
-                    port=PORT,
+                    port=cfg.MQTT_PORT,
                     keepalive=cfg.MQTT_KEEPALIVE,
                     bind_address=cfg.MQTT_BIND_ADDRESS,
                     bind_port=cfg.MQTT_BIND_PORT,
