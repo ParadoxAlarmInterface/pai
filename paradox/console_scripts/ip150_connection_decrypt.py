@@ -32,46 +32,63 @@ class PayloadParser:
     def parse(self, parsed):
         message_type = parsed.header.message_type
         if message_type == IPMessageType.serial_passthrough_request:
-            parsed_payload = self.panel.parse_message(parsed.payload)
+            self._parse_serial_passthrough_request(parsed)
+        elif message_type == IPMessageType.serial_passthrough_response:
+            self._parse_serial_passthrough_response(parsed)
+        elif message_type == IPMessageType.ip_request:
+            self._parse_ip_request(parsed)
+        elif message_type == IPMessageType.ip_response:
+            self._parse_ip_response(parsed)
+
+    def _parse_ip_response(self, parsed):
+        if parsed.header.command == IPMessageCommand.connect:
+            print(IPPayloadConnectResponse.parse(parsed.payload))
+        else:
+            print(f"No parser for ip_response payload: {binascii.hexlify(parsed.payload)}")
+
+    def _parse_serial_passthrough_response(self, parsed):
+        parsed_payload = self.panel.parse_message(
+            parsed.payload, direction="frompanel"
+        )
+        if parsed_payload is not None:
             if parsed_payload is not None:
                 print(parsed_payload)
             else:
-                print("No parser available for the message")
-        elif message_type == IPMessageType.serial_passthrough_response:
-            parsed_payload = self.panel.parse_message(
-                parsed.payload, direction="frompanel"
-            )
-            if parsed_payload is not None:
-                if parsed_payload is not None:
-                    print(parsed_payload)
-                else:
-                    print("No parser available for the message")
+                print(f"No parser for serial_passthrough_response payload: {binascii.hexlify(parsed.payload)}")
 
-                if parsed_payload.fields.value.po.command == 0:  # panel detection
-                    self.panel = create_panel(None, parsed_payload)
-                if parsed_payload.fields.value.po.command == 5:  # eeprom/ram read
-                    if (
-                        "control" in parsed_payload.fields.value
-                        and parsed_payload.fields.value.control.ram_access
-                        and parsed_payload.fields.value.control._eeprom_address_bits
-                        == 0
-                        and parsed_payload.fields.value.bus_address == 0
-                    ):
-                        ram_address = parsed_payload.fields.value.address
-                        ram_parser = self.panel.get_message("RAMDataParserMap").get(
-                            ram_address
-                        )
-                        if ram_parser is not None:
-                            print(ram_parser.parse(parsed_payload.fields.value.data))
-                        else:
-                            print(
-                                f"No parser for {ram_address} ram address, data: {binascii.hexlify(parsed_payload.fields.value.data)}"
-                            )
-        elif message_type == IPMessageType.ip_request:
-            pass
-        elif message_type == IPMessageType.ip_response:
-            if parsed.header.command == IPMessageCommand.connect:
-                print(IPPayloadConnectResponse.parse(parsed.payload))
+            if parsed_payload.fields.value.po.command == 0:  # panel detection
+                self.panel = create_panel(None, parsed_payload)
+            if parsed_payload.fields.value.po.command == 5:  # eeprom/ram read
+                self._parse_serial_passthrough_eeprom_read(parsed_payload)
+
+    def _parse_serial_passthrough_eeprom_read(self, parsed_payload):
+        if (
+                "control" in parsed_payload.fields.value
+                and parsed_payload.fields.value.control.ram_access
+                and parsed_payload.fields.value.control._eeprom_address_bits
+                == 0
+                and parsed_payload.fields.value.bus_address == 0
+        ):
+            ram_address = parsed_payload.fields.value.address
+            ram_parser = self.panel.get_message("RAMDataParserMap").get(
+                ram_address
+            )
+            if ram_parser is not None:
+                print(ram_parser.parse(parsed_payload.fields.value.data))
+            else:
+                print(
+                    f"No parser for {ram_address} ram address, data: {binascii.hexlify(parsed_payload.fields.value.data)}"
+                )
+
+    def _parse_serial_passthrough_request(self, parsed):
+        parsed_payload = self.panel.parse_message(parsed.payload)
+        if parsed_payload is not None:
+            print(parsed_payload)
+        else:
+            print(f"No parser for serial_passthrough_request payload: {binascii.hexlify(parsed.payload)}")
+
+    def _parse_ip_request(self, parsed):
+        print(f"No parser for ip_request payload: {binascii.hexlify(parsed.payload)}")
 
 
 def decrypt_file(file, password):
