@@ -147,7 +147,7 @@ def main():
         "package, 'Follow->TCP Stream', 'Show and save data as': "
         "'YAML', copy contents to a file.",
     )
-    parser.add_argument("password", type=str, help="IP Module password for decryption")
+    parser.add_argument("password", type=str, default="paradox", help="IP Module password for decryption")
 
     args = parser.parse_args()
 
