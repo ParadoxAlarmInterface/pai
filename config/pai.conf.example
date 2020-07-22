@@ -97,6 +97,7 @@ import logging
 # MQTT_RAW_TOPIC = 'raw'
 #
 # MQTT_NOTIFICATIONS_TOPIC = 'notifications'
+# MQTT_SEND_PANIC_TOPIC = 'panic'
 # MQTT_PUBLISH_RAW_EVENTS = True
 # MQTT_INTERFACE_TOPIC = 'interface'
 # MQTT_TOGGLE_CODES = {}

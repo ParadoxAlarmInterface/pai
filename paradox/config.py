@@ -115,6 +115,7 @@ class Config(object):
         "MQTT_STATES_TOPIC": "states",
         "MQTT_RAW_TOPIC": "raw",
         "MQTT_NOTIFICATIONS_TOPIC": "notifications",
+        "MQTT_SEND_PANIC_TOPIC": "panic",
         "MQTT_PUBLISH_RAW_EVENTS": True,
         "MQTT_PUBLISH_DEFINITIONS": False,  # Publish definitions of partitions/zones/users to mqtt.
         "MQTT_INTERFACE_TOPIC": "interface",

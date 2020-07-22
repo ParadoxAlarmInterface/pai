@@ -309,3 +309,21 @@ class Panel(PanelBase):
                     accepted = True
 
         return accepted
+
+    async def send_panic(self, partition, panic_type, user_id):
+        accepted = False
+
+        args = {
+            "partition": partition,
+            "panic_type": "panic_type",
+            "user_id": user_id
+        }
+
+        reply = await self.core.send_wait(
+            parsers.SendPanicAction, args, reply_expected=0x04
+        )
+
+        if reply is not None:
+            accepted = True
+
+        return accepted

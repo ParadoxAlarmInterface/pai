@@ -485,6 +485,25 @@ class Paradox:
 
         return accepted
 
+    async def send_panic(self, partition_id, panic_type, user_id) -> bool:
+        logger.debug("Send panic: {}, user: {}, type: {}".format(partition_id, user_id, panic_type))
+
+        partition = self.storage.get_container_object("partition", partition_id)
+        user = self.storage.get_container_object("user", user_id)
+
+        if partition is None or user is None:
+            logger.error("Send panic: user or partition is not found")
+
+        try:
+            return await self.panel.send_panic(partition["id"], panic_type, user["id"])
+        except NotImplementedError:
+            logger.error("send_panic is not implemented for this alarm type")
+        except asyncio.CancelledError:
+            logger.error("send_panic canceled")
+        except asyncio.TimeoutError:
+            logger.error("send_panic timeout")
+
+
     def get_label(self, label_type: str, label_id) -> Optional[str]:
         el = self.storage.get_container_object(label_type, label_id)
         if el:

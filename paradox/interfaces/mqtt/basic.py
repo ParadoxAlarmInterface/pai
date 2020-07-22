@@ -121,8 +121,12 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             self._mqtt_handle_partition_control,
         )
         self.subscribe_callback(
-            "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_NOTIFICATIONS_TOPIC, "#"),
+            "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_NOTIFICATIONS_TOPIC, "+"),
             self._mqtt_handle_notifications,
+        )
+        self.subscribe_callback(
+            "{}/{}/{}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_SEND_PANIC_TOPIC, "+", "+"),
+            self._mqtt_handle_send_panic,
         )
 
         if not self.connected_future.done():
@@ -233,6 +237,24 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
         if not await self.alarm.control_output(element, command):
             logger.warning("Output command refused: {}={}".format(element, command))
+
+    @mqtt_handle_decorator
+    async def _mqtt_handle_send_panic(self, prep: ParsedMessage):
+        topics, partition, userid = prep
+
+        panic_type = topics[2]
+
+        if cfg.MQTT_CHALLENGE_SECRET is not None:
+            command = self._validate_command_with_challenge(userid)
+
+            if command is None:
+                return
+
+        logger.debug("Send panic command: partition: {}, user: {}, type: {}".format(partition, userid, panic_type))
+
+        if not await self.alarm.send_panic(partition, panic_type, userid):
+            logger.warning("Send panic command refused: {}, user: {}, type: {}".format(partition, userid, panic_type))
+
 
     def _handle_panel_event(self, event: Event):
         """
