@@ -110,6 +110,12 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         )
         self.subscribe_callback(
             "{}/{}/{}/#".format(
+                cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC, cfg.MQTT_DOOR_TOPIC
+            ),
+            self._mqtt_handle_door_control,
+        )
+        self.subscribe_callback(
+            "{}/{}/{}/#".format(
                 cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC, cfg.MQTT_ZONE_TOPIC
             ),
             self._mqtt_handle_zone_control,
@@ -255,6 +261,21 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         if not await self.alarm.send_panic(partition, panic_type, userid):
             logger.warning("Send panic command refused: {}, user: {}, type: {}".format(partition, userid, panic_type))
 
+
+    @mqtt_handle_decorator
+    async def _mqtt_handle_door_control(self, prep: ParsedMessage):
+        topics, element, command = prep
+
+        if cfg.MQTT_CHALLENGE_SECRET is not None:
+            command = self._validate_command_with_challenge(command)
+
+            if command is None:
+                return
+
+        logger.debug("Door command: {} = {}".format(element, command))
+
+        if not await self.alarm.control_door(element, command):
+            logger.warning("Door command refused: {}={}".format(element, command))
 
     def _handle_panel_event(self, event: Event):
         """

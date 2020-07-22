@@ -111,6 +111,7 @@ class Config(object):
         "MQTT_HOMEASSISTANT_CONTROL_TOPIC": "hass_control",
         "MQTT_HOMEASSISTANT_DISCOVERY_PREFIX": "homeassistant",
         "MQTT_OUTPUT_TOPIC": "outputs",
+        "MQTT_DOOR_TOPIC": "doors",
         "MQTT_KEYPAD_TOPIC": "keypads",
         "MQTT_STATES_TOPIC": "states",
         "MQTT_RAW_TOPIC": "raw",

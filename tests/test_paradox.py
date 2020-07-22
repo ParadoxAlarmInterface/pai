@@ -22,4 +22,17 @@ async def test_send_panic(mocker):
     alarm.panel.send_panic.assert_called_once_with(1, "fire", 3)
 
 
+@pytest.mark.asyncio
+async def test_control_doors(mocker):
+    alarm = Paradox()
+    alarm.panel = mocker.Mock(spec=Panel)
+    alarm.panel.control_doors = CoroutineMock()
 
+    alarm.storage.get_container("door").deep_merge({1: {"id": 1, "key": "Door 1"}})
+
+    assert await alarm.control_door("1", "unlock")
+    alarm.panel.control_doors.assert_called_once_with([1], "unlock")
+    alarm.panel.control_doors.reset_mock()
+
+    assert await alarm.control_door("Door 1", "unlock")
+    alarm.panel.control_doors.assert_called_once_with([1], "unlock")

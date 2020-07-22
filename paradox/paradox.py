@@ -503,6 +503,34 @@ class Paradox:
         except asyncio.TimeoutError:
             logger.error("send_panic timeout")
 
+    async def control_door(self, door, command) -> bool:
+        command = command.lower()
+        logger.debug("Control Door: {} - {}".format(door, command))
+
+        doors_selected = self.storage.get_container("door").select(door)
+
+        # Not Found
+        if len(doors_selected) == 0:
+            logger.error("No doors selected")
+            return False
+
+        # Apply state changes
+        accepted = False
+        try:
+            accepted = await self.panel.control_doors(doors_selected, command)
+        except NotImplementedError:
+            logger.error("control_door is not implemented for this alarm type")
+        except asyncio.CancelledError:
+            logger.error("control_door canceled")
+        except asyncio.TimeoutError:
+            logger.error("control_door timeout")
+        # Apply state changes
+
+        # Refresh status
+        self.request_status_refresh()  # Trigger status update
+
+        return accepted
+
 
     def get_label(self, label_type: str, label_id) -> Optional[str]:
         el = self.storage.get_container_object(label_type, label_id)

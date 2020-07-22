@@ -360,6 +360,10 @@ class Panel:
         raise NotImplementedError("override control_outputs in a subclass")
 
     @abstractmethod
+    def control_doors(self, doors, command) -> bool:
+        raise NotImplementedError("override control_doors in a subclass")
+
+    @abstractmethod
     def dump_memory(self, file, memory_type):
         raise NotImplementedError("override dump_memory in a subclass")
 
