@@ -500,7 +500,7 @@ class Paradox:
             logger.error("Send panic: user or partition is not found")
 
         try:
-            return await self.panel.send_panic(partition["id"], panic_type, user["id"])
+            return await self.panel.send_panic([partition["id"]], panic_type, user["id"])
         except NotImplementedError:
             logger.error("send_panic is not implemented for this alarm type")
         except asyncio.CancelledError:

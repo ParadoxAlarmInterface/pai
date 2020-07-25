@@ -910,9 +910,9 @@ SendPanicAction = Struct(  # Supported on firmware versions 7.15+
             "packet_length" / PacketLength(Int8ub),
             "unknown0" / Const(0x09, Int8ub),
             "_not_used" / Padding(3),
-            "user_id" / Int16ul,
+            "user_id" / Int16ub,
             "panic_type" / Enum(Int8ub, emergency=0, medical=1, fire=2,),  # wild guess
-            "partition" / Int8ub,
+            "partitions" / BitsSwapped(Bitwise(EnumerationAdapter(Array(8, Flag)))),
         )
     ),
     "checksum" / PacketChecksum(Bytes(1)),

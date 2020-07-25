@@ -17,11 +17,11 @@ async def test_send_panic(mocker):
     alarm.storage.get_container("user").deep_merge({3: {"id": 3, "key": "User 3"}})
 
     assert await alarm.send_panic("1", "fire", "3")
-    alarm.panel.send_panic.assert_called_once_with(1, "fire", 3)
+    alarm.panel.send_panic.assert_called_once_with([1], "fire", 3)
     alarm.panel.send_panic.reset_mock()
 
     assert await alarm.send_panic("Partition 1", "fire", "User 3")
-    alarm.panel.send_panic.assert_called_once_with(1, "fire", 3)
+    alarm.panel.send_panic.assert_called_once_with([1], "fire", 3)
 
 
 @pytest.mark.asyncio
