@@ -28,6 +28,12 @@ def mqtt_handle_decorator(
         typing.Coroutine[None, "BasicMQTTInterface", ParsedMessage],
     ]
 ):
+    async def try_func(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except:
+            logger.exception('Exception executing MQTT function')
+
     def wrapper(
         self: "BasicMQTTInterface", client: Client, userdata, message: MQTTMessage
     ):
@@ -68,7 +74,7 @@ def mqtt_handle_decorator(
             if len(topics) >= 4:
                 element = topics[3]
 
-            call_soon_in_main_loop(func(self, ParsedMessage(topics, element, content)))
+            call_soon_in_main_loop(try_func(self, ParsedMessage(topics, element, content)))
         except:
             logger.exception("Failed to execute command")
 
