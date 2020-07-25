@@ -131,7 +131,9 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             self._mqtt_handle_notifications,
         )
         self.subscribe_callback(
-            "{}/{}/{}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_SEND_PANIC_TOPIC, "+", "+"),
+            "{}/{}/{}/{}".format(
+                cfg.MQTT_BASE_TOPIC, cfg.MQTT_SEND_PANIC_TOPIC, "+", "+"
+            ),
             self._mqtt_handle_send_panic,
         )
 
@@ -256,11 +258,18 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             if command is None:
                 return
 
-        logger.debug("Send panic command: partition: {}, user: {}, type: {}".format(partition, userid, panic_type))
+        logger.debug(
+            "Send panic command: partition: {}, user: {}, type: {}".format(
+                partition, userid, panic_type
+            )
+        )
 
         if not await self.alarm.send_panic(partition, panic_type, userid):
-            logger.warning("Send panic command refused: {}, user: {}, type: {}".format(partition, userid, panic_type))
-
+            logger.warning(
+                "Send panic command refused: {}, user: {}, type: {}".format(
+                    partition, userid, panic_type
+                )
+            )
 
     @mqtt_handle_decorator
     async def _mqtt_handle_door_control(self, prep: ParsedMessage):

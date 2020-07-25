@@ -26,7 +26,14 @@ setup(
     install_requires=["construct~=2.9.43", "argparse>=1.4.0"],
     python_requires=">=3.6",
     setup_requires=["wheel"] + pytest_runner,
-    tests_require=["pytest", "pytest-asyncio", "pytest-env", "pytest-mock", "mock", "asynctest"],
+    tests_require=[
+        "pytest",
+        "pytest-asyncio",
+        "pytest-env",
+        "pytest-mock",
+        "mock",
+        "asynctest",
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: Eclipse Public License 2.0 (EPL-2.0)",

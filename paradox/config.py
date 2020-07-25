@@ -82,8 +82,15 @@ class Config(object):
         # MQTT
         "MQTT_ENABLE": False,  # Enable MQTT Interface
         "MQTT_HOST": "127.0.0.1",  # Hostname or address
-        "MQTT_PORT": (1883, int, (1, 65535)),  # TCP Port (TLS port if MQTT_TLS_CERT_PATH is set)
-        "MQTT_TLS_CERT_PATH" : (None, [str, type(None)]),  # Path to ca cert (/etc/pai/certs/ca.pem), if you want TLS
+        "MQTT_PORT": (
+            1883,
+            int,
+            (1, 65535),
+        ),  # TCP Port (TLS port if MQTT_TLS_CERT_PATH is set)
+        "MQTT_TLS_CERT_PATH": (
+            None,
+            [str, type(None)],
+        ),  # Path to ca cert (/etc/pai/certs/ca.pem), if you want TLS
         "MQTT_KEEPALIVE": (60, int, (1, 3600)),  # Keep alive
         "MQTT_USERNAME": (None, [str, type(None)]),  # MQTT Username for authentication
         "MQTT_PASSWORD": (None, [str, type(None)]),  # MQTT Password

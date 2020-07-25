@@ -11,7 +11,9 @@ async def test_send_panic(mocker):
     alarm.panel = mocker.Mock(spec=Panel)
     alarm.panel.send_panic = CoroutineMock()
 
-    alarm.storage.get_container("partition").deep_merge({1: {"id": 1, "key": "Partition 1"}})
+    alarm.storage.get_container("partition").deep_merge(
+        {1: {"id": 1, "key": "Partition 1"}}
+    )
     alarm.storage.get_container("user").deep_merge({3: {"id": 3, "key": "User 3"}})
 
     assert await alarm.send_panic("1", "fire", "3")

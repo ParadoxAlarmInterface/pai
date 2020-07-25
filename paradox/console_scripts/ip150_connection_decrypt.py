@@ -44,17 +44,19 @@ class PayloadParser:
         if parsed.header.command == IPMessageCommand.connect:
             print(IPPayloadConnectResponse.parse(parsed.payload))
         else:
-            print(f"No parser for ip_response payload: {binascii.hexlify(parsed.payload)}")
+            print(
+                f"No parser for ip_response payload: {binascii.hexlify(parsed.payload)}"
+            )
 
     def _parse_serial_passthrough_response(self, parsed):
-        parsed_payload = self.panel.parse_message(
-            parsed.payload, direction="frompanel"
-        )
+        parsed_payload = self.panel.parse_message(parsed.payload, direction="frompanel")
         if parsed_payload is not None:
             if parsed_payload is not None:
                 print(parsed_payload)
             else:
-                print(f"No parser for serial_passthrough_response payload: {binascii.hexlify(parsed.payload)}")
+                print(
+                    f"No parser for serial_passthrough_response payload: {binascii.hexlify(parsed.payload)}"
+                )
 
             if parsed_payload.fields.value.po.command == 0:  # panel detection
                 self.panel = create_panel(None, parsed_payload)
@@ -63,16 +65,13 @@ class PayloadParser:
 
     def _parse_serial_passthrough_eeprom_read(self, parsed_payload):
         if (
-                "control" in parsed_payload.fields.value
-                and parsed_payload.fields.value.control.ram_access
-                and parsed_payload.fields.value.control._eeprom_address_bits
-                == 0
-                and parsed_payload.fields.value.bus_address == 0
+            "control" in parsed_payload.fields.value
+            and parsed_payload.fields.value.control.ram_access
+            and parsed_payload.fields.value.control._eeprom_address_bits == 0
+            and parsed_payload.fields.value.bus_address == 0
         ):
             ram_address = parsed_payload.fields.value.address
-            ram_parser = self.panel.get_message("RAMDataParserMap").get(
-                ram_address
-            )
+            ram_parser = self.panel.get_message("RAMDataParserMap").get(ram_address)
             if ram_parser is not None:
                 print(ram_parser.parse(parsed_payload.fields.value.data))
             else:
@@ -85,7 +84,9 @@ class PayloadParser:
         if parsed_payload is not None:
             print(parsed_payload)
         else:
-            print(f"No parser for serial_passthrough_request payload: {binascii.hexlify(parsed.payload)}")
+            print(
+                f"No parser for serial_passthrough_request payload: {binascii.hexlify(parsed.payload)}"
+            )
 
     def _parse_ip_request(self, parsed):
         print(f"No parser for ip_request payload: {binascii.hexlify(parsed.payload)}")
@@ -147,7 +148,12 @@ def main():
         "package, 'Follow->TCP Stream', 'Show and save data as': "
         "'YAML', copy contents to a file.",
     )
-    parser.add_argument("password", type=str, default="paradox", help="IP Module password for decryption")
+    parser.add_argument(
+        "password",
+        type=str,
+        default="paradox",
+        help="IP Module password for decryption",
+    )
 
     args = parser.parse_args()
 
