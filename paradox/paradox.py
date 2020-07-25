@@ -22,6 +22,7 @@ from paradox.hardware import Panel, create_panel
 from paradox.lib import ps
 from paradox.lib.async_message_manager import (ErrorMessageHandler,
                                                EventMessageHandler)
+from paradox.lib.handlers import PersistentHandler
 from paradox.lib.utils import deep_merge
 from paradox.parsers.status import convert_raw_status
 
@@ -68,9 +69,7 @@ class Paradox:
                 from paradox.connections.serial_connection import SerialCommunication
 
                 self._connection = SerialCommunication(
-                    self.on_connection_message,
-                    port=cfg.SERIAL_PORT,
-                    baud=cfg.SERIAL_BAUD,
+                    port=cfg.SERIAL_PORT, baud=cfg.SERIAL_BAUD,
                 )
             elif cfg.CONNECTION_TYPE == "IP":
                 logger.info("Using IP Connection")
@@ -78,7 +77,6 @@ class Paradox:
                 from paradox.connections.ip.connection import IPConnection
 
                 self._connection = IPConnection(
-                    self.on_connection_message,
                     host=cfg.IP_CONNECTION_HOST,
                     port=cfg.IP_CONNECTION_PORT,
                     password=cfg.IP_CONNECTION_PASSWORD,
@@ -93,6 +91,10 @@ class Paradox:
         return self._connection
 
     def _register_connection_handlers(self):
+        self.connection.register_raw_handler(
+            PersistentHandler(self.on_connection_message)
+        )
+
         self.connection.register_handler(EventMessageHandler(self.handle_event_message))
         self.connection.register_handler(ErrorMessageHandler(self.handle_error_message))
 
@@ -323,10 +325,9 @@ class Paradox:
                 )
                 return
 
-            if self.run_state != RunState.PAUSE:
-                self.connection.schedule_message_handling(
-                    recv_message
-                )  # schedule handling in the loop
+            self.connection.schedule_message_handling(
+                recv_message
+            )  # schedule handling in the loop
         except:
             logger.exception("Error parsing message")
 
@@ -486,7 +487,11 @@ class Paradox:
         return accepted
 
     async def send_panic(self, partition_id, panic_type, user_id) -> bool:
-        logger.debug("Send panic: {}, user: {}, type: {}".format(partition_id, user_id, panic_type))
+        logger.debug(
+            "Send panic: {}, user: {}, type: {}".format(
+                partition_id, user_id, panic_type
+            )
+        )
 
         partition = self.storage.get_container_object("partition", partition_id)
         user = self.storage.get_container_object("user", user_id)
@@ -530,7 +535,6 @@ class Paradox:
         self.request_status_refresh()  # Trigger status update
 
         return accepted
-
 
     def get_label(self, label_type: str, label_id) -> Optional[str]:
         el = self.storage.get_container_object(label_type, label_id)
@@ -623,12 +627,14 @@ class Paradox:
         if self.run_state == RunState.RUN:
             logger.info("Pausing from the Alarm Panel")
             self.run_state = RunState.PAUSE
+            self.connection.handler_registry.set_ignore_if_no_handlers(True)
             # EVO IP150 IP Interface does not work if we send this
             # await self.send_wait(self.panel.get_message('CloseConnection'), None)
 
     async def resume(self):
         logger.info("Resuming PAI")
         if self.run_state == RunState.PAUSE:
+            self.connection.handler_registry.set_ignore_if_no_handlers(False)
             await self.full_connect()
 
     def _clean_session(self):

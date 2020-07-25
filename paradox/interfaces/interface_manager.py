@@ -79,7 +79,7 @@ class InterfaceManager:
         # Load IP Interface
         if self.conf.IP_INTERFACE_ENABLE:
             try:
-                from paradox.interfaces.ip_interface import IPInterface
+                from paradox.interfaces.ip_interface.interface import IPInterface
 
                 self.register(IPInterface(self.alarm))
             except:

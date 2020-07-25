@@ -6,11 +6,11 @@ import pytest
 from construct import Container
 
 from paradox.hardware.evo.parsers import LiveEvent, ReadEEPROMResponse
-from paradox.lib.async_message_manager import (AsyncMessageManager,
-                                               PersistentMessageHandler)
+from paradox.lib.async_message_manager import AsyncMessageManager
+from paradox.lib.handlers import PersistentHandler
 
 
-class EventMessageHandler(PersistentMessageHandler):
+class EventMessageHandler(PersistentHandler):
     def can_handle(self, message):
         return message.fields.value.po.command == 0xE
 
@@ -27,7 +27,7 @@ def test_event_handler():
 
     mh.register_handler(eh)
 
-    assert 1 == len(mh.handler_registry.handlers)
+    assert 1 == len(mh.handler_registry)
 
     payload = b"\xe2\xff\xad\x06\x14\x13\x01\x04\x0e\x10\x00\x01\x05\x00\x00\x00\x00\x00\x02Living room     \x00\xcc"
 
@@ -36,7 +36,7 @@ def test_event_handler():
     coro = asyncio.ensure_future(mh.schedule_message_handling(message))
     loop.run_until_complete(coro)
 
-    assert 1 == len(mh.handler_registry.handlers)
+    assert 1 == len(mh.handler_registry)
 
 
 def test_event_handler_failure():
@@ -53,7 +53,7 @@ def test_event_handler_failure():
 
     mh.register_handler(eh)
 
-    assert 1 == len(mh.handler_registry.handlers)
+    assert 1 == len(mh.handler_registry)
 
     message = ReadEEPROMResponse.parse(eeprom_response_bin)
 
@@ -63,7 +63,7 @@ def test_event_handler_failure():
         coro.result() is None
     )  # failed to parse response message return None. Maybe needs to throw something.
 
-    assert 1 == len(mh.handler_registry.handlers)
+    assert 1 == len(mh.handler_registry)
     eh.handle.assert_not_called()
 
 
@@ -103,12 +103,12 @@ def test_handler_two_messages():
         asyncio.gather(task_handle_wait, task_get_eeprom, loop=loop)
     )
 
-    assert 1 == len(mh.handler_registry.handlers)
+    assert 1 == len(mh.handler_registry)
 
     assert task_handle_event1.done()
     assert isinstance(task_get_eeprom.result(), Container)
 
-    assert 1 == len(mh.handler_registry.handlers)
+    assert 1 == len(mh.handler_registry)
 
 
 def test_handler_timeout():
@@ -138,12 +138,12 @@ def test_handler_timeout():
     task_get_eeprom = loop.create_task(get_eeprom_result(mh))
     loop.create_task(post_eeprom_message(mh))
 
-    assert 0 == len(mh.handler_registry.handlers)
+    assert 0 == len(mh.handler_registry)
 
     with pytest.raises(asyncio.TimeoutError):
         loop.run_until_complete(task_get_eeprom)
 
-    assert 0 == len(mh.handler_registry.handlers)
+    assert 0 == len(mh.handler_registry)
 
     # Also test EventMessageHandler
     event_handler = EventMessageHandler(event_handler)
@@ -154,8 +154,8 @@ def test_handler_timeout():
         LiveEvent.parse(event_response_bin)
     )
 
-    assert 1 == len(mh.handler_registry.handlers)
+    assert 1 == len(mh.handler_registry)
 
     loop.run_until_complete(task_handle_event1)
 
-    assert 1 == len(mh.handler_registry.handlers)
+    assert 1 == len(mh.handler_registry)

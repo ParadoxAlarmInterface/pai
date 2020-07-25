@@ -9,14 +9,13 @@ logger = logging.getLogger("PAI").getChild(__name__)
 
 
 class Connection(AsyncMessageManager):
-    def __init__(self, on_message: typing.Callable[[bytes], None]):
+    def __init__(self):
         super().__init__()
         self._connected = False
         self._protocol: ConnectionProtocol = None
-        self._on_message = on_message
 
     def on_message(self, raw: bytes):
-        self._on_message(raw)
+        self.schedule_raw_message_handling(raw)
 
     @property
     def connected(self) -> bool:

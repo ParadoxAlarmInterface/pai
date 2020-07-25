@@ -18,8 +18,8 @@ logger = logging.getLogger("PAI").getChild(__name__)
 
 
 class SerialCommunication(Connection, ConnectionHandler):
-    def __init__(self, on_message: typing.Callable[[bytes], None], port, baud=9600):
-        super().__init__(on_message=on_message)
+    def __init__(self, port, baud=9600):
+        super().__init__()
         self.port_path = port
         self.baud = baud
         self.connected_future = None

@@ -153,7 +153,7 @@ class IPConnectionProtocol(ConnectionProtocol):
 
     def send_raw(self, raw):
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("PAI -> Mod {}".format(binascii.hexlify(raw)))
+            logger.debug("PAI -> IP (raw) {}".format(binascii.hexlify(raw)))
 
         self.check_active()
 
@@ -161,7 +161,7 @@ class IPConnectionProtocol(ConnectionProtocol):
 
     def send_message(self, message):
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("PAI -> IPC {}".format(binascii.hexlify(message)))
+            logger.debug("PAI -> IP (payload) {}".format(binascii.hexlify(message)))
 
         self.check_active()
 
@@ -180,7 +180,7 @@ class IPConnectionProtocol(ConnectionProtocol):
             password=self.key,
         )
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("IPC -> Mod {}".format(binascii.hexlify(msg)))
+            logger.debug("PAI -> IP (raw) {}".format(binascii.hexlify(msg)))
 
         self.transport.write(msg)
 
@@ -188,7 +188,9 @@ class IPConnectionProtocol(ConnectionProtocol):
         message = IPMessageResponse.parse(data, password=self.key)
 
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("IPC -> PAI {}".format(binascii.hexlify(message.payload)))
+            logger.debug(
+                "IP -> PAI (payload) {}".format(binascii.hexlify(message.payload))
+            )
 
         if message.header.message_type == IPMessageType.serial_passthrough_response:
             self.handler.on_message(message.payload)
@@ -216,7 +218,7 @@ class IPConnectionProtocol(ConnectionProtocol):
             return
 
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("Mod -> IPC {}".format(binascii.hexlify(self.buffer)))
+            logger.debug("IP -> PAI (raw) {}".format(binascii.hexlify(self.buffer)))
 
         self._process_message(self.buffer)
         self.buffer = b""

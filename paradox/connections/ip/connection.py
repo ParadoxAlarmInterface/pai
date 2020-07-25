@@ -19,21 +19,16 @@ from paradox.connections.protocols import (IPConnectionProtocol,
                                            SerialConnectionProtocol)
 from paradox.exceptions import PAICriticalException
 from paradox.lib import stun
-from paradox.lib.async_message_manager import (FutureMessageHandler,
-                                               HandlerRegistry)
+from paradox.lib.handlers import FutureHandler, HandlerRegistry
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
 
 class IPConnection(Connection, IPConnectionHandler):
     def __init__(
-        self,
-        on_message: typing.Callable[[bytes], None],
-        host="127.0.0.1",
-        port=10000,
-        password=None,
+        self, host="127.0.0.1", port=10000, password=None,
     ):
-        super(IPConnection, self).__init__(on_message=on_message)
+        super(IPConnection, self).__init__()
         if isinstance(password, str):
             password = password.encode()
         self.password = password
@@ -50,7 +45,7 @@ class IPConnection(Connection, IPConnectionHandler):
         self.ip_handler_registry = HandlerRegistry()
 
     async def wait_for_ip_message(self, timeout=2) -> Container:
-        future = FutureMessageHandler()
+        future = FutureHandler()
         return await self.ip_handler_registry.wait_until_complete(future, timeout)
 
     def on_ip_message(self, container: Container):
