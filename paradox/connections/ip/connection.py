@@ -5,7 +5,6 @@ import binascii
 import json
 import logging
 import time
-import typing
 
 import requests
 from construct import Container
@@ -13,11 +12,11 @@ from construct import Container
 from paradox.config import config as cfg
 from paradox.connections.connection import Connection
 from paradox.connections.handler import IPConnectionHandler
-from paradox.connections.ip.parsers import (IPMessageCommand, IPMessageRequest,
-                                            IPPayloadConnectResponse)
+from paradox.connections.ip.commands import IPModuleConnectCommand
 from paradox.connections.protocols import (IPConnectionProtocol,
                                            SerialConnectionProtocol)
-from paradox.exceptions import PAICriticalException
+from paradox.exceptions import (ConnectToSiteFailed, PAICriticalException,
+                                StunSessionRefreshFailed)
 from paradox.lib import stun
 from paradox.lib.handlers import FutureHandler, HandlerRegistry
 
@@ -44,9 +43,12 @@ class IPConnection(Connection, IPConnectionHandler):
 
         self.ip_handler_registry = HandlerRegistry()
 
-    async def wait_for_ip_message(self, timeout=2) -> Container:
-        future = FutureHandler()
-        return await self.ip_handler_registry.wait_until_complete(future, timeout)
+    def reset_key(self):
+        self.set_key(self.password)
+
+    def set_key(self, value):
+        self.key = value
+        self._protocol.key = value
 
     def on_ip_message(self, container: Container):
         return self.loop.create_task(self.ip_handler_registry.handle(container))
@@ -72,309 +74,167 @@ class IPConnection(Connection, IPConnectionHandler):
                 self.stun_tunnel.close()
                 self.stun_tunnel = None
             except:
-                logger.exception("stun_control socket close failed")
+                logger.exception("stun_tunnel socket close failed")
+
+    async def wait_for_ip_message(self, timeout=2) -> Container:
+        future = FutureHandler()
+        return await self.ip_handler_registry.wait_until_complete(future, timeout)
+
+    async def send_raw_ip_message(self, msg):
+        self._protocol.send_raw(msg)
+
+    def write(self, data: bytes):
+        """Write data to socket"""
+
+        self._refresh_stun_if_required()
+
+        return super(IPConnection, self).write(data)
 
     async def close(self):
         self.connection_timestamp = 0
 
         await super(IPConnection, self).close()
 
-    def make_protocol(self):
-        if cfg.IP_CONNECTION_BARE:
-            return SerialConnectionProtocol(self)
-        else:
-            return IPConnectionProtocol(self, self.key)
-
     async def connect(self) -> bool:
         tries = 1
         max_tries = 3
+        self.connected = False
 
         while tries <= max_tries:
-
-            if (
-                cfg.IP_CONNECTION_SITEID is not None
-                and cfg.IP_CONNECTION_EMAIL is not None
-            ):
-                try:
-                    r = await self.connect_to_site()
-
-                    if r and self.site_info is not None:
-                        if await self.connect_to_ip_module():
-                            return True
-                except:
-                    logger.exception(
-                        "Try %d/%d. Unable to connect to SITE ID" % (tries, max_tries)
-                    )
-            else:
-                try:
-                    logger.info(
-                        "Connecting to IP module. Try %d/%d" % (tries, max_tries)
-                    )
-
+            logger.info("Connecting to IP module. Try %d/%d" % (tries, max_tries))
+            try:
+                if (
+                    cfg.IP_CONNECTION_SITEID is not None
+                    and cfg.IP_CONNECTION_EMAIL is not None
+                ):
+                    await self._connect_to_site()
                     _, self._protocol = await self.loop.create_connection(
-                        self.make_protocol, host=self.host, port=self.port
+                        self._make_protocol, sock=self.stun_tunnel.sock
+                    )
+                    logger.info(
+                        "Connected to Site: {}".format(cfg.IP_CONNECTION_SITEID)
+                    )
+                else:
+                    _, self._protocol = await self.loop.create_connection(
+                        self._make_protocol, host=self.host, port=self.port
                     )
                     if cfg.IP_CONNECTION_BARE:
                         return True
 
-                    if await self.connect_to_ip_module():
-                        return True
-                except OSError as e:
-                    logger.error(
-                        "Connect to IP Module failed (try %d/%d): %s"
-                        % (tries, max_tries, str(e))
-                    )
-                except PAICriticalException:
-                    raise
-                except:
-                    logger.exception(
-                        "Unable to connect to IP Module (try %d/%d)"
-                        % (tries, max_tries)
-                    )
+                await IPModuleConnectCommand(self).execute()
+                self.connected = True
+
+                return self.connected
+
+            except asyncio.TimeoutError:
+                logger.error(
+                    "Unable to establish session with IP Module. Timeout. Only one connection at a time is allowed."
+                )
+            except OSError as e:
+                logger.error(
+                    "Connect to IP Module failed (try %d/%d): %s"
+                    % (tries, max_tries, str(e))
+                )
+            except PAICriticalException:
+                raise
+            except:
+                logger.exception(
+                    "Unhandled exception while connecting to IP Module (try %d/%d)"
+                    % (tries, max_tries)
+                )
 
             tries += 1
 
         return False
 
-    async def connect_to_site(self):
+    def _make_protocol(self):
+        if cfg.IP_CONNECTION_BARE:
+            return SerialConnectionProtocol(self)
+        else:
+            return IPConnectionProtocol(self, self.key)
+
+    async def _connect_to_site(self) -> None:
         self.connection_timestamp = 0
         logger.info("Connecting to Site: {}".format(cfg.IP_CONNECTION_SITEID))
         if self.site_info is None:
-            self.site_info = await self.get_site_info(
+            self.site_info = await self._get_site_info(
                 siteid=cfg.IP_CONNECTION_SITEID, email=cfg.IP_CONNECTION_EMAIL
             )
 
         if self.site_info is None:
-            logger.error("Unable to get site info")
-            return False
-        try:
-            # xoraddr = binascii.unhexlify(self.site_info['site'][0]['module'][0]['xoraddr'])
-            if self.site_info is None:
-                logger.error("Unable to get site info")
-                return False
+            raise ConnectToSiteFailed("Unable to get site info")
 
-            self.module = None
+        # xoraddr = binascii.unhexlify(self.site_info['site'][0]['module'][0]['xoraddr'])
+        self.module = None
 
-            logger.debug("Site Info: {}".format(json.dumps(self.site_info, indent=4)))
+        logger.debug("Site Info: {}".format(json.dumps(self.site_info, indent=4)))
 
-            if cfg.IP_CONNECTION_PANEL_SERIAL is not None:
-                for site in self.site_info["site"]:
-                    for module in site:
-                        logger.debug(
-                            "Found module with panel serial: {}".format(
-                                module["panelSerial"]
-                            )
+        if cfg.IP_CONNECTION_PANEL_SERIAL is not None:
+            for site in self.site_info["site"]:
+                for module in site:
+                    logger.debug(
+                        "Found module with panel serial: {}".format(
+                            module["panelSerial"]
                         )
-                        if module["panelSerial"] == cfg.IP_CONNECTION_PANEL_SERIAL:
-                            self.module = module
-                            break
-
-                    if self.module is not None:
-                        break
-            else:
-                self.module = self.site_info["site"][0]["module"][0]  # Use first
-
-            if self.module is None:
-                self.site_info = None  # Reset state
-                logger.error("Unable to find module with desired panel serial")
-                return False
-
-            xoraddr = binascii.unhexlify(self.module["xoraddr"])
-
-            stun_host = "turn.paradoxmyhome.com"
-
-            logger.debug("STUN TCP Change Request")
-            self.stun_control = stun.StunClient(stun_host)
-            self.stun_control.send_tcp_change_request()
-            stun_r = self.stun_control.receive_response()
-            if stun.is_error(stun_r):
-                logger.error(stun.get_error(stun_r))
-                return False
-
-            logger.debug("STUN TCP Binding Request")
-            self.stun_control.send_binding_request()
-            stun_r = self.stun_control.receive_response()
-            if stun.is_error(stun_r):
-                logger.error(stun.get_error(stun_r))
-                return False
-
-            logger.debug("STUN Connect Request")
-            self.stun_control.send_connect_request(xoraddr=xoraddr)
-            stun_r = self.stun_control.receive_response()
-            if stun.is_error(stun_r):
-                logger.error(stun.get_error(stun_r))
-                return False
-
-            self.connection_timestamp = time.time()
-
-            connection_id = stun_r[0]["attr_body"]
-            raddr = self.stun_control.sock.getpeername()
-
-            logger.debug("STUN Connection Bind Request")
-            self.stun_tunnel = stun.StunClient(host=raddr[0], port=raddr[1])
-            self.stun_tunnel.send_connection_bind_request(
-                binascii.unhexlify(connection_id)
-            )
-            stun_r = self.stun_tunnel.receive_response()
-            if stun.is_error(stun_r):
-                logger.error(stun.get_error(stun_r))
-                return False
-
-            _, self._protocol = await self.loop.create_connection(
-                self.make_protocol, sock=self.stun_tunnel.sock
-            )
-            logger.info("Connected to Site: {}".format(cfg.IP_CONNECTION_SITEID))
-        except:
-            logger.exception("Unable to negotiate connection to site")
-            return False
-
-        return True
-
-    async def connect_to_ip_module(self):
-        try:
-            logger.info("Authenticating with IP Module")
-
-            self.key = (
-                self.password
-            )  # first request is with initial password, next with generated by panel key
-
-            self._protocol.key = self.password
-
-            msg = IPMessageRequest.build(
-                dict(
-                    header=dict(
-                        command=IPMessageCommand.connect,
-                        # sub_command=3,
-                        flags=dict(installer_mode=True),
-                        cryptor_code="aes_256_ecb",
-                    ),
-                    payload=self.password,
-                ),
-                password=self.password,
-            )
-            self._protocol.send_raw(msg)
-            in_message = await self.wait_for_ip_message()
-
-            response = IPPayloadConnectResponse.parse(in_message.payload)
-
-            if response.login_status != "success":
-                logger.error(f"Error connecting to IP Module: {response.login_status}")
-
-                if response.login_status == "invalid_password":
-                    raise PAICriticalException("Invalid IP Module password")
-                return False
-
-            logger.info(
-                "Authentication Success. IP({}) Module version {:02x}, firmware: {}.{}, serial: {}".format(
-                    response.ip_type,
-                    response.hardware_version,
-                    response.ip_firmware_major,
-                    response.ip_firmware_minor,
-                    binascii.hexlify(response.ip_module_serial).decode("utf-8"),
-                )
-            )
-
-            self.key = response.key
-            self._protocol.key = response.key
-
-            # F2
-            logger.debug("Sending keep alive request")
-            msg = IPMessageRequest.build(
-                dict(
-                    header=dict(
-                        command=IPMessageCommand.keep_alive,
-                        flags=dict(installer_mode=True),
-                        cryptor_code="aes_256_ecb",
-                    ),
-                    payload=b"\x00\x00\x00\x00",
-                ),
-                password=self.key,
-            )
-            self._protocol.send_raw(msg)
-            in_message = await self.wait_for_ip_message()
-            logger.debug(
-                "Keep alive response: {}".format(binascii.hexlify(in_message.payload))
-            )
-
-            # # F4
-            # logger.debug("Sending F4")
-            # msg = binascii.unhexlify('aa00000309f400000001eeeeeeee0000')
-            # self.connection.send_raw(msg)
-            # message_payload = await self.wait_for_message(raw=True)
-            #
-            # logger.debug("F4 answer: {}".format(binascii.hexlify(message_payload)))
-
-            # F3
-            logger.debug("Sending upload download connection request")
-            msg = IPMessageRequest.build(
-                dict(
-                    header=dict(
-                        command=IPMessageCommand.upload_download_connection,
-                        flags=dict(installer_mode=True),
-                        cryptor_code="aes_256_ecb",
                     )
-                ),
-                password=self.key,
-            )
-            self._protocol.send_raw(msg)
-            in_message = await self.wait_for_ip_message()
+                    if module["panelSerial"] == cfg.IP_CONNECTION_PANEL_SERIAL:
+                        self.module = module
+                        break
 
-            logger.debug(
-                "Upload download connection response: {}".format(
-                    binascii.hexlify(in_message.payload)
-                )
-            )
+                if self.module is not None:
+                    break
+        else:
+            self.module = self.site_info["site"][0]["module"][0]  # Use first
 
-            # F8
-            logger.debug("Sending toggle keep alive request")
-            payload = binascii.unhexlify(
-                "0a500080000000000000000000000000000000000000000000000000000000000000000000d0"
-            )
-            msg = IPMessageRequest.build(
-                dict(
-                    header=dict(
-                        command=IPMessageCommand.toggle_keep_alive,
-                        flags=dict(installer_mode=True),
-                        cryptor_code="aes_256_ecb",
-                    ),
-                    payload=payload,
-                ),
-                password=self.key,
-            )
-            self._protocol.send_raw(msg)
-            in_message = await self.wait_for_ip_message()
-            logger.debug(
-                "Toggle keep alive response: {}".format(
-                    binascii.hexlify(in_message.payload)
-                )
+        if self.module is None:
+            self.site_info = None  # Reset state
+            raise ConnectToSiteFailed("Unable to find module with desired panel serial")
+
+        xoraddr = binascii.unhexlify(self.module["xoraddr"])
+
+        stun_host = "turn.paradoxmyhome.com"
+
+        logger.debug("STUN TCP Change Request")
+        self.stun_control = stun.StunClient(stun_host)
+        self.stun_control.send_tcp_change_request()
+        stun_r = self.stun_control.receive_response()
+        if stun.is_error(stun_r):
+            raise ConnectToSiteFailed(
+                f"STUN TCP Change Request error: {stun.get_error(stun_r)}"
             )
 
-            logger.info("Session successfully established with IP Module")
-
-            self.connected = True
-        except asyncio.TimeoutError:
-            self.connected = False
-            logger.error(
-                "Unable to establish session with IP Module. Timeout. Only one connection at a time is allowed."
+        logger.debug("STUN TCP Binding Request")
+        self.stun_control.send_binding_request()
+        stun_r = self.stun_control.receive_response()
+        if stun.is_error(stun_r):
+            raise ConnectToSiteFailed(
+                f"STUN TCP Binding Request error: {stun.get_error(stun_r)}"
             )
-        except PAICriticalException:
-            raise
-        except:
-            self.connected = False
-            logger.exception("Unable to establish session with IP Module")
 
-        return self.connected
+        logger.debug("STUN Connect Request")
+        self.stun_control.send_connect_request(xoraddr=xoraddr)
+        stun_r = self.stun_control.receive_response()
+        if stun.is_error(stun_r):
+            raise ConnectToSiteFailed(
+                f"STUN Connect Request error: {stun.get_error(stun_r)}"
+            )
 
-    def write(self, data: bytes):
-        """Write data to socket"""
+        self.connection_timestamp = time.time()
 
-        if not self.refresh_stun():
-            raise ConnectionError("Failed to refresh STUN")
+        connection_id = stun_r[0]["attr_body"]
+        raddr = self.stun_control.sock.getpeername()
 
-        return super(IPConnection, self).write(data)
+        logger.debug("STUN Connection Bind Request")
+        self.stun_tunnel = stun.StunClient(host=raddr[0], port=raddr[1])
+        self.stun_tunnel.send_connection_bind_request(binascii.unhexlify(connection_id))
+        stun_r = self.stun_tunnel.receive_response()
+        if stun.is_error(stun_r):
+            raise ConnectToSiteFailed(
+                f"STUN Connection Bind Request error: {stun.get_error(stun_r)}"
+            )
 
     @staticmethod
-    async def get_site_info(email, siteid):
+    async def _get_site_info(email, siteid):
         logger.info("Getting site info")
         URL = "https://api.insightgoldatpmh.com/v1/site"
 
@@ -402,24 +262,19 @@ class IPConnection(Connection, IPConnectionHandler):
 
         return None
 
-    def refresh_stun(self):
+    def _refresh_stun_if_required(self) -> None:
         if self.site_info is None or self.connection_timestamp == 0:
-            return True
+            return
 
-        try:
-            # Refresh session if required
-            if time.time() - self.connection_timestamp >= 500:
-                logger.info("Refreshing session")
-                self.stun_control.send_refresh_request()
-                stun_r = self.stun_control.receive_response()
-                if stun.is_error(stun_r):
-                    logger.error(stun.get_error(stun_r))
-                    self.connected = False
-                    return False
+        # Refresh session if required
+        if time.time() - self.connection_timestamp >= 500:
+            logger.info("STUN Session Refresh")
+            self.stun_control.send_refresh_request()
+            stun_r = self.stun_control.receive_response()
+            if stun.is_error(stun_r):
+                self.connected = False
+                raise StunSessionRefreshFailed(
+                    f"STUN Session Refresh failed: {stun.get_error(stun_r)}"
+                )
 
-                self.connection_timestamp = time.time()
-
-            return True
-        except:
-            logger.exception("Session refresh")
-            return False
+            self.connection_timestamp = time.time()
