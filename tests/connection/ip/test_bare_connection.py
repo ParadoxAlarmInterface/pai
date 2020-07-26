@@ -25,7 +25,4 @@ async def test_connect(mocker):
 
     create_connection_mock.assert_called_once()
 
-    assert connection.connected is False
-    connection.on_connection()
-
     assert connection.connected is True

@@ -1,5 +1,3 @@
-import asyncio
-
 import pytest
 from asynctest import CoroutineMock
 
@@ -23,7 +21,6 @@ async def test_connect(mocker):
     create_connection_mock = CoroutineMock(return_value=(None, TestProtocol()))
     mocker.patch.object(connection.loop, 'create_connection', create_connection_mock)
     connect_command_execute = mocker.patch.object(IPModuleConnectCommand, 'execute', CoroutineMock())
-
 
     assert connection.connected is False
 

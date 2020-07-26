@@ -62,14 +62,12 @@ class BareIPConnection(MultiAttemptConnection):
         self.host = host
         self.port = port
 
-    def on_connection(self):
-        logger.info("Bare IP Connection established")
-        self.connected = True
-
     async def _try_connect(self):
         _, self._protocol = await self.loop.create_connection(
             self._make_protocol, host=self.host, port=self.port
         )
+
+        self.connected = True
 
     def _make_protocol(self):
         return SerialConnectionProtocol(self)
