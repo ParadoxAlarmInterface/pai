@@ -74,13 +74,30 @@ class Paradox:
             elif cfg.CONNECTION_TYPE == "IP":
                 logger.info("Using IP Connection")
 
-                from paradox.connections.ip.connection import IPConnection
+                if cfg.IP_CONNECTION_BARE:
+                    from paradox.connections.ip.connection import BareIPConnection
 
-                self._connection = IPConnection(
-                    host=cfg.IP_CONNECTION_HOST,
-                    port=cfg.IP_CONNECTION_PORT,
-                    password=cfg.IP_CONNECTION_PASSWORD,
-                )
+                    self._connection = BareIPConnection(
+                        host=cfg.IP_CONNECTION_HOST,
+                        port=cfg.IP_CONNECTION_PORT
+                    )
+                elif (cfg.IP_CONNECTION_SITEID is not None and cfg.IP_CONNECTION_EMAIL is not None):
+                    from paradox.connections.ip.connection import StunIPConnection
+
+                    self._connection = StunIPConnection(
+                        site_id=cfg.IP_CONNECTION_SITEID,
+                        email=cfg.IP_CONNECTION_EMAIL,
+                        panel_serial=cfg.IP_CONNECTION_PANEL_SERIAL,
+                        password=cfg.IP_CONNECTION_PASSWORD,
+                    )
+                else:
+                    from paradox.connections.ip.connection import LocalIPConnection
+
+                    self._connection = LocalIPConnection(
+                        host=cfg.IP_CONNECTION_HOST,
+                        port=cfg.IP_CONNECTION_PORT,
+                        password=cfg.IP_CONNECTION_PASSWORD,
+                    )
             else:
                 raise AssertionError(
                     "Invalid connection type: {}".format(cfg.CONNECTION_TYPE)

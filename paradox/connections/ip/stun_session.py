@@ -6,7 +6,6 @@ import time
 
 import requests
 
-from paradox.config import config as cfg
 from paradox.exceptions import ConnectToSiteFailed, StunSessionRefreshFailed
 from paradox.lib import stun
 
@@ -14,7 +13,11 @@ logger = logging.getLogger("PAI").getChild(__name__)
 
 
 class StunSession:
-    def __init__(self):
+    def __init__(self, site_id, email, panel_serial):
+        self.site_id = site_id
+        self.email = email
+        self.panel_serial = panel_serial
+
         self.site_info = None
         self.module = None
         self.stun_control = None
@@ -24,10 +27,10 @@ class StunSession:
 
     async def connect(self) -> None:
         self.connection_timestamp = 0
-        logger.info("Connecting to Site: {}".format(cfg.IP_CONNECTION_SITEID))
+        logger.info("Connecting to Site: {}".format(self.site_id))
         if self.site_info is None:
             self.site_info = await self._get_site_info(
-                siteid=cfg.IP_CONNECTION_SITEID, email=cfg.IP_CONNECTION_EMAIL
+                siteid=self.site_id, email=self.email
             )
 
         if self.site_info is None:
@@ -38,7 +41,7 @@ class StunSession:
 
         logger.debug("Site Info: {}".format(json.dumps(self.site_info, indent=4)))
 
-        if cfg.IP_CONNECTION_PANEL_SERIAL is not None:
+        if self.panel_serial is not None:
             for site in self.site_info["site"]:
                 for module in site:
                     logger.debug(
@@ -46,7 +49,7 @@ class StunSession:
                             module["panelSerial"]
                         )
                     )
-                    if module["panelSerial"] == cfg.IP_CONNECTION_PANEL_SERIAL:
+                    if module["panelSerial"] == self.panel_serial:
                         self.module = module
                         break
 
@@ -102,7 +105,7 @@ class StunSession:
                 f"STUN Connection Bind Request error: {stun.get_error(stun_r)}"
             )
 
-        logger.info("Connected to Site: {}".format(cfg.IP_CONNECTION_SITEID))
+        logger.info("Connected to Site: {}".format(self.site_id))
 
     def get_socket(self):
         return self.stun_tunnel.sock
