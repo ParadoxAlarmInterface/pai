@@ -6,13 +6,9 @@ def test_send_panic_size():
 
     partition = 5
 
-    args = {
-        "partitions": [partition],
-        "panic_type": "fire",
-        "user_id": 2
-    }
+    args = {"partitions": [partition], "panic_type": "fire", "user_id": 2}
 
-    raw = SendPanicAction.build({"fields":{"value": args}})
+    raw = SendPanicAction.build({"fields": {"value": args}})
     print(list(bytearray(raw)))
 
     assert raw[0] == 64
@@ -21,5 +17,4 @@ def test_send_panic_size():
     assert raw[6] == 0  # user id >> 8
     assert raw[7] == 2  # user id & 255
     assert raw[8] == 2  # panic type fire
-    assert raw[9] == 1 << (partition-1)  # partition
-
+    assert raw[9] == 1 << (partition - 1)  # partition
