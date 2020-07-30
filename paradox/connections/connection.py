@@ -1,26 +1,34 @@
 import logging
-import typing
 from abc import abstractmethod
 
+from paradox.connections.handler import ConnectionHandler
 from paradox.connections.protocols import ConnectionProtocol
 from paradox.lib.async_message_manager import AsyncMessageManager
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
 
-class Connection(AsyncMessageManager):
-    def __init__(self, on_message: typing.Callable[[bytes], None]):
+class Connection(AsyncMessageManager, ConnectionHandler):
+    _protocol: ConnectionProtocol
+
+    def __init__(self):
         super().__init__()
-        self._connected = False
+        self.connected = False
         self._protocol: ConnectionProtocol = None
-        self._on_message = on_message
 
     def on_message(self, raw: bytes):
-        self._on_message(raw)
+        self.schedule_raw_message_handling(raw)
+
+    def on_connection(self):
+        logger.info("Connection established")
+
+    def on_connection_loss(self):
+        logger.error("Connection was lost")
+        self.connected = False
 
     @property
     def connected(self) -> bool:
-        return self._connected and self._protocol and self._protocol.is_active()
+        return self._connected and self._protocol is not None and self._protocol.is_active()
 
     @connected.setter
     def connected(self, value: bool):

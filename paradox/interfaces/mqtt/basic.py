@@ -28,6 +28,12 @@ def mqtt_handle_decorator(
         typing.Coroutine[None, "BasicMQTTInterface", ParsedMessage],
     ]
 ):
+    async def try_func(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except:
+            logger.exception("Exception executing MQTT function")
+
     def wrapper(
         self: "BasicMQTTInterface", client: Client, userdata, message: MQTTMessage
     ):
@@ -68,7 +74,9 @@ def mqtt_handle_decorator(
             if len(topics) >= 4:
                 element = topics[3]
 
-            call_soon_in_main_loop(func(self, ParsedMessage(topics, element, content)))
+            call_soon_in_main_loop(
+                try_func(self, ParsedMessage(topics, element, content))
+            )
         except:
             logger.exception("Failed to execute command")
 
@@ -110,6 +118,12 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         )
         self.subscribe_callback(
             "{}/{}/{}/#".format(
+                cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC, cfg.MQTT_DOOR_TOPIC
+            ),
+            self._mqtt_handle_door_control,
+        )
+        self.subscribe_callback(
+            "{}/{}/{}/#".format(
                 cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC, cfg.MQTT_ZONE_TOPIC
             ),
             self._mqtt_handle_zone_control,
@@ -121,8 +135,14 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             self._mqtt_handle_partition_control,
         )
         self.subscribe_callback(
-            "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_NOTIFICATIONS_TOPIC, "#"),
+            "{}/{}/{}".format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_NOTIFICATIONS_TOPIC, "+"),
             self._mqtt_handle_notifications,
+        )
+        self.subscribe_callback(
+            "{}/{}/{}/{}".format(
+                cfg.MQTT_BASE_TOPIC, cfg.MQTT_SEND_PANIC_TOPIC, "+", "+"
+            ),
+            self._mqtt_handle_send_panic,
         )
 
         if not self.connected_future.done():
@@ -233,6 +253,46 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
         if not await self.alarm.control_output(element, command):
             logger.warning("Output command refused: {}={}".format(element, command))
+
+    @mqtt_handle_decorator
+    async def _mqtt_handle_send_panic(self, prep: ParsedMessage):
+        topics, partition, userid = prep
+
+        panic_type = topics[2]
+
+        if cfg.MQTT_CHALLENGE_SECRET is not None:
+            command = self._validate_command_with_challenge(userid)
+
+            if command is None:
+                return
+
+        logger.debug(
+            "Send panic command: partition: {}, user: {}, type: {}".format(
+                partition, userid, panic_type
+            )
+        )
+
+        if not await self.alarm.send_panic(partition, panic_type, userid):
+            logger.warning(
+                "Send panic command refused: {}, user: {}, type: {}".format(
+                    partition, userid, panic_type
+                )
+            )
+
+    @mqtt_handle_decorator
+    async def _mqtt_handle_door_control(self, prep: ParsedMessage):
+        topics, element, command = prep
+
+        if cfg.MQTT_CHALLENGE_SECRET is not None:
+            command = self._validate_command_with_challenge(command)
+
+            if command is None:
+                return
+
+        logger.debug("Door command: {} = {}".format(element, command))
+
+        if not await self.alarm.control_door(element, command):
+            logger.warning("Door command refused: {}={}".format(element, command))
 
     def _handle_panel_event(self, event: Event):
         """

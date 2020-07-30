@@ -82,8 +82,15 @@ class Config(object):
         # MQTT
         "MQTT_ENABLE": False,  # Enable MQTT Interface
         "MQTT_HOST": "127.0.0.1",  # Hostname or address
-        "MQTT_PORT": (1883, int, (1, 65535)),  # TCP Port (TLS port if MQTT_TLS_CERT_PATH is set)
-        "MQTT_TLS_CERT_PATH" : (None, [str, type(None)]),  # Path to ca cert (/etc/pai/certs/ca.pem), if you want TLS
+        "MQTT_PORT": (
+            1883,
+            int,
+            (1, 65535),
+        ),  # TCP Port (TLS port if MQTT_TLS_CERT_PATH is set)
+        "MQTT_TLS_CERT_PATH": (
+            None,
+            [str, type(None)],
+        ),  # Path to ca cert (/etc/pai/certs/ca.pem), if you want TLS
         "MQTT_KEEPALIVE": (60, int, (1, 3600)),  # Keep alive
         "MQTT_USERNAME": (None, [str, type(None)]),  # MQTT Username for authentication
         "MQTT_PASSWORD": (None, [str, type(None)]),  # MQTT Password
@@ -111,10 +118,12 @@ class Config(object):
         "MQTT_HOMEASSISTANT_CONTROL_TOPIC": "hass_control",
         "MQTT_HOMEASSISTANT_DISCOVERY_PREFIX": "homeassistant",
         "MQTT_OUTPUT_TOPIC": "outputs",
+        "MQTT_DOOR_TOPIC": "doors",
         "MQTT_KEYPAD_TOPIC": "keypads",
         "MQTT_STATES_TOPIC": "states",
         "MQTT_RAW_TOPIC": "raw",
         "MQTT_NOTIFICATIONS_TOPIC": "notifications",
+        "MQTT_SEND_PANIC_TOPIC": "panic",
         "MQTT_PUBLISH_RAW_EVENTS": True,
         "MQTT_PUBLISH_DEFINITIONS": False,  # Publish definitions of partitions/zones/users to mqtt.
         "MQTT_INTERFACE_TOPIC": "interface",

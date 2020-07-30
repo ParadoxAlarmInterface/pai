@@ -1,8 +1,8 @@
 import asyncio
 import logging
 import os
-import ssl
 import socket
+import ssl
 import sys
 import time
 import typing
@@ -84,12 +84,14 @@ class MQTTConnection(Client):
             self.username_pw_set(username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
 
         if cfg.MQTT_TLS_CERT_PATH is not None:
-            self.tls_set(ca_certs=cfg.MQTT_TLS_CERT_PATH,
+            self.tls_set(
+                ca_certs=cfg.MQTT_TLS_CERT_PATH,
                 certfile=None,
                 keyfile=None,
                 cert_reqs=ssl.CERT_REQUIRED,
                 tls_version=ssl.PROTOCOL_TLSv1_2,
-                ciphers=None)
+                ciphers=None,
+            )
             self.tls_insecure_set(False)
 
         self.will_set(self.availability_topic, "offline", 0, retain=True)

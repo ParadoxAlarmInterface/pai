@@ -92,11 +92,13 @@ import logging
 # MQTT_DEFINITIONS_TOPIC = 'control'      # Base for definitions
 # MQTT_HOMEASSISTANT_DISCOVERY_PREFIX = 'homeassistant'
 # MQTT_OUTPUT_TOPIC = 'outputs'
+# MQTT_DOOR_TOPIC = 'doors'
 # MQTT_KEYPAD_TOPIC = 'keypads'
 # MQTT_STATES_TOPIC = 'states'
 # MQTT_RAW_TOPIC = 'raw'
 #
 # MQTT_NOTIFICATIONS_TOPIC = 'notifications'
+# MQTT_SEND_PANIC_TOPIC = 'panic'
 # MQTT_PUBLISH_RAW_EVENTS = True
 # MQTT_INTERFACE_TOPIC = 'interface'
 # MQTT_TOGGLE_CODES = {}

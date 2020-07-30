@@ -11,9 +11,24 @@ class StatusRequestException(PAIException):
     pass
 
 
-class PAICriticalException(PAIException):
-    """Should stop PAI"""
+class PAIConnectionError(PAIException):
+    pass
 
+
+class ConnectToIpModuleFailed(PAIConnectionError):
+    pass
+
+
+class ConnectToSiteFailed(PAIConnectionError):
+    pass
+
+
+class StunSessionRefreshFailed(PAIConnectionError):
+    pass
+
+
+# CRITICAL Exceptions below that will stop PAI.
+class PAICriticalException(PAIException):
     pass
 
 

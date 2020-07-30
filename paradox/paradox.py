@@ -22,6 +22,7 @@ from paradox.hardware import Panel, create_panel
 from paradox.lib import ps
 from paradox.lib.async_message_manager import (ErrorMessageHandler,
                                                EventMessageHandler)
+from paradox.lib.handlers import PersistentHandler
 from paradox.lib.utils import deep_merge
 from paradox.parsers.status import convert_raw_status
 
@@ -68,21 +69,35 @@ class Paradox:
                 from paradox.connections.serial_connection import SerialCommunication
 
                 self._connection = SerialCommunication(
-                    self.on_connection_message,
-                    port=cfg.SERIAL_PORT,
-                    baud=cfg.SERIAL_BAUD,
+                    port=cfg.SERIAL_PORT, baud=cfg.SERIAL_BAUD,
                 )
             elif cfg.CONNECTION_TYPE == "IP":
                 logger.info("Using IP Connection")
 
-                from paradox.connections.ip.connection import IPConnection
+                if cfg.IP_CONNECTION_BARE:
+                    from paradox.connections.ip.connection import BareIPConnection
 
-                self._connection = IPConnection(
-                    self.on_connection_message,
-                    host=cfg.IP_CONNECTION_HOST,
-                    port=cfg.IP_CONNECTION_PORT,
-                    password=cfg.IP_CONNECTION_PASSWORD,
-                )
+                    self._connection = BareIPConnection(
+                        host=cfg.IP_CONNECTION_HOST,
+                        port=cfg.IP_CONNECTION_PORT
+                    )
+                elif (cfg.IP_CONNECTION_SITEID is not None and cfg.IP_CONNECTION_EMAIL is not None):
+                    from paradox.connections.ip.connection import StunIPConnection
+
+                    self._connection = StunIPConnection(
+                        site_id=cfg.IP_CONNECTION_SITEID,
+                        email=cfg.IP_CONNECTION_EMAIL,
+                        panel_serial=cfg.IP_CONNECTION_PANEL_SERIAL,
+                        password=cfg.IP_CONNECTION_PASSWORD,
+                    )
+                else:
+                    from paradox.connections.ip.connection import LocalIPConnection
+
+                    self._connection = LocalIPConnection(
+                        host=cfg.IP_CONNECTION_HOST,
+                        port=cfg.IP_CONNECTION_PORT,
+                        password=cfg.IP_CONNECTION_PASSWORD,
+                    )
             else:
                 raise AssertionError(
                     "Invalid connection type: {}".format(cfg.CONNECTION_TYPE)
@@ -93,6 +108,10 @@ class Paradox:
         return self._connection
 
     def _register_connection_handlers(self):
+        self.connection.register_raw_handler(
+            PersistentHandler(self.on_connection_message)
+        )
+
         self.connection.register_handler(EventMessageHandler(self.handle_event_message))
         self.connection.register_handler(ErrorMessageHandler(self.handle_error_message))
 
@@ -314,7 +333,6 @@ class Paradox:
         # Messages are not decoded. 
         # Some handlers may still get the RAW message bytes
         if self.run_state == RunState.PAUSE:
-            logger.debug("RAW MESSAGE")
             self.connection.schedule_message_handling(
                   message
             )  # schedule handling in the loop
@@ -334,10 +352,9 @@ class Paradox:
                 )
                 return
 
-            if self.run_state != RunState.PAUSE:
-                self.connection.schedule_message_handling(
-                    recv_message
-                )  # schedule handling in the loop
+            self.connection.schedule_message_handling(
+                recv_message
+            )  # schedule handling in the loop
         except:
             logger.exception("Error parsing message")
 
@@ -496,6 +513,58 @@ class Paradox:
 
         return accepted
 
+    async def send_panic(self, partition_id, panic_type, user_id) -> bool:
+        logger.debug(
+            "Send panic: {}, user: {}, type: {}".format(
+                partition_id, user_id, panic_type
+            )
+        )
+
+        partition = self.storage.get_container_object("partition", partition_id)
+        user = self.storage.get_container_object("user", user_id)
+
+        if partition is None or user is None:
+            logger.error("Send panic: user or partition is not found")
+
+        try:
+            return await self.panel.send_panic(
+                [partition["id"]], panic_type, user["id"]
+            )
+        except NotImplementedError:
+            logger.error("send_panic is not implemented for this alarm type")
+        except asyncio.CancelledError:
+            logger.error("send_panic canceled")
+        except asyncio.TimeoutError:
+            logger.error("send_panic timeout")
+
+    async def control_door(self, door, command) -> bool:
+        command = command.lower()
+        logger.debug("Control Door: {} - {}".format(door, command))
+
+        doors_selected = self.storage.get_container("door").select(door)
+
+        # Not Found
+        if len(doors_selected) == 0:
+            logger.error("No doors selected")
+            return False
+
+        # Apply state changes
+        accepted = False
+        try:
+            accepted = await self.panel.control_doors(doors_selected, command)
+        except NotImplementedError:
+            logger.error("control_door is not implemented for this alarm type")
+        except asyncio.CancelledError:
+            logger.error("control_door canceled")
+        except asyncio.TimeoutError:
+            logger.error("control_door timeout")
+        # Apply state changes
+
+        # Refresh status
+        self.request_status_refresh()  # Trigger status update
+
+        return accepted
+
     def get_label(self, label_type: str, label_id) -> Optional[str]:
         el = self.storage.get_container_object(label_type, label_id)
         if el:
@@ -587,12 +656,14 @@ class Paradox:
         if self.run_state == RunState.RUN:
             logger.info("Pausing from the Alarm Panel")
             self.run_state = RunState.PAUSE
+            self.connection.handler_registry.set_ignore_if_no_handlers(True)
             # EVO IP150 IP Interface does not work if we send this
             # await self.send_wait(self.panel.get_message('CloseConnection'), None)
 
     async def resume(self):
         logger.info("Resuming PAI")
         if self.run_state == RunState.PAUSE:
+            self.connection.handler_registry.set_ignore_if_no_handlers(False)
             await self.full_connect()
 
     def _clean_session(self):

@@ -296,3 +296,41 @@ class Panel_EVOBase(PanelBase):
         else:
             logger.info('PGM command: "%s" failed' % command)
         return reply is not None
+
+    async def control_doors(self, doors, command) -> bool:
+        """
+        Control Doors
+        :param list doors: a list of doors
+        :param str command: textual command
+        :return: True if we have at least one success
+        """
+
+        args = {"doors": doors, "command": command}
+
+        try:
+            reply = await self.core.send_wait(
+                parsers.PerformDoorAction, args, reply_expected=0x04
+            )
+        except MappingError:
+            logger.error('Door command: "%s" is not supported' % command)
+            return False
+
+        if reply:
+            logger.info('Door command: "%s" succeeded' % command)
+        else:
+            logger.info('Door command: "%s" failed' % command)
+        return reply is not None
+
+    async def send_panic(self, partitions, panic_type, user_id):
+        accepted = False
+
+        args = {"partitions": partitions, "panic_type": panic_type, "user_id": user_id}
+
+        reply = await self.core.send_wait(
+            parsers.SendPanicAction, args, reply_expected=0x04
+        )
+
+        if reply is not None:
+            accepted = True
+
+        return accepted

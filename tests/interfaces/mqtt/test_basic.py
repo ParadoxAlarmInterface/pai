@@ -135,3 +135,47 @@ async def test_mqtt_handle_zone_control_utf8(mocker):
         interface.stop()
         interface.join()
         assert not interface.is_alive()
+
+
+@pytest.mark.asyncio
+async def test_mqtt_handle_send_panic(mocker):
+    interface = get_interface(mocker)
+    try:
+        await asyncio.sleep(0.01)
+
+        partition = 1
+        panic_type = "fire"  # 2
+        userid = 3
+
+        message = MQTTMessage(
+            topic=f"paradox/panic/{panic_type}/{partition}".encode("utf-8")
+        )
+        message.payload = str(userid).encode("utf-8")
+
+        interface._mqtt_handle_send_panic(None, None, message)
+
+        await asyncio.sleep(0.01)
+        interface.alarm.send_panic.assert_called_once_with("1", "fire", "3")
+    finally:
+        interface.stop()
+        interface.join()
+        assert not interface.is_alive()
+
+
+@pytest.mark.asyncio
+async def test_mqtt_handle_door_control(mocker):
+    interface = get_interface(mocker)
+    try:
+        await asyncio.sleep(0.01)
+
+        message = MQTTMessage(topic="paradox/control/doors/Door 1".encode("utf-8"))
+        message.payload = b"unlock"
+
+        interface._mqtt_handle_door_control(None, None, message)
+
+        await asyncio.sleep(0.01)
+        interface.alarm.control_door.assert_called_once_with("Door 1", "unlock")
+    finally:
+        interface.stop()
+        interface.join()
+        assert not interface.is_alive()

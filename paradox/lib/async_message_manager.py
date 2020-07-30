@@ -1,141 +1,27 @@
 import asyncio
 import logging
-from abc import abstractmethod
-from typing import Awaitable, Callable, List, Optional
+from typing import Callable, Optional
 
 from construct import Container
 
+from paradox.lib.handlers import (FutureHandler, HandlerRegistry,
+                                  PersistentHandler)
 logger = logging.getLogger("PAI").getChild(__name__)
 
-
-class MessageHandler:
-    def __init__(self, name=None):
-        super().__init__()
-        self.persistent = False
-        self.name = name if name is not None else self.__class__.__name__
-
-    def can_handle(self, message: Container) -> bool:
-        return True
-
-    @abstractmethod
-    async def __call__(self, message: Container):
-        """
-        Handle message
-        :param message:
-        :return:
-        """
-
-
-class AlreadyHandledError(Exception):
-    pass
-
-
-class FutureMessageHandler(MessageHandler, asyncio.Future):
-    def __init__(
-        self, check_fn: Optional[Callable[[Container], bool]] = None, name=None,
-    ):
-        super().__init__()
-        self.name = name if name is not None else self.__class__.__name__
-        self._check_fn = check_fn
-
-    def can_handle(self, message: Container) -> bool:
-        if self.done():
-            raise AlreadyHandledError()
-        if not isinstance(message, Container):
+class EventMessageHandler(PersistentHandler):
+    def can_handle(self, data) -> bool:
+        if not isinstance(data, Container):
             return False
-        if isinstance(self._check_fn, Callable):
-            return self._check_fn(message)
-        return True
+        values = data.fields.value
+        return values.po.command == 0xE and (not hasattr(values, "requested_event_nr"))
 
-    async def __call__(self, message: Container):
-        self.set_result(message)
-
-        return message
-
-
-class PersistentMessageHandler(MessageHandler):
-    def __init__(self, callback: Callable[[Container], None], name=None):
-        super(PersistentMessageHandler, self).__init__(name)
-        self._handle = callback
-        self.persistent = True
-
-    async def __call__(self, message: Container):
-        result = self._handle(message)
-
-        if isinstance(result, Awaitable):
-            return await result
-        else:
-            return result
-
-
-class EventMessageHandler(PersistentMessageHandler):
-    def can_handle(self, message: Container) -> bool:
-        if not isinstance(message, Container):
+class ErrorMessageHandler(PersistentHandler):
+    def can_handle(self, data) -> bool:
+        if not isinstance(data, Container):
             return False
-        values = message.fields.value
-        return values.po.command == 0xE and (
-            not hasattr(values, "event_source") or values.event_source == 0xFF
+        return data.fields.value.po.command == 0x7 and hasattr(
+                data.fields.value, "message"
         )
-
-
-class ErrorMessageHandler(PersistentMessageHandler):
-    def can_handle(self, message: Container) -> bool:
-        if not isinstance(message, Container):
-            return False
-
-        return message.fields.value.po.command == 0x7 and hasattr(
-            message.fields.value, "message"
-        )
-
-
-class HandlerRegistry:
-    def __init__(self):
-        self.handlers: List[MessageHandler] = []
-
-    def append(self, handler: MessageHandler):
-        self.handlers.append(handler)
-
-    def remove(self, handler: MessageHandler):
-        self.handlers.remove(handler)
-
-    def remove_by_name(self, name):
-        to_remove = filter(lambda x: x.name == name, self.handlers)
-        for handler in to_remove:
-            self.remove(handler)
-
-    async def wait_until_complete(self, handler: MessageHandler, timeout=2):
-        self.append(handler)
-        try:
-            return await asyncio.wait_for(handler, timeout=timeout)
-        finally:
-            assert not handler.persistent
-            self.remove(handler)
-
-    async def handle(self, message: Container):
-        """
-        Find handler for inbound message and handle it.
-        :param message:
-        :return:
-        """
-        handled = False
-        for handler in self.handlers:
-            try:
-                if handler.can_handle(message):
-                    handled = True
-                    await handler(message)
-            except AlreadyHandledError:
-                logger.error("Already handled")
-            except:
-                logger.exception("Exception caught during message handling")
-                raise
-
-        if not handled:
-            logger.error(
-                "No handler for message {}\nDetail: {}".format(
-                    message.fields.value.po.command, message
-                )
-            )
-
 
 class AsyncMessageManager:
     def __init__(self, loop=None):
@@ -146,13 +32,20 @@ class AsyncMessageManager:
         self.loop = loop
 
         self.handler_registry = HandlerRegistry()
+        self.raw_handler_registry = HandlerRegistry()
 
     async def wait_for_message(
         self, check_fn: Optional[Callable[[Container], bool]] = None, timeout=2
     ) -> Container:
         return await self.handler_registry.wait_until_complete(
-            FutureMessageHandler(check_fn), timeout
+            FutureHandler(check_fn), timeout
         )
+
+    def register_raw_handler(self, handler):
+        self.raw_handler_registry.append(handler)
+
+    def deregister_raw_handler(self, name):
+        self.raw_handler_registry.remove_by_name(name)
 
     def register_handler(self, handler):
         self.handler_registry.append(handler)
@@ -162,3 +55,6 @@ class AsyncMessageManager:
 
     def schedule_message_handling(self, message: Container):
         return self.loop.create_task(self.handler_registry.handle(message))
+
+    def schedule_raw_message_handling(self, message: Container):
+        return self.loop.create_task(self.raw_handler_registry.handle(message))
