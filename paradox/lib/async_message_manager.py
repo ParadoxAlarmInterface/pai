@@ -41,6 +41,8 @@ class FutureMessageHandler(MessageHandler, asyncio.Future):
     def can_handle(self, message: Container) -> bool:
         if self.done():
             raise AlreadyHandledError()
+        if not isinstance(message, Container):
+            return False
         if isinstance(self._check_fn, Callable):
             return self._check_fn(message)
         return True
@@ -68,6 +70,8 @@ class PersistentMessageHandler(MessageHandler):
 
 class EventMessageHandler(PersistentMessageHandler):
     def can_handle(self, message: Container) -> bool:
+        if not isinstance(message, Container):
+            return False
         values = message.fields.value
         return values.po.command == 0xE and (
             not hasattr(values, "event_source") or values.event_source == 0xFF
@@ -76,6 +80,9 @@ class EventMessageHandler(PersistentMessageHandler):
 
 class ErrorMessageHandler(PersistentMessageHandler):
     def can_handle(self, message: Container) -> bool:
+        if not isinstance(message, Container):
+            return False
+
         return message.fields.value.po.command == 0x7 and hasattr(
             message.fields.value, "message"
         )

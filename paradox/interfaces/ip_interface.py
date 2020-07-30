@@ -237,6 +237,7 @@ class ClientConnection:
 
                     if in_message.payload[0] == 0x00:  # Just a status update
                         status = "connected"
+                    continue # Stop processing here. The response will arrive and be delivered by the handler
 
                 else:
                     logger.warning(
