@@ -83,6 +83,14 @@ def mqtt_handle_decorator(
     return wrapper
 
 
+def _extract_command_user(command):
+    aux = command.split(" ")
+    if len(aux) > 1:
+        return aux[0], aux[1]
+    else:
+        return aux[0], None
+
+
 class BasicMQTTInterface(AbstractMQTTInterface):
     def __init__(self, alarm):
         super().__init__(alarm)
@@ -166,21 +174,34 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         topics, element, command = prep
 
         if cfg.MQTT_CHALLENGE_SECRET is not None:
-            command = self._validate_command_with_challenge(command)
+            command, user = self._validate_command_with_challenge(command)
             if command is None:
                 return
+        else:
+            command, user = _extract_command_user(command)
+
+        message = "Zone command: {}={} user: {}".format(element, command, user)
+        logger.debug(message)
+        self._publish_status(message)
 
         if not await self.alarm.control_zone(element, command):
-            logger.warning("Zone command refused: {}={}".format(element, command))
+            message = "Zone command refused: {}={} user: {}".format(element, command, user)
+            logger.warning(message)
+        else:
+            message = "Zone command accepted: {}={} user: {}".format(element, command, user)
+
+        self._publish_status(message)
 
     @mqtt_handle_decorator
     async def _mqtt_handle_partition_control(self, prep: ParsedMessage):
         topics, element, command = prep
 
         if cfg.MQTT_CHALLENGE_SECRET is not None:
-            command = self._validate_command_with_challenge(command)
+            command, user = self._validate_command_with_challenge(command)
             if command is None:
                 return
+        else:
+            command, user = _extract_command_user(command)
 
         command = cfg.MQTT_COMMAND_ALIAS.get(command, command)
 
@@ -235,24 +256,41 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                 )
             )
 
-        logger.info("Partition command: {} = {}".format(element, command))
+        message = "Partition command: {}={} user: {}".format(element, command, user)
+        logger.info(message)
+        self._publish_status(message)
+
         if not await self.alarm.control_partition(element, command):
-            logger.warning("Partition command refused: {}={}".format(element, command))
+            message = "Partition command refused: {}={} user: {}".format(element, command, user)
+            logger.warning(message)
+        else:
+            message = "Partition command accepted: {}={} user: {}".format(element, command, user)
+
+        self._publish_status(message)
 
     @mqtt_handle_decorator
     async def _mqtt_handle_output_control(self, prep: ParsedMessage):
         topics, element, command = prep
 
         if cfg.MQTT_CHALLENGE_SECRET is not None:
-            command = self._validate_command_with_challenge(command)
+            command, user = self._validate_command_with_challenge(command)
 
             if command is None:
                 return
+        else:
+            command, user = _extract_command_user(command)
 
-        logger.debug("Output command: {} = {}".format(element, command))
+        message = "Output command: {}={} user: {}".format(element, command, user)
+        logger.debug(message)
+        self._publish_status(message)
 
         if not await self.alarm.control_output(element, command):
-            logger.warning("Output command refused: {}={}".format(element, command))
+            message = "Output command refused: {}={} user: {}".format(element, command, user)
+            logger.warning(message)
+        else:
+            message = "Output command accepted: {}={} user: {}".format(element, command, user)
+
+        self._publish_status(message)
 
     @mqtt_handle_decorator
     async def _mqtt_handle_send_panic(self, prep: ParsedMessage):
@@ -261,38 +299,56 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         panic_type = topics[2]
 
         if cfg.MQTT_CHALLENGE_SECRET is not None:
-            command = self._validate_command_with_challenge(userid)
+            userid, user = self._validate_command_with_challenge(userid)
 
-            if command is None:
+            if userid is None:
                 return
+        else:
+            userid, user = _extract_command_user(userid)
 
-        logger.debug(
-            "Send panic command: partition: {}, user: {}, type: {}".format(
-                partition, userid, panic_type
+        message = "Send panic command: partition: {}, userid: {}, user: {}, type: {}".format(
+                partition, userid, user, panic_type
             )
-        )
+        logger.debug(message)
+        self._publish_status(message)
 
         if not await self.alarm.send_panic(partition, panic_type, userid):
-            logger.warning(
-                "Send panic command refused: {}, user: {}, type: {}".format(
-                    partition, userid, panic_type
+            message = "Send panic command refused: {}, userid: {}, user: {}, type: {}".format(
+                    partition, userid, user, panic_type
                 )
-            )
+
+            logger.warning(message)
+        else:
+            message = "Send panic command accepted: {}, userid: {}, user: {}, type: {}".format(
+                    partition, userid, user, panic_type
+                )
+
+        self._publish_status(message)
 
     @mqtt_handle_decorator
     async def _mqtt_handle_door_control(self, prep: ParsedMessage):
         topics, element, command = prep
 
         if cfg.MQTT_CHALLENGE_SECRET is not None:
-            command = self._validate_command_with_challenge(command)
+            command, user = self._validate_command_with_challenge(command)
 
             if command is None:
                 return
+        else:
+            command, user = _extract_command_user(command)
 
-        logger.debug("Door command: {} = {}".format(element, command))
+        message = "Door command: {}={} user=".format(element, command, user)
+
+        logger.debug(message)
+        self._publish_status(message)
 
         if not await self.alarm.control_door(element, command):
-            logger.warning("Door command refused: {}={}".format(element, command))
+            message = "Door command refused: {}={} user: {}".format(element, command, user)
+            logger.warning(message)
+        else:
+            message = "Door command accepted: {}={} user: {}".format(element, command, user)
+
+        self._publish_status(message)
 
     def _handle_panel_event(self, event: Event):
         """
@@ -450,23 +506,44 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
         if challenge is None:
             logger.warning("No challenge set")
-            return
+            return None, None
 
-        if len(aux) == 2:
-            h = hashlib.new("SHA1")
-            i = cfg.MQTT_CHALLENGE_ROUNDS
-            text = f"{challenge}{cfg.MQTT_CHALLENGE_SECRET}".encode("utf-8")
+        if len(aux) != 2 and len(aux) != 3:
+            logger.warning("Invalid command format. Authentication code required")
+            return None, None
 
-            while i > 0:
-                h.update(text)
-                i -= 1
+        user = None
+        response = None
 
-            if aux[1] == h.hexdigest():
-                logger.info("Authentication success")
-                return aux[0]
-            else:
-                logger.info("Authentication failed")
-                return
+        if isinstance(cfg.MQTT_CHALLENGE_SECRET, dict):
+            if aux[1] in cfg.MQTT_CHALLENGE_SECRET and len(aux) == 3:
+                secret = cfg.MQTT_CHALLENGE_SECRET[aux[1]]
+                user = aux[1]
+                response = aux[2]
+        elif isinstance(cfg.MQTT_CHALLENGE_SECRET, str):
+            secret = cfg.MQTT_CHALLENGE_SECRET
+            response = aux[1]
         else:
-            logger.warning("Invalid command format")
-            return
+            logger.error(f"Authentication failed. Invalid setting MQTT_CHALLENGE_SECRET of type {type(cfg.MQTT_CHALLENGE_SECRET)}")
+            return None, None
+
+        h = hashlib.new("SHA1")
+        i = cfg.MQTT_CHALLENGE_ROUNDS
+        text = f"{challenge}{secret}".encode("utf-8")
+
+        while i > 0:
+            h.update(text)
+            i -= 1
+
+        if response == h.hexdigest():
+            message = f"Authentication success. user: {user}"
+            ret = aux[0]  # Pass the command
+        else:
+            message = f"Authentication failed. user: {user}"
+            ret = None
+            user = None  # Clear user
+
+        self._publish_status(message)
+        logger.info(message)
+        return ret, user
+

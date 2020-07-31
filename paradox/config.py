@@ -143,6 +143,8 @@ class Config(object):
             "arm": "partition all arm",
             "disarm": "partition all disarm",
         },
+        "MQTT_PUBLISH_STATUS": "True",
+        "MQTT_STATUS_TOPIC": "status",
         # MQTT command aliases
         "MQTT_COMMAND_ALIAS": {
             # For homebridge

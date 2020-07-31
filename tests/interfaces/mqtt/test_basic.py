@@ -71,6 +71,11 @@ async def test_handle_panel_event(mocker):
         pytest.param(b"arm_stay", "arm_stay"),
         pytest.param(b"arm_sleep", "arm_sleep"),
         pytest.param(b"disarm", "disarm"),
+        # with user
+        pytest.param(b"arm USER", "arm"),
+        pytest.param(b"arm_stay USER", "arm_stay"),
+        pytest.param(b"arm_sleep USER", "arm_sleep"),
+        pytest.param(b"disarm USER", "disarm"),
         # Homeassistant
         pytest.param(b"armed_home", "arm_stay"),
         pytest.param(b"armed_night", "arm_sleep"),

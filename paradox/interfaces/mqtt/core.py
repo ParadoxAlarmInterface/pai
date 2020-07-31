@@ -275,6 +275,14 @@ class AbstractMQTTInterface(ThreadQueueInterface):
         }
         self.loop.call_soon_threadsafe(self.mqtt.publish, topic, value, qos, retain)
 
+    def _publish_status(self, message):
+        self.publish(
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            message,
+            2,
+            True,
+        )
+
     def subscribe_callback(self, sub, callback: typing.Callable):
         self.mqtt.message_callback_add(sub, callback)
         self.mqtt.subscribe(sub)
