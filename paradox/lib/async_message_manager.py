@@ -6,20 +6,24 @@ from construct import Container
 
 from paradox.lib.handlers import (FutureHandler, HandlerRegistry,
                                   PersistentHandler)
+
 logger = logging.getLogger("PAI").getChild(__name__)
 
+
 class EventMessageHandler(PersistentHandler):
-    def can_handle(self, data) -> bool:
+    def can_handle(self, data: Container) -> bool:
         assert isinstance(data, Container)
         values = data.fields.value
         return values.po.command == 0xE and (not hasattr(values, "requested_event_nr"))
 
+
 class ErrorMessageHandler(PersistentHandler):
-    def can_handle(self, data) -> bool:
+    def can_handle(self, data: Container) -> bool:
         assert isinstance(data, Container)
         return data.fields.value.po.command == 0x7 and hasattr(
-                data.fields.value, "message"
+            data.fields.value, "message"
         )
+
 
 class AsyncMessageManager:
     def __init__(self, loop=None):
