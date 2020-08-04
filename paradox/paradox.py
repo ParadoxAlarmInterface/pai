@@ -329,15 +329,6 @@ class Paradox:
         if not self.panel:
             return
 
-        # Pause mode. 
-        # Messages are not decoded. 
-        # Some handlers may still get the RAW message bytes
-        if self.run_state == RunState.PAUSE:
-            self.connection.schedule_message_handling(
-                  message
-            )  # schedule handling in the loop
-            return
-
         try:
             recv_message = self.panel.parse_message(message, direction="frompanel")
 
