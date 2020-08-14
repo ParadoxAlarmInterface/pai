@@ -3,6 +3,7 @@ import json
 
 import pytest
 
+from paradox.config import config as cfg
 from paradox.data.model import DetectedPanel
 from paradox.hardware.common import ProductIdEnum
 from paradox.interfaces.mqtt.homeassistant import HomeAssistantMQTTInterface
@@ -13,6 +14,7 @@ from tests.hardware.evo.test_panel import create_evo192_panel
 @pytest.mark.asyncio
 async def test_hass(mocker):
     mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_event_loop())
+    mocker.patch.multiple(cfg, MQTT_HOMEASSISTANT_AUTODISCOVERY_ENABLE=True)
     con = mocker.patch("paradox.interfaces.mqtt.core.MQTTConnection")
     con.get_instance.return_value.availability_topic = "paradox/interface/availability"
     con.get_instance.return_value.run_status_topic = "paradox/interface/run_status"

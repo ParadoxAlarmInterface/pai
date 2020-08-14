@@ -28,7 +28,11 @@ class Connection(AsyncMessageManager, ConnectionHandler):
 
     @property
     def connected(self) -> bool:
-        return self._connected and self._protocol is not None and self._protocol.is_active()
+        return (
+            self._connected
+            and self._protocol is not None
+            and self._protocol.is_active()
+        )
 
     @connected.setter
     def connected(self, value: bool):

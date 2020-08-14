@@ -185,10 +185,14 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         self._publish_command_status(message)
 
         if not await self.alarm.control_zone(element, command):
-            message = "Zone command refused: {}={} user: {}".format(element, command, user)
+            message = "Zone command refused: {}={} user: {}".format(
+                element, command, user
+            )
             logger.warning(message)
         else:
-            message = "Zone command accepted: {}={} user: {}".format(element, command, user)
+            message = "Zone command accepted: {}={} user: {}".format(
+                element, command, user
+            )
 
         self._publish_command_status(message)
 
@@ -261,10 +265,14 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         self._publish_command_status(message)
 
         if not await self.alarm.control_partition(element, command):
-            message = "Partition command refused: {}={} user: {}".format(element, command, user)
+            message = "Partition command refused: {}={} user: {}".format(
+                element, command, user
+            )
             logger.warning(message)
         else:
-            message = "Partition command accepted: {}={} user: {}".format(element, command, user)
+            message = "Partition command accepted: {}={} user: {}".format(
+                element, command, user
+            )
 
         self._publish_command_status(message)
 
@@ -285,10 +293,14 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         self._publish_command_status(message)
 
         if not await self.alarm.control_output(element, command):
-            message = "Output command refused: {}={} user: {}".format(element, command, user)
+            message = "Output command refused: {}={} user: {}".format(
+                element, command, user
+            )
             logger.warning(message)
         else:
-            message = "Output command accepted: {}={} user: {}".format(element, command, user)
+            message = "Output command accepted: {}={} user: {}".format(
+                element, command, user
+            )
 
         self._publish_command_status(message)
 
@@ -307,21 +319,21 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             userid, user = _extract_command_user(userid)
 
         message = "Send panic command: partition: {}, userid: {}, user: {}, type: {}".format(
-                partition, userid, user, panic_type
-            )
+            partition, userid, user, panic_type
+        )
         logger.debug(message)
         self._publish_command_status(message)
 
         if not await self.alarm.send_panic(partition, panic_type, userid):
             message = "Send panic command refused: {}, userid: {}, user: {}, type: {}".format(
-                    partition, userid, user, panic_type
-                )
+                partition, userid, user, panic_type
+            )
 
             logger.warning(message)
         else:
             message = "Send panic command accepted: {}, userid: {}, user: {}, type: {}".format(
-                    partition, userid, user, panic_type
-                )
+                partition, userid, user, panic_type
+            )
 
         self._publish_command_status(message)
 
@@ -343,10 +355,14 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         self._publish_command_status(message)
 
         if not await self.alarm.control_door(element, command):
-            message = "Door command refused: {}={} user: {}".format(element, command, user)
+            message = "Door command refused: {}={} user: {}".format(
+                element, command, user
+            )
             logger.warning(message)
         else:
-            message = "Door command accepted: {}={} user: {}".format(element, command, user)
+            message = "Door command accepted: {}={} user: {}".format(
+                element, command, user
+            )
 
         self._publish_command_status(message)
 
@@ -524,7 +540,9 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             secret = cfg.MQTT_CHALLENGE_SECRET
             response = aux[1]
         else:
-            logger.error(f"Authentication failed. Invalid setting MQTT_CHALLENGE_SECRET of type {type(cfg.MQTT_CHALLENGE_SECRET)}")
+            logger.error(
+                f"Authentication failed. Invalid setting MQTT_CHALLENGE_SECRET of type {type(cfg.MQTT_CHALLENGE_SECRET)}"
+            )
             return None, None
 
         h = hashlib.new("SHA1")
@@ -546,4 +564,3 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         self._publish_command_status(message)
         logger.info(message)
         return ret, user
-

@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from abc import abstractmethod, ABC
+from abc import ABC, abstractmethod
 
 from construct import Container
 
@@ -36,8 +36,7 @@ class MultiAttemptConnection(Connection):
                 )
             except OSError as e:
                 logger.error(
-                    "Connect failed (try %d/%d): %s"
-                    % (tries, max_tries, str(e))
+                    "Connect failed (try %d/%d): %s" % (tries, max_tries, str(e))
                 )
             except PAICriticalException:
                 raise
