@@ -4,6 +4,7 @@ import pytest
 
 from paradox.hardware.spectra_magellan.panel import Panel
 from paradox.hardware.spectra_magellan.parsers import ReadEEPROMResponse
+from paradox.config import config as cfg
 
 # Label loading
 request_reply_map = {
@@ -56,8 +57,7 @@ async def send_wait(message_type, args, reply_expected):
 
 @pytest.mark.asyncio
 async def test_label_loading(mocker):
-    config = mocker.patch("paradox.hardware.panel.cfg")
-    config.LIMITS = {
+    mocker.patch.multiple(cfg, LIMITS = {
         "zone": [1],
         "pgm": [],
         "partition": [],
@@ -67,8 +67,7 @@ async def test_label_loading(mocker):
         "keypad": [],
         "site": [],
         "siren": [],
-    }
-    config.LABEL_ENCODING = "latin2"
+    }, LABEL_ENCODING="latin2")
 
     core = mocker.MagicMock()
     core.send_wait = send_wait

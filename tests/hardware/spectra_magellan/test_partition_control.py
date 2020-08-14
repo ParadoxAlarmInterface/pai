@@ -99,8 +99,7 @@ class MockClient(threading.Thread):
 
 @pytest.fixture(scope="function")
 async def setup_panel(mocker):
-    mocker.patch.object(cfg, "LOGGING_LEVEL_CONSOLE", logging.DEBUG)
-    mocker.patch.object(cfg, "LOGGING_DUMP_PACKETS", True)
+    mocker.patch.multiple(cfg, LOGGING_LEVEL_CONSOLE= logging.DEBUG, LOGGING_DUMP_PACKETS=True)
     mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_event_loop())
     # cfg.LOGGING_LEVEL_CONSOLE = logging.DEBUG
     # cfg.LOGGING_DUMP_PACKETS = True

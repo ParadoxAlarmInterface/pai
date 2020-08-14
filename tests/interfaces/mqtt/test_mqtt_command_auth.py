@@ -1,13 +1,10 @@
 import asyncio
-import datetime
 import hashlib
-import json
 
 import pytest
 from paho.mqtt.client import MQTTMessage
 
 from paradox.config import config as cfg
-from paradox.event import Event
 from paradox.interfaces.mqtt.basic import BasicMQTTInterface
 
 
@@ -20,8 +17,12 @@ SECRET_USER = "UserA"
 
 
 def get_interface(mocker, secret):
-    cfg.MQTT_CHALLENGE_SECRET = secret
-    cfg.MQTT_ENABLE = True
+    mocker.patch.multiple(
+        cfg,
+        MQTT_CHALLENGE_SECRET=secret,
+        MQTT_ENABLE=secret,
+        MQTT_PUBLISH_COMMAND_STATUS=secret,
+    )
     mocker.MagicMock.__await__ = (
         lambda x: async_magic().__await__()
     )  # Deal with await error
@@ -118,7 +119,7 @@ async def test_auth_output_control(mocker):
         await asyncio.sleep(0.01)
 
         interface.mqtt.publish.assert_any_call(
-            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
             "Authentication failed. user: None",
             2,
             True,
@@ -141,7 +142,7 @@ async def test_auth_output_control(mocker):
         await asyncio.sleep(0.01)
 
         interface.mqtt.publish.assert_any_call(
-            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
             "Authentication success. user: None",
             2,
             True,
@@ -169,7 +170,7 @@ async def test_auth_output_control(mocker):
             pass
 
         interface.mqtt.publish.assert_any_call(
-            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
             "Authentication failed. user: None",
             2,
             True,
@@ -210,7 +211,7 @@ async def test_auth_output_control_user(mocker):
         interface._mqtt_handle_output_control(None, None, message)
         await asyncio.sleep(0.01)
         interface.mqtt.publish.assert_any_call(
-            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
             f"Authentication failed. user: {SECRET_USER}",
             2,
             True,
@@ -232,7 +233,7 @@ async def test_auth_output_control_user(mocker):
         interface._mqtt_handle_output_control(None, None, message)
         await asyncio.sleep(0.01)
         interface.mqtt.publish.assert_any_call(
-            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
             f"Authentication success. user: {SECRET_USER}",
             2,
             True,
@@ -258,7 +259,7 @@ async def test_auth_output_control_user(mocker):
         except AssertionError:
             pass
         interface.mqtt.publish.assert_any_call(
-            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
             f"Authentication failed. user: {SECRET_USER}",
             2,
             True,
@@ -298,7 +299,7 @@ async def test_auth_partition_control(mocker):
         interface._mqtt_handle_partition_control(None, None, message)
         await asyncio.sleep(0.01)
         interface.mqtt.publish.assert_any_call(
-            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
             "Authentication failed. user: None",
             2,
             True,
@@ -319,7 +320,7 @@ async def test_auth_partition_control(mocker):
         interface._mqtt_handle_partition_control(None, None, message)
         await asyncio.sleep(0.01)
         interface.mqtt.publish.assert_any_call(
-            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
             "Authentication success. user: None",
             2,
             True,
@@ -347,7 +348,7 @@ async def test_auth_partition_control(mocker):
             pass
 
         interface.mqtt.publish.assert_any_call(
-            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
             "Authentication failed. user: None",
             2,
             True,
@@ -387,7 +388,7 @@ async def test_auth_partition_control_user(mocker):
         interface._mqtt_handle_partition_control(None, None, message)
         await asyncio.sleep(0.01)
         interface.mqtt.publish.assert_any_call(
-            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
             f"Authentication failed. user: {SECRET_USER}",
             2,
             True,
@@ -409,7 +410,7 @@ async def test_auth_partition_control_user(mocker):
         await asyncio.sleep(0.01)
         interface.alarm.control_partition.assert_called_once_with("Partition01", "arm")
         interface.mqtt.publish.assert_any_call(
-            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
             f"Authentication success. user: {SECRET_USER}",
             2,
             True,
@@ -435,7 +436,7 @@ async def test_auth_partition_control_user(mocker):
             pass
 
         interface.mqtt.publish.assert_any_call(
-            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
             f"Authentication failed. user: {SECRET_USER}",
             2,
             True,
@@ -477,7 +478,7 @@ async def test_auth_zone_control(mocker):
         interface._mqtt_handle_zone_control(None, None, message)
         await asyncio.sleep(0.01)
         interface.mqtt.publish.assert_any_call(
-            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
             "Authentication failed. user: None",
             2,
             True,
@@ -498,7 +499,7 @@ async def test_auth_zone_control(mocker):
         interface._mqtt_handle_zone_control(None, None, message)
         await asyncio.sleep(0.01)
         interface.mqtt.publish.assert_any_call(
-            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
             "Authentication success. user: None",
             2,
             True,
@@ -525,7 +526,7 @@ async def test_auth_zone_control(mocker):
             pass
 
         interface.mqtt.publish.assert_any_call(
-            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
             "Authentication failed. user: None",
             2,
             True,
@@ -565,7 +566,7 @@ async def test_auth_zone_control_user(mocker):
         interface._mqtt_handle_zone_control(None, None, message)
         await asyncio.sleep(0.01)
         interface.mqtt.publish.assert_any_call(
-            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
             f"Authentication failed. user: {SECRET_USER}",
             2,
             True,
@@ -587,7 +588,7 @@ async def test_auth_zone_control_user(mocker):
         interface._mqtt_handle_zone_control(None, None, message)
         await asyncio.sleep(0.01)
         interface.mqtt.publish.assert_any_call(
-            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
             f"Authentication success. user: {SECRET_USER}",
             2,
             True,
@@ -614,7 +615,7 @@ async def test_auth_zone_control_user(mocker):
             pass
 
         interface.mqtt.publish.assert_any_call(
-            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
             f"Authentication failed. user: {SECRET_USER}",
             2,
             True,
