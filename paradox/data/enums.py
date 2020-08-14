@@ -5,9 +5,10 @@ from enum import IntEnum
 class RunState(IntEnum):
     STOP = 0
     INIT = 1
-    RUN = 2
-    PAUSE = 3
-    ERROR = 4
+    CONNECTED = 2
+    RUN = 3
+    PAUSE = 4
+    ERROR = 5
 
 
 class EventLevel(IntEnum):
@@ -27,7 +28,13 @@ class EventLevel(IntEnum):
         if level in EventLevel.__members__:
             return EventLevel.__members__[level]
 
-        raise (Exception("Invalid log level {}. Valid levels: {}".format(level, list(EventLevel.__members__))))
+        raise (
+            Exception(
+                "Invalid log level {}. Valid levels: {}".format(
+                    level, list(EventLevel.__members__)
+                )
+            )
+        )
 
     def __lt__(self, other):
         if self.__class__ is other.__class__:

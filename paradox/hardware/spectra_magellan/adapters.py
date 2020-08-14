@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
-from construct import Adapter
 import datetime
+
+from construct import Adapter
 
 
 class DateAdapter(Adapter):
@@ -9,13 +10,25 @@ class DateAdapter(Adapter):
         return datetime.datetime(obj[0] * 100 + obj[1], obj[2], obj[3], obj[4], obj[5])
 
     def _encode(self, obj, context, path):
-        return [obj.year / 100, obj.year % 100, obj.month, obj.day, obj.hour, obj.minute]
+        return [
+            obj.year / 100,
+            obj.year % 100,
+            obj.month,
+            obj.day,
+            obj.hour,
+            obj.minute,
+        ]
 
 
 class ModuleSerialAdapter(Adapter):
     def _decode(self, obj, context, path):
-        return hex(int(obj[0]) * 10 ^ 8 + int(obj[1]) * 10 ^ 4 + int(obj[2]) * 10 ^ 2 + int(
-            obj[3]) * 10 ^ 0)
+        return hex(
+            int(obj[0]) * 10
+            ^ 8 + int(obj[1]) * 10
+            ^ 4 + int(obj[2]) * 10
+            ^ 2 + int(obj[3]) * 10
+            ^ 0
+        )
 
 
 class PartitionStateAdapter(Adapter):
@@ -60,7 +73,7 @@ class StatusAdapter(Adapter):
         for i in range(0, len(obj)):
             status = obj[i]
             for j in range(0, 8):
-                r[i * 8 + j + 1] = (((status >> j) & 0x01) == 0x01)
+                r[i * 8 + j + 1] = ((status >> j) & 0x01) == 0x01
 
         return r
 
@@ -71,7 +84,8 @@ class PartitionStatusAdapter(Adapter):
 
         for i in range(0, 2):
             partition_status[i + 1] = dict(
-                alarm=(obj[0 + i * 4] & 0xf0 != 0) or (obj[2 + i * 4] & 0x80 != 0),  # Combined status
+                alarm=(obj[0 + i * 4] & 0xF0 != 0)
+                or (obj[2 + i * 4] & 0x80 != 0),  # Combined status
                 pulse_fire_alarm=obj[0 + i * 4] & 0x80 != 0,
                 audible_alarm=obj[0 + i * 4] & 0x40 != 0,
                 silent_alarm=obj[0 + i * 4] & 0x20 != 0,
@@ -122,7 +136,8 @@ class ZoneStatusAdapter(Adapter):
                 bypassed=(obj[i] & 0x08) != 0,
                 shutdown=(obj[i] & 0x04) != 0,
                 in_tx_delay=(obj[i] & 0x02) != 0,
-                was_bypassed=(obj[i] & 0x01) != 0)
+                was_bypassed=(obj[i] & 0x01) != 0,
+            )
 
         return zone_status
 
@@ -133,4 +148,3 @@ class SignalStrengthAdapter(Adapter):
         for i in range(0, len(obj)):
             strength[i + 1] = obj[i]
         return strength
-

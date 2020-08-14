@@ -7,12 +7,13 @@ from collections import namedtuple
 from paradox.config import config as cfg
 from paradox.lib import ps
 from paradox.lib.utils import sanitize_key
-from .core import AbstractMQTTInterface
+
 from ...data.model import DetectedPanel
+from .core import AbstractMQTTInterface
 
-logger = logging.getLogger('PAI').getChild(__name__)
+logger = logging.getLogger("PAI").getChild(__name__)
 
-PreparseResponse = namedtuple('preparse_response', 'topics element content')
+PreparseResponse = namedtuple("preparse_response", "topics element content")
 
 
 class HomeAssistantMQTTInterface(AbstractMQTTInterface):
@@ -21,22 +22,27 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         self.armed = dict()
         self.partitions = {}
         self.zones = {}
+        self.pgms = {}
 
         self.availability_topic = self.mqtt.availability_topic
         self.run_status_topic = self.mqtt.run_status_topic
 
-        self.connected_future = asyncio.Future()  # TODO: do not create it, use some other
+        self.connected_future = (
+            asyncio.Future()
+        )  # TODO: do not create it, use some other
         panel_detected_future = asyncio.Future()
         first_status_update_future = asyncio.Future()
 
         def _ready_future_callback(x):
             self._publish_when_ready(
                 panel_detected_future.result()["panel"],
-                first_status_update_future.result()["status"]
+                first_status_update_future.result()["status"],
             )
 
         ready_future = asyncio.ensure_future(
-            asyncio.gather(self.connected_future, panel_detected_future, first_status_update_future)
+            asyncio.gather(
+                self.connected_future, panel_detected_future, first_status_update_future
+            )
         )
         ready_future.add_done_callback(_ready_future_callback)
 
@@ -50,13 +56,14 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             self.connected_future.set_result(True)
 
     def _handle_labels_loaded(self, data):
-        partitions = data.get('partition', {})
+        partitions = data.get("partition", {})
         for k, v in partitions.items():
             p_data = {}
             p_data.update(v)
             self.partitions[k] = p_data
 
-        self.zones = data.get('zone', {})
+        self.zones = data.get("zone", {})
+        self.pgms = data.get("pgm", {})
 
     def _publish_when_ready(self, panel: DetectedPanel, status):
         device = dict(
@@ -64,32 +71,31 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             model=panel.model,
             identifiers=["Paradox", panel.model, panel.serial_number],
             name=panel.model,
-            sw_version=panel.firmware_version
+            sw_version=panel.firmware_version,
         )
 
         self._publish_run_state_sensor(device, panel.serial_number)
 
-        if 'partition' in status:
-            self._process_partition_statuses(status['partition'], device, panel.serial_number)
-        if 'zone' in status:
-            self._process_zone_statuses(status['zone'], device, panel.serial_number)
+        if "partition" in status:
+            self._process_partition_statuses(
+                status["partition"], device, panel.serial_number
+            )
+        if "zone" in status:
+            self._process_zone_statuses(status["zone"], device, panel.serial_number)
+        if "pgm" in status:
+            self._process_pgm_statuses(status["pgm"], device, panel.serial_number)
 
     def _publish_run_state_sensor(self, device, device_sn):
-        configuration_topic = '{}/sensor/{}/{}/config'.format(
-            cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
-            device_sn,
-            'run_status'
+        configuration_topic = "{}/sensor/{}/{}/config".format(
+            cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX, device_sn, "run_status"
         )
 
         config = dict(
-            name='Run status',
-            unique_id="{}_partition_{}".format(
-                device_sn,
-                'run_status'
-            ),
+            name="Run status",
+            unique_id="{}_partition_{}".format(device_sn, "run_status"),
             state_topic=self.run_status_topic,
             # availability_topic=self.availability_topic,
-            device=device
+            device=device,
         )
 
         self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
@@ -100,31 +106,28 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 continue
             partition = self.partitions[p_key]
 
-            state_topic = '{}/{}/{}/{}/{}'.format(
+            state_topic = "{}/{}/{}/{}/{}".format(
                 cfg.MQTT_BASE_TOPIC,
                 cfg.MQTT_STATES_TOPIC,
                 cfg.MQTT_PARTITION_TOPIC,
-                sanitize_key(partition['key']),
-                'current_state'
+                sanitize_key(partition["key"]),
+                "current_state",
             )
 
-            configuration_topic = '{}/alarm_control_panel/{}/{}/config'.format(
+            configuration_topic = "{}/alarm_control_panel/{}/{}/config".format(
                 cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
                 device_sn,
-                sanitize_key(partition['key'])
+                sanitize_key(partition["key"]),
             )
-            command_topic = '{}/{}/{}/{}'.format(
+            command_topic = "{}/{}/{}/{}".format(
                 cfg.MQTT_BASE_TOPIC,
                 cfg.MQTT_CONTROL_TOPIC,
                 cfg.MQTT_PARTITION_TOPIC,
-                sanitize_key(partition['key'])
+                sanitize_key(partition["key"]),
             )
             config = dict(
-                name=partition['label'],
-                unique_id="{}_partition_{}".format(
-                    device_sn,
-                    partition['key']
-                ),
+                name=partition["label"],
+                unique_id="{}_partition_{}".format(device_sn, partition["key"]),
                 command_topic=command_topic,
                 state_topic=state_topic,
                 availability_topic=self.availability_topic,
@@ -132,7 +135,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 payload_disarm="disarm",
                 payload_arm_home="arm_stay",
                 payload_arm_away="arm",
-                payload_arm_night="arm_sleep"
+                payload_arm_night="arm_sleep",
             )
 
             self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
@@ -144,29 +147,72 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
 
             zone = self.zones[z_key]
 
-            open_topic = '{}/{}/{}/{}/{}'.format(
+            open_topic = "{}/{}/{}/{}/{}".format(
                 cfg.MQTT_BASE_TOPIC,
                 cfg.MQTT_STATES_TOPIC,
                 cfg.MQTT_ZONE_TOPIC,
-                sanitize_key(zone['key']),
-                'open'
+                sanitize_key(zone["key"]),
+                "open",
             )
 
             config = dict(
-                name=zone['label'],
-                unique_id="{}_zone_{}_open".format(device_sn, zone['key']),
+                name=zone["label"],
+                unique_id="{}_zone_{}_open".format(device_sn, zone["key"]),
                 state_topic=open_topic,
                 device_class="motion",
                 availability_topic=self.availability_topic,
                 payload_on="True",
                 payload_off="False",
-                device=device
+                device=device,
             )
 
-            configuration_topic = '{}/binary_sensor/{}/{}/config'.format(
+            configuration_topic = "{}/binary_sensor/{}/{}/config".format(
                 cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
                 device_sn,
-                sanitize_key(zone['key'])
+                sanitize_key(zone["key"]),
+            )
+
+            self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
+
+    def _process_pgm_statuses(self, pgm_statuses, device, device_sn):
+        for pgm_key, p_status in pgm_statuses.items():
+            if pgm_key not in self.pgms:
+                continue
+
+            pgm = self.pgms[pgm_key]
+
+            on_topic = "{}/{}/{}/{}/{}".format(
+                cfg.MQTT_BASE_TOPIC,
+                cfg.MQTT_STATES_TOPIC,
+                cfg.MQTT_OUTPUT_TOPIC,
+                sanitize_key(pgm["key"]),
+                "on",
+            )
+
+            command_topic = "{}/{}/{}/{}".format(
+                cfg.MQTT_BASE_TOPIC,
+                cfg.MQTT_CONTROL_TOPIC,
+                cfg.MQTT_OUTPUT_TOPIC,
+                sanitize_key(pgm["key"]),
+            )
+
+            config = dict(
+                name=pgm["label"],
+                unique_id="{}_pgm_{}_open".format(device_sn, pgm["key"]),
+                state_topic=on_topic,
+                command_topic=command_topic,
+                availability_topic=self.availability_topic,
+                state_on="True",
+                state_off="False",
+                payload_on="on",
+                payload_off="off",
+                device=device,
+            )
+
+            configuration_topic = "{}/switch/{}/{}/config".format(
+                cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
+                device_sn,
+                sanitize_key(pgm["key"]),
             )
 
             self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)

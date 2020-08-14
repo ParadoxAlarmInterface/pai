@@ -1,65 +1,55 @@
-import asyncio
 import logging
-import typing
+from abc import abstractmethod
 
+from paradox.connections.handler import ConnectionHandler
+from paradox.connections.protocols import ConnectionProtocol
 from paradox.lib.async_message_manager import AsyncMessageManager
 
-logger = logging.getLogger('PAI').getChild(__name__)
+logger = logging.getLogger("PAI").getChild(__name__)
 
 
-class ConnectionProtocol(asyncio.Protocol):
-    def __init__(self, on_message: typing.Callable[[bytes], None], on_con_lost):
-        self.transport = None
-        self.use_variable_message_length = True
-        self.on_message = on_message
-        self.on_con_lost = on_con_lost
+class Connection(AsyncMessageManager, ConnectionHandler):
+    _protocol: ConnectionProtocol
 
-    def connection_made(self, transport):
-        self.transport = transport
-
-    def close(self):
-        if self.transport:
-            try:
-                self.transport.close()
-            except Exception:
-                logger.exception("Connection transport close raised Exception")
-            self.transport = None
-
-    def send_message(self, message):
-        raise NotImplementedError('This function needs to be overridden in a subclass')
-
-    def connection_lost(self, exc):
-        self.close()
-        self.on_con_lost()
-
-    def variable_message_length(self, mode):
-        self.use_variable_message_length = mode
-
-
-class Connection(AsyncMessageManager):
-    def __init__(self, on_message: typing.Callable[[bytes], None]):
+    def __init__(self):
         super().__init__()
         self.connected = False
-        self.connection = None  # type: ConnectionProtocol
-        self.on_message = on_message
+        self._protocol: ConnectionProtocol = None
 
-    async def connect(self):
-        raise NotImplementedError("Implement in subclass")
+    def on_message(self, raw: bytes):
+        self.schedule_raw_message_handling(raw)
+
+    def on_connection(self):
+        logger.info("Connection established")
+
+    def on_connection_loss(self):
+        logger.error("Connection was lost")
+        self.connected = False
+
+    @property
+    def connected(self) -> bool:
+        return self._connected and self._protocol is not None and self._protocol.is_active()
+
+    @connected.setter
+    def connected(self, value: bool):
+        self._connected = value
+
+    @abstractmethod
+    async def connect(self) -> bool:
+        raise NotImplementedError("Implement in a subclass")
 
     def write(self, data: bytes):
         if self.connected:
-            self.connection.send_message(data)
+            self._protocol.send_message(data)  # throws ConnectionError
         else:
-            raise ConnectionError("Failed to write data to connection")
+            raise ConnectionError("Not connected")
 
-    def close(self):
-        logger.info('Closing connection')
-
-        if self.connection:
-            self.connection.close()
-            self.connection = None
+    async def close(self):
+        if self._protocol:
+            await self._protocol.close()
+            self._protocol = None
         self.connected = False
 
     def variable_message_length(self, mode):
-        if self.connection is not None:
-            self.connection.variable_message_length(mode)
+        if self._protocol is not None:
+            self._protocol.variable_message_length(mode)

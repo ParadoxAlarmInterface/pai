@@ -75,8 +75,8 @@ Tested in the following environment:
 ## Authors
 
 * João Paulo Barraca - [@jpbarraca](https://github.com/jpbarraca) - Main code and MG/SP devices
-* Ion Darie - [@iondarie](https://github.com/iondarie) - PAI Logo & Homebridge integration
-* Jevgeni Kiski - [@yozik04](https://github.com/yozik04) - EVO devices
+* Jevgeni Kiski - [@yozik04](https://github.com/yozik04) - Main code and EVO devices
+* Ion Darie - [@iondarie](https://github.com/iondarie) - PAI Logo, Homebridge integration, testing
 
 
 ## Acknowledgments

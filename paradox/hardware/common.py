@@ -1,11 +1,11 @@
-from construct import ExprAdapter, Rebuild, Int8ub, Enum, Checksum, this
+from construct import Checksum, Enum, ExprAdapter, Int8ub, Rebuild, this
 
 
 def calculate_checksum(message):
     r = 0
     for c in message:
         r += c
-    r = (r % 256)
+    r = r % 256
     return bytes([r])
 
 
@@ -19,7 +19,7 @@ def _hex_to_int(obj, path):
 def PacketLength(subcons):
     return Rebuild(
         subcons,
-        lambda x: x._root._subcons.fields.sizeof() + x._root._subcons.checksum.sizeof()
+        lambda x: x._root._subcons.fields.sizeof() + x._root._subcons.checksum.sizeof(),
     )
 
 
@@ -44,7 +44,7 @@ ProductIdEnum = Enum(
     SPECTRA_SP4000=26,
     SPECTRA_SP65=27,
     MAGELLAN_MG5000=64,
-    MAGELLAN_MG5050=65
+    MAGELLAN_MG5050=65,
 )
 
 CommunicationSourceIDEnum = Enum(
@@ -60,5 +60,5 @@ CommunicationSourceIDEnum = Enum(
     NeWare_Dialer=8,
     IP_Direct=9,
     VDMP3_Direct=10,
-    VDMP3_GSM=11
+    VDMP3_GSM=11,
 )

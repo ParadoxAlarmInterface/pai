@@ -2,18 +2,22 @@ import binascii
 import inspect
 import logging
 import typing
+from abc import abstractmethod
 from collections import defaultdict, namedtuple
 from itertools import chain
+from time import time
 
 from construct import Construct, Container, EnumIntegerString
 
 from paradox.config import config as cfg
-from paradox.lib.utils import sanitize_key, construct_free
+from paradox.lib.utils import construct_free, sanitize_key
+
+from ..lib import ps
 from . import parsers
 
-logger = logging.getLogger('PAI').getChild(__name__)
+logger = logging.getLogger("PAI").getChild(__name__)
 
-IndexAddress = namedtuple('IndexAddress', 'idx address')
+IndexAddress = namedtuple("IndexAddress", "idx address")
 
 
 class Panel:
@@ -23,16 +27,16 @@ class Panel:
     max_eeprom_response_data_length = 0  # override in a subclass
     status_request_addresses = []  # override in a subclass
 
-    def __init__(self, core, product_id, variable_message_length=True):
+    def __init__(self, core, variable_message_length=True):
         self.core = core
-        self.product_id = product_id
+        self.settings = {}
         self.variable_message_length = variable_message_length
 
-    def parse_message(self, message, direction='topanel') -> typing.Optional[Container]:
+    def parse_message(self, message, direction="topanel") -> typing.Optional[Container]:
         if message is None or len(message) == 0:
             return None
 
-        if direction == 'topanel':
+        if direction == "topanel":
             if message[0] == 0x72 and message[1] == 0:
                 return parsers.InitiateCommunication.parse(message)
             elif message[0] == 0x5F:
@@ -50,7 +54,7 @@ class Panel:
         if name in clsmembers:
             return clsmembers[name]
         else:
-            raise ResourceWarning('{} parser not found'.format(name))
+            raise ResourceWarning("{} parser not found".format(name))
 
     @staticmethod
     def get_error_message(error_code) -> str:
@@ -109,44 +113,73 @@ class Panel:
 
         return binascii.a2b_hex(password.zfill(4))
 
+    async def load_memory(self):
+        logger.info("Loading definitions")
+        definitions = await self.load_definitions()
+        ps.sendMessage("definitions_loaded", data=definitions)
+
+        logger.info("Loading labels")
+        labels = await self.load_labels()
+        ps.sendMessage("labels_loaded", data=labels)
+
     async def load_definitions(self):
-        if 'definitions' not in self.mem_map:
+        if "definitions" not in self.mem_map:
             return {}
         logger.info("Updating Definitions from Panel")
 
         data = defaultdict(dict)
         try:
-            def_parsers = self.get_message('DefinitionsParserMap')
+            def_parsers = self.get_message("DefinitionsParserMap")
 
-            definitions = self.mem_map['definitions']
+            definitions = self.mem_map["definitions"]
             for elem_type in definitions:
                 if elem_type not in def_parsers:
-                    logger.warning('No parser for %s definitions', elem_type)
+                    logger.warning("No parser for %s definitions", elem_type)
+                    continue
+
+                start_time = time()
                 parser = def_parsers[elem_type]
+                if isinstance(parser, typing.Callable):
+                    parser = parser(self.settings)
+
                 assert isinstance(parser, Construct)
                 elem_def = definitions[elem_type]
                 limits = cfg.LIMITS.get(elem_type)
-                enabled_indexes = []
+                enabled_indexes = set()
 
-                addresses = enumerate(chain.from_iterable(elem_def['addresses']), start=1)
+                addresses = enumerate(
+                    chain.from_iterable(elem_def["addresses"]), start=1
+                )
 
-                async for index, raw_data in self._eeprom_batch_reader(addresses, parser.sizeof()):
+                async for index, raw_data in self._eeprom_batch_reader(
+                    addresses, parser.sizeof()
+                ):
                     element = parser.parse(raw_data)
+                    if cfg.LOGGING_DUMP_MESSAGES:
+                        logger.debug(f"EEPROM parsed ({elem_type}/{index}): {element}")
                     if elem_def.get("bit_encoded"):
                         for elem_index, elem_data in element.items():
-                            definition = elem_data.get('definition')
-                            data_index = (index-1)*len(element) + elem_index
+                            definition = elem_data.get("definition")
+                            data_index = (index - 1) * len(element) + elem_index
                             data[elem_type][data_index] = elem_data
-                            if definition != 'disabled':
-                                enabled_indexes.append(data_index)
+                            if definition != "disabled":
+                                enabled_indexes.add(data_index)
                     else:
                         data[elem_type][index] = element
-                        definition = element.get('definition')
-                        if definition != 'disabled':
-                            enabled_indexes.append(index)
+                        definition = element.get("definition")
+                        if definition != "disabled":
+                            enabled_indexes.add(index)
 
                 if limits is None:
                     cfg.LIMITS[elem_type] = enabled_indexes
+                else:
+                    cfg.LIMITS[elem_type] = list(
+                        set(cfg.LIMITS[elem_type]).intersection(enabled_indexes)
+                    )
+
+                logger.info(
+                    f"{elem_type.title()} definitions loaded ({round(time() - start_time, 2)}s)"
+                )
 
         except ResourceWarning:
             pass
@@ -158,25 +191,33 @@ class Panel:
 
         data = defaultdict(dict)
 
-        for elem_type in self.mem_map['labels']:
-            elem_def = self.mem_map['labels'][elem_type]
+        for elem_type in self.mem_map["labels"]:
+            start_time = time()
+            elem_def = self.mem_map["labels"][elem_type]
 
-            addresses = enumerate(chain.from_iterable(elem_def['addresses']), start=1)
+            addresses = enumerate(chain.from_iterable(elem_def["addresses"]), start=1)
             limits = cfg.LIMITS.get(elem_type)
             if limits is not None:
                 addresses = iter((i, a) for i, a in addresses if i in limits)
 
-            await self._load_labels(data[elem_type], addresses, label_offset=elem_def['label_offset'])
+            await self._load_labels(
+                data, elem_type, addresses, label_offset=elem_def["label_offset"]
+            )
 
-            logger.info("{}: {}".format(elem_type.title(), ', '.join([v["label"] for v in data[elem_type].values()])))
+            logger.info(
+                f"{elem_type.title()} labels loaded ({round(time()-start_time, 2)}s): "
+                + f"{', '.join([v['label'] for v in data[elem_type].values()])}"
+            )
 
         return data
 
     async def _eeprom_read_address(self, address, length):
         args = dict(address=address, length=length)
         reply = await self.core.send_wait(
-            self.get_message('ReadEEPROM'), args,
-            reply_expected=lambda m: m.fields.value.po.command == 0x05 and m.fields.value.address == address
+            self.get_message("ReadEEPROM"),
+            args,
+            reply_expected=lambda m: m.fields.value.po.command == 0x05
+            and m.fields.value.address == address,
         )
 
         if reply is None:
@@ -196,8 +237,13 @@ class Panel:
                 ia = IndexAddress(*next(addresses))
                 batch_len = len(batch)
                 if batch and (
-                        (batch[0].address + batch_len * field_length != ia.address)  # Addresses are not sequential
-                        or ((batch_len + 1) * field_length > self.max_eeprom_response_data_length)  # one more field will not fit
+                    (
+                        batch[0].address + batch_len * field_length != ia.address
+                    )  # Addresses are not sequential
+                    or (
+                        (batch_len + 1) * field_length
+                        > self.max_eeprom_response_data_length
+                    )  # one more field will not fit
                 ):
                     send_batch = batch
                     batch = []
@@ -212,16 +258,21 @@ class Panel:
                 if request_length == 0:
                     break
                 else:
-                    data = await self._eeprom_read_address(send_batch[0].address, request_length)
+                    data = await self._eeprom_read_address(
+                        send_batch[0].address, request_length
+                    )
                     for i, ia2 in enumerate(send_batch, start=0):
-                        yield ia2.idx, data[i * field_length:(i + 1) * field_length]
+                        yield ia2.idx, data[i * field_length : (i + 1) * field_length]
 
-    async def _load_labels(self,
-                           data_dict: dict,
-                           addresses: typing.Iterator[typing.Tuple[int, int]],
-                           field_length=16,
-                           label_offset=0,
-                           template=None):
+    async def _load_labels(
+        self,
+        data: dict,
+        elem_type: str,
+        addresses: typing.Iterator[typing.Tuple[int, int]],
+        field_length=16,
+        label_offset=0,
+        template=None,
+    ):
         """
         Load labels from panel
 
@@ -232,36 +283,43 @@ class Panel:
         :param template: Default template
         :return:
         """
+        element_dict = data[elem_type]
+
         if template is None:
             template = {}
 
         async for index, data in self._eeprom_batch_reader(addresses, field_length):
-            b_label = data[label_offset:label_offset + field_length].strip(b'\0 ')
+            b_label = data[label_offset : label_offset + field_length].strip(b"\0 ")
 
-            label = b_label.replace(b'\0', b' ')
+            label = b_label.replace(b"\0", b" ")
 
             try:
                 label = label.decode(cfg.LABEL_ENCODING)
             except UnicodeDecodeError:
-                logger.warning('Unable to properly decode label {} using the {} encoding.\n \
-                    Specify a different encoding using the LABEL_ENCODING configuration option.'.format(
-                    b_label,
-                    cfg.LABEL_ENCODING
-                ))
-                label = label.decode('utf-8', errors='ignore')
+                logger.warning(
+                    "Unable to properly decode label {} using the {} encoding.\n \
+                    Specify a different encoding using the LABEL_ENCODING configuration option.".format(
+                        b_label, cfg.LABEL_ENCODING
+                    )
+                )
+                label = label.decode("utf-8", errors="ignore")
 
             properties = template.copy()
-            properties['id'] = index
-            properties['key'] = sanitize_key(label)
-            properties['label'] = label
-            data_dict[index] = properties
+            properties["id"] = index
+            properties["key"] = sanitize_key(label) or sanitize_key(
+                f"{elem_type} {index}"
+            )
+            properties["label"] = label
+            element_dict[index] = properties
 
-    def initialize_communication(self, reply, password):
+    @abstractmethod
+    def initialize_communication(self, password):
         raise NotImplementedError("override initialize_communication in a subclass")
 
     def get_status_requests(self) -> typing.Iterable[typing.Awaitable]:
         return (self.request_status(i) for i in self.status_request_addresses)
 
+    @abstractmethod
     async def request_status(self, nr) -> typing.Optional[Container]:
         raise NotImplementedError("override request_status in a subclass")
 
@@ -279,19 +337,36 @@ class Panel:
 
         parser = parser_map[mvars.address]
         try:
-            return parser.parse(mvars.data)
-        except Exception:
-            logger.exception("Unable to parse RAM Status Block ({})".format(mvars.address))
+            res = parser.parse(mvars.data)
+            if cfg.LOGGING_DUMP_MESSAGES:
+                logger.debug(f"Status parsed({mvars.address}): {res}")
+            return res
+        except:
+            logger.exception(
+                "Unable to parse RAM Status Block ({})".format(mvars.address)
+            )
             return
 
+    @abstractmethod
     def control_zones(self, zones, command) -> bool:
         raise NotImplementedError("override control_zones in a subclass")
 
+    @abstractmethod
     def control_partitions(self, partitions, command) -> bool:
         raise NotImplementedError("override control_partitions in a subclass")
 
+    @abstractmethod
     def control_outputs(self, outputs, command) -> bool:
         raise NotImplementedError("override control_outputs in a subclass")
 
-    def dump_memory(self):
+    @abstractmethod
+    def control_doors(self, doors, command) -> bool:
+        raise NotImplementedError("override control_doors in a subclass")
+
+    @abstractmethod
+    def dump_memory(self, file, memory_type):
         raise NotImplementedError("override dump_memory in a subclass")
+
+    @abstractmethod
+    def send_panic(self, partition, panic_type, user_id):
+        raise NotImplementedError("override send_panic in a subclass")

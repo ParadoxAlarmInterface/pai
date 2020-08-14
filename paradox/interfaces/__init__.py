@@ -4,7 +4,7 @@ import asyncio
 import logging
 import threading
 
-logger = logging.getLogger('PAI').getChild(__name__)
+logger = logging.getLogger("PAI").getChild(__name__)
 
 
 class Interface:
@@ -56,9 +56,8 @@ class ThreadQueueInterface(threading.Thread, Interface):
         except (KeyboardInterrupt, SystemExit):
             logger.debug("Interface loop stopping")
             self.stop()
-        except Exception:
+        except:
             logger.exception("Interface loop")
 
     def _run(self):
         logger.info("Starting %s Interface", self.name)
-

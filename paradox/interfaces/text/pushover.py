@@ -9,7 +9,7 @@ from paradox.config import config as cfg
 from paradox.event import EventLevel
 from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
 
-logger = logging.getLogger('PAI').getChild(__name__)
+logger = logging.getLogger("PAI").getChild(__name__)
 
 _level_2_priority = {
     EventLevel.NOTSET: chump.LOWEST,
@@ -17,15 +17,21 @@ _level_2_priority = {
     EventLevel.INFO: chump.LOW,
     EventLevel.WARN: chump.NORMAL,
     EventLevel.ERROR: chump.HIGH,
-    EventLevel.CRITICAL: chump.EMERGENCY
+    EventLevel.CRITICAL: chump.EMERGENCY,
 }
 
 
 class PushoverTextInterface(ConfiguredAbstractTextInterface):
     """Interface Class using Pushover"""
+
     def __init__(self, alarm):
-        super().__init__(alarm, cfg.PUSHOVER_EVENT_FILTERS, cfg.PUSHOVER_ALLOW_EVENTS, cfg.PUSHOVER_IGNORE_EVENTS,
-                         cfg.PUSHOVER_MIN_EVENT_LEVEL)
+        super().__init__(
+            alarm,
+            cfg.PUSHOVER_EVENT_FILTERS,
+            cfg.PUSHOVER_ALLOW_EVENTS,
+            cfg.PUSHOVER_IGNORE_EVENTS,
+            cfg.PUSHOVER_MIN_EVENT_LEVEL,
+        )
 
         self.app = None
         self.users = {}
@@ -35,7 +41,9 @@ class PushoverTextInterface(ConfiguredAbstractTextInterface):
 
         self.app = chump.Application(cfg.PUSHOVER_KEY)
         if not self.app.is_authenticated:
-            raise Exception('Failed to authenticate with Pushover. Please check PUSHOVER_APPLICATION_KEY')
+            raise Exception(
+                "Failed to authenticate with Pushover. Please check PUSHOVER_APPLICATION_KEY"
+            )
 
     def send_message(self, message: str, level: EventLevel):
         for user_key, devices_raw in cfg.PUSHOVER_BROADCAST_KEYS.items():
@@ -46,19 +54,38 @@ class PushoverTextInterface(ConfiguredAbstractTextInterface):
 
             if not user.is_authenticated:
                 raise Exception(
-                    'Failed to check user key with Pushover. Please check PUSHOVER_BROADCAST_KEYS[%s]' % user_key)
+                    "Failed to check user key with Pushover. Please check PUSHOVER_BROADCAST_KEYS[%s]"
+                    % user_key
+                )
 
-            if devices_raw == '*' or devices_raw is None:
-                user.send_message(message, title='Alarm', priority=_level_2_priority.get(level, chump.NORMAL))
+            if devices_raw == "*" or devices_raw is None:
+                try:
+                    user.send_message(
+                        message,
+                        title="Alarm",
+                        priority=_level_2_priority.get(level, chump.NORMAL),
+                    )
+                except:
+                    logger.exception("pushbullet send message")
+
             else:
-                devices = list(filter(bool, re.split(r'[\s]*,[\s]*', devices_raw)))
+                devices = list(filter(bool, re.split(r"[\s]*,[\s]*", devices_raw)))
 
                 for elem in (elem for elem in devices if elem not in user.devices):
-                    logger.warning('%s is not in the Pushover device list for the user %s' % (elem, user_key))
+                    logger.warning(
+                        "%s is not in the Pushover device list for the user %s"
+                        % (elem, user_key)
+                    )
 
                 for device in devices:
-                    user.send_message(
-                        message, title='PAI', device=device, priority=_level_2_priority.get(level, chump.NORMAL)
-                    )
+                    try:
+                        user.send_message(
+                            message,
+                            title="PAI",
+                            device=device,
+                            priority=_level_2_priority.get(level, chump.NORMAL),
+                        )
+                    except:
+                        logger.exception("pushbullet send message")
 
         # TODO: Missing the message reception

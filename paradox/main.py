@@ -1,28 +1,29 @@
 import asyncio
 import logging
-from logging.handlers import RotatingFileHandler
-import sys
-import time
 import signal
+import sys
+from logging.handlers import RotatingFileHandler
 
 from paradox import VERSION
 from paradox.config import config as cfg
 from paradox.exceptions import PAICriticalException
-
-from paradox.paradox import Paradox
 from paradox.interfaces.interface_manager import InterfaceManager
+from paradox.lib.encodings import register_encodings
+from paradox.paradox import Paradox
 
 alarm = None
 interface_manager = None
 
-logger = logging.getLogger('PAI')
+logger = logging.getLogger("PAI")
 
 
 def get_format(level):
     if level <= logging.DEBUG:
-        return '%(asctime)s - %(levelname)-8s - %(threadName)-10s - %(name)s - %(message)s'
+        return (
+            "%(asctime)s - %(levelname)-8s - %(threadName)-10s - %(name)s - %(message)s"
+        )
     else:
-        return '%(asctime)s - %(levelname)-8s - %(name)s - %(message)s'
+        return "%(asctime)s - %(levelname)-8s - %(name)s - %(message)s"
 
 
 def config_logger(logger):
@@ -30,10 +31,12 @@ def config_logger(logger):
 
     if cfg.LOGGING_FILE is not None:
         logfile_handler = RotatingFileHandler(
-            cfg.LOGGING_FILE, mode='a',
+            cfg.LOGGING_FILE,
+            mode="a",
             maxBytes=cfg.LOGGING_FILE_MAX_SIZE * 1024 * 1024,
             backupCount=cfg.LOGGING_FILE_MAX_FILES,
-            encoding=None, delay=0
+            encoding=None,
+            delay=0,
         )
 
         logfile_handler.setLevel(cfg.LOGGING_LEVEL_FILE)
@@ -49,27 +52,24 @@ def config_logger(logger):
     logger.setLevel(logger_level)
 
 
-def exit_handler(signum=None, frame=None):
+async def exit_handler(signame=None):
     global alarm, interface_manager
 
-    if signum is not None:
-        logger.info('Captured signal %d. Exiting' % signum)
-    
+    if signame is not None:
+        logger.info(f"Captured signal {signame}. Exiting")
+
     if alarm:
-        alarm.disconnect()
+        await alarm.disconnect()
         alarm = None
 
     if interface_manager:
         interface_manager.stop()
         interface_manager = None
 
-    time.sleep(1)
-    
     logger.info("Good bye!")
-    sys.exit(0)
 
 
-async def run_loop(alarm: Paradox):
+async def run_loop():
     retry = 1
     while alarm is not None:
         logger.info("Starting...")
@@ -77,36 +77,41 @@ async def run_loop(alarm: Paradox):
         retry_time_wait = 30 if retry_time_wait > 30 else retry_time_wait
 
         try:
-            if await alarm.connect():
+            if await alarm.full_connect():
                 retry = 1
                 await alarm.loop()
             else:
                 logger.error("Unable to connect to alarm")
 
-            time.sleep(retry_time_wait)
+            if alarm:
+                await asyncio.sleep(retry_time_wait)
         except ConnectionError as e:  # Connection to IP Module or MQTT lost
             logger.error("Connection to panel lost: %s. Restarting" % str(e))
-            time.sleep(retry_time_wait)
+            await asyncio.sleep(retry_time_wait)
         except OSError:  # Connection to IP Module or MQTT lost
             logger.exception("Restarting")
-            time.sleep(retry_time_wait)
+            await asyncio.sleep(retry_time_wait)
         except PAICriticalException:
             logger.exception("PAI Critical exception. Stopping PAI")
             break
         except (KeyboardInterrupt, SystemExit):
             break  # break exits the retry loop
-        except Exception:
+        except:
             logger.exception("Restarting")
-            time.sleep(retry_time_wait)
+            await asyncio.sleep(retry_time_wait)
 
         retry += 1
+
+    if alarm:
+        await exit_handler()
 
 
 def main(args):
     global alarm, interface_manager
-    
-    if 'config' in args and args.config is not None:
+
+    if "config" in args and args.config is not None:
         import os
+
         config_file = os.path.abspath(args.config)
         cfg.load(config_file)
     else:
@@ -119,16 +124,22 @@ def main(args):
 
     logger.info(f"Console Log level set to {cfg.LOGGING_LEVEL_CONSOLE}")
 
-    signal.signal(signal.SIGINT, exit_handler)
-    signal.signal(signal.SIGTERM, exit_handler)
+    # Registering additional encodings
+    register_encodings()
 
     # Start interacting with the alarm
     alarm = Paradox()
+    loop = asyncio.get_event_loop()
+    for signame in ("SIGINT", "SIGTERM"):
+        sig = getattr(signal, signame)
+        loop.add_signal_handler(
+            sig, lambda: asyncio.ensure_future(exit_handler(signame))
+        )
+
     interface_manager = InterfaceManager(alarm, config=cfg)
     interface_manager.start()
 
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(run_loop(alarm))
-    
-    exit_handler()
+    loop.run_until_complete(run_loop())
 
+    sys.exit(0)

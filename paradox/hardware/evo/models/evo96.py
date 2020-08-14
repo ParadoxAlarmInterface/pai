@@ -8,53 +8,41 @@ class Panel_EVO96(Panel_EVOBase):
                 "label_offset": 0,
                 "addresses": [
                     range(0x00430, 0x00730, 0x10),  # EVO48
-                    range(0x00730, 0x00a30, 0x10)  # EVO96 = EVO48 + 48 zones
-                ]
+                    range(0x00730, 0x00A30, 0x10),  # EVO96 = EVO48 + 48 zones
+                ],
             },
             "pgm": {
                 "label_offset": 0,
                 "addresses": [range(0x07082, 0x7482, 0x20)],
-                "template": {
-                    "on": False,
-                    "pulse": False
-                }
+                "template": {"on": False, "pulse": False},
             },
             "partition": {
                 "label_offset": 0,
                 "addresses": [
-                    range(0x03a6b, 0x03c17, 0x6b),  # EVO48
-                    range(0x03c17, 0x03dc3,
-                          0x6b)  # EVO96 & EVO192 = EVO48 + 4 partitions
-                ]
+                    range(0x03A6B, 0x03C17, 0x6B),  # EVO48
+                    range(
+                        0x03C17, 0x03DC3, 0x6B
+                    ),  # EVO96 & EVO192 = EVO48 + 4 partitions
+                ],
             },
-            "user": {
-                "label_offset": 0,
-                "addresses": [range(0x03e47, 0x04e47, 0x10)]
-            },
-            "bus-module": {  # modules
+            "user": {"label_offset": 0, "addresses": [range(0x03E47, 0x04E47, 0x10)]},
+            "module": {  # modules
                 "label_offset": 0,
                 "addresses": [
-                    range(0x04e47, 0x05637, 0x10),  # EVO48
-                    range(0x05637, 0x05e27,
-                          0x10)  # EVO96 & EVO192 = EVO48 + 127 modules
-                ]
+                    range(0x04E47, 0x05637, 0x10),  # EVO48
+                    range(
+                        0x05637, 0x05E27, 0x10
+                    ),  # EVO96 & EVO192 = EVO48 + 127 modules
+                ],
             },
-            "door": {
-                "label_offset": 0,
-                "addresses": [range(0x0345c, 0x365c, 0x10)]
-            }
+            "door": {"label_offset": 0, "addresses": [range(0x0345C, 0x365C, 0x10)]},
         },
         "definitions": {
-            "zone": {
-                "addresses": [
-                    range(0x01f0, 0x02ae + 2, 2)  # EVO96
-                ]
-            },
+            "zone": {"addresses": [range(0x01F0, 0x02AE + 2, 2)]},  # EVO96
             "partition": {
                 "bit_encoded": True,
-                "addresses": [
-                    [0x39d8]  # All 8 partitions as bits
-                ]
-            }
-        }
+                "addresses": [[0x39D8]],  # All 8 partitions as bits
+            },
+            "user": {"addresses": [range(0x0BF0, 0x32EC + 10, 10),]},  # 999 users
+        },
     }

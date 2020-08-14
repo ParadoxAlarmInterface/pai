@@ -1,15 +1,18 @@
 import os
+
 import pytest
 
-from paradox.event import ChangeEvent, Change
+from paradox.event import Change, ChangeEvent
 from paradox.hardware.evo import Panel_EVO192
 
 
 def generate_property_test_parameters():
-    logfile = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'properties.log')
-    with open(logfile, 'r') as f:
+    logfile = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)), "properties.log"
+    )
+    with open(logfile, "r") as f:
         for line in f:
-            aux = line.strip().split(' ', 1)
+            aux = line.strip().split(" ", 1)
             if aux[1] in ["True", "False"]:
                 values = [True, False]
             else:
@@ -29,21 +32,33 @@ def generate_property_test_parameters():
 
 
 def test_property_map_value():
-    change = Change(property='arm', new_value=True, old_value=None, type='partition', key='Fridge')
+    change = Change(
+        property="arm", new_value=True, old_value=None, type="partition", key="Fridge"
+    )
     evt = ChangeEvent(change_object=change, property_map=Panel_EVO192.property_map)
     assert evt
     assert evt.message == "Partition Fridge is armed"
 
 
 def test_property_map_bad():
-    change = Change(property='does_not_exist', new_value=True, old_value=None, type='system', key='alarm_in_memory')
+    change = Change(
+        property="does_not_exist",
+        new_value=True,
+        old_value=None,
+        type="system",
+        key="alarm_in_memory",
+    )
     with pytest.raises(AssertionError):
         ChangeEvent(change_object=change, property_map=Panel_EVO192.property_map)
 
 
-@pytest.mark.parametrize("property,type,value,partition,label", generate_property_test_parameters())
+@pytest.mark.parametrize(
+    "property,type,value,partition,label", generate_property_test_parameters()
+)
 def test_property(property, type, value, partition, label):
-    change = Change(property=property, new_value=value, old_value=None, type=type, key=label)
+    change = Change(
+        property=property, new_value=value, old_value=None, type=type, key=label
+    )
     evt = ChangeEvent(change_object=change, property_map=Panel_EVO192.property_map)
 
     assert evt
@@ -93,8 +108,9 @@ def test_property(property, type, value, partition, label):
 #     assert true_ == Panel_EVO192.property_map[property]["message"]["True"]
 #     assert false_ == Panel_EVO192.property_map[property]["message"]["False"]
 
+
 def test_property_map_keys():
-    synthetic_props = ['current_state', 'target_state']
+    synthetic_props = ["current_state", "target_state"]
     expected_keys = set(k.values[0] for k in generate_property_test_parameters())
     expected_keys.update(synthetic_props)
     actual_keys = set(Panel_EVO192.property_map.keys())

@@ -96,6 +96,9 @@ ENV/
 # mypy
 .mypy_cache/
 
+/pai.conf
+/pai.json
+/pai.yaml
 /config/*.conf
 /config/*.json
 /config/*.yaml

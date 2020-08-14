@@ -2,23 +2,33 @@ import asyncio
 import logging
 import os
 import socket
+import ssl
+import sys
 import time
 import typing
 from enum import Enum
 
-from paho.mqtt.client import Client, MQTT_ERR_SUCCESS
+from paho.mqtt.client import LOGGING_LEVEL, MQTT_ERR_SUCCESS, Client
 
 from paradox.config import config as cfg
 from paradox.data.enums import RunState
 from paradox.interfaces import ThreadQueueInterface
 from paradox.lib import ps
 
-logger = logging.getLogger('PAI').getChild(__name__)
+logger = logging.getLogger("PAI").getChild(__name__)
 
-ELEMENT_TOPIC_MAP = dict(partition=cfg.MQTT_PARTITION_TOPIC, zone=cfg.MQTT_ZONE_TOPIC,
-                         output=cfg.MQTT_OUTPUT_TOPIC, repeater=cfg.MQTT_REPEATER_TOPIC,
-                         bus=cfg.MQTT_BUS_TOPIC, keypad=cfg.MQTT_KEYPAD_TOPIC,
-                         system=cfg.MQTT_SYSTEM_TOPIC, user=cfg.MQTT_USER_TOPIC)
+ELEMENT_TOPIC_MAP = dict(
+    partition=cfg.MQTT_PARTITION_TOPIC,
+    zone=cfg.MQTT_ZONE_TOPIC,
+    output=cfg.MQTT_OUTPUT_TOPIC,
+    pgm=cfg.MQTT_OUTPUT_TOPIC,
+    repeater=cfg.MQTT_REPEATER_TOPIC,
+    bus=cfg.MQTT_BUS_TOPIC,
+    module=cfg.MQTT_MODULE_TOPIC,
+    keypad=cfg.MQTT_KEYPAD_TOPIC,
+    system=cfg.MQTT_SYSTEM_TOPIC,
+    user=cfg.MQTT_USER_TOPIC,
+)
 
 
 class ConnectionState(Enum):
@@ -32,6 +42,7 @@ RUN_STATE_2_PAYLOAD = {
     RunState.ERROR: "error",
     RunState.INIT: "initializing",
     RunState.PAUSE: "paused",
+    RunState.CONNECTED: "connected",
     RunState.RUN: "online",
     RunState.STOP: "stopped",
 }
@@ -41,17 +52,23 @@ class MQTTConnection(Client):
     _instance = None
 
     @classmethod
-    def get_instance(cls) -> 'MQTTConnection':
+    def get_instance(cls) -> "MQTTConnection":
         if cls._instance is None:
             cls._instance = MQTTConnection()
 
         return cls._instance
 
     def __init__(self):
-        super(MQTTConnection, self).__init__("paradox_mqtt/{}".format(os.urandom(8).hex()))
+        super(MQTTConnection, self).__init__(
+            "paradox_mqtt/{}".format(os.urandom(8).hex())
+        )
         self._last_run_state = "unknown"
-        self.run_status_topic = '{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, 'run_status')
-        self.availability_topic = '{}/{}/{}'.format(cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, 'availability')
+        self.run_status_topic = "{}/{}/{}".format(
+            cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, "run_status"
+        )
+        self.availability_topic = "{}/{}/{}".format(
+            cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, "availability"
+        )
         self.on_connect = self._on_connect_cb
         self.on_disconnect = self._on_disconnect_cb
         self.state = ConnectionState.NEW
@@ -66,7 +83,41 @@ class MQTTConnection(Client):
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
             self.username_pw_set(username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
 
-        self.will_set(self.availability_topic, 'offline', 0, retain=True)
+        if cfg.MQTT_TLS_CERT_PATH is not None:
+            self.tls_set(
+                ca_certs=cfg.MQTT_TLS_CERT_PATH,
+                certfile=None,
+                keyfile=None,
+                cert_reqs=ssl.CERT_REQUIRED,
+                tls_version=ssl.PROTOCOL_TLSv1_2,
+                ciphers=None,
+            )
+            self.tls_insecure_set(False)
+
+        self.will_set(self.availability_topic, "offline", 0, retain=True)
+
+        self.on_log = self.on_client_log
+
+    def on_client_log(self, client, userdata, level, buf):
+        level_std = LOGGING_LEVEL[level]
+        exc_info = None
+
+        type_, exc, trace = sys.exc_info()
+        if exc:  # Can be (socket.error, OSError, WebsocketConnectionError, ...)
+            if hasattr(exc, "errno"):
+                exc_msg = f"{os.strerror(exc.errno)}({exc.errno})"
+                if exc.errno in [22, 49]:
+                    level_std = logging.ERROR
+                    buf = f"{buf}: Please check MQTT connection settings. Especially MQTT_BIND_ADDRESS and MQTT_BIND_PORT"
+            else:
+                exc_msg = str(exc)
+
+            buf = f"{buf}: {exc_msg}"
+            if "Connection failed" in buf:
+                level_std = logging.WARNING
+
+        if level_std > logging.DEBUG:
+            logger.log(level_std, buf, exc_info=exc_info)
 
     def on_run_state_change(self, state: RunState):
         v = RUN_STATE_2_PAYLOAD.get(state, "unknown")
@@ -79,15 +130,20 @@ class MQTTConnection(Client):
             # TODO: Some initial connection retry mechanism required
             try:
                 self.connect_async(
-                    host=cfg.MQTT_HOST, port=cfg.MQTT_PORT, keepalive=cfg.MQTT_KEEPALIVE,
-                    bind_address=cfg.MQTT_BIND_ADDRESS, bind_port=cfg.MQTT_BIND_PORT
+                    host=cfg.MQTT_HOST,
+                    port=cfg.MQTT_PORT,
+                    keepalive=cfg.MQTT_KEEPALIVE,
+                    bind_address=cfg.MQTT_BIND_ADDRESS,
+                    bind_port=cfg.MQTT_BIND_PORT,
                 )
 
                 self.state = ConnectionState.CONNECTING
 
                 logger.info("MQTT loop started")
             except socket.gaierror:
-                logger.exception("Failed to connect to MQTT (%s:%d)", cfg.MQTT_HOST, cfg.MQTT_PORT)
+                logger.exception(
+                    "Failed to connect to MQTT (%s:%d)", cfg.MQTT_HOST, cfg.MQTT_PORT
+                )
 
     def stop(self):
         if self.state in [ConnectionState.CONNECTING, ConnectionState.CONNECTED]:
@@ -103,10 +159,14 @@ class MQTTConnection(Client):
     def _call_registars(self, method, *args, **kwargs):
         for r in self.registrars:
             try:
-                if hasattr(r, method) and isinstance(getattr(r, method), typing.Callable):
+                if hasattr(r, method) and isinstance(
+                    getattr(r, method), typing.Callable
+                ):
                     getattr(r, method)(*args, **kwargs)
-            except Exception as e:
-                logger.exception('Failed to call "%s" on "%s"', method, r.__class__.__name__)
+            except:
+                logger.exception(
+                    'Failed to call "%s" on "%s"', method, r.__class__.__name__
+                )
 
     def register(self, cls):
         self.registrars.append(cls)
@@ -126,7 +186,12 @@ class MQTTConnection(Client):
     def _report_run_state(self, status):
         self._last_run_state = status
         self.publish(self.run_status_topic, status, 0, retain=True)
-        self.publish(self.availability_topic, "online" if status in ["online", "paused"] else "offline", 0, retain=True)
+        self.publish(
+            self.availability_topic,
+            "online" if status in ["online", "paused"] else "offline",
+            0,
+            retain=True,
+        )
 
     def _on_connect_cb(self, client, userdata, flags, result):
         if result == MQTT_ERR_SUCCESS:
@@ -148,12 +213,13 @@ class MQTTConnection(Client):
 
     def disconnect(self, reasoncode=None, properties=None):
         self.state = ConnectionState.DISCONNECTING
-        self._report_run_state('offline')
+        self._report_run_state("offline")
         super(MQTTConnection, self).disconnect()
 
 
 class AbstractMQTTInterface(ThreadQueueInterface):
     """Interface Class using MQTT"""
+
     def __init__(self, alarm):
         super().__init__(alarm)
 
@@ -167,6 +233,7 @@ class AbstractMQTTInterface(ThreadQueueInterface):
 
     def stop(self):
         """ Stops the MQTT Interface Thread"""
+
         def stop_loop():
             self.republish_task.cancel()
             self.loop.stop()
@@ -182,8 +249,11 @@ class AbstractMQTTInterface(ThreadQueueInterface):
             await asyncio.sleep(cfg.MQTT_REPUBLISH_INTERVAL)
             trigger = time.time() - cfg.MQTT_REPUBLISH_INTERVAL
 
-            for k, v in filter(lambda f: f[1].get("last_publish") <= trigger, self.republish_cache.items()):
-                self.publish(k, v['value'], v['qos'], v['retain'])
+            for k, v in filter(
+                lambda f: f[1].get("last_publish") <= trigger,
+                self.republish_cache.items(),
+            ):
+                self.publish(k, v["value"], v["qos"], v["retain"])
 
     def _run(self):
         super(AbstractMQTTInterface, self)._run()
@@ -197,8 +267,21 @@ class AbstractMQTTInterface(ThreadQueueInterface):
         self.loop.close()
 
     def publish(self, topic, value, qos, retain):
-        self.republish_cache[topic] = {'value': value, 'qos': qos, 'retain': retain, 'last_publish': time.time()}
+        self.republish_cache[topic] = {
+            "value": value,
+            "qos": qos,
+            "retain": retain,
+            "last_publish": time.time(),
+        }
         self.loop.call_soon_threadsafe(self.mqtt.publish, topic, value, qos, retain)
+
+    def _publish_status(self, message):
+        self.publish(
+            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_STATUS_TOPIC}",
+            message,
+            2,
+            True,
+        )
 
     def subscribe_callback(self, sub, callback: typing.Callable):
         self.mqtt.message_callback_add(sub, callback)

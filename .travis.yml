@@ -1,6 +1,6 @@
-sudo: required
 dist: xenial
 language: python
+cache: pip
 python:
   - '3.6'
   - '3.7'
@@ -11,7 +11,7 @@ install:
 script: python setup.py test
 deploy:
   provider: pypi
-  user: __token__
+  username: __token__
   distributions: "sdist bdist_wheel"
   skip_existing: true
   on:
@@ -33,3 +33,10 @@ jobs:
         - docker-ce
         - docker-ce-cli
         - containerd.io
+notifications:
+  webhooks:
+    urls:
+      - https://webhooks.gitter.im/e/008067a67792a8e27478
+    on_success: change
+    on_failure: always
+    on_start: never

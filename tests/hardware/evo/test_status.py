@@ -5,27 +5,42 @@ import pytest
 
 from paradox.paradox import Paradox
 from paradox.parsers.status import convert_raw_status
-from .status_data import message_parser_output, converted_status
+
+from .status_data import converted_status, message_parser_output
 
 
 def test_convert_raw_status(mocker):
-    mocker.patch('paradox.lib.ps')
+    mocker.patch("paradox.lib.ps")
     p = Paradox()
     status = convert_raw_status(message_parser_output)
 
     assert status["zone"] == {
-        1: dict(open=False, tamper=False, low_battery=False, generated_alarm=False, presently_in_alarm=False,
-                activated_entry_delay=False,
-                activated_intellizone_delay=False, bypassed=False, shutted_down=False,
-                tx_delay=False, supervision_trouble=False),
-        2: dict(open=False, tamper=False, low_battery=False, generated_alarm=False,
-                presently_in_alarm=False,
-                activated_entry_delay=False,
-                activated_intellizone_delay=False,
-                bypassed=False,
-                shutted_down=False,
-                tx_delay=False,
-                supervision_trouble=False)
+        1: dict(
+            open=False,
+            tamper=False,
+            low_battery=False,
+            generated_alarm=False,
+            presently_in_alarm=False,
+            activated_entry_delay=False,
+            activated_intellizone_delay=False,
+            bypassed=False,
+            shutted_down=False,
+            tx_delay=False,
+            supervision_trouble=False,
+        ),
+        2: dict(
+            open=False,
+            tamper=False,
+            low_battery=False,
+            generated_alarm=False,
+            presently_in_alarm=False,
+            activated_entry_delay=False,
+            activated_intellizone_delay=False,
+            bypassed=False,
+            shutted_down=False,
+            tx_delay=False,
+            supervision_trouble=False,
+        ),
     }
 
     assert status["partition"] == message_parser_output["partition_status"]

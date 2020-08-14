@@ -1,53 +1,58 @@
-from construct import Struct, RawCopy, Int8ub, Const, Padding, Int16ub, Default, Bytes, Enum, Int32ub, BitStruct, \
-    BitsInteger, Flag, ExprAdapter, Byte, Nibble, obj_, Int8ul
+from construct import (BitsInteger, BitStruct, Byte, Bytes, Const, Default,
+                       Enum, ExprAdapter, Flag, Int8ub, Int8ul, Int16ub,
+                       Int16ul, Int32ub, Nibble, Padding, RawCopy, Struct,
+                       obj_)
 
-from .adapters import StatusAdapter, DateAdapter, PartitionStatusAdapter, ZoneStatusAdapter, SignalStrengthAdapter, \
-    ModuleSerialAdapter
-from ..common import CommunicationSourceIDEnum, ProductIdEnum, PacketChecksum
+from ..common import CommunicationSourceIDEnum, PacketChecksum, ProductIdEnum
+from .adapters import (DateAdapter, ModuleSerialAdapter,
+                       PartitionStatusAdapter, SignalStrengthAdapter,
+                       StatusAdapter, ZoneStatusAdapter)
 
 InitializeCommunication = Struct(
-    "fields" / RawCopy(
+    "fields"
+    / RawCopy(
         Struct(
             "po" / Struct("command" / Const(0x00, Int8ub)),
             "_not_used0" / Padding(3),
             "product_id" / ProductIdEnum,
-            "firmware" / Struct(
-                "version" / Int8ub,
-                "revision" / Int8ub,
-                "build" / Int8ub),
+            "firmware"
+            / Struct("version" / Int8ub, "revision" / Int8ub, "build" / Int8ub),
             "panel_id" / Int16ub,
-            "pc_password" / Default(Bytes(2), b'0000'),
+            "pc_password" / Default(Bytes(2), b"0000"),
             "_not_used1" / Bytes(1),
-            "source_method" / Default(Enum(
-                Int8ub,
-                Winload_Connection=0x00,
-                NEware_Connection=0x55), 0x00),
+            "source_method"
+            / Default(
+                Enum(Int8ub, Winload_Connection=0x00, NEware_Connection=0x55), 0x00
+            ),
             "user_code" / Default(Int32ub, 0x00000000),
             "_not_used2" / Padding(15),
             "source_id" / Default(CommunicationSourceIDEnum, 1),
-            "user_id" / Struct(
-                "high" / Default(Int8ub, 0),
-                "low" / Default(Int8ub, 0)),
-        )),
-    "checksum" / PacketChecksum(Bytes(1))
+            "user_id" / Default(Int16ul, 0),
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
 )
 
 InitializeCommunicationResponse = Struct(
-    "fields" / RawCopy(
+    "fields"
+    / RawCopy(
         Struct(
             "po" / Struct("command" / Const(0x10, Int8ub)),
             "neware_connection" / Int16ub,
             "user_id_low" / Int8ub,
-            "partition_rights" / BitStruct(
-                "_not_used" / BitsInteger(6),
-                "partition_2" / Flag,
-                "partition_1" / Flag),
+            "partition_rights"
+            / BitStruct(
+                "_not_used" / BitsInteger(6), "partition_2" / Flag, "partition_1" / Flag
+            ),
             "_not_used0" / Padding(31),
-        )),
-    "checksum" / PacketChecksum(Bytes(1)))
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
 
 PanelStatus = Struct(
-    "fields" / RawCopy(
+    "fields"
+    / RawCopy(
         Struct(
             "po" / Struct("command" / Const(0x50, Int8ub)),
             "_not_used0" / Default(Int8ub, 0x00),
@@ -55,15 +60,17 @@ PanelStatus = Struct(
             "status_request" / Default(Int8ub, 0x00),
             "_not_used1" / Padding(29),
             "source_id" / Default(CommunicationSourceIDEnum, 1),
-            "user_high" / Default(Int8ub, 0),
-            "user_low" / Default(Int8ub, 0),
-        )),
+            "user_id" / Default(Int16ul, 0),
+        )
+    ),
     Padding(31),
-    "checksum" / PacketChecksum(Bytes(1)))
+    "checksum" / PacketChecksum(Bytes(1)),
+)
 
 RAMDataParserMap = {
     0: Struct(
-        "troubles" / BitStruct(
+        "troubles"
+        / BitStruct(
             "timer_loss_trouble" / Flag,
             "fire_loop_trouble" / Flag,
             "module_tamper_trouble" / Flag,
@@ -93,30 +100,35 @@ RAMDataParserMap = {
             "pager_fail_to_communicate_trouble" / Flag,
             "central_2_reporting_ftc_indicator_trouble" / Flag,
             "central_1_reporting_ftc_indicator_trouble" / Flag,
-            "telephone_line" / Flag),
-
-        "system" / Struct(
+            "telephone_line" / Flag,
+        ),
+        "system"
+        / Struct(
             "date" / Struct("time" / DateAdapter(Bytes(6))),
-            "power" / Struct(
-                "vdc" / ExprAdapter(Byte, lambda obj, ctx: round(obj * (20.3 - 1.4) / 255.0 + 1.4, 1), 0),
-                "battery" / ExprAdapter(Byte, lambda obj, ctx: round(obj * 22.8 / 255.0, 1), 0),
-                "dc" / ExprAdapter(Byte, lambda obj, ctx: round(obj * 22.8 / 255.0, 1), 0),
+            "power"
+            / Struct(
+                "vdc"
+                / ExprAdapter(
+                    Byte, lambda obj, ctx: round(obj * (20.3 - 1.4) / 255.0 + 1.4, 1), 0
+                ),
+                "battery"
+                / ExprAdapter(Byte, lambda obj, ctx: round(obj * 22.8 / 255.0, 1), 0),
+                "dc"
+                / ExprAdapter(Byte, lambda obj, ctx: round(obj * 22.8 / 255.0, 1), 0),
             ),
-            "rf" / Struct(
-                "noise_floor" / Int8ub,
-            )
+            "rf" / Struct("noise_floor" / Int8ub,),
         ),
         "zone_open" / StatusAdapter(Bytes(4)),
         "zone_tamper" / StatusAdapter(Bytes(4)),
         "pgm_tamper" / StatusAdapter(Bytes(2)),
-        "bus-module_tamper" / StatusAdapter(Bytes(2)),
+        "module_tamper" / StatusAdapter(Bytes(2)),
         "zone_fire" / StatusAdapter(Bytes(4)),
-        "_not_used0" / Int8ub
+        "_not_used0" / Int8ub,
     ),
     1: Struct(
         "zone_rf_supervision_trouble" / StatusAdapter(Bytes(4)),
         "pgm_supervision_trouble" / StatusAdapter(Bytes(2)),
-        "bus-module_supervision_trouble" / StatusAdapter(Bytes(2)),
+        "module_supervision_trouble" / StatusAdapter(Bytes(2)),
         "repeater_supervision_trouble" / StatusAdapter(Bytes(1)),
         "zone_rf_low_battery_trouble" / StatusAdapter(Bytes(4)),
         "partition_status" / PartitionStatusAdapter(Bytes(8)),
@@ -125,81 +137,85 @@ RAMDataParserMap = {
         "keypad_ac_loss_trouble" / StatusAdapter(Bytes(1)),
         "keypad_battery_failure_trouble" / StatusAdapter(Bytes(1)),
         "keypad_supervision_failure_trouble" / StatusAdapter(Bytes(1)),
-        "_not_used0" / Padding(6)
+        "_not_used0" / Padding(6),
     ),
-    2: Struct(
-        "zone_status" / ZoneStatusAdapter(Bytes(32))
-    ),
-    3: Struct(
-        "zone_signal_strength" / SignalStrengthAdapter(Bytes(32))
-    ),
+    2: Struct("zone_status" / ZoneStatusAdapter(Bytes(32))),
+    3: Struct("zone_signal_strength" / SignalStrengthAdapter(Bytes(32))),
     4: Struct(
         "pgm_signal_strength" / SignalStrengthAdapter(Bytes(16)),
         "repeater_signal_strength" / SignalStrengthAdapter(Bytes(2)),
         "keypad_signal_strength" / SignalStrengthAdapter(Bytes(8)),
-        "_not_used1" / Padding(6)
+        "_not_used1" / Padding(6),
     ),
-    5: Struct(
-        "zone_exit_delay" / StatusAdapter(Bytes(4)),
-        "_not_used0" / Padding(28)
-    ),
+    5: Struct("zone_exit_delay" / StatusAdapter(Bytes(4)), "_not_used0" / Padding(28)),
 }
 
 LiveEvent = Struct(
-    "fields" / RawCopy(
+    "fields"
+    / RawCopy(
         Struct(
-            "po" / BitStruct(
+            "po"
+            / BitStruct(
                 "command" / Const(0xE, Nibble),
-                "status" / Struct(
+                "status"
+                / Struct(
                     "reserved" / Flag,
                     "alarm_reporting_pending" / Flag,
                     "Winload_connected" / Flag,
-                    "NeWare_connected" / Flag)),
-            "time" / DateAdapter(Bytes(6)),
-            "event" / Struct(
-                "major" / Int8ub,
-                "minor" / Int8ub
+                    "NeWare_connected" / Flag,
+                ),
             ),
+            "time" / DateAdapter(Bytes(6)),
+            "event" / Struct("major" / Int8ub, "minor" / Int8ub),
             "partition" / ExprAdapter(Byte, obj_ + 1, obj_ - 1),
             "module_serial" / ModuleSerialAdapter(Bytes(4)),
             "unknown0" / Bytes(1),
             "label" / Bytes(16),
             "unknown1" / Bytes(1),
             "reserved0" / Bytes(4),
-        )),
-    "checksum" / PacketChecksum(Bytes(1)))
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
 
 CloseConnection = Struct(
-    "fields" / RawCopy(
+    "fields"
+    / RawCopy(
         Struct(
-            "po" / Struct(
-                "command" / Const(0x70, Int8ub)
-            ),
+            "po" / Struct("command" / Const(0x70, Int8ub)),
             "_not_used0" / Const(0, Int8ub),
             "validation_byte" / Default(Int8ub, 0),
             "_not_used1" / Padding(29),
-            "message" / Default(Enum(
-                Int8ub,
-                authentication_failed=0x12,
-                panel_will_disconnect=0x05), 0x05),
+            "message"
+            / Default(
+                Enum(Int8ub, authentication_failed=0x12, panel_will_disconnect=0x05),
+                0x05,
+            ),
             "source_id" / Default(CommunicationSourceIDEnum, 1),
-            "user_high" / Default(Int8ub, 0),
-            "user_low" / Default(Int8ub, 0),
-        )),
-    "checksum" / PacketChecksum(Bytes(1)))
+            "user_id" / Default(Int16ul, 0),
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
 
 ErrorMessage = Struct(
-    "fields" / RawCopy(
+    "fields"
+    / RawCopy(
         Struct(
-            "po" / BitStruct(
+            "po"
+            / BitStruct(
                 "command" / Const(0x7, Nibble),
-                "status" / Struct(
+                "status"
+                / Struct(
                     "reserved" / Flag,
                     "alarm_reporting_pending" / Flag,
                     "Winload_connected" / Flag,
-                    "NeWare_connected" / Flag)),
+                    "NeWare_connected" / Flag,
+                ),
+            ),
             "_not_used0" / Default(Int8ub, 0),
-            "message" / Enum(
+            "message"
+            / Enum(
                 Int8ub,
                 requested_command_failed=0x00,
                 invalid_user_code=0x01,
@@ -214,66 +230,84 @@ ErrorMessage = Struct(
                 upgrade_request_fail=0x16,
                 record_number_out_of_range=0x17,
                 invalid_record_type=0x19,
-                multibus_not_supported=0x1a,
-                incorrect_number_of_users=0x1b,
-                invalid_label_number=0x1c
+                multibus_not_supported=0x1A,
+                incorrect_number_of_users=0x1B,
+                invalid_label_number=0x1C,
             ),
             "_not_used1" / Padding(33),
-        )),
-    "checksum" / PacketChecksum(Bytes(1)))
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
 
 ReadEEPROM = Struct(
-    "fields" / RawCopy(
+    "fields"
+    / RawCopy(
         Struct(
             "po" / Struct("command" / Const(0x50, Int8ub)),
             "_not_used0" / Padding(1),
             "address" / Default(Int16ub, 0),
             "_not_used1" / Padding(29),
             "source_id" / Default(CommunicationSourceIDEnum, 1),
-            "user_high" / Default(Int8ub, 0),
-            "user_low" / Default(Int8ub, 0),
-        )),
-    "checksum" / PacketChecksum(Bytes(1)))
+            "user_id" / Default(Int16ul, 0),
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
 
 ReadEEPROMResponse = Struct(
-    "fields" / RawCopy(
+    "fields"
+    / RawCopy(
         Struct(
-            "po" / BitStruct(
+            "po"
+            / BitStruct(
                 "command" / Const(0x5, Nibble),
-                "status" / Struct(
+                "status"
+                / Struct(
                     "reserved" / Flag,
                     "alarm_reporting_pending" / Flag,
                     "Winload_connected" / Flag,
-                    "NeWare_connected" / Flag)),
+                    "NeWare_connected" / Flag,
+                ),
+            ),
             "_not_used0" / Padding(1),
             "address" / Int16ub,
             "data" / Bytes(32),
-        )),
-    "checksum" / PacketChecksum(Bytes(1)))
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
 
 ReadStatusResponse = Struct(
-    "fields" / RawCopy(
+    "fields"
+    / RawCopy(
         Struct(
-            "po" / BitStruct(
+            "po"
+            / BitStruct(
                 "command" / Const(0x5, Nibble),
-                "status" / Struct(
+                "status"
+                / Struct(
                     "reserved" / Flag,
                     "alarm_reporting_pending" / Flag,
                     "Winload_connected" / Flag,
-                    "NeWare_connected" / Flag)),
+                    "NeWare_connected" / Flag,
+                ),
+            ),
             "_not_used0" / Padding(1),
             "validation" / Const(0x80, Int8ub),
             "address" / Int8ub,
             "data" / Bytes(32),
-        )),
-    "checksum" / PacketChecksum(Bytes(1)))
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
 
 # noinspection PyUnresolvedReferences
 SetTimeDate = Struct(
-    "fields" / RawCopy(
+    "fields"
+    / RawCopy(
         Struct(
-            "po" / Struct(
-                "command" / Const(0x30, Int8ub)),
+            "po" / Struct("command" / Const(0x30, Int8ub)),
             "_not_used0" / Padding(3),
             "century" / Int8ub,
             "year" / Int8ub,
@@ -283,32 +317,41 @@ SetTimeDate = Struct(
             "minute" / Int8ub,
             "_not_used1" / Padding(23),
             "source_id" / Default(CommunicationSourceIDEnum, 1),
-            "user_high" / Default(Int8ub, 0),
-            "user_low" / Default(Int8ub, 0),
-        )),
-    "checksum" / PacketChecksum(Bytes(1)))
+            "user_id" / Default(Int16ul, 0),
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
 
 SetTimeDateResponse = Struct(
-    "fields" / RawCopy(
+    "fields"
+    / RawCopy(
         Struct(
-            "po" / BitStruct(
+            "po"
+            / BitStruct(
                 "command" / Const(0x3, Nibble),
-                "status" / Struct(
+                "status"
+                / Struct(
                     "reserved" / Flag,
                     "alarm_reporting_pending" / Flag,
                     "Winload_connected" / Flag,
-                    "NeWare_connected" / Flag)),
+                    "NeWare_connected" / Flag,
+                ),
+            ),
             "_not_used0" / Padding(35),
-        )),
-    "checksum" / PacketChecksum(Bytes(1)))
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
 
 PerformAction = Struct(
-    "fields" / RawCopy(
+    "fields"
+    / RawCopy(
         Struct(
-            "po" / Struct(
-                "command" / Const(0x40, Int8ub)),
+            "po" / Struct("command" / Const(0x40, Int8ub)),
             "_not_used0" / Padding(1),
-            "action" / Enum(
+            "action"
+            / Enum(
                 Int8ub,
                 Stay_Arm=0x01,
                 Stay_Arm1=0x02,
@@ -319,39 +362,47 @@ PerformAction = Struct(
                 Sleep_Arm_StayD=0x07,
                 Disarm_Both_Disable_StayD=0x08,
                 Bypass=0x10,
-                Beep=0x10,
+                # Beep=0x10,
+                Clear_Alarm_In_Memory=0x1B,
                 PGM_On_Override=0x30,
                 PGM_Off_Override=0x31,
                 PGM_On=0x32,
                 PGM_Off=0x33,
                 Reload_RAM=0x80,
                 Bus_Scan=0x85,
-                Future_Use=0x90),
-            "argument" / Enum(
-                Int8ub,
-                One_Beep=0x04,
-                Fail_Beep=0x08,
-                Beep_Twice=0x0c,
-                Accept_Beep=0x10),
-            "_not_used1" / Padding(29),
+                Future_Use=0x90,
+            ),
+            "argument"
+            / Enum(
+                Int8ub, One_Beep=0x04, Fail_Beep=0x08, Beep_Twice=0x0C, Accept_Beep=0x10
+            ),
+            "instant" / Default(Flag, False),
+            "_not_used1" / Padding(28),
             "source_id" / Default(CommunicationSourceIDEnum, 1),
-            "user_high" / Default(Int8ub, 0),
-            "user_low" / Default(Int8ub, 0),
-        )),
-    "checksum" / PacketChecksum(Bytes(1)))
+            "user_id" / Default(Int16ul, 0),
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
 
 PerformActionResponse = Struct(
-    "fields" / RawCopy(
+    "fields"
+    / RawCopy(
         Struct(
-            "po" / BitStruct(
+            "po"
+            / BitStruct(
                 "command" / Const(0x4, Nibble),
-                "status" / Struct(
+                "status"
+                / Struct(
                     "reserved" / Flag,
                     "alarm_reporting_pending" / Flag,
                     "Winload_connected" / Flag,
-                    "NeWare_connected" / Flag)),
+                    "NeWare_connected" / Flag,
+                ),
+            ),
             "_not_used0" / Padding(1),
-            "action" / Enum(
+            "action"
+            / Enum(
                 Int8ub,
                 Stay_Arm=0x01,
                 Stay_Arm1=0x02,
@@ -369,15 +420,19 @@ PerformActionResponse = Struct(
                 PGM_Of=0x33,
                 Reload_RAM=0x80,
                 Bus_Scan=0x85,
-                Future_Use=0x90),
+                Future_Use=0x90,
+            ),
             "_not_used1" / Padding(33),
-        )),
-    "checksum" / PacketChecksum(Bytes(1)))
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
 
 # EEPROM Structures
 DefinitionsParserMap = {
     "zone": Struct(
-        "definition" / Enum(
+        "definition"
+        / Enum(
             Int8ul,
             disabled=0,
             delay_1=1,
@@ -409,22 +464,44 @@ DefinitionsParserMap = {
             instant_no_pre_alarm_stay=33,
             instant_no_pre_alarm_sleep=34,
             entry_delay_1_stay_full_instant=35,
-            entry_delay_1_full_instant=36
+            entry_delay_1_full_instant=36,
         ),
         "partition" / Int8ul,
-        "options" / BitStruct(
+        "options"
+        / BitStruct(
             "auto_zone_shutdown" / Flag,
             "bypassable" / Flag,
             "rf_supervision" / Flag,
-            "alarm_type" / Enum(BitsInteger(2),
-                                audible_alarm_steady=0,
-                                silent_alarm=1,
-                                audible_alarm_pulse=2,
-                                report_only=3
-                                ),
+            "alarm_type"
+            / Enum(
+                BitsInteger(2),
+                audible_alarm_steady=0,
+                silent_alarm=1,
+                audible_alarm_pulse=2,
+                report_only=3,
+            ),
             "intellizone" / Flag,
             "delay_alarm_transmission" / Flag,
-            "force_arming" / Flag
-        )
+            "force_arming" / Flag,
+        ),
     )
 }
+
+SendPanicAction = Struct(  # Supported on firmware versions 7.15+
+    "fields"
+    / RawCopy(
+        Struct(
+            "po" / Struct("command" / Const(0x40, Int8ub)),
+            "packet_length" / Const(37, Int8ub),
+            "unknown0" / Const(0x1A, Int8ub),
+            "partition" / Int8ub,
+            "panic_type" / Enum(Int8ub, emergency=0, medical=1, fire=2,),  # wild guess
+            "user_id" / Int8ub,
+            "_not_used" / Padding(26),
+            "unknown1" / Const(0x06, Int8ub),
+            "_not_used" / Padding(1),
+            "user_id" / Int16ul,
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
