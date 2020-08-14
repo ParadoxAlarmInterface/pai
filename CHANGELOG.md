@@ -4,6 +4,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2020-08-14
+Very large release
+
+### Added
+- MQTT TLS support
+- New tags added for `*_EVENT_FILTERS` properties: `entry_delay`, `entry_delay_finished`, `exit_delay`, `exit_delay_finished`
+- PAI service stops if detects critical exception like wrong password or serial port not available
+- SP/MG wrong password detection
+- EVO: PGM status reading and controlling. Switches added to HomeAssistant autodiscovery.
+- EVO: user names who armed or disarmed partition.
+- EVO: Loads user definition
+- EVO: User/Card door access messages
+- Label encodings: `paradox-en` and `paradox-ru`. See [#146](https://github.com/ParadoxAlarmInterface/pai/issues/146)
+- Memory dump console script `pai-dump-memory`
+- Configuration file search logic improved. Looks in current dir, `~/.local/etc`, `/etc/pai`, `/usr/local/etc/pai`.
+File names scanned: `pai.conf`, `pai.json`, `pai.yaml`
+- Configuration: `MQTT_BIND_ADDRESS` default matches Paho MQTT default
+- Configuration: `MQTT_PUBLISH_DEFINITIONS` default `False`
+- Configuration: `MQTT_PUBLISH_STATUS` default `False`
+- Configuration: `IP_INTERFACE_PASSWORD` accepts `string` type
+
+### Changed
+- `*_EVENT_FILTERS` defaults changed that selects only live events.
+- Partition `current_state` property states: `pending` changed to `arming`
+- AES crypto performance improvements. Python can't do faster.
+- Serial connection modules are not required for installation if they are not used.
+- Docker: No builds for arm/v7 as arm/v6 is fully compatible with it.
+
+### Refactoring
+- Large refactoring of all connection code
+- IP Interface rewrite
+
+### Alpha
+- EVO: Alpha Door actions: [#165](https://github.com/ParadoxAlarmInterface/pai/issues/165)
+- Trigger alarm via mqtt in new firmwares: [#162](https://github.com/ParadoxAlarmInterface/pai/issues/162)
+- Alpha attempt on HomeAssistant notifications. Controlled by `HOMEASSISTANT_NOTIFICATIONS*` settings.
+
 ## [2.1.0] - 2020-02-08
 
 ### Added
