@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Very large release
 
 ### Added
+- Time syncing only when there is a large drift. Controlled by `SYNC_TIME_MIN_DRIFT`
 - MQTT TLS support
 - New tags added for `*_EVENT_FILTERS` properties: `entry_delay`, `entry_delay_finished`, `exit_delay`, `exit_delay_finished`
 - PAI service stops if detects critical exception like wrong password or serial port not available
