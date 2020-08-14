@@ -3,11 +3,11 @@ import json
 
 import pytest
 
+from paradox.config import config as cfg
 from paradox.data.model import DetectedPanel
 from paradox.hardware.common import ProductIdEnum
 from paradox.interfaces.mqtt.homeassistant import HomeAssistantMQTTInterface
 from paradox.lib.ps import sendMessage
-from paradox.config import config as cfg
 from tests.hardware.evo.test_panel import create_evo192_panel
 
 

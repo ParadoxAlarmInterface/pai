@@ -64,13 +64,14 @@ async def test_validate_challenge(mocker):
         resp = calc_response(interface.challenge, SECRET, cfg.MQTT_CHALLENGE_ROUNDS)
 
         res = interface._validate_command_with_challenge(f"arm {resp}")
-        assert res[0] == 'arm'
+        assert res[0] == "arm"
         assert res[1] == None
 
     finally:
         interface.stop()
         interface.join()
         assert not interface.is_alive()
+
 
 @pytest.mark.asyncio
 async def test_validate_challenge_user(mocker):
@@ -87,13 +88,14 @@ async def test_validate_challenge_user(mocker):
         resp = calc_response(interface.challenge, SECRET, cfg.MQTT_CHALLENGE_ROUNDS)
 
         res = interface._validate_command_with_challenge(f"arm {SECRET_USER} {resp}")
-        assert res[0] == 'arm'
+        assert res[0] == "arm"
         assert res[1] == SECRET_USER
 
     finally:
         interface.stop()
         interface.join()
         assert not interface.is_alive()
+
 
 @pytest.mark.asyncio
 async def test_auth_output_control(mocker):
@@ -188,6 +190,7 @@ async def test_auth_output_control(mocker):
         interface.join()
         assert not interface.is_alive()
 
+
 @pytest.mark.asyncio
 async def test_auth_output_control_user(mocker):
     interface = get_interface(mocker, {SECRET_USER: SECRET})
@@ -205,7 +208,7 @@ async def test_auth_output_control_user(mocker):
         )
 
         message = MQTTMessage(topic=b"paradox/control/outputs/Output01")
-        message.payload = f"on {SECRET_USER} XXX".encode('utf-8')
+        message.payload = f"on {SECRET_USER} XXX".encode("utf-8")
 
         # Auth fail due to invalid response
         interface._mqtt_handle_output_control(None, None, message)
@@ -275,6 +278,7 @@ async def test_auth_output_control_user(mocker):
         interface.stop()
         interface.join()
         assert not interface.is_alive()
+
 
 @pytest.mark.asyncio
 async def test_auth_partition_control(mocker):
@@ -365,6 +369,7 @@ async def test_auth_partition_control(mocker):
         interface.join()
         assert not interface.is_alive()
 
+
 @pytest.mark.asyncio
 async def test_auth_partition_control_user(mocker):
     interface = get_interface(mocker, {SECRET_USER: SECRET})
@@ -382,7 +387,7 @@ async def test_auth_partition_control_user(mocker):
         )
 
         message = MQTTMessage(topic=b"paradox/control/partitions/Partition01")
-        message.payload = f"arm {SECRET_USER} XXX".encode('utf-8')
+        message.payload = f"arm {SECRET_USER} XXX".encode("utf-8")
 
         # Auth fail due to invalid response
         interface._mqtt_handle_partition_control(None, None, message)
@@ -543,6 +548,7 @@ async def test_auth_zone_control(mocker):
         interface.join()
         assert not interface.is_alive()
 
+
 @pytest.mark.asyncio
 async def test_auth_zone_control_user(mocker):
     interface = get_interface(mocker, {SECRET_USER: SECRET})
@@ -560,7 +566,7 @@ async def test_auth_zone_control_user(mocker):
         )
 
         message = MQTTMessage(topic=b"paradox/control/zones/zone01")
-        message.payload = f"bypass {SECRET_USER} XXX".encode('utf-8')
+        message.payload = f"bypass {SECRET_USER} XXX".encode("utf-8")
 
         # Auth fail due to invalid response
         interface._mqtt_handle_zone_control(None, None, message)
@@ -578,7 +584,6 @@ async def test_auth_zone_control_user(mocker):
             2,
             True,
         )
-
 
         # Auth success
         interface.mqtt.publish.reset_mock()
