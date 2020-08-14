@@ -21,8 +21,8 @@ Very large release
 - Configuration file search logic improved. Looks in current dir, `~/.local/etc`, `/etc/pai`, `/usr/local/etc/pai`.
 File names scanned: `pai.conf`, `pai.json`, `pai.yaml`
 - Configuration: `MQTT_BIND_ADDRESS` default matches Paho MQTT default
-- Configuration: `MQTT_PUBLISH_DEFINITIONS` default `False`
-- Configuration: `MQTT_PUBLISH_STATUS` default `False`
+- Configuration: `MQTT_PUBLISH_DEFINITIONS` default `False`. Publishes zone, partition, user definitions to MQTT. A lot of data on boot.
+- Configuration: `MQTT_PUBLISH_COMMAND_STATUS` default `False`. Sends textual command statuses to mqtt.
 - Configuration: `IP_INTERFACE_PASSWORD` accepts `string` type
 
 ### Changed
