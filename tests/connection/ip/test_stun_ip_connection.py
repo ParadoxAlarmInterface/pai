@@ -1,16 +1,9 @@
-import asyncio
-
 import pytest
 from asynctest import CoroutineMock
 
 from paradox.connections.ip.connection import StunIPConnection
 from paradox.connections.ip.commands import IPModuleConnectCommand
 from paradox.connections.ip.stun_session import StunSession
-
-
-class TestProtocol:
-    def is_active(self):
-        return True
 
 
 @pytest.mark.asyncio
@@ -22,7 +15,10 @@ async def test_connect(mocker):
         password="test"
     )
 
-    create_connection_mock = CoroutineMock(return_value=(None, TestProtocol()))
+    protocol = mocker.Mock()
+    protocol.is_active.return_value = True
+
+    create_connection_mock = CoroutineMock(return_value=(None, protocol))
     mocker.patch.object(connection.loop, 'create_connection', create_connection_mock)
     connect_command_execute = mocker.patch.object(IPModuleConnectCommand, 'execute', CoroutineMock())
 
