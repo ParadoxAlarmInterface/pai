@@ -104,6 +104,9 @@ import logging
 # MQTT_TOGGLE_CODES = {}
 # MQTT_USE_NUMERIC_STATES = False         # use 0 and 1 instead of True and False
 #
+# MQTT_PUBLISH_COMMAND_STATUS = False  # Publish command statuses to MQTT
+# MQTT_COMMAND_STATUS_TOPIC = "command_status"
+#
 ### MQTT Home Assistant Auto Discovery
 # MQTT_HOMEASSISTANT_AUTODISCOVERY_ENABLE = False
 #

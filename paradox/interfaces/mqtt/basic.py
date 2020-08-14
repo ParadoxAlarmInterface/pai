@@ -182,7 +182,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
         message = "Zone command: {}={} user: {}".format(element, command, user)
         logger.debug(message)
-        self._publish_status(message)
+        self._publish_command_status(message)
 
         if not await self.alarm.control_zone(element, command):
             message = "Zone command refused: {}={} user: {}".format(element, command, user)
@@ -190,7 +190,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         else:
             message = "Zone command accepted: {}={} user: {}".format(element, command, user)
 
-        self._publish_status(message)
+        self._publish_command_status(message)
 
     @mqtt_handle_decorator
     async def _mqtt_handle_partition_control(self, prep: ParsedMessage):
@@ -258,7 +258,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
         message = "Partition command: {}={} user: {}".format(element, command, user)
         logger.info(message)
-        self._publish_status(message)
+        self._publish_command_status(message)
 
         if not await self.alarm.control_partition(element, command):
             message = "Partition command refused: {}={} user: {}".format(element, command, user)
@@ -266,7 +266,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         else:
             message = "Partition command accepted: {}={} user: {}".format(element, command, user)
 
-        self._publish_status(message)
+        self._publish_command_status(message)
 
     @mqtt_handle_decorator
     async def _mqtt_handle_output_control(self, prep: ParsedMessage):
@@ -282,7 +282,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
         message = "Output command: {}={} user: {}".format(element, command, user)
         logger.debug(message)
-        self._publish_status(message)
+        self._publish_command_status(message)
 
         if not await self.alarm.control_output(element, command):
             message = "Output command refused: {}={} user: {}".format(element, command, user)
@@ -290,7 +290,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         else:
             message = "Output command accepted: {}={} user: {}".format(element, command, user)
 
-        self._publish_status(message)
+        self._publish_command_status(message)
 
     @mqtt_handle_decorator
     async def _mqtt_handle_send_panic(self, prep: ParsedMessage):
@@ -310,7 +310,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                 partition, userid, user, panic_type
             )
         logger.debug(message)
-        self._publish_status(message)
+        self._publish_command_status(message)
 
         if not await self.alarm.send_panic(partition, panic_type, userid):
             message = "Send panic command refused: {}, userid: {}, user: {}, type: {}".format(
@@ -323,7 +323,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                     partition, userid, user, panic_type
                 )
 
-        self._publish_status(message)
+        self._publish_command_status(message)
 
     @mqtt_handle_decorator
     async def _mqtt_handle_door_control(self, prep: ParsedMessage):
@@ -340,7 +340,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         message = "Door command: {}={} user=".format(element, command, user)
 
         logger.debug(message)
-        self._publish_status(message)
+        self._publish_command_status(message)
 
         if not await self.alarm.control_door(element, command):
             message = "Door command refused: {}={} user: {}".format(element, command, user)
@@ -348,7 +348,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         else:
             message = "Door command accepted: {}={} user: {}".format(element, command, user)
 
-        self._publish_status(message)
+        self._publish_command_status(message)
 
     def _handle_panel_event(self, event: Event):
         """
@@ -543,7 +543,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             ret = None
             user = None  # Clear user
 
-        self._publish_status(message)
+        self._publish_command_status(message)
         logger.info(message)
         return ret, user
 
