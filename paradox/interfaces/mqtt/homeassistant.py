@@ -75,7 +75,6 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         )
 
         self._publish_run_state_sensor(device, panel.serial_number)
-
         if "partition" in status:
             self._process_partition_statuses(
                 status["partition"], device, panel.serial_number
@@ -84,6 +83,8 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             self._process_zone_statuses(status["zone"], device, panel.serial_number)
         if "pgm" in status:
             self._process_pgm_statuses(status["pgm"], device, panel.serial_number)
+        if "system" in status:
+            self._process_system_statuses(status['system'], device, panel.serial_number)
 
     def _publish_run_state_sensor(self, device, device_sn):
         configuration_topic = "{}/sensor/{}/{}/config".format(
@@ -105,25 +106,27 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             if p_key not in self.partitions:
                 continue
             partition = self.partitions[p_key]
+            key = sanitize_key(partition["key"])
 
+            # Publish Alarm Panel
             state_topic = "{}/{}/{}/{}/{}".format(
                 cfg.MQTT_BASE_TOPIC,
                 cfg.MQTT_STATES_TOPIC,
                 cfg.MQTT_PARTITION_TOPIC,
-                sanitize_key(partition["key"]),
+                key,
                 "current_state",
             )
 
             configuration_topic = "{}/alarm_control_panel/{}/{}/config".format(
                 cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
                 device_sn,
-                sanitize_key(partition["key"]),
+                key
             )
             command_topic = "{}/{}/{}/{}".format(
                 cfg.MQTT_BASE_TOPIC,
                 cfg.MQTT_CONTROL_TOPIC,
                 cfg.MQTT_PARTITION_TOPIC,
-                sanitize_key(partition["key"]),
+                key
             )
             config = dict(
                 name=partition["label"],
@@ -137,42 +140,116 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 payload_arm_away="arm",
                 payload_arm_night="arm_sleep",
             )
-
             self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
+            
+            # Publish individual entities
+
+            for status in p_status:
+
+                topic = "{}/{}/{}/{}/{}".format(
+                    cfg.MQTT_BASE_TOPIC,
+                    cfg.MQTT_STATES_TOPIC,
+                    cfg.MQTT_PARTITION_TOPIC,
+                    key,
+                    status,
+                )
+
+                config = dict(
+                    name="Partition {} {}".format(partition["label"], status.replace("_"," ").title()),
+                    unique_id="{}_partition_{}_{}".format(device_sn, key, status),
+                    state_topic=topic,
+                    availability_topic=self.availability_topic,
+                    payload_on="True",
+                    payload_off="False",
+                    device=device,
+                )
+
+                configuration_topic = "{}/binary_sensor/{}/partition_{}_{}/config".format(
+                    cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
+                    device_sn,
+                    key, 
+                    status)
+
+                self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
 
     def _process_zone_statuses(self, zone_statuses, device, device_sn):
         for z_key, p_status in zone_statuses.items():
+
             if z_key not in self.zones:
                 continue
-
+            
             zone = self.zones[z_key]
-
-            open_topic = "{}/{}/{}/{}/{}".format(
+            key = sanitize_key(zone["key"])
+            
+            # Publish command
+                
+            topic = "{}/{}/{}/{}/{}".format(
                 cfg.MQTT_BASE_TOPIC,
                 cfg.MQTT_STATES_TOPIC,
                 cfg.MQTT_ZONE_TOPIC,
-                sanitize_key(zone["key"]),
-                "open",
+                key,
+                "bypassed",
             )
-
+            
+            command_topic = "{}/{}/{}/{}".format(
+                cfg.MQTT_BASE_TOPIC,
+                cfg.MQTT_CONTROL_TOPIC,
+                cfg.MQTT_ZONE_TOPIC,
+                key,
+            )
+            
             config = dict(
-                name=zone["label"],
-                unique_id="{}_zone_{}_open".format(device_sn, zone["key"]),
-                state_topic=open_topic,
-                device_class="motion",
+                name="Zone {} {}".format(key, "Bypass"),
+                unique_id="{}_zone_{}_{}".format(device_sn, key, "bypass"),
+                state_topic=topic,
                 availability_topic=self.availability_topic,
-                payload_on="True",
-                payload_off="False",
-                device=device,
+                command_topic=command_topic,
+                payload_on="bypass",
+                payload_off="clear_bypass",
+                state_on="True",
+                state_off="False",
+                device=device
             )
-
-            configuration_topic = "{}/binary_sensor/{}/{}/config".format(
+            configuration_topic = "{}/switch/{}/zone_{}_bypass/config".format(
                 cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
-                device_sn,
-                sanitize_key(zone["key"]),
+                device_sn, 
+                key,
             )
-
+                
             self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
+
+            # Publish Status
+            for status in p_status:
+
+                topic = "{}/{}/{}/{}/{}".format(
+                    cfg.MQTT_BASE_TOPIC,
+                    cfg.MQTT_STATES_TOPIC,
+                    cfg.MQTT_ZONE_TOPIC,
+                    key,
+                    status,
+                )
+
+                config = dict(
+                    name="Zone {} {}".format(zone["label"], status.replace("_"," ").title()),
+                    unique_id="{}_zone_{}_{}".format(device_sn, key, status),
+                    state_topic=topic,
+                    availability_topic=self.availability_topic,
+                    payload_on="True",
+                    payload_off="False",
+                    device=device,
+                )
+                
+                if status == 'open':
+                    config['device_class'] = 'motion'
+
+                configuration_topic = "{}/binary_sensor/{}/zone_{}_{}/config".format(
+                    cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
+                    device_sn, 
+                    key,
+                    status
+                )
+                
+                self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
 
     def _process_pgm_statuses(self, pgm_statuses, device, device_sn):
         for pgm_key, p_status in pgm_statuses.items():
@@ -202,17 +279,53 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 state_topic=on_topic,
                 command_topic=command_topic,
                 availability_topic=self.availability_topic,
-                state_on="True",
-                state_off="False",
-                payload_on="on",
-                payload_off="off",
                 device=device,
             )
 
-            configuration_topic = "{}/switch/{}/{}/config".format(
+            configuration_topic = "{}/switch/{}/pgm_{}_open/config".format(
                 cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
                 device_sn,
                 sanitize_key(pgm["key"]),
             )
 
             self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
+    
+    def _process_system_statuses(self, system_statuses, device, device_sn):
+        for system_key, p_status in system_statuses.items():
+            for status in p_status:
+                
+                topic = "{}/{}/{}/{}/{}".format(
+                    cfg.MQTT_BASE_TOPIC,
+                    cfg.MQTT_STATES_TOPIC,
+                    cfg.MQTT_SYSTEM_TOPIC,
+                    system_key,
+                    status,
+                )
+
+                config = dict(
+                    name="Panel {}".format(status),
+                    unique_id="{}_system_{}_{}".format(device_sn, system_key, status),
+                    state_topic=topic,
+                    availability_topic=self.availability_topic,
+                    device=device,
+                )
+
+                if system_key == 'troubles':
+                    dev_type = 'binary_sensor'
+                    config['payload_on'] = 'True'
+                    config['payload_off'] = 'False'
+                    config['device_class'] = 'problem'
+                else:
+                    dev_type = 'sensor'
+                    if system_key == 'power':
+                        config['unit_of_measurement'] = 'V'
+
+                configuration_topic = "{}/{}/{}/{}_{}/config".format(
+                    cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
+                    dev_type,
+                    device_sn,
+                    system_key,
+                    status
+                )
+
+                self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
