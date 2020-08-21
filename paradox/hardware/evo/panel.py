@@ -35,11 +35,7 @@ class Panel_EVOBase(PanelBase):
     ):
         super(Panel_EVOBase, self).__init__(core, variable_message_length)
 
-        raw_data = (
-            start_communication_response.fields.data
-            + start_communication_response.checksum
-        )
-        self.settings = parsers.InitializeCommunication.parse(raw_data).fields.value
+        self._populate_settings(start_communication_response)
 
         enabled_partitions = list(
             (key for key, val in self.settings.system_options.partitions.items() if val)
@@ -53,6 +49,16 @@ class Panel_EVOBase(PanelBase):
                 cfg.LIMITS["partition"] = list(
                     set(cfg.LIMITS["partition"]).intersection(enabled_partitions)
                 )
+
+    def _populate_settings(self, start_communication_response):
+        raw_data = (
+                start_communication_response.fields.data
+                + start_communication_response.checksum
+        )
+        parsed = parsers.InitializeCommunication.parse(raw_data)
+        if cfg.LOGGING_DUMP_MESSAGES:
+            logger.debug("Second parse of InitializeCommunication response: %s", parsed)
+        self.settings = parsed.fields.value
 
     def get_message(self, name: str) -> Construct:
         try:
