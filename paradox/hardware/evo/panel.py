@@ -37,19 +37,6 @@ class Panel_EVOBase(PanelBase):
 
         self._populate_settings(start_communication_response)
 
-        enabled_partitions = list(
-            (key for key, val in self.settings.system_options.partitions.items() if val)
-        )
-
-        if hasattr(cfg, "LIMITS"):
-            partition_limits = cfg.LIMITS.get("partition")
-            if partition_limits is None:
-                cfg.LIMITS["partition"] = enabled_partitions
-            else:
-                cfg.LIMITS["partition"] = list(
-                    set(cfg.LIMITS["partition"]).intersection(enabled_partitions)
-                )
-
     def _populate_settings(self, start_communication_response):
         raw_data = (
                 start_communication_response.fields.data
