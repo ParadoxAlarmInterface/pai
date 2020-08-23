@@ -46,7 +46,7 @@ import logging
 #     # 'door': range(1, 32),     # Doors to consider
 #     # 'pgm': range(1, 17),      # PGMs to monitor and control
 #     # 'partition': [1, 2],      # Partitions to monitor and control
-#     # 'bus-module': range(1, 17),      # Buses to monitor
+#     # 'module': range(1, 17),      # Buses to monitor
 #     # 'repeater': range(1, 9),  # Repeaters to monitor
 #     # 'keypad': range(1, 9)     # Keypads to monitor
 # }
