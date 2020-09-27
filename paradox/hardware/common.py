@@ -45,6 +45,7 @@ ProductIdEnum = Enum(
     SPECTRA_SP65=27,
     MAGELLAN_MG5000=64,
     MAGELLAN_MG5050=65,
+    MAGELLAN_MG5075=66,
 )
 
 CommunicationSourceIDEnum = Enum(
