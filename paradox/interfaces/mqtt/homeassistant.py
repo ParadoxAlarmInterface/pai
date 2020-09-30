@@ -92,8 +92,8 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         )
 
         config = dict(
-            name="Run status",
-            unique_id="{}_partition_{}".format(device_sn, "run_status"),
+            name=f'Paradox {device_sn} PAI Status',
+            unique_id=f'paradox_{device_sn}_pai_status',
             state_topic=self.run_status_topic,
             # availability_topic=self.availability_topic,
             device=device,
@@ -128,9 +128,10 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 cfg.MQTT_PARTITION_TOPIC,
                 key
             )
+
             config = dict(
-                name=partition["label"],
-                unique_id="{}_partition_{}".format(device_sn, partition["key"]),
+                name=f'Paradox {device_sn} Partition {partition["key"]}',
+                unique_id=f'paradox_{device_sn}_partition_{key.lower()}',
                 command_topic=command_topic,
                 state_topic=state_topic,
                 availability_topic=self.availability_topic,
@@ -139,6 +140,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 payload_arm_home="arm_stay",
                 payload_arm_away="arm",
                 payload_arm_night="arm_sleep",
+                force_update="True"
             )
             self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
             
@@ -155,13 +157,14 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 )
 
                 config = dict(
-                    name="Partition {} {}".format(partition["label"], status.replace("_"," ").title()),
-                    unique_id="{}_partition_{}_{}".format(device_sn, key, status),
+                    name=f'Paradox {device_sn} Partition {partition["key"]} {status.replace("_"," ").title()}',
+                    unique_id=f'paradox_{device_sn}_partition_{key.lower()}_{status}',
                     state_topic=topic,
                     availability_topic=self.availability_topic,
                     payload_on="True",
                     payload_off="False",
                     device=device,
+                    force_update="True"
                 )
 
                 configuration_topic = "{}/binary_sensor/{}/partition_{}_{}/config".format(
@@ -199,8 +202,8 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             )
             
             config = dict(
-                name="Zone {} {}".format(key, "Bypass"),
-                unique_id="{}_zone_{}_{}".format(device_sn, key, "bypass"),
+                name=f'Paradox {device_sn} Zone {zone["key"]} Bypass',
+                unique_id=f'paradox_{device_sn}_zone_{key.lower()}_bypass',
                 state_topic=topic,
                 availability_topic=self.availability_topic,
                 command_topic=command_topic,
@@ -208,7 +211,8 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 payload_off="clear_bypass",
                 state_on="True",
                 state_off="False",
-                device=device
+                device=device,
+                force_update="True"
             )
             configuration_topic = "{}/switch/{}/zone_{}_bypass/config".format(
                 cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
@@ -230,13 +234,14 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 )
 
                 config = dict(
-                    name="Zone {} {}".format(zone["label"], status.replace("_"," ").title()),
-                    unique_id="{}_zone_{}_{}".format(device_sn, key, status),
+                    name=f'Paradox {device_sn} Zone {zone["key"]} {status.replace("_"," ").title()}',
+                    unique_id=f'paradox_{device_sn}_zone_{key.lower()}_{status}',
                     state_topic=topic,
                     availability_topic=self.availability_topic,
                     payload_on="True",
                     payload_off="False",
                     device=device,
+                    force_update="True"
                 )
                 
                 if status == 'open':
@@ -257,12 +262,13 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 continue
 
             pgm = self.pgms[pgm_key]
+            key = sanitize_key(pgm["key"])
 
             on_topic = "{}/{}/{}/{}/{}".format(
                 cfg.MQTT_BASE_TOPIC,
                 cfg.MQTT_STATES_TOPIC,
                 cfg.MQTT_OUTPUT_TOPIC,
-                sanitize_key(pgm["key"]),
+                key,
                 "on",
             )
 
@@ -270,22 +276,23 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 cfg.MQTT_BASE_TOPIC,
                 cfg.MQTT_CONTROL_TOPIC,
                 cfg.MQTT_OUTPUT_TOPIC,
-                sanitize_key(pgm["key"]),
+                key
             )
 
             config = dict(
-                name=pgm["label"],
-                unique_id="{}_pgm_{}_open".format(device_sn, pgm["key"]),
+                name=f'Paradox {device_sn} PGM {pgm["label"]} Open',
+                unique_id=f'paradox_{device_sn}_pgm_{key.lower()}_open',
                 state_topic=on_topic,
                 command_topic=command_topic,
                 availability_topic=self.availability_topic,
                 device=device,
+                force_update="True"
             )
 
             configuration_topic = "{}/switch/{}/pgm_{}_open/config".format(
                 cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
                 device_sn,
-                sanitize_key(pgm["key"]),
+                key,
             )
 
             self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
@@ -303,11 +310,12 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 )
 
                 config = dict(
-                    name="Panel {}".format(status),
-                    unique_id="{}_system_{}_{}".format(device_sn, system_key, status),
+                    name=f'Paradox {device_sn} System {system_key.title()} {status.replace("_"," ").title()}',
+                    unique_id=f'paradox_{device_sn}_system_{system_key}_{status}',
                     state_topic=topic,
                     availability_topic=self.availability_topic,
                     device=device,
+                    force_update="True"
                 )
 
                 if system_key == 'troubles':
