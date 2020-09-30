@@ -6,7 +6,7 @@ from construct import (BitsInteger, BitStruct, Byte, Bytes, Const, Default,
 from ..common import CommunicationSourceIDEnum, PacketChecksum, ProductIdEnum
 from .adapters import (DateAdapter, ModuleSerialAdapter,
                        PartitionStatusAdapter, SignalStrengthAdapter,
-                       StatusAdapter, ZoneStatusAdapter)
+                       StatusAdapter, ZoneStatusAdapter, PGMDefinitionAdapter)
 
 InitializeCommunication = Struct(
     "fields"
@@ -484,6 +484,9 @@ DefinitionsParserMap = {
             "delay_alarm_transmission" / Flag,
             "force_arming" / Flag,
         ),
+    ),
+    'pgm': Struct(
+        "definition" / PGMDefinitionAdapter(Bytes(6)),
     )
 }
 

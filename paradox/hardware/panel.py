@@ -155,6 +155,7 @@ class Panel:
                     addresses, parser.sizeof()
                 ):
                     element = parser.parse(raw_data)
+
                     if cfg.LOGGING_DUMP_MESSAGES:
                         logger.debug(f"EEPROM parsed ({elem_type}/{index}): {element}")
                     if elem_def.get("bit_encoded"):
