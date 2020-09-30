@@ -42,7 +42,9 @@ class Panel(PanelBase):
     mem_map = {
         "status_base1": 0x8000,
         "status_base2": 0x1FE0,
-        "definitions": {"zone": {"addresses": [range(0x730, 0x800, 0x03)]}},
+        "definitions": {
+            "zone": {"addresses": [range(0x730, 0x7A0, 0x03)]},
+            "pgm": {"addresses": [range(0x7A0, 0x800, 0x06)]}},
         "labels": {
             "zone": {"label_offset": 0, "addresses": [range(0x010, 0x210, 0x10)]},
             "pgm": {

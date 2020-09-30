@@ -3,7 +3,7 @@
 import datetime
 
 from construct import Adapter
-
+from enum import Enum
 
 class DateAdapter(Adapter):
     def _decode(self, obj, context, path):
@@ -142,9 +142,101 @@ class ZoneStatusAdapter(Adapter):
         return zone_status
 
 
+class PGMStatusAdapter(Adapter):
+    def _decode(self, obj, context, path):
+        pgm_status = dict()
+        for i in range(0, len(obj)):
+            pgm_status[i + 1] = dict(
+                on=(obj[i] & 32) != 0,
+            )
+
+        return pgm_status
+
+
 class SignalStrengthAdapter(Adapter):
     def _decode(self, obj, context, path):
         strength = dict()
         for i in range(0, len(obj)):
             strength[i + 1] = obj[i]
         return strength
+
+
+class PGMDefinitionAdapter(Adapter):
+    class PGMEvent(Enum):
+        zone_ok = 0
+        zone_open = 1
+        partition_status = 2
+        bell_status = 3
+        non_reportable_event = 6
+        remote_control_access = 7
+        pgm_activation_8 = 8
+        pgm_activation_9 = 9
+        pgm_activation_10 = 10
+        pgm_activation_11 = 11
+        cold_start_wireless_zone = 12
+        cold_start_wireless_output_module = 13
+        bypass_programming = 14
+        user_code_activated_output = 15
+        wireless_smoke_maintenance_signal = 16
+        delay_zone_alarm_transmission = 17
+        zone_signal_strength_weak_1 = 18
+        zone_signal_strength_weak_2 = 19
+        zone_signal_strength_weak_3 = 20
+        zone_signal_strength_weak_4 = 21
+        button_pressed_on_remote1 = 22
+        button_pressed_on_remote2 = 23
+        fire_delay_started = 24
+        upload_download_software_access = 26
+        bus_module_added_removed = 27
+        stayd_pass_acknowledged = 28
+        arming_with_user = 29
+        special_arming = 30
+        disarming_with_user = 31
+        disarming_after_alarm_with_user = 32
+        alarm_cancelled_with_user = 33
+        special_disarming = 34
+        zone_bypassed = 35
+        zone_in_alarm = 36
+        fire_alarm = 37
+        zone_alarm_restore = 38
+        fire_alarm_restore = 39
+        special_alarm = 40
+        zone_shutdown = 41
+        zone_tampered = 42
+        zone_tamper_restored = 43
+        new_trouble = 44
+        trouble_restored = 45
+        bus_module_new_trouble = 46
+        bus_module_trouble_restored = 47
+        special = 48
+        low_battery_on_zone = 49
+        low_battery_on_zone_restore = 50
+        zone_supervision_trouble = 51
+        zone_supervision_restore = 52
+        wireless_output_supervision_trouble = 53
+        wireless_output_supervision_restore = 54
+        wireless_output_tamper_trouble = 55
+        wireless_output_tamper_trouble_restore = 56
+        non_medical_alarm = 57
+        zone_was_forced = 58
+        zone_included = 59
+        force_zone_has_been_rearmed = 60
+        system_status = 64
+
+    def _decode(self, obj, context, path):
+        disabled = sum(obj) == 0
+
+        if disabled:
+            return 'disabled'
+
+        try:
+            activation_event = PGMDefinitionAdapter.PGMEvent(obj[0]) if sum(obj[:3]) != 0 else 'disabled'
+        except:
+            activation_event = 'unknown'
+
+        try:
+            deactivation_event = PGMDefinitionAdapter.PGMEvent(obj[3]) if sum(obj[3:]) != 0 else 'disabled'
+        except:
+            deactivation_event = 'unknown'
+
+        return dict(activation=activation_event, deactivation=deactivation_event)

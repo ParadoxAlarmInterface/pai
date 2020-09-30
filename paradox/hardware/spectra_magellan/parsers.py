@@ -6,7 +6,7 @@ from construct import (BitsInteger, BitStruct, Byte, Bytes, Const, Default,
 from ..common import CommunicationSourceIDEnum, PacketChecksum, ProductIdEnum
 from .adapters import (DateAdapter, ModuleSerialAdapter,
                        PartitionStatusAdapter, SignalStrengthAdapter,
-                       StatusAdapter, ZoneStatusAdapter)
+                       StatusAdapter, ZoneStatusAdapter, PGMDefinitionAdapter, PGMStatusAdapter)
 
 InitializeCommunication = Struct(
     "fields"
@@ -148,6 +148,7 @@ RAMDataParserMap = {
         "_not_used1" / Padding(6),
     ),
     5: Struct("zone_exit_delay" / StatusAdapter(Bytes(4)), "_not_used0" / Padding(28)),
+    7: Struct("pgm_status" / PGMStatusAdapter(Bytes(32))),
 }
 
 LiveEvent = Struct(
@@ -484,6 +485,9 @@ DefinitionsParserMap = {
             "delay_alarm_transmission" / Flag,
             "force_arming" / Flag,
         ),
+    ),
+    'pgm': Struct(
+        "definition" / PGMDefinitionAdapter(Bytes(6)),
     )
 }
 
