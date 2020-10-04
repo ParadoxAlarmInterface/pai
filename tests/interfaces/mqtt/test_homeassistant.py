@@ -55,8 +55,8 @@ async def test_hass(mocker):
             "homeassistant/sensor/aabbccdd/run_status/config",
             json.dumps(
                 {
-                    "name": "Run status",
-                    "unique_id": "aabbccdd_partition_run_status",
+                    "name": "Paradox aabbccdd PAI Status",
+                    "unique_id": "paradox_aabbccdd_pai_status",
                     "state_topic": "paradox/interface/run_status",
                     "device": {
                         "manufacturer": "Paradox",
@@ -75,8 +75,8 @@ async def test_hass(mocker):
             "homeassistant/alarm_control_panel/aabbccdd/Partition_1/config",
             json.dumps(
                 {
-                    "name": "Partition 1",
-                    "unique_id": "aabbccdd_partition_Partition_1",
+                    "name": "Paradox aabbccdd Partition Partition_1",
+                    "unique_id": "paradox_aabbccdd_partition_partition_1",
                     "command_topic": "paradox/control/partitions/Partition_1",
                     "state_topic": "paradox/states/partitions/Partition_1/current_state",
                     "availability_topic": "paradox/interface/availability",
@@ -91,6 +91,7 @@ async def test_hass(mocker):
                     "payload_arm_home": "arm_stay",
                     "payload_arm_away": "arm",
                     "payload_arm_night": "arm_sleep",
+                    "force_update": True
                 }
             ),
             0,

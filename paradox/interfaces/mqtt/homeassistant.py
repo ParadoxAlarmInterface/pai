@@ -140,7 +140,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 payload_arm_home="arm_stay",
                 payload_arm_away="arm",
                 payload_arm_night="arm_sleep",
-                force_update="True"
+                force_update=True
             )
             self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
             
@@ -164,7 +164,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                     payload_on="True",
                     payload_off="False",
                     device=device,
-                    force_update="True"
+                    force_update=True
                 )
 
                 configuration_topic = "{}/binary_sensor/{}/partition_{}_{}/config".format(
@@ -212,7 +212,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 state_on="True",
                 state_off="False",
                 device=device,
-                force_update="True"
+                force_update=True
             )
             configuration_topic = "{}/switch/{}/zone_{}_bypass/config".format(
                 cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
@@ -241,7 +241,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                     payload_on="True",
                     payload_off="False",
                     device=device,
-                    force_update="True"
+                    force_update=True
                 )
                 
                 if status == 'open':
@@ -286,7 +286,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 command_topic=command_topic,
                 availability_topic=self.availability_topic,
                 device=device,
-                force_update="True"
+                force_update=True
             )
 
             configuration_topic = "{}/switch/{}/pgm_{}_open/config".format(
@@ -315,7 +315,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                     state_topic=topic,
                     availability_topic=self.availability_topic,
                     device=device,
-                    force_update="True"
+                    force_update=True
                 )
 
                 if system_key == 'troubles':
