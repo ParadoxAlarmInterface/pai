@@ -163,8 +163,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                     availability_topic=self.availability_topic,
                     payload_on="True",
                     payload_off="False",
-                    device=device,
-                    force_update=True
+                    device=device
                 )
 
                 configuration_topic = "{}/binary_sensor/{}/partition_{}_{}/config".format(
