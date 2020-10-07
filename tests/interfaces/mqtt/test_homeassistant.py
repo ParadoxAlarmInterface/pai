@@ -90,8 +90,7 @@ async def test_hass(mocker):
                     "payload_disarm": "disarm",
                     "payload_arm_home": "arm_stay",
                     "payload_arm_away": "arm",
-                    "payload_arm_night": "arm_sleep",
-                    "force_update": True
+                    "payload_arm_night": "arm_sleep"
                 }
             ),
             0,
