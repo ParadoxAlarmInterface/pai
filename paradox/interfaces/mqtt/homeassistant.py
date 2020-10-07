@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import typing
 from collections import namedtuple
 
 from paradox.config import config as cfg
@@ -139,8 +138,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 payload_disarm="disarm",
                 payload_arm_home="arm_stay",
                 payload_arm_away="arm",
-                payload_arm_night="arm_sleep",
-                force_update=True
+                payload_arm_night="arm_sleep"
             )
             self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
             
@@ -210,8 +208,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 payload_off="clear_bypass",
                 state_on="True",
                 state_off="False",
-                device=device,
-                force_update=True
+                device=device
             )
             configuration_topic = "{}/switch/{}/zone_{}_bypass/config".format(
                 cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
@@ -239,8 +236,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                     availability_topic=self.availability_topic,
                     payload_on="True",
                     payload_off="False",
-                    device=device,
-                    force_update=True
+                    device=device
                 )
                 
                 if status == 'open':
@@ -284,8 +280,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 state_topic=on_topic,
                 command_topic=command_topic,
                 availability_topic=self.availability_topic,
-                device=device,
-                force_update=True
+                device=device
             )
 
             configuration_topic = "{}/switch/{}/pgm_{}_open/config".format(
@@ -313,8 +308,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                     unique_id=f'paradox_{device_sn}_system_{system_key}_{status}',
                     state_topic=topic,
                     availability_topic=self.availability_topic,
-                    device=device,
-                    force_update=True
+                    device=device
                 )
 
                 if system_key == 'troubles':
