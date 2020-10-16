@@ -280,7 +280,9 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 state_topic=on_topic,
                 command_topic=command_topic,
                 availability_topic=self.availability_topic,
-                device=device
+                device=device,
+                state_on="True",
+                state_off="False"
             )
 
             configuration_topic = "{}/switch/{}/pgm_{}_open/config".format(
