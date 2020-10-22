@@ -11,12 +11,10 @@ ENV PAI_CONFIG_FILE=${PAI_CONFIG_PATH}/pai.conf \
   PAI_LOGGING_FILE=${PAI_LOGGING_PATH}/paradox.log
 
 RUN apk add --no-cache tzdata \
-  && mkdir -p ${PAI_CONFIG_PATH} ${WORK_DIR} ${PAI_LOGGING_PATH} \
-  && addgroup pai && adduser -S pai -G pai \
-  && chown -R pai ${WORK_DIR} ${PAI_LOGGING_PATH} ${PAI_CONFIG_PATH}
+  && mkdir -p ${PAI_CONFIG_PATH} ${WORK_DIR} ${PAI_LOGGING_PATH}
 
-COPY --chown=pai . ${WORK_DIR}
-COPY --chown=pai config/pai.conf.example ${PAI_CONFIG_FILE}
+COPY . ${WORK_DIR}
+COPY config/pai.conf.example ${PAI_CONFIG_FILE}
 
 # OR
 #RUN wget -c https://github.com/jpbarraca/pai/archive/master.tar.gz -O - | tar -xz --strip 1
@@ -27,9 +25,6 @@ RUN cd ${WORK_DIR} \
   && pip install --no-cache-dir -r requirements.txt \
   && pip install --no-cache-dir . \
   && rm -fr ${WORK_DIR}
-
-# process run as paradox user
-USER pai
 
 # conf file from host
 VOLUME ${PAI_CONFIG_PATH}
