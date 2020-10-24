@@ -1,5 +1,6 @@
 import asyncio
 import json
+from json.decoder import JSONDecodeError
 
 import pytest
 
@@ -17,7 +18,7 @@ async def test_hass(mocker):
     mocker.patch.multiple(cfg, MQTT_HOMEASSISTANT_AUTODISCOVERY_ENABLE=True)
     con = mocker.patch("paradox.interfaces.mqtt.core.MQTTConnection")
     con.get_instance.return_value.availability_topic = "paradox/interface/availability"
-    con.get_instance.return_value.run_status_topic = "paradox/interface/run_status"
+    con.get_instance.return_value.pai_status_topic = "paradox/interface/run_status"
 
     alarm = mocker.MagicMock()
 
@@ -51,52 +52,72 @@ async def test_hass(mocker):
 
         await asyncio.sleep(0.01)
 
-        interface.mqtt.publish.assert_any_call(
+        assert_any_call_with_json(interface.mqtt.publish,
             "homeassistant/sensor/aabbccdd/run_status/config",
-            json.dumps(
-                {
-                    "name": "Paradox aabbccdd PAI Status",
-                    "unique_id": "paradox_aabbccdd_pai_status",
-                    "state_topic": "paradox/interface/run_status",
-                    "device": {
-                        "manufacturer": "Paradox",
-                        "model": "EVO192",
-                        "identifiers": ["Paradox", "EVO192", "aabbccdd"],
-                        "name": "EVO192",
-                        "sw_version": "6.80 build 5",
-                    },
-                }
-            ),
+            {
+                "name": "Paradox aabbccdd PAI Status",
+                "unique_id": "paradox_aabbccdd_pai_status",
+                "state_topic": "paradox/interface/run_status",
+                "availability_topic": "paradox/interface/availability",
+                "device": {
+                    "manufacturer": "Paradox",
+                    "model": "EVO192",
+                    "identifiers": ["Paradox", "EVO192", "aabbccdd"],
+                    "name": "EVO192",
+                    "sw_version": "6.80 build 5",
+                },
+            },
             0,
-            True,
+            True
         )
 
-        interface.mqtt.publish.assert_any_call(
+        assert_any_call_with_json(interface.mqtt.publish,
             "homeassistant/alarm_control_panel/aabbccdd/Partition_1/config",
-            json.dumps(
-                {
-                    "name": "Paradox aabbccdd Partition Partition_1",
-                    "unique_id": "paradox_aabbccdd_partition_partition_1",
-                    "command_topic": "paradox/control/partitions/Partition_1",
-                    "state_topic": "paradox/states/partitions/Partition_1/current_state",
-                    "availability_topic": "paradox/interface/availability",
-                    "device": {
-                        "manufacturer": "Paradox",
-                        "model": "EVO192",
-                        "identifiers": ["Paradox", "EVO192", "aabbccdd"],
-                        "name": "EVO192",
-                        "sw_version": "6.80 build 5",
-                    },
-                    "payload_disarm": "disarm",
-                    "payload_arm_home": "arm_stay",
-                    "payload_arm_away": "arm",
-                    "payload_arm_night": "arm_sleep"
-                }
-            ),
+            {
+                "name": "Paradox aabbccdd Partition Partition_1",
+                "unique_id": "paradox_aabbccdd_partition_partition_1",
+                "command_topic": "paradox/control/partitions/Partition_1",
+                "state_topic": "paradox/states/partitions/Partition_1/current_state",
+                "availability_topic": "paradox/interface/availability",
+                "device": {
+                    "manufacturer": "Paradox",
+                    "model": "EVO192",
+                    "identifiers": ["Paradox", "EVO192", "aabbccdd"],
+                    "name": "EVO192",
+                    "sw_version": "6.80 build 5",
+                },
+                "payload_disarm": "disarm",
+                "payload_arm_home": "arm_stay",
+                "payload_arm_away": "arm",
+                "payload_arm_night": "arm_sleep"
+            },
             0,
-            True,
+            True
         )
     finally:
         interface.stop()
         interface.join()
         assert not interface.is_alive()
+
+
+def _decode_json(value):
+    if isinstance(value, str) and value.startswith(('{', '[')):
+        try:
+            return json.loads(value)
+        except JSONDecodeError:
+            pass
+
+    return value
+
+
+def _decode_arguments(*args, **kwargs):
+    new_arg = tuple(_decode_json(arg) for arg in args)
+    new_kwarg = dict((key, _decode_json(val)) for key, val in kwargs)
+    return new_arg, new_kwarg
+
+
+def assert_any_call_with_json(self, *args, **kwargs):
+    actual = [_decode_arguments(*args, **kwargs) for args, kwargs in self.call_args_list]
+    expected = (args, kwargs)
+
+    assert expected in actual

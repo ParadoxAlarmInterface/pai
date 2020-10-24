@@ -1,6 +1,8 @@
+import json
+
 from construct import Container, ListContainer
 
-from paradox.lib.utils import construct_free, deep_merge, sanitize_key
+from paradox.lib.utils import construct_free, deep_merge, sanitize_key, SerializableToJSONEncoder
 
 
 def test_deep_merge():
@@ -62,3 +64,13 @@ def test_construct_free():
     r = construct_free(a)
     assert isinstance(r, dict)
     assert isinstance(r["a"], list)
+
+
+def test_json_serialization():
+    class TestEntity:
+        def serialize(self):
+            return dict(a="b")
+
+    data = {1: TestEntity()}
+
+    assert '{"1": {"a": "b"}}' == json.dumps(data, cls=SerializableToJSONEncoder)

@@ -5,7 +5,10 @@ from collections import namedtuple
 
 from paradox.config import config as cfg
 from paradox.lib import ps
-from paradox.lib.utils import sanitize_key
+from paradox.lib.utils import SerializableToJSONEncoder
+from .entities.abstract_entity import AbstractEntity
+from .entities.device import Device
+from .entities.factory import MQTTAutodiscoveryEntityFactory
 
 from ...data.model import DetectedPanel
 from .core import AbstractMQTTInterface
@@ -23,8 +26,9 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         self.zones = {}
         self.pgms = {}
 
-        self.availability_topic = self.mqtt.availability_topic
-        self.run_status_topic = self.mqtt.run_status_topic
+        self.entity_factory = MQTTAutodiscoveryEntityFactory(self.mqtt.availability_topic)
+
+        self.run_status_topic = self.mqtt.pai_status_topic
 
         self.connected_future = (
             asyncio.Future()
@@ -65,270 +69,67 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         self.pgms = data.get("pgm", {})
 
     def _publish_when_ready(self, panel: DetectedPanel, status):
-        device = dict(
-            manufacturer="Paradox",
-            model=panel.model,
-            identifiers=["Paradox", panel.model, panel.serial_number],
-            name=panel.model,
-            sw_version=panel.firmware_version,
-        )
+        self.entity_factory.set_device(Device(panel))
 
-        self._publish_run_state_sensor(device, panel.serial_number)
+        self._publish_pai_state_sensor_config()
         if "partition" in status:
-            self._process_partition_statuses(
-                status["partition"], device, panel.serial_number
-            )
+            self._publish_partition_configs(status["partition"])
         if "zone" in status:
-            self._process_zone_statuses(status["zone"], device, panel.serial_number)
+            self._publish_zone_configs(status["zone"])
         if "pgm" in status:
-            self._process_pgm_statuses(status["pgm"], device, panel.serial_number)
+            self._publish_pgm_configs(status["pgm"])
         if "system" in status:
-            self._process_system_statuses(status['system'], device, panel.serial_number)
+            self._publish_system_property_configs(status['system'])
 
-    def _publish_run_state_sensor(self, device, device_sn):
-        configuration_topic = "{}/sensor/{}/{}/config".format(
-            cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX, device_sn, "run_status"
-        )
+    def _publish_config(self, entity: AbstractEntity):
+        self.publish(entity.get_configuration_topic(), json.dumps(entity, cls=SerializableToJSONEncoder), 0,
+                     cfg.MQTT_RETAIN)
 
-        config = dict(
-            name=f'Paradox {device_sn} PAI Status',
-            unique_id=f'paradox_{device_sn}_pai_status',
-            state_topic=self.run_status_topic,
-            # availability_topic=self.availability_topic,
-            device=device,
-        )
+    def _publish_pai_state_sensor_config(self):
+        pai_state_sensor_config = self.entity_factory.make_pai_status_sensor(self.run_status_topic)
+        self._publish_config(pai_state_sensor_config)
 
-        self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
-
-    def _process_partition_statuses(self, partition_statuses, device, device_sn):
-        for p_key, p_status in partition_statuses.items():
-            if p_key not in self.partitions:
+    def _publish_partition_configs(self, partition_statuses):
+        for partition_key, partition_status in partition_statuses.items():
+            if partition_key not in self.partitions:
                 continue
-            partition = self.partitions[p_key]
-            key = sanitize_key(partition["key"])
 
-            # Publish Alarm Panel
-            state_topic = "{}/{}/{}/{}/{}".format(
-                cfg.MQTT_BASE_TOPIC,
-                cfg.MQTT_STATES_TOPIC,
-                cfg.MQTT_PARTITION_TOPIC,
-                key,
-                "current_state",
-            )
-
-            configuration_topic = "{}/alarm_control_panel/{}/{}/config".format(
-                cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
-                device_sn,
-                key
-            )
-            command_topic = "{}/{}/{}/{}".format(
-                cfg.MQTT_BASE_TOPIC,
-                cfg.MQTT_CONTROL_TOPIC,
-                cfg.MQTT_PARTITION_TOPIC,
-                key
-            )
-
-            config = dict(
-                name=f'Paradox {device_sn} Partition {partition["key"]}',
-                unique_id=f'paradox_{device_sn}_partition_{key.lower()}',
-                command_topic=command_topic,
-                state_topic=state_topic,
-                availability_topic=self.availability_topic,
-                device=device,
-                payload_disarm="disarm",
-                payload_arm_home="arm_stay",
-                payload_arm_away="arm",
-                payload_arm_night="arm_sleep"
-            )
-            self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
+            partition = self.partitions[partition_key]
+            partition_alarm_control_panel_config = self.entity_factory.make_alarm_control_panel_config(partition)
+            self._publish_config(partition_alarm_control_panel_config)
             
             # Publish individual entities
+            for property_name in partition_status:
+                partition_property_binary_sensor_config = self.entity_factory.make_partition_status_binary_sensor(partition, property_name)
+                self._publish_config(partition_property_binary_sensor_config)
 
-            for status in p_status:
-
-                topic = "{}/{}/{}/{}/{}".format(
-                    cfg.MQTT_BASE_TOPIC,
-                    cfg.MQTT_STATES_TOPIC,
-                    cfg.MQTT_PARTITION_TOPIC,
-                    key,
-                    status,
-                )
-
-                config = dict(
-                    name=f'Paradox {device_sn} Partition {partition["key"]} {status.replace("_"," ").title()}',
-                    unique_id=f'paradox_{device_sn}_partition_{key.lower()}_{status}',
-                    state_topic=topic,
-                    availability_topic=self.availability_topic,
-                    payload_on="True",
-                    payload_off="False",
-                    device=device
-                )
-
-                configuration_topic = "{}/binary_sensor/{}/partition_{}_{}/config".format(
-                    cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
-                    device_sn,
-                    key, 
-                    status)
-
-                self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
-
-    def _process_zone_statuses(self, zone_statuses, device, device_sn):
-        for z_key, p_status in zone_statuses.items():
-
-            if z_key not in self.zones:
+    def _publish_zone_configs(self, zone_statuses):
+        for zone_key, zone_status in zone_statuses.items():
+            if zone_key not in self.zones:
                 continue
-            
-            zone = self.zones[z_key]
-            key = sanitize_key(zone["key"])
-            
-            # Publish command
-                
-            topic = "{}/{}/{}/{}/{}".format(
-                cfg.MQTT_BASE_TOPIC,
-                cfg.MQTT_STATES_TOPIC,
-                cfg.MQTT_ZONE_TOPIC,
-                key,
-                "bypassed",
-            )
-            
-            command_topic = "{}/{}/{}/{}".format(
-                cfg.MQTT_BASE_TOPIC,
-                cfg.MQTT_CONTROL_TOPIC,
-                cfg.MQTT_ZONE_TOPIC,
-                key,
-            )
-            
-            config = dict(
-                name=f'Paradox {device_sn} Zone {zone["key"]} Bypass',
-                unique_id=f'paradox_{device_sn}_zone_{key.lower()}_bypass',
-                state_topic=topic,
-                availability_topic=self.availability_topic,
-                command_topic=command_topic,
-                payload_on="bypass",
-                payload_off="clear_bypass",
-                state_on="True",
-                state_off="False",
-                device=device
-            )
-            configuration_topic = "{}/switch/{}/zone_{}_bypass/config".format(
-                cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
-                device_sn, 
-                key,
-            )
-                
-            self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
+
+            zone = self.zones[zone_key]
+
+            zone_bypass_switch_config = self.entity_factory.make_zone_bypass_switch(zone)
+            self._publish_config(zone_bypass_switch_config)
 
             # Publish Status
-            for status in p_status:
+            for property_name in zone_status:
+                zone_status_binary_sensor = self.entity_factory.make_zone_status_binary_sensor(zone, property_name)
+                self._publish_config(zone_status_binary_sensor)
 
-                topic = "{}/{}/{}/{}/{}".format(
-                    cfg.MQTT_BASE_TOPIC,
-                    cfg.MQTT_STATES_TOPIC,
-                    cfg.MQTT_ZONE_TOPIC,
-                    key,
-                    status,
-                )
-
-                config = dict(
-                    name=f'Paradox {device_sn} Zone {zone["key"]} {status.replace("_"," ").title()}',
-                    unique_id=f'paradox_{device_sn}_zone_{key.lower()}_{status}',
-                    state_topic=topic,
-                    availability_topic=self.availability_topic,
-                    payload_on="True",
-                    payload_off="False",
-                    device=device
-                )
-                
-                if status == 'open':
-                    config['device_class'] = 'motion'
-
-                configuration_topic = "{}/binary_sensor/{}/zone_{}_{}/config".format(
-                    cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
-                    device_sn, 
-                    key,
-                    status
-                )
-                
-                self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
-
-    def _process_pgm_statuses(self, pgm_statuses, device, device_sn):
-        for pgm_key, p_status in pgm_statuses.items():
+    def _publish_pgm_configs(self, pgm_statuses):
+        for pgm_key, pgm_status in pgm_statuses.items():
             if pgm_key not in self.pgms:
                 continue
 
             pgm = self.pgms[pgm_key]
-            key = sanitize_key(pgm["key"])
 
-            on_topic = "{}/{}/{}/{}/{}".format(
-                cfg.MQTT_BASE_TOPIC,
-                cfg.MQTT_STATES_TOPIC,
-                cfg.MQTT_OUTPUT_TOPIC,
-                key,
-                "on",
-            )
-
-            command_topic = "{}/{}/{}/{}".format(
-                cfg.MQTT_BASE_TOPIC,
-                cfg.MQTT_CONTROL_TOPIC,
-                cfg.MQTT_OUTPUT_TOPIC,
-                key
-            )
-
-            config = dict(
-                name=f'Paradox {device_sn} PGM {pgm["label"]} Open',
-                unique_id=f'paradox_{device_sn}_pgm_{key.lower()}_open',
-                state_topic=on_topic,
-                command_topic=command_topic,
-                availability_topic=self.availability_topic,
-                device=device,
-                state_on="True",
-                state_off="False"
-            )
-
-            configuration_topic = "{}/switch/{}/pgm_{}_open/config".format(
-                cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
-                device_sn,
-                key,
-            )
-
-            self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
+            pgm_switch_config = self.entity_factory.make_pgm_switch(pgm)
+            self._publish_config(pgm_switch_config)
     
-    def _process_system_statuses(self, system_statuses, device, device_sn):
-        for system_key, p_status in system_statuses.items():
-            for status in p_status:
-                
-                topic = "{}/{}/{}/{}/{}".format(
-                    cfg.MQTT_BASE_TOPIC,
-                    cfg.MQTT_STATES_TOPIC,
-                    cfg.MQTT_SYSTEM_TOPIC,
-                    system_key,
-                    status,
-                )
-
-                config = dict(
-                    name=f'Paradox {device_sn} System {system_key.title()} {status.replace("_"," ").title()}',
-                    unique_id=f'paradox_{device_sn}_system_{system_key}_{status}',
-                    state_topic=topic,
-                    availability_topic=self.availability_topic,
-                    device=device
-                )
-
-                if system_key == 'troubles':
-                    dev_type = 'binary_sensor'
-                    config['payload_on'] = 'True'
-                    config['payload_off'] = 'False'
-                    config['device_class'] = 'problem'
-                else:
-                    dev_type = 'sensor'
-                    if system_key == 'power':
-                        config['unit_of_measurement'] = 'V'
-
-                configuration_topic = "{}/{}/{}/{}_{}/config".format(
-                    cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
-                    dev_type,
-                    device_sn,
-                    system_key,
-                    status
-                )
-
-                self.publish(configuration_topic, json.dumps(config), 0, cfg.MQTT_RETAIN)
+    def _publish_system_property_configs(self, system_statuses):
+        for system_key, system_status in system_statuses.items():
+            for property_name in system_status:
+                system_property_config = self.entity_factory.make_system_status(system_key, property_name)
+                self._publish_config(system_property_config)

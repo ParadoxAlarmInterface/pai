@@ -38,6 +38,13 @@ class JSONByteEncoder(json.JSONEncoder):
         return super(JSONByteEncoder, self).default(o)
 
 
+class SerializableToJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if hasattr(obj, "serialize") and callable(obj.serialize):
+            return obj.serialize()
+        return super().default(obj)
+
+
 class SortableTuple(tuple):
     def __lt__(self, rhs):
         return self[0] < rhs[0]

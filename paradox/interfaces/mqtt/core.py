@@ -62,9 +62,9 @@ class MQTTConnection(Client):
         super(MQTTConnection, self).__init__(
             "paradox_mqtt/{}".format(os.urandom(8).hex())
         )
-        self._last_run_state = "unknown"
-        self.run_status_topic = "{}/{}/{}".format(
-            cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, "run_status"
+        self._last_pai_status = "unknown"
+        self.pai_status_topic = "{}/{}/{}".format(
+            cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, "pai_status"
         )
         self.availability_topic = "{}/{}/{}".format(
             cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, "availability"
@@ -121,7 +121,7 @@ class MQTTConnection(Client):
 
     def on_run_state_change(self, state: RunState):
         v = RUN_STATE_2_PAYLOAD.get(state, "unknown")
-        self._report_run_state(v)
+        self._report_pai_status(v)
 
     def start(self):
         if self.state == ConnectionState.NEW:
@@ -183,9 +183,9 @@ class MQTTConnection(Client):
     def connected(self):
         return self.state == ConnectionState.CONNECTED
 
-    def _report_run_state(self, status):
-        self._last_run_state = status
-        self.publish(self.run_status_topic, status, 0, retain=True)
+    def _report_pai_status(self, status):
+        self._last_pai_status = status
+        self.publish(self.pai_status_topic, status, 0, retain=True)
         self.publish(
             self.availability_topic,
             "online" if status in ["online", "paused"] else "offline",
@@ -197,7 +197,7 @@ class MQTTConnection(Client):
         if result == MQTT_ERR_SUCCESS:
             logger.info("MQTT Broker Connected")
             self.state = ConnectionState.CONNECTED
-            self._report_run_state(self._last_run_state)
+            self._report_pai_status(self._last_pai_status)
             self._call_registars("on_connect", client, userdata, flags, result)
         else:
             logger.error("Failed to connect to MQTT. Code: %d" % result)
@@ -213,7 +213,7 @@ class MQTTConnection(Client):
 
     def disconnect(self, reasoncode=None, properties=None):
         self.state = ConnectionState.DISCONNECTING
-        self._report_run_state("offline")
+        self._report_pai_status("offline")
         super(MQTTConnection, self).disconnect()
 
 

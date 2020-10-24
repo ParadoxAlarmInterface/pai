@@ -45,7 +45,9 @@ class ElementTypeContainer(dict):
             return list(self)
 
         else:
-            if not isinstance(needle, (list, set)):
+            if isinstance(needle, range):
+                needle = list(needle)
+            elif not isinstance(needle, (list, set)):
                 needle = [needle]
 
             selected = []

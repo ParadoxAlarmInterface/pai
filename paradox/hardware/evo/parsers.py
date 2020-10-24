@@ -161,17 +161,16 @@ InitializeCommunication = Struct(
 RAMDataParserMap = {
     1: Struct(
         "_weekday" / Int8ub,
-        "pgm_flags"
-        / BitStruct(  # TODO: Do we need BitsSwapped here?
+        "_system_flags" / BitStruct(  # TODO: Do we need BitsSwapped here?
             "chime_zone_partition" / BitsSwapped(StatusFlags(4)),
             "power_smoke" / Flag,
             "ground_start" / Flag,
             "kiss_off" / Flag,
-            "line_ring" / Flag,
-            "bell_partition" / BitsSwapped(StatusFlags(8)),
-            "fire_alarm" / BitsSwapped(StatusFlags(8)),
-            "open_close_kiss_off" / BitsSwapped(StatusFlags(8)),
+            "line_ring" / Flag
         ),
+        "partition_bell" / BitsSwapped(Bitwise(StatusFlags(8))),
+        "partition_fire_alarm" / BitsSwapped(Bitwise(StatusFlags(8))),
+        "partition_open_close_kiss_off" / BitsSwapped(Bitwise(StatusFlags(8))),
         "key-switch_triggered" / BitsSwapped(Bitwise(StatusFlags(32))),
         "door_open" / BitsSwapped(Bitwise(StatusFlags(32))),
         "system"
