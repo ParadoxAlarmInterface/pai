@@ -18,7 +18,7 @@ async def test_hass(mocker):
     mocker.patch.multiple(cfg, MQTT_HOMEASSISTANT_AUTODISCOVERY_ENABLE=True)
     con = mocker.patch("paradox.interfaces.mqtt.core.MQTTConnection")
     con.get_instance.return_value.availability_topic = "paradox/interface/availability"
-    con.get_instance.return_value.pai_status_topic = "paradox/interface/run_status"
+    con.get_instance.return_value.pai_status_topic = "paradox/interface/pai_status"
 
     alarm = mocker.MagicMock()
 
@@ -53,11 +53,11 @@ async def test_hass(mocker):
         await asyncio.sleep(0.01)
 
         assert_any_call_with_json(interface.mqtt.publish,
-            "homeassistant/sensor/aabbccdd/run_status/config",
+            "homeassistant/sensor/aabbccdd/pai_status/config",
             {
-                "name": "Paradox aabbccdd PAI Status",
+                "name": "PAI Status",
                 "unique_id": "paradox_aabbccdd_pai_status",
-                "state_topic": "paradox/interface/run_status",
+                "state_topic": "paradox/interface/pai_status",
                 "availability_topic": "paradox/interface/availability",
                 "device": {
                     "manufacturer": "Paradox",
@@ -72,9 +72,9 @@ async def test_hass(mocker):
         )
 
         assert_any_call_with_json(interface.mqtt.publish,
-            "homeassistant/alarm_control_panel/aabbccdd/Partition_1/config",
+            "homeassistant/alarm_control_panel/aabbccdd/partition_Partition_1/config",
             {
-                "name": "Paradox aabbccdd Partition Partition_1",
+                "name": "Partition Partition 1",
                 "unique_id": "paradox_aabbccdd_partition_partition_1",
                 "command_topic": "paradox/control/partitions/Partition_1",
                 "state_topic": "paradox/states/partitions/Partition_1/current_state",
