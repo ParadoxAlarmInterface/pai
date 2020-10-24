@@ -15,12 +15,12 @@ class PAIStatusSensor(AbstractEntity):
         )
 
     def serialize(self):
-        config = super().serialize()
-        config.update(dict(
+        config = dict(
             name=f'PAI Status',
             unique_id=f'paradox_{self.device.serial_number}_pai_status',
             state_topic=self.run_status_topic,
-        ))
+            device=self.device
+        )
         return config
 
 

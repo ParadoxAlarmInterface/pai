@@ -76,12 +76,11 @@ def test_trouble_binary_sensor_serialize(mqtt_entity_factory):
     assert binary_sensor.get_configuration_topic() == "homeassistant/binary_sensor/1234abcd/system_troubles_ac_trouble/config"
 
 
-def test_run_status_sensor_serialize(mqtt_entity_factory):
+def test_pai_status_sensor_serialize(mqtt_entity_factory):
     sensor = mqtt_entity_factory.make_pai_status_sensor("paradox/interface/pai_status")
     assert _serialize_deserialize(sensor) == {
         'unique_id': 'paradox_1234abcd_pai_status',
         'name': 'PAI Status',
-        'availability_topic': 'paradox/interface/availability',
         'state_topic': 'paradox/interface/pai_status',
         'device': _get_expected_device_block()
     }

@@ -58,7 +58,6 @@ async def test_hass(mocker):
                 "name": "PAI Status",
                 "unique_id": "paradox_aabbccdd_pai_status",
                 "state_topic": "paradox/interface/pai_status",
-                "availability_topic": "paradox/interface/availability",
                 "device": {
                     "manufacturer": "Paradox",
                     "model": "EVO192",
