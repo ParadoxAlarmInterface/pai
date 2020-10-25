@@ -21,7 +21,7 @@ class AlarmControlPanel(AbstractEntity):
     def serialize(self):
         config = super().serialize()
         config.update(dict(
-            name=f'Partition {self.label}',
+            name=f'Paradox {self.device.serial_number} Partition {self.label}',
             unique_id=f'paradox_{self.device.serial_number}_partition_{self.key.lower()}',
             command_topic=self._get_command_topic(),
             state_topic=self._get_state_topic(),

@@ -34,7 +34,7 @@ class AbstractStatusBinarySensor(AbstractBinarySensor):
     def serialize(self):
         config = super().serialize()
         config.update(dict(
-            name=f'{self.entity_type.capitalize()} {self.label} {self.property_name.replace("_", " ").capitalize()}',
+            name=f'Paradox {self.device.serial_number} {self.entity_type.capitalize()} {self.label} {self.property_name.replace("_", " ").capitalize()}',
             unique_id=f'paradox_{self.device.serial_number}_{self.entity_type}_{self.key.lower()}_{self.property_name}',
             state_topic=self._get_state_topic(),
         ))

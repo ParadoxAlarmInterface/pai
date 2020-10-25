@@ -16,7 +16,7 @@ class PAIStatusSensor(AbstractEntity):
 
     def serialize(self):
         config = dict(
-            name=f'PAI Status',
+            name=f'Paradox {self.device.serial_number} PAI Status',
             unique_id=f'paradox_{self.device.serial_number}_pai_status',
             state_topic=self.run_status_topic,
             device=self.device
@@ -43,7 +43,7 @@ class SystemStatusSensor(AbstractEntity):
     def serialize(self):
         config = super().serialize()
         config.update(dict(
-            name=f'System {self.key.title()} {self.property_name.replace("_", " ").title()}',
+            name=f'Paradox {self.device.serial_number} System {self.key.title()} {self.property_name.replace("_", " ").title()}',
             unique_id=f'paradox_{self.device.serial_number}_system_{self.key}_{self.property_name}',
             state_topic=self._get_state_topic(),
         ))

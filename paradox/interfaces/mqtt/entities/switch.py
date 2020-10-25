@@ -35,7 +35,7 @@ class ZoneBypassSwitch(Switch):
     def serialize(self):
         config = super().serialize()
         config.update(dict(
-            name=f'Zone {self.label} Bypass',
+            name=f'Paradox {self.device.serial_number} Zone {self.label} Bypass',
             unique_id=f'paradox_{self.device.serial_number}_zone_{self.key.lower()}_bypass',
             state_topic=self._get_state_topic(),
             command_topic=self._get_command_topic(),
@@ -79,7 +79,7 @@ class PGMSwitch(Switch):
     def serialize(self):
         config = super().serialize()
         config.update(dict(
-            name=f'PGM {self.pgm["label"]} Open',
+            name=f'Paradox {self.device.serial_number} PGM {self.pgm["label"]} Open',
             unique_id=f'paradox_{self.device.serial_number}_pgm_{self.key.lower()}_open',
             state_topic=self._get_state_topic(),
             command_topic=self._get_command_topic(),
