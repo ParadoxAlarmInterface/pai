@@ -67,7 +67,11 @@ class Config(object):
             (0, 0xFFFFFFFF),
         ),  # Duration of a PGM pulse in seconds
         "SYNC_TIME": False,  # Update panel time periodically when time drifts more than SYNC_TIME_MIN_DRIFT
-        "SYNC_TIME_MIN_DRIFT": 60,  # Minimum time drift in seconds to initiate time sync
+        "SYNC_TIME_MIN_DRIFT": (
+                120,
+                int,
+                (60, 0xFFFFFFFF)
+        ), # Minimum time drift in seconds to initiate time sync
         "PASSWORD": (
             None,
             [int, str, bytes, type(None)],
