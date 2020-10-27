@@ -71,7 +71,7 @@ async def test_hass(mocker):
         )
 
         assert_any_call_with_json(interface.mqtt.publish,
-            "homeassistant/alarm_control_panel/aabbccdd/partition_Partition_1/config",
+            "homeassistant/alarm_control_panel/aabbccdd/partition_partition_1/config",
             {
                 "name": "Paradox aabbccdd Partition Partition 1",
                 "unique_id": "paradox_aabbccdd_partition_partition_1",
