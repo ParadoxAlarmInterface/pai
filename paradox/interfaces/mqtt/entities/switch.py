@@ -1,12 +1,12 @@
-from paradox.interfaces.mqtt.entities.abstract_entity import AbstractEntity
-from paradox.config import config as cfg
+from paradox.interfaces.mqtt.entities.abstract_entity import AbstractControllableEntity
 from paradox.lib.utils import sanitize_key
 
 
-class Switch(AbstractEntity):
-    @property
-    def entity_type(self) -> str:
-        raise NotImplemented()
+class Switch(AbstractControllableEntity):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.hass_entity_type = "switch"
 
     def serialize(self):
         config = super().serialize()
@@ -24,42 +24,17 @@ class ZoneBypassSwitch(Switch):
 
         self.key = sanitize_key(zone["key"])
         self.label = zone["label"]
+        self.property = "bypassed"
 
-    @property
-    def entity_type(self) -> str:
-        return "zone"
-
-    def get_configuration_topic(self):
-        return f"{cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX}/switch/{self.device.serial_number}/{self.entity_type}_{self.key}_bypass/config"
+        self.pai_entity_type = "zone"
 
     def serialize(self):
         config = super().serialize()
         config.update(dict(
-            name=f'Paradox {self.device.serial_number} Zone {self.label} Bypass',
-            unique_id=f'paradox_{self.device.serial_number}_zone_{self.key.lower()}_bypass',
-            state_topic=self._get_state_topic(),
-            command_topic=self._get_command_topic(),
             payload_on="bypass",
             payload_off="clear_bypass",
         ))
         return config
-
-    def _get_command_topic(self):
-        return "{}/{}/{}/{}".format(
-            cfg.MQTT_BASE_TOPIC,
-            cfg.MQTT_CONTROL_TOPIC,
-            cfg.MQTT_ZONE_TOPIC,
-            self.key,
-        )
-
-    def _get_state_topic(self):
-        return "{}/{}/{}/{}/{}".format(
-            cfg.MQTT_BASE_TOPIC,
-            cfg.MQTT_STATES_TOPIC,
-            cfg.MQTT_ZONE_TOPIC,
-            self.key,
-            "bypassed",
-        )
 
 
 class PGMSwitch(Switch):
@@ -68,37 +43,7 @@ class PGMSwitch(Switch):
         self.pgm = pgm
 
         self.key = sanitize_key(pgm["key"])
+        self.label = pgm["label"]
+        self.property = "on"
 
-    @property
-    def entity_type(self) -> str:
-        return "pgm"
-
-    def get_configuration_topic(self):
-        return f"{cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX}/switch/{self.device.serial_number}/{self.entity_type}_{self.key}_open/config"
-
-    def serialize(self):
-        config = super().serialize()
-        config.update(dict(
-            name=f'Paradox {self.device.serial_number} PGM {self.pgm["label"]} Open',
-            unique_id=f'paradox_{self.device.serial_number}_pgm_{self.key.lower()}_open',
-            state_topic=self._get_state_topic(),
-            command_topic=self._get_command_topic(),
-        ))
-        return config
-
-    def _get_command_topic(self):
-        return "{}/{}/{}/{}".format(
-            cfg.MQTT_BASE_TOPIC,
-            cfg.MQTT_CONTROL_TOPIC,
-            cfg.MQTT_OUTPUT_TOPIC,
-            self.key
-        )
-
-    def _get_state_topic(self):
-        return "{}/{}/{}/{}/{}".format(
-            cfg.MQTT_BASE_TOPIC,
-            cfg.MQTT_STATES_TOPIC,
-            cfg.MQTT_OUTPUT_TOPIC,
-            self.key,
-            "on",
-        )
+        self.pai_entity_type = "pgm"

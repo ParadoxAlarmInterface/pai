@@ -27,7 +27,7 @@ def test_alarm_control_panel_serialize(mqtt_entity_factory):
         'payload_disarm': 'disarm',
     }
 
-    assert alarm_control_panel.get_configuration_topic() == "homeassistant/alarm_control_panel/1234abcd/partition_Partition_1/config"
+    assert alarm_control_panel.configuration_topic == "homeassistant/alarm_control_panel/1234abcd/partition_partition_1/config"
 
 
 def test_partition_binary_sensor_serialize(mqtt_entity_factory):
@@ -42,7 +42,7 @@ def test_partition_binary_sensor_serialize(mqtt_entity_factory):
         'payload_off': 'False',
     }
 
-    assert binary_sensor.get_configuration_topic() == "homeassistant/binary_sensor/1234abcd/partition_Partition_1_arm/config"
+    assert binary_sensor.configuration_topic == "homeassistant/binary_sensor/1234abcd/partition_partition_1_arm/config"
 
 
 def test_zone_binary_sensor_serialize(mqtt_entity_factory):
@@ -58,14 +58,14 @@ def test_zone_binary_sensor_serialize(mqtt_entity_factory):
         'device_class': 'motion'
     }
 
-    assert binary_sensor.get_configuration_topic() == "homeassistant/binary_sensor/1234abcd/zone_Zone_1_open/config"
+    assert binary_sensor.configuration_topic == "homeassistant/binary_sensor/1234abcd/zone_zone_1_open/config"
 
 
 def test_trouble_binary_sensor_serialize(mqtt_entity_factory):
     binary_sensor = mqtt_entity_factory.make_system_status("troubles", "ac_trouble")
     assert _serialize_deserialize(binary_sensor) == {
         'unique_id': 'paradox_1234abcd_system_troubles_ac_trouble',
-        'name': 'Paradox 1234abcd System troubles Ac trouble',
+        'name': 'Paradox 1234abcd System troubles Ac Trouble',
         'availability_topic': 'paradox/interface/availability',
         'state_topic': 'paradox/states/system/troubles/ac_trouble',
         'device': _get_expected_device_block(),
@@ -73,7 +73,7 @@ def test_trouble_binary_sensor_serialize(mqtt_entity_factory):
         'payload_off': 'False',
     }
 
-    assert binary_sensor.get_configuration_topic() == "homeassistant/binary_sensor/1234abcd/system_troubles_ac_trouble/config"
+    assert binary_sensor.configuration_topic == "homeassistant/binary_sensor/1234abcd/system_troubles_ac_trouble/config"
 
 
 def test_pai_status_sensor_serialize(mqtt_entity_factory):
@@ -85,7 +85,7 @@ def test_pai_status_sensor_serialize(mqtt_entity_factory):
         'device': _get_expected_device_block()
     }
 
-    assert sensor.get_configuration_topic() == "homeassistant/sensor/1234abcd/pai_status/config"
+    assert sensor.configuration_topic == "homeassistant/sensor/1234abcd/pai_status/config"
 
 
 def test_run_system_status_sensor_serialize(mqtt_entity_factory):
@@ -99,14 +99,14 @@ def test_run_system_status_sensor_serialize(mqtt_entity_factory):
         'unit_of_measurement': 'V'
     }
 
-    assert sensor.get_configuration_topic() == "homeassistant/sensor/1234abcd/system_power_vdc/config"
+    assert sensor.configuration_topic == "homeassistant/sensor/1234abcd/system_power_vdc/config"
 
 
 def test_pgm_switch_serialize(mqtt_entity_factory):
     sensor = mqtt_entity_factory.make_pgm_switch({"key": "PGM_1", "label": "PGM 1"})
     assert _serialize_deserialize(sensor) == {
-        'unique_id': 'paradox_1234abcd_pgm_pgm_1_open',
-        'name': 'Paradox 1234abcd PGM PGM 1 Open',
+        'unique_id': 'paradox_1234abcd_pgm_pgm_1_on',
+        'name': 'Paradox 1234abcd Pgm PGM 1 On',
         'availability_topic': 'paradox/interface/availability',
         'state_topic': 'paradox/states/outputs/PGM_1/on',
         'command_topic': 'paradox/control/outputs/PGM_1',
@@ -115,14 +115,14 @@ def test_pgm_switch_serialize(mqtt_entity_factory):
         'state_off': 'False',
     }
 
-    assert sensor.get_configuration_topic() == "homeassistant/switch/1234abcd/pgm_PGM_1_open/config"
+    assert sensor.configuration_topic == "homeassistant/switch/1234abcd/pgm_pgm_1_on/config"
 
 
 def test_zone_bypass_switch_serialize(mqtt_entity_factory):
     sensor = mqtt_entity_factory.make_zone_bypass_switch({"key": "Zone_1", "label": "Zone 1"})
     assert _serialize_deserialize(sensor) == {
-        'unique_id': 'paradox_1234abcd_zone_zone_1_bypass',
-        'name': 'Paradox 1234abcd Zone Zone 1 Bypass',
+        'unique_id': 'paradox_1234abcd_zone_zone_1_bypassed',
+        'name': 'Paradox 1234abcd Zone Zone 1 Bypassed',
         'availability_topic': 'paradox/interface/availability',
         'state_topic': 'paradox/states/zones/Zone_1/bypassed',
         'command_topic': 'paradox/control/zones/Zone_1',
@@ -133,7 +133,7 @@ def test_zone_bypass_switch_serialize(mqtt_entity_factory):
         'payload_off': 'clear_bypass',
     }
 
-    assert sensor.get_configuration_topic() == "homeassistant/switch/1234abcd/zone_Zone_1_bypass/config"
+    assert sensor.configuration_topic == "homeassistant/switch/1234abcd/zone_zone_1_bypassed/config"
 
 
 def _serialize_deserialize(entity):

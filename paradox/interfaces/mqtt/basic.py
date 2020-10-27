@@ -15,7 +15,8 @@ from paradox.lib import ps
 from paradox.lib.utils import (JSONByteEncoder, call_soon_in_main_loop,
                                sanitize_key)
 
-from .core import ELEMENT_TOPIC_MAP, AbstractMQTTInterface
+from .core import AbstractMQTTInterface
+from .helpers import ELEMENT_TOPIC_MAP, get_control_topic_prefix
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -118,28 +119,19 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         ps.subscribe(self._handle_panel_event, "events")
 
     def on_connect(self, mqttc, userdata, flags, result):
-        self.subscribe_callback(
-            "{}/{}/{}/#".format(
-                cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC, cfg.MQTT_OUTPUT_TOPIC
-            ),
+        self.subscribe_callback(get_control_topic_prefix("output")+"/#",
             self._mqtt_handle_output_control,
         )
         self.subscribe_callback(
-            "{}/{}/{}/#".format(
-                cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC, cfg.MQTT_DOOR_TOPIC
-            ),
+            get_control_topic_prefix("door")+"/#",
             self._mqtt_handle_door_control,
         )
         self.subscribe_callback(
-            "{}/{}/{}/#".format(
-                cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC, cfg.MQTT_ZONE_TOPIC
-            ),
+            get_control_topic_prefix("zone")+"/#",
             self._mqtt_handle_zone_control,
         )
         self.subscribe_callback(
-            "{}/{}/{}/#".format(
-                cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC, cfg.MQTT_PARTITION_TOPIC
-            ),
+            get_control_topic_prefix("partition")+"/#",
             self._mqtt_handle_partition_control,
         )
         self.subscribe_callback(

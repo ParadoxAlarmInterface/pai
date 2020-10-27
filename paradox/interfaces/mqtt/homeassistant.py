@@ -82,7 +82,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             self._publish_system_property_configs(status['system'])
 
     def _publish_config(self, entity: AbstractEntity):
-        self.publish(entity.get_configuration_topic(), json.dumps(entity, cls=SerializableToJSONEncoder), 0,
+        self.publish(entity.configuration_topic, json.dumps(entity, cls=SerializableToJSONEncoder), 0,
                      cfg.MQTT_RETAIN)
 
     def _publish_pai_state_sensor_config(self):
@@ -110,12 +110,12 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
 
             zone = self.zones[zone_key]
 
-            zone_bypass_switch_config = self.entity_factory.make_zone_bypass_switch(zone)
-            self._publish_config(zone_bypass_switch_config)
-
             # Publish Status
             for property_name in zone_status:
-                zone_status_binary_sensor = self.entity_factory.make_zone_status_binary_sensor(zone, property_name)
+                if property_name == "bypassed":
+                    zone_status_binary_sensor = self.entity_factory.make_zone_bypass_switch(zone)
+                else:
+                    zone_status_binary_sensor = self.entity_factory.make_zone_status_binary_sensor(zone, property_name)
                 self._publish_config(zone_status_binary_sensor)
 
     def _publish_pgm_configs(self, pgm_statuses):

@@ -1,30 +1,22 @@
-from paradox.interfaces.mqtt.entities.abstract_entity import AbstractEntity
+from paradox.interfaces.mqtt.entities.abstract_entity import AbstractControllableEntity
 from paradox.interfaces.mqtt.entities.device import Device
 from paradox.lib.utils import sanitize_key
-from paradox.config import config as cfg
 
 
-class AlarmControlPanel(AbstractEntity):
+class AlarmControlPanel(AbstractControllableEntity):
     def __init__(self, partition: dict, device: Device, availability_topic: str):
         super(AlarmControlPanel, self).__init__(device, availability_topic)
 
         self.key = sanitize_key(partition["key"])
         self.label = partition["label"]
+        self.property = "current_state"
 
-    def get_configuration_topic(self):
-        return "{}/alarm_control_panel/{}/partition_{}/config".format(
-            cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
-            self.device.serial_number,
-            self.key
-        )
+        self.hass_entity_type = "alarm_control_panel"
+        self.pai_entity_type = "partition"
 
     def serialize(self):
         config = super().serialize()
         config.update(dict(
-            name=f'Paradox {self.device.serial_number} Partition {self.label}',
-            unique_id=f'paradox_{self.device.serial_number}_partition_{self.key.lower()}',
-            command_topic=self._get_command_topic(),
-            state_topic=self._get_state_topic(),
             payload_disarm="disarm",
             payload_arm_home="arm_stay",
             payload_arm_away="arm",
@@ -32,19 +24,10 @@ class AlarmControlPanel(AbstractEntity):
         ))
         return config
 
-    def _get_state_topic(self):
-        return "{}/{}/{}/{}/{}".format(
-            cfg.MQTT_BASE_TOPIC,
-            cfg.MQTT_STATES_TOPIC,
-            cfg.MQTT_PARTITION_TOPIC,
-            self.key,
-            "current_state",
-        )
+    @property
+    def entity_id(self):
+        return f"{self.pai_entity_type}_{self.key.lower()}"
 
-    def _get_command_topic(self):
-        return "{}/{}/{}/{}".format(
-            cfg.MQTT_BASE_TOPIC,
-            cfg.MQTT_CONTROL_TOPIC,
-            cfg.MQTT_PARTITION_TOPIC,
-            self.key
-        )
+    @property
+    def entity_name(self):
+        return f"{self.pai_entity_type.title()} {self.label}"

@@ -17,19 +17,6 @@ from paradox.lib import ps
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
-ELEMENT_TOPIC_MAP = dict(
-    partition=cfg.MQTT_PARTITION_TOPIC,
-    zone=cfg.MQTT_ZONE_TOPIC,
-    output=cfg.MQTT_OUTPUT_TOPIC,
-    pgm=cfg.MQTT_OUTPUT_TOPIC,
-    repeater=cfg.MQTT_REPEATER_TOPIC,
-    bus=cfg.MQTT_BUS_TOPIC,
-    module=cfg.MQTT_MODULE_TOPIC,
-    keypad=cfg.MQTT_KEYPAD_TOPIC,
-    system=cfg.MQTT_SYSTEM_TOPIC,
-    user=cfg.MQTT_USER_TOPIC,
-)
-
 
 class ConnectionState(Enum):
     NEW = 0
