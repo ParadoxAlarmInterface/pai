@@ -17,7 +17,7 @@ from paradox.data.model import DetectedPanel
 from paradox.event import Change, ChangeEvent, Event, LiveEvent
 from paradox.exceptions import (AuthenticationFailed, PanelNotDetected,
                                 StatusRequestException,
-                                async_loop_unhandled_exception_handler)
+                                async_loop_unhandled_exception_handler, CodeLockout)
 from paradox.hardware import Panel, create_panel
 from paradox.lib import ps
 from paradox.lib.async_message_manager import (ErrorMessageHandler,
@@ -634,6 +634,8 @@ class Paradox:
             logger.error("Got ERROR Message: {}".format(message))
             if message == "Invalid PC Password":
                 raise AuthenticationFailed()
+            elif "Partition in code lockout" in message:
+                raise CodeLockout()
 
     async def disconnect(self):
         logger.info("Disconnecting from the Alarm Panel")
