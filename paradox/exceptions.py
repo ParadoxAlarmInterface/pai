@@ -35,6 +35,8 @@ class PAICriticalException(PAIException):
 class AuthenticationFailed(PAICriticalException):
     pass
 
+class CodeLockout(PAICriticalException):
+    pass
 
 class PanelNotDetected(PAICriticalException):
     pass
