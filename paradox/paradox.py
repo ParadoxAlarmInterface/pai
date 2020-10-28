@@ -634,7 +634,7 @@ class Paradox:
             logger.error("Got ERROR Message: {}".format(message))
             if message == "Invalid PC Password":
                 raise AuthenticationFailed()
-            elif "Partition in code lockout" in message:
+            elif "code lockout" in message:
                 raise CodeLockout()
 
     async def disconnect(self):
