@@ -175,7 +175,7 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
             data = b""
 
             if r == b"ERROR":
-                raise ("Got error from modem: {}".format(r))
+                raise Exception("Got error from modem: {}".format(r))
 
             while r != expected:
                 r = self.loop.run_until_complete(self.port.read())
