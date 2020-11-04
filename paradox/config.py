@@ -251,7 +251,8 @@ class Config(object):
         "DUMMY_EVENT_FILTERS": [
             "live,alarm-restore",
             "live,trouble-clock",
-            "live,tamper" "live,arm",
+            "live,tamper",
+            "live,arm",
             "live,disarm",
         ],
         "DUMMY_MIN_EVENT_LEVEL": (
