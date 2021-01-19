@@ -117,7 +117,7 @@ class Config(object):
         "MQTT_REPEATER_TOPIC": "repeaters",  # Base for repeater states
         "MQTT_USER_TOPIC": "users",  # Base for user states
         "MQTT_EVENTS_TOPIC": "events",  # Base for events
-        "MQTT_CONTROL_TOPIC": "control",  # Base for control of othe elements (ROOT/CONTROL/TYPE)
+        "MQTT_CONTROL_TOPIC": "control",  # Base for control of other elements (ROOT/CONTROL/TYPE)
         "MQTT_DEFINITION_TOPIC": "definitions",  # Base for definitions
         "MQTT_HOMEASSISTANT_CONTROL_TOPIC": "hass_control",
         "MQTT_HOMEASSISTANT_DISCOVERY_PREFIX": "homeassistant",

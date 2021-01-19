@@ -22,8 +22,8 @@ COPY config/pai.conf.example ${PAI_CONFIG_FILE}
 
 # install python library
 RUN cd ${WORK_DIR} \
-  && pip install --no-cache-dir -r requirements.txt \
-  && pip install --no-cache-dir . \
+  && pip3 install --no-cache-dir -r requirements.txt \
+  && pip3 install --no-cache-dir . \
   && rm -fr ${WORK_DIR}
 
 # conf file from host
