@@ -4,7 +4,7 @@ from paradox.lib.utils import sanitize_key
 
 
 class AlarmControlPanel(AbstractControllableEntity):
-    def __init__(self, partition: dict, device: Device, availability_topic: str):
+    def __init__(self, partition: dict, device: Device, availability_topic: str, code: str = None):
         super(AlarmControlPanel, self).__init__(device, availability_topic)
 
         self.key = sanitize_key(partition["key"])
@@ -14,6 +14,8 @@ class AlarmControlPanel(AbstractControllableEntity):
         self.hass_entity_type = "alarm_control_panel"
         self.pai_entity_type = "partition"
 
+        self.code = code
+
     def serialize(self):
         config = super().serialize()
         config.update(dict(
@@ -22,6 +24,8 @@ class AlarmControlPanel(AbstractControllableEntity):
             payload_arm_away="arm",
             payload_arm_night="arm_sleep"
         ))
+        if self.code is not None:
+            config['code']=self.code
         return config
 
     @property

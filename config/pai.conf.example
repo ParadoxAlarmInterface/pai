@@ -109,6 +109,7 @@ import logging
 #
 ### MQTT Home Assistant Auto Discovery
 # MQTT_HOMEASSISTANT_AUTODISCOVERY_ENABLE = False
+# MQTT_HOMEASSISTANT_CODE = None
 #
 ### Dash App
 # MQTT_DASH_PUBLISH = False

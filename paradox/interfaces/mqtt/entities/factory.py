@@ -13,8 +13,8 @@ class MQTTAutodiscoveryEntityFactory:
     def set_device(self, device):
         self.device = device
 
-    def make_alarm_control_panel_config(self, partition):
-        return AlarmControlPanel(partition, self.device, self.availability_topic)
+    def make_alarm_control_panel_config(self, partition, code: str = None):
+        return AlarmControlPanel(partition, self.device, self.availability_topic, code)
 
     def make_partition_status_binary_sensor(self, partition, status):
         return PartitionBinarySensor(partition, status, self.device, self.availability_topic)

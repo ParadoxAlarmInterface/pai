@@ -95,7 +95,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 continue
 
             partition = self.partitions[partition_key]
-            partition_alarm_control_panel_config = self.entity_factory.make_alarm_control_panel_config(partition)
+            partition_alarm_control_panel_config = self.entity_factory.make_alarm_control_panel_config(partition, cfg.MQTT_HOMEASSISTANT_CODE)
             self._publish_config(partition_alarm_control_panel_config)
             
             # Publish individual entities

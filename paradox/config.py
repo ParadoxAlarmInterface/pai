@@ -107,6 +107,7 @@ class Config(object):
             (60, 0xFFFFFFFF),
         ),  # Interval for republishing all data
         "MQTT_HOMEASSISTANT_AUTODISCOVERY_ENABLE": False,
+        "MQTT_HOMEASSISTANT_CODE": (None, [str, type(None)]),
         # MQTT Topics
         "MQTT_BASE_TOPIC": "paradox",  # Root of all topics
         "MQTT_ZONE_TOPIC": "zones",  # Base for zone states
