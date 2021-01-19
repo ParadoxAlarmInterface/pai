@@ -20,4 +20,5 @@ export DOCKER_CLI_EXPERIMENTAL=enabled
 
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 docker buildx create --use
+docker buildx inspect --bootstrap
 docker buildx build --progress plain --platform linux/386,linux/amd64,linux/arm/v6,linux/arm64/v8 -t "paradoxalarminterface/pai:$DOCKER_IMAGE_TAG" --push .
