@@ -2,6 +2,7 @@ import asyncio
 import logging
 import signal
 import sys
+import time
 from logging.handlers import RotatingFileHandler
 
 from paradox import VERSION
@@ -109,6 +110,7 @@ async def run_loop():
 def main(args):
     global alarm, interface_manager
 
+    time.tzset()
     if "config" in args and args.config is not None:
         import os
 
