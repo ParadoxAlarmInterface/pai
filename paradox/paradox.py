@@ -81,8 +81,8 @@ class Paradox:
                         host=cfg.IP_CONNECTION_HOST, port=cfg.IP_CONNECTION_PORT
                     )
                 elif (
-                    cfg.IP_CONNECTION_SITEID is not None
-                    and cfg.IP_CONNECTION_EMAIL is not None
+                    cfg.IP_CONNECTION_SITEID
+                    and cfg.IP_CONNECTION_EMAIL
                 ):
                     from paradox.connections.ip.connection import StunIPConnection
 
