@@ -410,7 +410,10 @@ def string_to_id_list(input: str):
         if range_match:
             arr += range(int(range_match.group(1)), int(range_match.group(2)) + 1)
         else:
-            arr.append(int(block))
+            try:
+                arr.append(int(block))
+            except ValueError:
+                pass
 
     return arr
 
