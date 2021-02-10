@@ -9,7 +9,7 @@ from time import time
 
 from construct import Construct, Container, EnumIntegerString
 
-from paradox.config import config as cfg
+from paradox.config import config as cfg, get_limits_for_type
 from paradox.lib.utils import construct_free, sanitize_key
 
 from ..lib import ps
@@ -144,7 +144,6 @@ class Panel:
 
                 assert isinstance(parser, Construct)
                 elem_def = definitions[elem_type]
-                limits = cfg.LIMITS.get(elem_type)
                 enabled_indexes = set()
 
                 addresses = enumerate(
@@ -170,12 +169,10 @@ class Panel:
                         if definition != "disabled":
                             enabled_indexes.add(index)
 
-                if limits is None:
-                    cfg.LIMITS[elem_type] = enabled_indexes
-                else:
-                    cfg.LIMITS[elem_type] = list(
-                        set(cfg.LIMITS[elem_type]).intersection(enabled_indexes)
-                    )
+                cfg.LIMITS[elem_type] = get_limits_for_type(elem_type, list(enabled_indexes))
+                cfg.LIMITS[elem_type] = list(
+                    set(cfg.LIMITS[elem_type]).intersection(enabled_indexes)
+                )
 
                 logger.info(
                     f"{elem_type.title()} definitions loaded ({round(time() - start_time, 2)}s)"
@@ -196,7 +193,7 @@ class Panel:
             elem_def = self.mem_map["labels"][elem_type]
 
             addresses = enumerate(chain.from_iterable(elem_def["addresses"]), start=1)
-            limits = cfg.LIMITS.get(elem_type)
+            limits = get_limits_for_type(elem_type)
             if limits is not None:
                 addresses = iter((i, a) for i, a in addresses if i in limits)
 

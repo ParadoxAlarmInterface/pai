@@ -1,7 +1,7 @@
 import logging
 import os
 import sys
-
+import re
 
 class Config(object):
     DEFAULTS = {
@@ -364,7 +364,6 @@ class Config(object):
                     default_type.append(int)
                 if int in default_type and not float in default_type:
                     default_type.append(float)
-
                 if type(v) in default_type:
                     setattr(self, k, v)
                 else:
@@ -398,5 +397,35 @@ class Config(object):
 
         self.CONFIG_LOADED = True
 
-
 config = Config()
+
+comma_splitter_re = re.compile('\s*,\s*')
+range_re = re.compile('(\d+)\s*-(\d+)\s*$')
+
+def string_to_id_list(input: str):
+    arr = []
+    blocks = comma_splitter_re.split(input)
+    for block in blocks:
+        range_match = range_re.match(block)
+        if range_match:
+            arr += range(int(range_match.group(1)), int(range_match.group(2)) + 1)
+        else:
+            arr.append(int(block))
+
+    return arr
+
+def get_limits_for_type(elem_type: str, default: list = None):
+    limits = config.LIMITS.get(elem_type, default)
+    if limits is None:
+        return default
+
+    if isinstance(limits, list):
+        return limits
+
+    if isinstance(limits, range):
+        return list(limits)
+
+    if isinstance(limits, str):
+        if "auto" in limits:
+            return default
+        return string_to_id_list(limits)
