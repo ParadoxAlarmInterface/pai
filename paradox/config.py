@@ -8,7 +8,7 @@ class Config(object):
         "LOGGING_LEVEL_CONSOLE": logging.INFO,  # See documentation of Logging package
         "LOGGING_LEVEL_FILE": logging.ERROR,
         "LOGGING_FILE": (
-            "/var/log/paradox.log",
+            None,
             [type(None), str],
         ),  # or set to file path : '/var/log/paradox.log'
         "LOGGING_FILE_MAX_SIZE": (10, int, (0, 0xFFFFFFFF)),  # Max log file size in MB
