@@ -9,7 +9,7 @@ from typing import Callable, Iterable, Optional, Sequence
 
 from construct import Container
 
-from paradox.config import config as cfg
+from paradox.config import config as cfg, get_limits_for_type
 from paradox.connections.connection import Connection
 from paradox.data.enums import RunState
 from paradox.data.memory_storage import MemoryStorage as Storage
@@ -309,11 +309,13 @@ class Paradox:
     def _process_status(raw_status: Container) -> None:
         status = convert_raw_status(raw_status)
 
-        for limit_key, limit_arr in cfg.LIMITS.items():
+        for limit_key in cfg.LIMITS.keys():
             if limit_key not in status:
                 continue
 
-            status[limit_key].filter(limit_arr)
+            limit_arr = get_limits_for_type(limit_key)
+            if limit_arr is not None:
+                status[limit_key].filter(limit_arr)
 
         #     # TODO: throttle power update messages
         #     if time.time() - self.last_power_update >= cfg.POWER_UPDATE_INTERVAL:
