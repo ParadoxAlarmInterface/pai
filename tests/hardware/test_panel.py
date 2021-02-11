@@ -22,6 +22,7 @@ from paradox.hardware import Panel
         (1000, b"1000"),
         (b"0bcd", b"0bcd"),
         (None, b"0000"),
+        ("", b"0000"),
     ],
 )
 def test_encode_password(input, expected, mocker):
