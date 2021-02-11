@@ -88,6 +88,7 @@ This work is inspired or uses parts from the following projects:
 
 ## Thanks
 * Ivan Markov - [@ivmarkov](https://github.com/ivmarkov) - Multi-platform Docker builds with Travis
+* Claudiu Bucur - [@clau-bucur](https://github.com/) - For fixing HomeAssistant plugin after Supervisor(2021.02.5) upgrade [#199](https://github.com/ParadoxAlarmInterface/pai/issues/199)
 
 ## Disclaimer
 
