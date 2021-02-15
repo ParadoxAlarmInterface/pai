@@ -10,7 +10,7 @@ codec_cache = {}
 
 def paradox_codec_search(name: str):
     name = name.lower()
-    match = re.match("^paradox-([a-z]{2})$", name)
+    match = re.match("^paradox[-_]([a-z]{2})$", name)
     if match:
         enc = match.group(1)
         mod = codec_cache.get(enc)
