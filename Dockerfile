@@ -1,4 +1,4 @@
-FROM python:3.7-alpine
+FROM python:3.9-alpine
 
 ENV WORK_DIR=workdir \
   HASSIO_DATA_PATH=/data \
