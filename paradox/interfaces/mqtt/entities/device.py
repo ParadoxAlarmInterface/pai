@@ -21,7 +21,7 @@ class Device:
         return dict(
             manufacturer="Paradox",
             model=self.model,
-            identifiers=["Paradox", self.model, self.serial_number],
+            identifiers=[f"Paradox_{self.model}_{self.serial_number}"],
             name=self.model,
             sw_version=self.firmware_version,
         )
