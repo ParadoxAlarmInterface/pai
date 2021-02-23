@@ -41,24 +41,24 @@ def test_en_encoding(raw, expected):
 def test_en_encoding_len():
     assert len(en.charmap) == 256
 
-# removed temporarily
-# test_data_ru = [
-#     (b"B", "B"),
-#     (b"0", "0"),
-#     (b"z", "z"),
-#     (bytes([160]), "Б"),
-#     (bytes([199]), "я"),
-#     (bytes([230]), "щ"),
-# ]
+
+test_data_ru = [
+    (b"B", "В"),  # 0x0412 instead of the normal B. Why? I don't know. ;)
+    (b"0", "0"),
+    (b"z", "z"),
+    (bytes([160]), "Б"),
+    (bytes([199]), "я"),
+    (bytes([230]), "щ"),
+]
 
 
-# @pytest.mark.parametrize("raw,expected", test_data_ru)
-# def test_ru_encoding(raw, expected):
-#     encoding = "paradox-ru"
-#     assert len(expected) == 1
+@pytest.mark.parametrize("raw,expected", test_data_ru)
+def test_ru_encoding(raw, expected):
+    encoding = "paradox-ru"
+    assert len(expected) == 1
 
-#     assert raw.decode(encoding) == expected, f"char {ord(raw)} != {expected}"
+    assert raw.decode(encoding) == expected, f"char {ord(raw)} != {expected}"
 
 
-# def test_ru_encoding_len():
-#     assert len(ru.decoding_table) == 256
+def test_ru_encoding_len():
+    assert len(ru.decoding_table) == 256
