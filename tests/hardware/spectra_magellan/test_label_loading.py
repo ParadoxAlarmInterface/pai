@@ -70,7 +70,7 @@ async def test_label_loading(mocker):
             "site": [],
             "siren": [],
         },
-        LABEL_ENCODING="latin2",
+        LABEL_ENCODING="paradox-hu",
     )
 
     core = mocker.MagicMock()
@@ -82,5 +82,5 @@ async def test_label_loading(mocker):
 
     zone_labels = labels["zone"]
     assert 4 == len(zone_labels)
-    assert labels["zone"][1]["key"] == "El_t_r"
+    assert labels["zone"][1]["key"] == "Eloter"
     assert labels["zone"][1]["id"] == 1
