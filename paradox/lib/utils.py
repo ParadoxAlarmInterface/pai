@@ -6,6 +6,8 @@ import json
 import re
 import threading
 import typing
+from slugify import slugify
+
 from copy import deepcopy
 
 from construct import Container, ListContainer
@@ -84,7 +86,7 @@ def sanitize_key(key):
     if isinstance(key, int):
         return str(key)
     else:
-        return re_sanitize_key.sub("_", key).strip("_")
+        return re_sanitize_key.sub("_", slugify(key, lowercase=False)).strip("_")
 
 
 def construct_free(container: Container):

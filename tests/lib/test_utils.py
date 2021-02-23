@@ -45,7 +45,7 @@ def test_deep_merge_extend_lists():
 
 
 def test_sanitize_key():
-    assert sanitize_key("Előtér") == "Előtér"
+    assert sanitize_key("Előtér") == "Eloter"
 
     assert sanitize_key("Living room") == "Living_room"
 
