@@ -1,4 +1,5 @@
-# Generator for Paradox Encodings
+
+paradox = {}
 
 # ENGLISH
 
@@ -122,12 +123,8 @@ original_ansi[224:255] = [
     (x, 32) for x in range(224,256)
 ]
 
-paradox = {}
 paradox['en'] = original_ansi + paradox_extra_conversions
 paradox['en'].sort(key=lambda x: x[0])
-
-
-
 
 # format: paradox code, unicode hex, char, windows-125* code
 
@@ -139,10 +136,10 @@ paradox['hu'][1] = (1, 0x00c1) # Á    193
 paradox['hu'][2] = (2, 0x0170) # Ű    219
 paradox['hu'][3] = (3, 0x0150) # Ő    213
 paradox['hu'][4] = (4, 0x0151) # ő    245
-#                ?  0x00fc  # ü    252
-#                ?  0x0171  # ű    251
-#                ?  0x00cd  # Í    205
-#                ?  0x00d6  # Ö    214
+#                   ?  0x00fc  # ü    252
+#                   ?  0x0171  # ű    251
+#                   ?  0x00cd  # Í    205
+#                   ?  0x00d6  # Ö    214
 
 
 # ESTONIAN (windows-1250 based)
@@ -161,19 +158,19 @@ paradox['de'][1] = (1, 0x00fc) # ü    252
 # extends the original English with a few modifications
 
 paradox['pl'] = paradox['en'].copy()
-#                ?  0x017b  # Ż    175
+#                   ?  0x017b  # Ż    175
 paradox['pl'][1] = (1, 0x017c) # ż    191
-#                ?  0x0106  # Ć    198
+#                   ?  0x0106  # Ć    198
 paradox['pl'][2] = (2, 0x0107) # ć    230
-#                ?  0x0104  # Ą    165
+#                   ?  0x0104  # Ą    165
 paradox['pl'][3] = (3, 0x0105) # ą    185
-#                ?  0x0118  # Ę    202
+#                   ?  0x0118  # Ę    202
 paradox['pl'][4] = (4, 0x0119) # ę    234
-#                ?  0x0179  # Ź    143 
+#                   ?  0x0179  # Ź    143 
 paradox['pl'][5] = (5, 0x017a) # ź    159
-#                ?, 0x0141  # Ł    163
+#                   ?, 0x0141  # Ł    163
 paradox['pl'][6] = (6, 0x0142) # ł    179
-#                ?, 0x015a  # Ś    140
+#                   ?, 0x015a  # Ś    140
 paradox['pl'][7] = (7, 0x015b) # ś    156
 
 # PORTUGUESE (windows-1252 based)
@@ -197,25 +194,5 @@ paradox['tr'] = paradox['en'].copy()
 paradox['tr'][1] = (1, 0x00fc) # ü    252
 paradox['tr'][2] = (2, 0x0131) # ı    253
 
-non_printable = [0, 127, 182]
-needs_escape = [34, 92, 218] # " and \ (appearing twice)
-
-
-def output(name, charmap):
-    f = open("../paradox/lib/encodings/charmaps/" + name + ".py", "w", encoding="utf-8")
-    print("# paradox encoding paradox-" + name, file=f)
-    print("charmap = (", file=f)
-    for (x, y) in charmap:
-        if x in non_printable:
-            char = "\\x" + "{:02x}".format(y)
-        elif x in needs_escape:
-            char = "\\" + chr(y)
-        else:
-            char = chr(y)
-        print('"' + char + '" # ' + str(x) + " " + "{:#06x}".format(y), file=f)
-    print(")", file=f)
-    f.close()
-
-
-for e in paradox:
-    output(e, paradox[e])
+non_printable = (0, 127, 182)
+needs_escape = (34, 92, 218) # " and \ (appearing twice)
