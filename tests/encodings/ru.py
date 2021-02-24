@@ -17,8 +17,8 @@ paradox['ru'][33:127] = [
 ]
 
 # fill up from 128 to 255 with spaces
-paradox['ru'][128:255] = [
-    (x, 32) for x in range(128,255)
+paradox['ru'][128:256] = [
+    (x, 32) for x in range(128,256)
 ]
 
 # from 69 to 230, there is a mix and match

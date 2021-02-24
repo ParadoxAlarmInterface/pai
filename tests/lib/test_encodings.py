@@ -1,8 +1,8 @@
 import pytest
 
-from paradox.lib.encodings import register_encodings, ru
+from paradox.lib.encodings import register_encodings
 
-from paradox.lib.encodings.charmaps import en
+from paradox.lib.encodings.charmaps import en, ru
 
 register_encodings()
 
@@ -61,4 +61,4 @@ def test_ru_encoding(raw, expected):
 
 
 def test_ru_encoding_len():
-    assert len(ru.decoding_table) == 256
+    assert len(ru.charmap) == 256
