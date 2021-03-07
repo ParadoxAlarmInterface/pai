@@ -193,9 +193,9 @@ class Config(object):
         # Pushover
         "PUSHOVER_ENABLE": False,
         "PUSHOVER_KEY": "",  # Application token for Pushover
-        "PUSHOVER_BROADCAST_KEYS": {  # Pushover user or group keys to broadcast notifications to
-            #    '<user_key>': '*'                # value can be '*' or comma separated list of device names
-        },
+        "PUSHOVER_BROADCAST_KEYS": [  # Pushover user or group keys to broadcast notifications to
+            #    {'user_key':'<user_key>', 'devices': '*'}                # value can be '*' or comma separated list of device names
+        ],
         "PUSHOVER_IGNORE_EVENTS": [],  # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
         "PUSHOVER_ALLOW_EVENTS": [],  # Same as before but as a white list. Default is use EVENT_FILTERS
         "PUSHOVER_EVENT_FILTERS": [  # list of tags, property changes to include or exclude. See event.py for tag list
