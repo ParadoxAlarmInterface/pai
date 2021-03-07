@@ -3,7 +3,7 @@ import binascii
 from construct import Container
 
 from paradox.hardware.evo.parsers import (DefinitionsParserMap,
-                                          get_user_definition)
+                                          get_user_definition, RAMDataParserMap)
 
 
 def test_zone_definition_test():
@@ -140,3 +140,31 @@ def test_user_definition_test():
         7: True,
         8: True,
     }
+
+def test_parse_ram_1_troubles():
+    raw_data = bytearray(64)
+    raw_data[18] = 20  # century
+    raw_data[20] = 1  # month
+    raw_data[21] = 1  # day
+
+    raw_data[13] |= 0x10  # zone tamper
+    raw_data[13] |= 0x20  # zone low battery
+
+    raw_data[14] |= 0x2  # battery failure trouble
+
+    raw_data[16] |= 0x20  # module AC lost
+
+    raw_data[17] |= 0x1  # missing keypad trouble
+    parser = RAMDataParserMap[1]
+
+    data = parser.parse(raw_data)
+    print(data)
+
+    assert data["system"]["troubles"]["zone_tamper_trouble"]
+    assert data["system"]["troubles"]["zone_low_battery_trouble"]
+
+    assert data["system"]["troubles"]["battery_failure_trouble"]
+
+    assert data["system"]["troubles"]["module_ac_trouble"]
+
+    assert data["system"]["troubles"]["missing_keypad_trouble"]
