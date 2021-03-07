@@ -147,7 +147,7 @@ def _make_device():
 
 def _get_expected_device_block():
     return {
-            'identifiers': ['Paradox', 'EVO', '1234abcd'],
+            'identifiers': ['Paradox_EVO_1234abcd'],
             'manufacturer': 'Paradox',
             'model': 'EVO',
             'name': 'EVO',

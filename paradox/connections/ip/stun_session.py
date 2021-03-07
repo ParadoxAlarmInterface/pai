@@ -41,7 +41,7 @@ class StunSession:
 
         logger.debug("Site Info: {}".format(json.dumps(self.site_info, indent=4)))
 
-        if self.panel_serial is not None:
+        if self.panel_serial:
             for site in self.site_info["site"]:
                 for module in site:
                     logger.debug(

@@ -61,7 +61,7 @@ async def test_hass(mocker):
                 "device": {
                     "manufacturer": "Paradox",
                     "model": "EVO192",
-                    "identifiers": ["Paradox", "EVO192", "aabbccdd"],
+                    "identifiers": ["Paradox_EVO192_aabbccdd"],
                     "name": "EVO192",
                     "sw_version": "6.80 build 5",
                 },
@@ -81,7 +81,7 @@ async def test_hass(mocker):
                 "device": {
                     "manufacturer": "Paradox",
                     "model": "EVO192",
-                    "identifiers": ["Paradox", "EVO192", "aabbccdd"],
+                    "identifiers": ["Paradox_EVO192_aabbccdd"],
                     "name": "EVO192",
                     "sw_version": "6.80 build 5",
                 },

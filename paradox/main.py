@@ -30,7 +30,7 @@ def get_format(level):
 def config_logger(logger):
     logger_level = cfg.LOGGING_LEVEL_CONSOLE
 
-    if cfg.LOGGING_FILE is not None:
+    if cfg.LOGGING_FILE:
         logfile_handler = RotatingFileHandler(
             cfg.LOGGING_FILE,
             mode="a",

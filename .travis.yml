@@ -2,9 +2,9 @@ dist: xenial
 language: python
 cache: pip
 python:
-  - '3.6'
   - '3.7'
   - '3.8'
+  - '3.9'
 install:
   - pip install .
   - pip install -r requirements.txt
@@ -21,7 +21,7 @@ deploy:
 jobs:
   include:
   - stage: deploy
-    python: '3.7'
+    python: '3.9'
     script: "./.travis/deploy.sh"
     if: type != pull_request AND (branch IN (dev, master) OR tag IS present)
     addons:
