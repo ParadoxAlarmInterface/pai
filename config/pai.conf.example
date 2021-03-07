@@ -170,9 +170,10 @@ import logging
 ### Pushover
 # PUSHOVER_ENABLE = False
 # PUSHOVER_KEY = ''                       # Application token for Pushover
-# PUSHOVER_BROADCAST_KEYS = {             # Pushover user or group keys to broadcast notifications to
-###    '<user_key>': '*'                  # value can be '*' or comma separated list of device names
-# }
+# PUSHOVER_BROADCAST_KEYS = [{             # Pushover user or group keys to broadcast notifications to
+#    'user_key': '<user_key>',
+#    'devices': '*'                  # value can be '*' or comma separated list of device names
+# }]
 # PUSHOVER_MIN_EVENT_LEVEL = 'INFO'
 ## Event filtering by tags:
 # PUSHOVER_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
