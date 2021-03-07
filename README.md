@@ -3,11 +3,11 @@
         <a href="https://gitter.im/paradox-alarm-interface/community">
             <img alt="Gitter" src="https://img.shields.io/gitter/room/paradox-alarm-interface/community?logo=gitter">
         </a>
-        <a href="https://travis-ci.org/ParadoxAlarmInterface/pai">
-            <img alt="Travis (.org) branch" src="https://img.shields.io/travis/ParadoxAlarmInterface/pai/master?label=master&logo=travis">
+        <a href="https://travis-ci.com/ParadoxAlarmInterface/pai">
+            <img alt="Travis (.com) branch" src="https://img.shields.io/travis/com/ParadoxAlarmInterface/pai/master?label=master&logo=travis">
         </a>
-        <a href="https://travis-ci.org/ParadoxAlarmInterface/pai/branches">
-            <img alt="Travis (.org) branch" src="https://img.shields.io/travis/ParadoxAlarmInterface/pai/dev?label=dev&logo=travis">
+        <a href="https://travis-ci.com/ParadoxAlarmInterface/pai/branches">
+            <img alt="Travis (.com) branch" src="https://img.shields.io/travis/com/ParadoxAlarmInterface/pai/dev?label=dev&logo=travis">
         </a>
         <a href="https://hub.docker.com/r/paradoxalarminterface/pai">
             <img alt="Docker Arch" src="https://img.shields.io/badge/docker_arch-386%7Camd64%7Carmv6%7Carmv7%7Carm64-green?logo=docker">
