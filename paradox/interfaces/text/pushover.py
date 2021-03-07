@@ -46,7 +46,10 @@ class PushoverTextInterface(ConfiguredAbstractTextInterface):
             )
 
     def send_message(self, message: str, level: EventLevel):
-        for user_key, devices_raw in cfg.PUSHOVER_BROADCAST_KEYS.items():
+        for settings in cfg.PUSHOVER_BROADCAST_KEYS:
+            user_key = settings["user_key"]
+            devices_raw = settings["devices"]
+
             user = self.users.get(user_key)  # type: chump.User
 
             if user is None:
