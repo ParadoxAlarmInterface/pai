@@ -211,7 +211,7 @@ def test_door_access():
     payload = b"\xe0\xff\xc1d\x14\x13\x0c\x05\x11\x19\x06\x00\x01\n\x00\x00\x00\x00\x03V\x99LIKS DOOR\x00\x00\x00\x00\x00+\x1b"
     raw = LiveEvent.parse(payload)
     event_ = event.LiveEvent(raw, event_map)
-    assert "[user:10] access on door VLIKS DOOR" == event_.message
+    assert "[user:10] access on door VÄLIKS DOOR" == event_.message
     print(event_)
 
 
