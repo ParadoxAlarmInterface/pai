@@ -55,7 +55,7 @@ class Config(object):
         # Paradox
         "KEEP_ALIVE_INTERVAL": 10,  # Interval between status updates
         "LIMITS": {},  # By default all zones will be monitored
-        "LABEL_ENCODING": "utf-8",  # Encoding to use when decoding labels. See https://docs.python.org/3/library/codecs.html#standard-encodings
+        "LABEL_ENCODING": "paradox-en",  # Encoding to use when decoding labels. paradox-* or https://docs.python.org/3/library/codecs.html#standard-encodings
         "LABEL_REFRESH_INTERVAL": (
             15 * 60,
             int,
