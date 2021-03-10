@@ -9,6 +9,11 @@ MODULES = {
     "argparse": dict(
         mandatory=True, desc="basic operation", install_name="argparse>=1.4.0"
     ),
+    "slugify": dict(
+        mandatory=True,
+        desc="basic operation (remove non-ascii from mqtt topic names)",
+        install_name="python-slugify>=4.0.1",
+    ),
     "pyserial": dict(
         mandatory=False, desc="the serial connection", install_name="pyserial>=3.4"
     ),
