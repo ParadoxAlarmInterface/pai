@@ -1,6 +1,6 @@
 # Generator for Paradox Encodings
 
-import ansi, ru
+import ansi, ru, el, ar, he
 
 
 def output(name, charmap, non_printable, needs_escape):
@@ -20,7 +20,7 @@ def output(name, charmap, non_printable, needs_escape):
 
 
 
-for f in [ansi, ru, ]:
+for f in [ansi, ru, el, ar, he]:
     for e in f.paradox: 
         output(
             e,
