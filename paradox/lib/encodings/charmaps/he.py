@@ -1,4 +1,4 @@
-# paradox encoding paradox-iw
+# paradox encoding paradox-he
 charmap = (
 "\x00" # 0 0x0000
 " " # 1 0x0020

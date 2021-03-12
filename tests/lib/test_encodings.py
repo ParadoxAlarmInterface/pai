@@ -2,7 +2,7 @@ import pytest
 
 from paradox.lib.encodings import register_encodings
 
-from paradox.lib.encodings.charmaps import en, ru, el, ar, iw
+from paradox.lib.encodings.charmaps import en, ru, el, ar, he
 
 register_encodings()
 
@@ -118,7 +118,7 @@ def test_ar_encoding_len():
 
 # HEBREW
 
-test_data_iw = [
+test_data_he = [
     (b"B", "B"),
     (b"0", "0"),
     (b"z", "z"),
@@ -129,13 +129,13 @@ test_data_iw = [
 ]
 
 
-@pytest.mark.parametrize("raw,expected", test_data_iw)
-def test_iw_encoding(raw, expected):
-    encoding = "paradox-iw"
+@pytest.mark.parametrize("raw,expected", test_data_he)
+def test_he_encoding(raw, expected):
+    encoding = "paradox-he"
     assert len(expected) == 1
 
     assert raw.decode(encoding) == expected, f"char {ord(raw)} != {expected}"
 
 
-def test_iw_encoding_len():
+def test_he_encoding_len():
     assert len(el.charmap) == 256
