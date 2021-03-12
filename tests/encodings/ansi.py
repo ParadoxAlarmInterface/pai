@@ -145,8 +145,8 @@ paradox['hu'][4] = (4, 0x0151) # ő    245
 # ESTONIAN (windows-1250 based)
 # extends the original English with a few modifications
 
-paradox['ee'] = paradox['en'].copy()
-paradox['ee'][1] = (1, 0x00fc) # ü    252
+paradox['et'] = paradox['en'].copy()
+paradox['et'][1] = (1, 0x00fc) # ü    252
 
 # GERMAN (windows-1250 based)
 # extends the original English with a few modifications
