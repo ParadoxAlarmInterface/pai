@@ -2,9 +2,11 @@ import pytest
 
 from paradox.lib.encodings import register_encodings
 
-from paradox.lib.encodings.charmaps import en, ru
+from paradox.lib.encodings.charmaps import en, ru, el, ar, iw
 
 register_encodings()
+
+# ENGLISH
 
 test_data_en = [
     (b"B", "B"),
@@ -41,6 +43,7 @@ def test_en_encoding(raw, expected):
 def test_en_encoding_len():
     assert len(en.charmap) == 256
 
+# RUSSIAN
 
 test_data_ru = [
     (b"B", "В"),  # 0x0412 instead of the normal B. Why? I don't know. ;)
@@ -62,3 +65,77 @@ def test_ru_encoding(raw, expected):
 
 def test_ru_encoding_len():
     assert len(ru.charmap) == 256
+
+# GREEK
+
+test_data_el = [
+    (b"B", "B"),
+    (b"0", "0"),
+    (b"z", "z"),
+    (bytes(  [1]), "Δ"),
+    (bytes([212]), "Γ"),
+    (bytes([228]), "ζ"),
+    (bytes([244]), "ω"),
+]
+
+
+@pytest.mark.parametrize("raw,expected", test_data_el)
+def test_el_encoding(raw, expected):
+    encoding = "paradox-el"
+    assert len(expected) == 1
+
+    assert raw.decode(encoding) == expected, f"char {ord(raw)} != {expected}"
+
+
+def test_el_encoding_len():
+    assert len(el.charmap) == 256
+
+
+# ARABIC
+
+test_data_ar = [
+    (b"B", "B"),
+    (b"0", "0"),
+    (b"z", "z"),
+    (bytes( [94]), " "),
+    (bytes([128]), "ب"),
+    (bytes([228]), "د"),
+    (bytes([244]), "أ"),
+]
+
+
+@pytest.mark.parametrize("raw,expected", test_data_ar)
+def test_ar_encoding(raw, expected):
+    encoding = "paradox-ar"
+    assert len(expected) == 1
+
+    assert raw.decode(encoding) == expected, f"char {ord(raw)} != {expected}"
+
+
+def test_ar_encoding_len():
+    assert len(el.charmap) == 256
+
+
+# HEBREW
+
+test_data_iw = [
+    (b"B", "B"),
+    (b"0", "0"),
+    (b"z", "z"),
+    (bytes( [94]), " "),
+    (bytes([160]), "א"),
+    (bytes([175]), "ן"),
+    (bytes([186]), "ת"),
+]
+
+
+@pytest.mark.parametrize("raw,expected", test_data_iw)
+def test_iw_encoding(raw, expected):
+    encoding = "paradox-iw"
+    assert len(expected) == 1
+
+    assert raw.decode(encoding) == expected, f"char {ord(raw)} != {expected}"
+
+
+def test_iw_encoding_len():
+    assert len(el.charmap) == 256
