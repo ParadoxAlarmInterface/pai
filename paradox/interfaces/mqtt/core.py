@@ -8,7 +8,7 @@ import time
 import typing
 from enum import Enum
 
-from paho.mqtt.client import LOGGING_LEVEL, MQTT_ERR_SUCCESS, Client
+from paho.mqtt.client import LOGGING_LEVEL, MQTT_ERR_SUCCESS, Client, connack_string
 
 from paradox.config import config as cfg
 from paradox.data.enums import RunState
@@ -200,13 +200,13 @@ class MQTTConnection(Client):
             self._report_run_state(self._last_run_state)
             self._call_registars("on_connect", client, userdata, flags, result)
         else:
-            logger.error("Failed to connect to MQTT. Code: %d" % result)
+            logger.error(f"Failed to connect to MQTT: {connack_string(result)} ({result})")
 
     def _on_disconnect_cb(self, client, userdata, rc):
         if rc == MQTT_ERR_SUCCESS:
             logger.info("MQTT Broker Disconnected")
         else:
-            logger.error("MQTT Broker unexpectedly disconnected. Code: %d", rc)
+            logger.error(f"MQTT Broker unexpectedly disconnected. Code: {rc}")
 
         self.state = ConnectionState.NEW
         self._call_registars("on_disconnect", client, userdata, rc)
