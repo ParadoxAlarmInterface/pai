@@ -142,6 +142,17 @@ class ZoneStatusAdapter(Adapter):
         return zone_status
 
 
+class PGMStatusAdapter(Adapter):
+    def _decode(self, obj, context, path):
+        pgm_status = dict()
+        for i in range(0, len(obj)):
+            pgm_status[i + 1] = dict(
+                on=(obj[i] & 32) != 0,
+            )
+
+        return pgm_status
+
+
 class SignalStrengthAdapter(Adapter):
     def _decode(self, obj, context, path):
         strength = dict()
