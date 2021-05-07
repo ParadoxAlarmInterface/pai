@@ -36,27 +36,8 @@ class StunSession:
         if self.site_info is None:
             raise ConnectToSiteFailed("Unable to get site info")
 
-        # xoraddr = binascii.unhexlify(self.site_info['site'][0]['module'][0]['xoraddr'])
-        self.module = None
-
         logger.debug("Site Info: {}".format(json.dumps(self.site_info, indent=4)))
-
-        if self.panel_serial:
-            for site in self.site_info["site"]:
-                for module in site:
-                    logger.debug(
-                        "Found module with panel serial: {}".format(
-                            module["panelSerial"]
-                        )
-                    )
-                    if module["panelSerial"] == self.panel_serial:
-                        self.module = module
-                        break
-
-                if self.module is not None:
-                    break
-        else:
-            self.module = self.site_info["site"][0]["module"][0]  # Use first
+        self.module = self._select_module()
 
         if self.module is None:
             self.site_info = None  # Reset state
@@ -64,32 +45,9 @@ class StunSession:
 
         xoraddr = binascii.unhexlify(self.module["xoraddr"])
 
-        stun_host = "turn.paradoxmyhome.com"
-
-        logger.debug("STUN TCP Change Request")
-        self.stun_control = stun.StunClient(stun_host)
-        self.stun_control.send_tcp_change_request()
-        stun_r = self.stun_control.receive_response()
-        if stun.is_error(stun_r):
-            raise ConnectToSiteFailed(
-                f"STUN TCP Change Request error: {stun.get_error(stun_r)}"
-            )
-
-        logger.debug("STUN TCP Binding Request")
-        self.stun_control.send_binding_request()
-        stun_r = self.stun_control.receive_response()
-        if stun.is_error(stun_r):
-            raise ConnectToSiteFailed(
-                f"STUN TCP Binding Request error: {stun.get_error(stun_r)}"
-            )
-
-        logger.debug("STUN Connect Request")
-        self.stun_control.send_connect_request(xoraddr=xoraddr)
-        stun_r = self.stun_control.receive_response()
-        if stun.is_error(stun_r):
-            raise ConnectToSiteFailed(
-                f"STUN Connect Request error: {stun.get_error(stun_r)}"
-            )
+        await self._stun_tcp_change_request()
+        await self._stun_tcp_binding_request()
+        stun_r = await self._stun_connect(xoraddr)
 
         self.connection_timestamp = time.time()
 
@@ -106,6 +64,53 @@ class StunSession:
             )
 
         logger.info("Connected to Site: {}".format(self.site_id))
+
+    async def _stun_connect(self, xoraddr):
+        logger.debug("STUN Connect Request")
+        self.stun_control.send_connect_request(xoraddr=xoraddr)
+        stun_r = self.stun_control.receive_response()
+        if stun.is_error(stun_r):
+            raise ConnectToSiteFailed(
+                f"STUN Connect Request error: {stun.get_error(stun_r)}"
+            )
+        return stun_r
+
+    async def _stun_tcp_binding_request(self):
+        logger.debug("STUN TCP Binding Request")
+        self.stun_control.send_binding_request()
+        stun_r = self.stun_control.receive_response()
+        if stun.is_error(stun_r):
+            raise ConnectToSiteFailed(
+                f"STUN TCP Binding Request error: {stun.get_error(stun_r)}"
+            )
+
+    async def _stun_tcp_change_request(self):
+        stun_host = "turn.paradoxmyhome.com"
+        logger.debug("STUN TCP Change Request")
+        self.stun_control = stun.StunClient(stun_host)
+        self.stun_control.send_tcp_change_request()
+        stun_r = self.stun_control.receive_response()
+        if stun.is_error(stun_r):
+            raise ConnectToSiteFailed(
+                f"STUN TCP Change Request error: {stun.get_error(stun_r)}"
+            )
+
+    def _select_module(self):
+        for site in self.site_info["site"]:
+            for module in site["module"]:
+                if module.get("xoraddr") is None:
+                    continue
+
+                logger.debug(
+                    "Found module with panel serial: {}".format(
+                        module["panelSerial"]
+                    )
+                )
+
+                if not self.panel_serial:  # Pick first available
+                    return module
+                elif module["panelSerial"] == self.panel_serial:
+                    return module
 
     def get_socket(self):
         return self.stun_tunnel.sock
@@ -171,3 +176,6 @@ class StunSession:
             time.sleep(5)
 
         return None
+
+    def get_potential_modules(self):
+        pass
