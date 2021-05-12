@@ -56,6 +56,8 @@ Can be looked up in Babyware (_Right click on a panel ⇾ Properties ⇾ PC Comm
 - **SITE ID**
 - **Email registered in the site**
 
+But do not do this because of https://github.com/CriticalSecurity/paradox
+
 ## How to use
 See [wiki](https://github.com/ParadoxAlarmInterface/pai/wiki/Installation)
 
