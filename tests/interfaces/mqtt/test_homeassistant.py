@@ -17,7 +17,7 @@ async def test_hass(mocker):
     mocker.patch.multiple(cfg, MQTT_HOMEASSISTANT_AUTODISCOVERY_ENABLE=True)
     con = mocker.patch("paradox.interfaces.mqtt.core.MQTTConnection")
     con.get_instance.return_value.availability_topic = "paradox/interface/availability"
-    con.get_instance.return_value.run_status_topic = "paradox/interface/run_status"
+    con.get_instance.return_value.pai_status_topic = "paradox/interface/pai_status"
 
     alarm = mocker.MagicMock()
 
@@ -52,12 +52,12 @@ async def test_hass(mocker):
         await asyncio.sleep(0.01)
 
         interface.mqtt.publish.assert_any_call(
-            "homeassistant/sensor/aabbccdd/run_status/config",
+            "homeassistant/sensor/aabbccdd/pai_status/config",
             json.dumps(
                 {
                     "name": "Run status",
-                    "unique_id": "aabbccdd_partition_run_status",
-                    "state_topic": "paradox/interface/run_status",
+                    "unique_id": "aabbccdd_partition_pai_status",
+                    "state_topic": "paradox/interface/pai_status",
                     "device": {
                         "manufacturer": "Paradox",
                         "model": "EVO192",

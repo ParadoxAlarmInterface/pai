@@ -14,7 +14,7 @@ def get_interface(mocker):
     con = mocker.patch("paradox.interfaces.mqtt.core.MQTTConnection")
     con.get_instance.return_value.connected = True
     con.get_instance.return_value.availability_topic = "paradox/interface/availability"
-    con.get_instance.return_value.run_status_topic = "paradox/interface/run_status"
+    con.get_instance.return_value.pai_status_topic = "paradox/interface/pai_status"
     interface = BasicMQTTInterface(mocker.MagicMock())
     interface.start()
     interface.on_connect(None, None, None, None)

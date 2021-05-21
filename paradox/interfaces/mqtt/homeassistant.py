@@ -25,7 +25,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         self.pgms = {}
 
         self.availability_topic = self.mqtt.availability_topic
-        self.run_status_topic = self.mqtt.pai_status_topic
+        self.pai_status_topic = self.mqtt.pai_status_topic
 
         self.connected_future = (
             asyncio.Future()
@@ -87,13 +87,13 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
 
     def _publish_run_state_sensor(self, device, device_sn):
         configuration_topic = "{}/sensor/{}/{}/config".format(
-            cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX, device_sn, "run_status"
+            cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX, device_sn, "pai_status"
         )
 
         config = dict(
             name="Run status",
-            unique_id="{}_partition_{}".format(device_sn, "run_status"),
-            state_topic=self.run_status_topic,
+            unique_id="{}_partition_{}".format(device_sn, "pai_status"),
+            state_topic=self.pai_status_topic,
             # availability_topic=self.availability_topic,
             device=device,
         )
