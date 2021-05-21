@@ -99,6 +99,9 @@ class Config(object):
         "MQTT_USERNAME": (None, [str, type(None)]),  # MQTT Username for authentication
         "MQTT_PASSWORD": (None, [str, type(None)]),  # MQTT Password
         "MQTT_RETAIN": True,  # Publish messages with Retain
+        "MQTT_QOS": (0, int, (0, 2)),  # Publish messages with QOS level (0 - fire and forget, 1 - at least once, 2 - exactly once)
+        "MQTT_PROTOCOL": ("3.1.1", str, ("3.1", "3.1.1", "5")),  # Protocol to use
+        "MQTT_TRANSPORT": ("tcp", str, ("tcp", "websockets")),  # Transport to use
         "MQTT_BIND_ADDRESS": "",  # MQTT Bind address (Paho default)
         "MQTT_BIND_PORT": 0,  # MQTT Bind port (Paho default)
         "MQTT_REPUBLISH_INTERVAL": (

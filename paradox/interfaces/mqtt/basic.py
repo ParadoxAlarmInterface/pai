@@ -452,8 +452,8 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         self.publish(
             "{}/{}/{}/{}".format(base, element_topic, sanitize_key(label), attribute),
             "{}".format(publish_value),
-            0,
-            cfg.MQTT_RETAIN,
+            qos=cfg.MQTT_QOS,
+            retain=cfg.MQTT_RETAIN,
         )
 
     def _on_ready(self):

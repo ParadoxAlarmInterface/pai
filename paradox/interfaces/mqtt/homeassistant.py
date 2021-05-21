@@ -25,7 +25,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         self.pgms = {}
 
         self.availability_topic = self.mqtt.availability_topic
-        self.run_status_topic = self.mqtt.run_status_topic
+        self.run_status_topic = self.mqtt.pai_status_topic
 
         self.connected_future = (
             asyncio.Future()
