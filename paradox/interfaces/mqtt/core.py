@@ -60,7 +60,7 @@ class MQTTConnection(Client):
 
     def __init__(self):
         super(MQTTConnection, self).__init__(
-            "paradox_mqtt/{}".format(os.urandom(8).hex())
+            "pai{}".format(os.urandom(8).hex())
         )
         self._last_run_state = "unknown"
         self.run_status_topic = "{}/{}/{}".format(
