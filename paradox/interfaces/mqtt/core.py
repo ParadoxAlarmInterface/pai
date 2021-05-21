@@ -282,7 +282,7 @@ class AbstractMQTTInterface(ThreadQueueInterface):
             self.publish(
                 f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
                 message,
-                qos=cfg.MQTT_QOS,
+                qos=2,
                 retain=True,
             )
 
