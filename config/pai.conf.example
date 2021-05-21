@@ -68,6 +68,9 @@ import logging
 # MQTT_ENABLE = False			# Enable MQTT Interface
 # MQTT_HOST = '127.0.0.1' 		# Hostname or address
 # MQTT_PORT = 1883        		# TCP Port (TLS port if MQTT_TLS_CERT_PATH is set)
+# MQTT_TRANSPORT = "tcp"        # Transport to use ("tcp" or "websockets")
+# MQTT_PROTOCOL = "3.1.1"       # Protocol to use ("3.1", "3.1.1" or "5")
+# MQTT_QOS = 0                  # Publish messages with QOS level (0 - fire and forget, 1 - at least once, 2 - exactly once)
 # MQTT_TLS_CERT_PATH = None		# Path to ca cert (/etc/pai/certs/ca.pem), if you want TLS
 # MQTT_KEEPALIVE = 60     		# Keep alive
 # MQTT_USERNAME = None    		# MQTT Username for authentication

@@ -8,7 +8,7 @@ import time
 import typing
 from enum import Enum
 
-from paho.mqtt.client import LOGGING_LEVEL, MQTT_ERR_SUCCESS, Client, connack_string
+from paho.mqtt.client import LOGGING_LEVEL, MQTT_ERR_SUCCESS, Client, connack_string, MQTTv311, MQTTv31, MQTTv5
 
 from paradox.config import config as cfg
 from paradox.data.enums import RunState
@@ -34,6 +34,11 @@ RUN_STATE_2_PAYLOAD = {
     RunState.STOP: "stopped",
 }
 
+protocol_map = {
+    "3.1": MQTTv31,
+    "3.1.1": MQTTv311,
+    "5": MQTTv5
+}
 
 class MQTTConnection(Client):
     _instance = None
@@ -47,7 +52,9 @@ class MQTTConnection(Client):
 
     def __init__(self):
         super(MQTTConnection, self).__init__(
-            "paradox_mqtt/{}".format(os.urandom(8).hex())
+            "paradox_mqtt/{}".format(os.urandom(8).hex()),
+            protocol=protocol_map.get(str(cfg.MQTT_PROTOCOL), MQTTv311),
+            transport=cfg.MQTT_TRANSPORT,
         )
         self._last_pai_status = "unknown"
         self.pai_status_topic = "{}/{}/{}".format(
@@ -59,6 +66,8 @@ class MQTTConnection(Client):
         self.on_connect = self._on_connect_cb
         self.on_disconnect = self._on_disconnect_cb
         self.state = ConnectionState.NEW
+        # self.enable_logger(logger)
+
         # self.on_subscribe = lambda client, userdata, mid, granted_qos: logger.debug("Subscribed: %s" %(mid))
         # self.on_message = lambda client, userdata, message: logger.debug("Message received: %s" % str(message))
         # self.on_publish = lambda client, userdata, mid: logger.debug("Message published: %s" % str(mid))
@@ -141,7 +150,11 @@ class MQTTConnection(Client):
     def publish(self, topic, payload=None, *args, **kwargs):
         logger.debug("MQTT: {}={}".format(topic, payload))
 
-        super(MQTTConnection, self).publish(topic, payload, *args, **kwargs)
+        self._publish(topic, payload, *args, **kwargs)
+
+    def _publish(self, topic, payload, *args, **kwargs):
+        info = super(MQTTConnection, self).publish(topic, payload, *args, **kwargs)
+        logger.debug(f"message: {info.is_published()}, rc: {info.rc}")
 
     def _call_registars(self, method, *args, **kwargs):
         for r in self.registrars:
@@ -172,15 +185,16 @@ class MQTTConnection(Client):
 
     def _report_pai_status(self, status):
         self._last_pai_status = status
-        self.publish(self.pai_status_topic, status, 0, retain=True)
+        self.publish(self.pai_status_topic, status, qos=cfg.MQTT_QOS, retain=True)
         self.publish(
             self.availability_topic,
             "online" if status in ["online", "paused"] else "offline",
-            0,
+            qos=cfg.MQTT_QOS,
             retain=True,
         )
 
-    def _on_connect_cb(self, client, userdata, flags, result):
+    def _on_connect_cb(self, client, userdata, flags, result, properties=None):
+        # called on Thread-6
         if result == MQTT_ERR_SUCCESS:
             logger.info("MQTT Broker Connected")
             self.state = ConnectionState.CONNECTED
@@ -190,6 +204,7 @@ class MQTTConnection(Client):
             logger.error(f"Failed to connect to MQTT: {connack_string(result)} ({result})")
 
     def _on_disconnect_cb(self, client, userdata, rc):
+        # called on Thread-6
         if rc == MQTT_ERR_SUCCESS:
             logger.info("MQTT Broker Disconnected")
         else:
@@ -260,15 +275,15 @@ class AbstractMQTTInterface(ThreadQueueInterface):
             "retain": retain,
             "last_publish": time.time(),
         }
-        self.loop.call_soon_threadsafe(self.mqtt.publish, topic, value, qos, retain)
+        self.mqtt.publish(topic, value, qos, retain)
 
     def _publish_command_status(self, message):
         if cfg.MQTT_PUBLISH_COMMAND_STATUS:
             self.publish(
                 f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_INTERFACE_TOPIC}/{cfg.MQTT_COMMAND_STATUS_TOPIC}",
                 message,
-                2,
-                True,
+                qos=cfg.MQTT_QOS,
+                retain=True,
             )
 
     def subscribe_callback(self, sub, callback: typing.Callable):

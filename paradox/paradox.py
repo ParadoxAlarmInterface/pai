@@ -415,8 +415,8 @@ class Paradox:
                     result = "exception"
                     logger.exception("Unexpected exception during send_wait")
                     raise
-                finally:
-                    logger.debug("send/receive %s in %.4f s", result, time.time() - t1)
+                #finally:
+                    #logger.debug("send/receive %s in %.4f s", result, time.time() - t1)
 
             attempt += 1
 
