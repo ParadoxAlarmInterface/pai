@@ -40,7 +40,8 @@ protocol_map = {
     "5": MQTTv5
 }
 
-class MQTTConnection(Client):
+class MQTTConnection():
+    client: Client
     _instance = None
 
     @classmethod
@@ -51,8 +52,8 @@ class MQTTConnection(Client):
         return cls._instance
 
     def __init__(self):
-        super(MQTTConnection, self).__init__(
-            "paradox_mqtt/{}".format(os.urandom(8).hex()),
+        self.client = Client(
+            "pai"+os.urandom(8).hex(),
             protocol=protocol_map.get(str(cfg.MQTT_PROTOCOL), MQTTv311),
             transport=cfg.MQTT_TRANSPORT,
         )
@@ -63,24 +64,24 @@ class MQTTConnection(Client):
         self.availability_topic = "{}/{}/{}".format(
             cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, "availability"
         )
-        self.on_connect = self._on_connect_cb
-        self.on_disconnect = self._on_disconnect_cb
+        self.client.on_connect = self._on_connect_cb
+        self.client.on_disconnect = self._on_disconnect_cb
         self.state = ConnectionState.NEW
-        # self.enable_logger(logger)
+        # self.client.enable_logger(logger)
 
-        # self.on_subscribe = lambda client, userdata, mid, granted_qos: logger.debug("Subscribed: %s" %(mid))
-        # self.on_message = lambda client, userdata, message: logger.debug("Message received: %s" % str(message))
-        # self.on_publish = lambda client, userdata, mid: logger.debug("Message published: %s" % str(mid))
+        # self.client.on_subscribe = lambda client, userdata, mid, granted_qos: logger.debug("Subscribed: %s" %(mid))
+        # self.client.on_message = lambda client, userdata, message: logger.debug("Message received: %s" % str(message))
+        # self.client.on_publish = lambda client, userdata, mid: logger.debug("Message published: %s" % str(mid))
 
         ps.subscribe(self.on_run_state_change, "run-state")
 
         self.registrars = []
 
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
-            self.username_pw_set(username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
+            self.client.username_pw_set(username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
 
         if cfg.MQTT_TLS_CERT_PATH is not None:
-            self.tls_set(
+            self.client.tls_set(
                 ca_certs=cfg.MQTT_TLS_CERT_PATH,
                 certfile=None,
                 keyfile=None,
@@ -88,11 +89,11 @@ class MQTTConnection(Client):
                 tls_version=ssl.PROTOCOL_TLSv1_2,
                 ciphers=None,
             )
-            self.tls_insecure_set(False)
+            self.client.tls_insecure_set(False)
 
-        self.will_set(self.availability_topic, "offline", 0, retain=True)
+        self.client.will_set(self.availability_topic, "offline", 0, retain=True)
 
-        self.on_log = self.on_client_log
+        self.client.on_log = self.on_client_log
 
     def on_client_log(self, client, userdata, level, buf):
         level_std = LOGGING_LEVEL[level]
@@ -121,11 +122,11 @@ class MQTTConnection(Client):
 
     def start(self):
         if self.state == ConnectionState.NEW:
-            self.loop_start()
+            self.client.loop_start()
 
             # TODO: Some initial connection retry mechanism required
             try:
-                self.connect_async(
+                self.client.connect_async(
                     host=cfg.MQTT_HOST,
                     port=cfg.MQTT_PORT,
                     keepalive=cfg.MQTT_KEEPALIVE,
@@ -144,17 +145,13 @@ class MQTTConnection(Client):
     def stop(self):
         if self.state in [ConnectionState.CONNECTING, ConnectionState.CONNECTED]:
             self.disconnect()
-            self.loop_stop()
+            self.client.loop_stop()
             logger.info("MQTT loop stopped")
 
     def publish(self, topic, payload=None, *args, **kwargs):
         logger.debug("MQTT: {}={}".format(topic, payload))
 
-        self._publish(topic, payload, *args, **kwargs)
-
-    def _publish(self, topic, payload, *args, **kwargs):
-        info = super(MQTTConnection, self).publish(topic, payload, *args, **kwargs)
-        logger.debug(f"message: {info.is_published()}, rc: {info.rc}")
+        self.client.publish(topic, payload, *args, **kwargs)
 
     def _call_registars(self, method, *args, **kwargs):
         for r in self.registrars:
@@ -216,7 +213,13 @@ class MQTTConnection(Client):
     def disconnect(self, reasoncode=None, properties=None):
         self.state = ConnectionState.DISCONNECTING
         self._report_pai_status("offline")
-        super(MQTTConnection, self).disconnect()
+        self.client.disconnect()
+
+    def message_callback_add(self, *args, **kwargs):
+        self.client.message_callback_add(*args, **kwargs)
+
+    def subscribe(self, *args, **kwargs):
+        self.client.subscribe(*args, **kwargs)
 
 
 class AbstractMQTTInterface(ThreadQueueInterface):
@@ -275,7 +278,7 @@ class AbstractMQTTInterface(ThreadQueueInterface):
             "retain": retain,
             "last_publish": time.time(),
         }
-        self.mqtt.publish(topic, value, qos, retain)
+        self.loop.call_soon_threadsafe(self.mqtt.publish, topic, value, qos, retain)
 
     def _publish_command_status(self, message):
         if cfg.MQTT_PUBLISH_COMMAND_STATUS:
