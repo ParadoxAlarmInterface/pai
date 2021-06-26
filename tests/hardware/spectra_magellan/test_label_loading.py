@@ -4,7 +4,7 @@ import pytest
 
 from paradox.config import config as cfg
 from paradox.hardware.spectra_magellan.panel import Panel
-from paradox.hardware.spectra_magellan.parsers import ReadEEPROMResponse
+from paradox.hardware.spectra_magellan.parsers import ReadEEPROMResponse, InitializeCommunication
 
 # Label loading
 request_reply_map = {
@@ -76,7 +76,12 @@ async def test_label_loading(mocker):
     core = mocker.MagicMock()
     core.send_wait = send_wait
 
-    panel = Panel(core, mocker.MagicMock())
+    start_communication_response = InitializeCommunication.parse(b'\x00\x00\x00\x00A\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00G')
+
+    panel = Panel(core, start_communication_response)
+    panel.settings = dict(
+        firmware=dict(version=6)
+    )
 
     labels = await panel.load_labels()
 

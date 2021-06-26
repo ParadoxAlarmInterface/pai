@@ -113,7 +113,16 @@ async def setup_panel(mocker):
     alarm.run_state = RunState.RUN
 
     start_communication_response = Container(
-        fields=Container(value=Container(product_id="MAGELLAN_MG5050"))
+        fields=Container(
+            value=Container(
+                product_id="MAGELLAN_MG5050",
+                firmware=Container(
+                    version=6,
+                    revision=1,
+                    build=0
+                )
+            )
+        )
     )
 
     alarm.panel = create_panel(alarm, start_communication_response)
