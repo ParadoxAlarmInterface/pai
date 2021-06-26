@@ -148,7 +148,7 @@ RAMDataParserMap = {
         "_not_used1" / Padding(6),
     ),
     5: Struct("zone_exit_delay" / StatusAdapter(Bytes(4)), "_not_used0" / Padding(28)),
-    7: Struct("pgm_status" / PGMStatusAdapter(Bytes(32))),
+    7: Struct("pgm_status" / PGMStatusAdapter(Bytes(32))),  # Not supported in firmware versions below 6.x
 }
 
 LiveEvent = Struct(

@@ -10,11 +10,10 @@ from construct import ChecksumError, Construct, Container
 
 from paradox.config import config as cfg
 from paradox.exceptions import AuthenticationFailed, StatusRequestException
-
-from ..panel import Panel as PanelBase
 from . import parsers
 from .event import event_map
 from .property import property_map
+from ..panel import Panel as PanelBase
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -34,10 +33,10 @@ PGM_ACTIONS = dict(on_override=0x30, off_override=0x31, on=0x32, off=0x33, pulse
 
 class Panel(PanelBase):
 
+    supports_pgm_status: bool
     event_map = event_map
     property_map = property_map
     max_eeprom_response_data_length = 32
-    status_request_addresses = parsers.RAMDataParserMap.keys()
 
     mem_map = {
         "status_base1": 0x8000,
@@ -68,6 +67,17 @@ class Panel(PanelBase):
         super(Panel, self).__init__(core, variable_message_length)
 
         self.settings = start_communication_response.fields.value
+
+        self.supports_pgm_status = self.settings.firmware.version >= 6
+
+    @property
+    def status_request_addresses(self):
+        addresses = list(parsers.RAMDataParserMap.keys())
+
+        if not self.supports_pgm_status:
+            addresses.remove(7)
+
+        return addresses
 
     async def dump_memory(self, file, memory_type):
         """
