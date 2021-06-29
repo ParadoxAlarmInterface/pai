@@ -11,6 +11,17 @@ from paradox.connections.ip.parsers import (IPMessageCommand, IPMessageRequest,
 from paradox.hardware import create_panel
 
 
+class Colors: # You may need to change color settings
+    RED = '\033[31m'
+    ENDC = '\033[m'
+    GREEN = '\033[32m'
+    YELLOW = '\033[33m'
+    BLUE = '\033[34m'
+    MAGENTA = '\033[95m'
+    CYAN = '\033[96m'
+    ON_WHITE = '\033[47m'
+
+
 def ordered_load(stream, Loader=yaml.loader.SafeLoader, object_pairs_hook=OrderedDict):
     class OrderedLoader(Loader):
         pass
@@ -42,20 +53,20 @@ class PayloadParser:
 
     def _parse_ip_response(self, parsed):
         if parsed.header.command == IPMessageCommand.connect:
-            print(IPPayloadConnectResponse.parse(parsed.payload))
+            print(f"{Colors.ON_WHITE}{IPPayloadConnectResponse.parse(parsed.payload)}{Colors.ENDC}")
         else:
             print(
-                f"No parser for ip_response payload: {binascii.hexlify(parsed.payload)}"
+                f"{Colors.RED}No parser for ip_response payload: {binascii.hexlify(parsed.payload)}{Colors.ENDC}"
             )
 
     def _parse_serial_passthrough_response(self, parsed):
         parsed_payload = self.panel.parse_message(parsed.payload, direction="frompanel")
         if parsed_payload is not None:
             if parsed_payload is not None:
-                print(parsed_payload)
+                print(f"{Colors.ON_WHITE}{parsed_payload}{Colors.ENDC}")
             else:
                 print(
-                    f"No parser for serial_passthrough_response payload: {binascii.hexlify(parsed.payload)}"
+                    f"{Colors.RED}No parser for serial_passthrough_response payload: {binascii.hexlify(parsed.payload)}{Colors.ENDC}"
                 )
 
             if parsed_payload.fields.value.po.command == 0:  # panel detection
@@ -73,23 +84,32 @@ class PayloadParser:
             ram_address = parsed_payload.fields.value.address
             ram_parser = self.panel.get_message("RAMDataParserMap").get(ram_address)
             if ram_parser is not None:
-                print(ram_parser.parse(parsed_payload.fields.value.data))
+                print(f"{Colors.ON_WHITE}{ram_parser.parse(parsed_payload.fields.value.data)}{Colors.ENDC}")
             else:
                 print(
-                    f"No parser for {ram_address} ram address, data: {binascii.hexlify(parsed_payload.fields.value.data)}"
+                    f"{Colors.RED}No parser for {ram_address} ram address, data: {binascii.hexlify(parsed_payload.fields.value.data)}{Colors.ENDC}"
                 )
 
     def _parse_serial_passthrough_request(self, parsed):
         parsed_payload = self.panel.parse_message(parsed.payload)
         if parsed_payload is not None:
-            print(parsed_payload)
+            print(f"{Colors.ON_WHITE}{parsed_payload}{Colors.ENDC}")
         else:
             print(
-                f"No parser for serial_passthrough_request payload: {binascii.hexlify(parsed.payload)}"
+                f"{Colors.RED}No parser for serial_passthrough_request payload: {binascii.hexlify(parsed.payload)}{Colors.ENDC}"
             )
 
     def _parse_ip_request(self, parsed):
-        print(f"No parser for ip_request payload: {binascii.hexlify(parsed.payload)}")
+        print(f"{Colors.RED}No parser for ip_request payload: {binascii.hexlify(parsed.payload)}{Colors.ENDC}")
+        if parsed.header.command == IPMessageCommand.multicommand:
+            i = 0
+            while i < len(parsed.payload):
+                cmd_len = parsed.payload[i]
+                i+=1
+                cmd = parsed.payload[i:i+cmd_len]
+                assert len(cmd) == cmd_len
+                i += cmd_len
+                print(f"{Colors.ON_WHITE}{cmd}{Colors.ENDC}")
 
 
 def decrypt_file(file, password):
@@ -99,7 +119,8 @@ def decrypt_file(file, password):
 
         n = 0
         for key, value in data.items():
-            if not value[0] == 0xaa:  # not an IP packet
+            if not value[0] == 0xaa:
+                print(f"{Colors.RED}Not an IP packet: {value}{Colors.ENDC}")
                 continue
             header = value[0:16]
 
@@ -125,13 +146,14 @@ def decrypt_file(file, password):
                 assert len(password) == 16, "Wrong password length"
 
             print(
-                "PC->IP: " if "peer0_" in key else "IP->PC: ",
+                f"{Colors.BLUE}PC->IP: " if "peer0_" in key else f"{Colors.GREEN}IP->PC: ",
                 f"header: {binascii.hexlify(header)}",
                 f"body: {binascii.hexlify(parsed.payload)}",
-                f"body_raw: {parsed.payload}",
+                f"body_raw: {parsed.payload}"
             )
 
             print(parsed)
+            print(Colors.ENDC)
             parser.parse(parsed)
 
             if "peer1_" in key:
@@ -142,7 +164,7 @@ def decrypt_file(file, password):
             n += 1
 
     except yaml.YAMLError as exc:
-        print(exc)
+        print(f"{Colors.RED}{exc}{Colors.ENDC}")
 
 
 def main():
