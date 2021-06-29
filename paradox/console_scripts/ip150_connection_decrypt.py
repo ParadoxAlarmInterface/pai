@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import binascii
+import traceback
 from collections import OrderedDict
 
 import yaml
@@ -41,15 +42,18 @@ class PayloadParser:
         self.panel = create_panel(None)
 
     def parse(self, parsed):
-        message_type = parsed.header.message_type
-        if message_type == IPMessageType.serial_passthrough_request:
-            self._parse_serial_passthrough_request(parsed)
-        elif message_type == IPMessageType.serial_passthrough_response:
-            self._parse_serial_passthrough_response(parsed)
-        elif message_type == IPMessageType.ip_request:
-            self._parse_ip_request(parsed)
-        elif message_type == IPMessageType.ip_response:
-            self._parse_ip_response(parsed)
+        try:
+            message_type = parsed.header.message_type
+            if message_type == IPMessageType.serial_passthrough_request:
+                self._parse_serial_passthrough_request(parsed)
+            elif message_type == IPMessageType.serial_passthrough_response:
+                self._parse_serial_passthrough_response(parsed)
+            elif message_type == IPMessageType.ip_request:
+                self._parse_ip_request(parsed)
+            elif message_type == IPMessageType.ip_response:
+                self._parse_ip_response(parsed)
+        except Exception:
+            traceback.print_exc()
 
     def _parse_ip_response(self, parsed):
         if parsed.header.command == IPMessageCommand.connect:
@@ -100,16 +104,17 @@ class PayloadParser:
             )
 
     def _parse_ip_request(self, parsed):
-        print(f"{Colors.RED}No parser for ip_request payload: {binascii.hexlify(parsed.payload)}{Colors.ENDC}")
         if parsed.header.command == IPMessageCommand.multicommand:
             i = 0
             while i < len(parsed.payload):
                 cmd_len = parsed.payload[i]
-                i+=1
+                i += 1
                 cmd = parsed.payload[i:i+cmd_len]
                 assert len(cmd) == cmd_len
                 i += cmd_len
                 print(f"{Colors.ON_WHITE}{cmd}{Colors.ENDC}")
+        else:
+            print(f"{Colors.RED}No parser for ip_request payload: {binascii.hexlify(parsed.payload)}{Colors.ENDC}")
 
 
 def decrypt_file(file, password):
