@@ -99,6 +99,8 @@ def decrypt_file(file, password):
 
         n = 0
         for key, value in data.items():
+            if not value[0] == 0xaa:  # not an IP packet
+                continue
             header = value[0:16]
 
             if "peer0_" in key:
@@ -110,13 +112,17 @@ def decrypt_file(file, password):
                 parsed.header.command == IPMessageCommand.connect
                 and parsed.header.message_type == IPMessageType.ip_request
             ):
-                assert password == parsed.payload, "Wrong decryption password"
+                if parsed.header.sub_command == 0:
+                    assert password == parsed.payload, "Wrong decryption password"
+                elif parsed.header.sub_command == 3:
+                    assert parsed.payload[0] & 240 == 16  # Connection succeeded
 
             if (
                 parsed.header.command == IPMessageCommand.connect
                 and parsed.header.message_type == IPMessageType.ip_response
             ):
                 password = parsed.payload[1:17]
+                assert len(password) == 16, "Wrong password length"
 
             print(
                 "PC->IP: " if "peer0_" in key else "IP->PC: ",
