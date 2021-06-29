@@ -129,7 +129,8 @@ def decrypt_file(file, password):
                 continue
             header = value[0:16]
 
-            if "peer0_" in key:
+            is_request = header[3] in [3, 4]
+            if is_request:
                 parsed = IPMessageRequest.parse(value, password=password)
             else:
                 parsed = IPMessageResponse.parse(value, password=password)
@@ -151,7 +152,7 @@ def decrypt_file(file, password):
                 assert len(password) == 16, "Wrong password length"
 
             print(
-                f"{Colors.BLUE}PC->IP: " if "peer0_" in key else f"{Colors.GREEN}IP->PC: ",
+                f"{Colors.BLUE}PC->IP: " if is_request else f"{Colors.GREEN}IP->PC: ",
                 f"header: {binascii.hexlify(header)}",
                 f"body: {binascii.hexlify(parsed.payload)}",
                 f"body_raw: {parsed.payload}"
@@ -161,7 +162,7 @@ def decrypt_file(file, password):
             print(Colors.ENDC)
             parser.parse(parsed)
 
-            if "peer1_" in key:
+            if not is_request:
                 print(
                     "----end %s-------------------------------------------------------------"
                     % key
