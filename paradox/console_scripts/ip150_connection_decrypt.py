@@ -117,7 +117,7 @@ class PayloadParser:
             print(f"{Colors.RED}No parser for ip_request payload: {binascii.hexlify(parsed.payload)}{Colors.ENDC}")
 
 
-def decrypt_file(file, password):
+def decrypt_file(file, password, max_packets: int = None):
     try:
         data = ordered_load(file, yaml.loader.SafeLoader)
         parser = PayloadParser()
@@ -128,8 +128,15 @@ def decrypt_file(file, password):
                 print(f"{Colors.RED}Not an IP packet: {value}{Colors.ENDC}")
                 continue
             header = value[0:16]
+            payload = value[16:]
 
             is_request = header[3] in [3, 4]
+            print(
+                f"{Colors.BLUE}PC->IP: " if is_request else f"{Colors.GREEN}IP->PC:\n",
+                f"\theader: {binascii.hexlify(header)}\n",
+                f"\tencrypted_payload: {binascii.hexlify(payload)}",
+            )
+
             if is_request:
                 parsed = IPMessageRequest.parse(value, password=password)
             else:
@@ -141,7 +148,7 @@ def decrypt_file(file, password):
             ):
                 if parsed.header.sub_command == 0:
                     assert password == parsed.payload, "Wrong decryption password"
-                elif parsed.header.sub_command == 3:
+                if parsed.header.sub_command == 3:
                     assert parsed.payload[0] & 240 == 16  # Connection succeeded
 
             if (
@@ -152,10 +159,8 @@ def decrypt_file(file, password):
                 assert len(password) == 16, "Wrong password length"
 
             print(
-                f"{Colors.BLUE}PC->IP: " if is_request else f"{Colors.GREEN}IP->PC: ",
-                f"header: {binascii.hexlify(header)}",
-                f"body: {binascii.hexlify(parsed.payload)}",
-                f"body_raw: {parsed.payload}"
+                f"\tpayload: {binascii.hexlify(parsed.payload)}\n",
+                f"\tpayload_raw: {parsed.payload}"
             )
 
             print(parsed)
@@ -168,6 +173,10 @@ def decrypt_file(file, password):
                     % key
                 )
             n += 1
+
+            if max_packets is not None and n > max_packets:
+                print(f"Force stopped on {max_packets} packets")
+                return
 
     except yaml.YAMLError as exc:
         print(f"{Colors.RED}{exc}{Colors.ENDC}")
@@ -188,10 +197,16 @@ def main():
         default="paradox",
         help="IP Module password for decryption",
     )
+    parser.add_argument(
+        "-n",
+        "--packets",
+        type=int,
+        help="Packets to decrypt",
+    )
 
     args = parser.parse_args()
 
-    decrypt_file(args.file, args.password.encode("utf8"))
+    decrypt_file(args.file, args.password.encode("utf8"), args.packets)
 
 
 if __name__ == "__main__":
