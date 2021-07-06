@@ -10,6 +10,7 @@ from paradox.connections.ip.parsers import (IPMessageCommand, IPMessageRequest,
                                             IPMessageResponse, IPMessageType,
                                             IPPayloadConnectResponse)
 from paradox.hardware import create_panel
+from paradox.hardware.parsers import InitiateCommunicationResponse
 
 
 class Colors: # You may need to change color settings
@@ -45,7 +46,7 @@ class PayloadParser:
         try:
             message_type = parsed.header.message_type
             if message_type == IPMessageType.serial_passthrough_request:
-                self._parse_serial_passthrough_request(parsed)
+                self._parse_message(parsed.payload, "topanel")
             elif message_type == IPMessageType.serial_passthrough_response:
                 self._parse_serial_passthrough_response(parsed)
             elif message_type == IPMessageType.ip_request:
@@ -56,23 +57,29 @@ class PayloadParser:
             traceback.print_exc()
 
     def _parse_ip_response(self, parsed):
-        if parsed.header.command == IPMessageCommand.connect:
+        if parsed.header.command == IPMessageCommand.connect and parsed.header.sub_command == 0:
             print(f"{Colors.ON_WHITE}{IPPayloadConnectResponse.parse(parsed.payload)}{Colors.ENDC}")
+            if len(parsed.payload) > 25:
+                p = parsed.payload[25:62]
+                print(f"{Colors.ON_WHITE}InitiateCommunicationResponse:\n{InitiateCommunicationResponse.parse(p)}{Colors.ENDC}")
+        elif parsed.header.command == IPMessageCommand.multicommand:
+            self._parse_multicommand(parsed, "frompanel")
         else:
             print(
                 f"{Colors.RED}No parser for ip_response payload: {binascii.hexlify(parsed.payload)}{Colors.ENDC}"
             )
 
-    def _parse_serial_passthrough_response(self, parsed):
-        parsed_payload = self.panel.parse_message(parsed.payload, direction="frompanel")
-        if parsed_payload is not None:
-            if parsed_payload is not None:
-                print(f"{Colors.ON_WHITE}{parsed_payload}{Colors.ENDC}")
-            else:
-                print(
-                    f"{Colors.RED}No parser for serial_passthrough_response payload: {binascii.hexlify(parsed.payload)}{Colors.ENDC}"
-                )
+    def _parse_multicommand(self, parsed, direction):
+        if parsed.header.sub_command == 0x0:  # Generic multicommand
+            self._parse_generic_multicommand(parsed, direction)
+        elif parsed.header.sub_command == 0x1:  # MGSP multiread
+            pass
+        elif parsed.header.sub_command == 0xdd:  # Unified multiread
+            pass
 
+    def _parse_serial_passthrough_response(self, parsed):
+        parsed_payload = self._parse_message(parsed.payload, direction="frompanel")
+        if parsed_payload is not None:
             if parsed_payload.fields.value.po.command == 0:  # panel detection
                 self.panel = create_panel(None, parsed_payload)
             if parsed_payload.fields.value.po.command == 5:  # eeprom/ram read
@@ -94,27 +101,33 @@ class PayloadParser:
                     f"{Colors.RED}No parser for {ram_address} ram address, data: {binascii.hexlify(parsed_payload.fields.value.data)}{Colors.ENDC}"
                 )
 
-    def _parse_serial_passthrough_request(self, parsed):
-        parsed_payload = self.panel.parse_message(parsed.payload)
+    def _parse_ip_request(self, parsed):
+        if parsed.header.command == IPMessageCommand.multicommand:
+            self._parse_multicommand(parsed, "topanel")
+        else:
+            print(f"{Colors.RED}No parser for ip_request payload: {binascii.hexlify(parsed.payload)}{Colors.ENDC}")
+
+    def _parse_generic_multicommand(self, parsed, direction: str):
+        i = 0
+        while i < len(parsed.payload):
+            cmd_len = parsed.payload[i]
+            i += 1
+            cmd = parsed.payload[i:i + cmd_len]
+            assert len(cmd) == cmd_len
+            i += cmd_len
+            print(f"{Colors.ON_WHITE}Multicommand: {cmd}{Colors.ENDC}")
+
+            self._parse_message(cmd, direction)
+
+    def _parse_message(self, message, direction):
+        parsed_payload = self.panel.parse_message(message, direction)
         if parsed_payload is not None:
             print(f"{Colors.ON_WHITE}{parsed_payload}{Colors.ENDC}")
         else:
             print(
-                f"{Colors.RED}No parser for serial_passthrough_request payload: {binascii.hexlify(parsed.payload)}{Colors.ENDC}"
+                f"{Colors.RED}No parser for {direction} message payload: {binascii.hexlify(message)}{Colors.ENDC}"
             )
-
-    def _parse_ip_request(self, parsed):
-        if parsed.header.command == IPMessageCommand.multicommand:
-            i = 0
-            while i < len(parsed.payload):
-                cmd_len = parsed.payload[i]
-                i += 1
-                cmd = parsed.payload[i:i+cmd_len]
-                assert len(cmd) == cmd_len
-                i += cmd_len
-                print(f"{Colors.ON_WHITE}{cmd}{Colors.ENDC}")
-        else:
-            print(f"{Colors.RED}No parser for ip_request payload: {binascii.hexlify(parsed.payload)}{Colors.ENDC}")
+        return parsed_payload
 
 
 def decrypt_file(file, password, max_packets: int = None):
@@ -154,9 +167,11 @@ def decrypt_file(file, password, max_packets: int = None):
             if (
                 parsed.header.command == IPMessageCommand.connect
                 and parsed.header.message_type == IPMessageType.ip_response
+                and parsed.header.sub_command == 0
             ):
                 password = parsed.payload[1:17]
                 assert len(password) == 16, "Wrong password length"
+                print(f"{Colors.RED}Session password: {password}{Colors.ENDC}")
 
             print(
                 f"\tpayload: {binascii.hexlify(parsed.payload)}\n",
