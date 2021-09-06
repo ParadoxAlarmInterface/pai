@@ -73,7 +73,7 @@ class PayloadParser:
         if parsed.header.sub_command == 0x0:  # Generic multicommand
             self._parse_generic_multicommand(parsed, direction)
         elif parsed.header.sub_command == 0x1:  # MGSP multiread
-            pass
+            self._parse_generic_mgsp_multiread(parsed, direction)
         elif parsed.header.sub_command == 0xdd:  # Unified multiread
             pass
 
@@ -129,6 +129,11 @@ class PayloadParser:
             )
         return parsed_payload
 
+    def _parse_generic_mgsp_multiread(self, parsed, direction):
+        print(
+            f"{Colors.RED}No parser for {direction} mgsp_multiread{Colors.ENDC}"
+        )
+
 
 def decrypt_file(file, password, max_packets: int = None):
     try:
@@ -161,17 +166,24 @@ def decrypt_file(file, password, max_packets: int = None):
             ):
                 if parsed.header.sub_command == 0:
                     assert password == parsed.payload, "Wrong decryption password"
-                if parsed.header.sub_command == 3:
-                    assert parsed.payload[0] & 240 == 16  # Connection succeeded
+
 
             if (
                 parsed.header.command == IPMessageCommand.connect
                 and parsed.header.message_type == IPMessageType.ip_response
-                and parsed.header.sub_command == 0
             ):
-                password = parsed.payload[1:17]
-                assert len(password) == 16, "Wrong password length"
-                print(f"{Colors.RED}Session password: {password}{Colors.ENDC}")
+                if parsed.header.sub_command == 0:
+                    password = parsed.payload[1:17]
+                    assert len(password) == 16, "Wrong password length"
+                    print(f"{Colors.RED}Session password: {password}{Colors.ENDC}")
+                elif parsed.header.sub_command == 3:
+                    connection_result = parsed.payload[0] & 240
+                    if connection_result == 16:
+                        print(f"{Colors.RED}Successfully connected{Colors.ENDC}")
+                    elif connection_result == 112:
+                        print(f"{Colors.RED}Connection failed{Colors.ENDC}")
+                    else:
+                        print(f"{Colors.RED}Connected to unknown{Colors.ENDC}")
 
             print(
                 f"\tpayload: {binascii.hexlify(parsed.payload)}\n",
