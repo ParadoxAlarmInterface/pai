@@ -3,6 +3,7 @@ import os
 import sys
 import re
 
+
 class Config(object):
     DEFAULTS = {
         "LOGGING_LEVEL_CONSOLE": logging.INFO,  # See documentation of Logging package
@@ -276,80 +277,19 @@ class Config(object):
             + dir(super(Config, self))
         )
 
+    def __init__(self):
+        self._reset_defaults()
+
     def load(self, alt_location=None):
         self.CONFIG_LOADED = False
 
-        env_config_path = os.environ.get("PAI_CONFIG_FILE")
-
-        if alt_location is not None:
-            locations = [alt_location]
-        elif env_config_path:
-            locations = [env_config_path]
-        else:
-            filenames = ["pai.conf", "pai.json", "pai.yaml"]
-            locations = [
-                os.path.join(dir, filename)
-                for dir in [
-                    os.path.realpath(os.getcwd()),
-                    os.path.expanduser("~/.local/etc"),
-                    "/etc/pai",
-                    "/usr/local/etc/pai",
-                ]
-                for filename in filenames
-            ]
-
-        for location in locations:
-            location = os.path.expanduser(location)
-            if os.path.exists(location) and os.path.isfile(location):
-                self.CONFIG_FILE_LOCATION = location
-                break
-        else:
-            err = f"ERROR: Could not find configuration file. Tried: {locations}"
-            sys.stderr.write(err + "\n")
-            raise (Exception(err))
+        self._find_config(alt_location)
 
         sys.stdout.write(
             "Attempting to load configuration from %s\n" % self.CONFIG_FILE_LOCATION
         )
-
-        entries = {}
-        conf_extension = os.path.splitext(self.CONFIG_FILE_LOCATION)[1]
-        if conf_extension in [".conf", ".py"]:
-            with open(self.CONFIG_FILE_LOCATION) as f:
-                exec(f.read(), None, entries)
-        elif conf_extension in [".json"]:
-            import json
-
-            with open(self.CONFIG_FILE_LOCATION) as f:
-                entries = json.load(f)
-        elif conf_extension in [".yaml"]:
-            import yaml
-
-            with open(self.CONFIG_FILE_LOCATION) as f:
-                entries = yaml.safe_load(f)
-        else:
-            err = "ERROR: Unsupported configuration file type"
-            sys.stderr.write(err + "\n")
-            raise (Exception(err))
-
-        # Updates values from env variables
-        for args in os.environ:
-            if not args.startswith("PAI_") or len(args) < 5:
-                continue
-            opt = args[4:]
-            if opt in self.DEFAULTS:
-                v = os.environ[args]
-                if v.isdigit():
-                    v = int(v)
-
-                entries[opt] = v
-
-        # Reset defaults
-        for k, v in self.DEFAULTS.items():
-            if isinstance(v, tuple):
-                v = v[0]
-
-            setattr(self, k, v)
+        entries = self._read_config()
+        self._update_from_environment(entries)
 
         # Set values
         for k, v in entries.items():
@@ -401,6 +341,78 @@ class Config(object):
                         raise (Exception(err))
 
         self.CONFIG_LOADED = True
+
+    def _update_from_environment(self, entries):
+        # Updates values from env variables
+        for args in os.environ:
+            if not args.startswith("PAI_") or len(args) < 5:
+                continue
+            opt = args[4:]
+            if opt in self.DEFAULTS:
+                v = os.environ[args]
+                if v.isdigit():
+                    v = int(v)
+
+                entries[opt] = v
+
+    def _read_config(self):
+        entries = {}
+        conf_extension = os.path.splitext(self.CONFIG_FILE_LOCATION)[1]
+        if conf_extension in [".conf", ".py"]:
+            with open(self.CONFIG_FILE_LOCATION) as f:
+                exec(f.read(), None, entries)
+        elif conf_extension in [".json"]:
+            import json
+
+            with open(self.CONFIG_FILE_LOCATION) as f:
+                entries = json.load(f)
+        elif conf_extension in [".yaml"]:
+            import yaml
+
+            with open(self.CONFIG_FILE_LOCATION) as f:
+                entries = yaml.safe_load(f)
+        else:
+            err = "ERROR: Unsupported configuration file type"
+            sys.stderr.write(err + "\n")
+            raise (Exception(err))
+        return entries
+
+    def _find_config(self, alt_location):
+        env_config_path = os.environ.get("PAI_CONFIG_FILE")
+        if alt_location is not None:
+            locations = [alt_location]
+        elif env_config_path:
+            locations = [env_config_path]
+        else:
+            filenames = ["pai.conf", "pai.json", "pai.yaml"]
+            locations = [
+                os.path.join(dir, filename)
+                for dir in [
+                    os.path.realpath(os.getcwd()),
+                    os.path.expanduser("~/.local/etc"),
+                    "/etc/pai",
+                    "/usr/local/etc/pai",
+                ]
+                for filename in filenames
+            ]
+        for location in locations:
+            location = os.path.expanduser(location)
+            if os.path.exists(location) and os.path.isfile(location):
+                self.CONFIG_FILE_LOCATION = location
+                break
+        else:
+            err = f"ERROR: Could not find configuration file. Tried: {locations}"
+            sys.stderr.write(err + "\n")
+            raise (Exception(err))
+
+    def _reset_defaults(self):
+        # Reset defaults
+        for k, v in self.DEFAULTS.items():
+            if isinstance(v, tuple):
+                v = v[0]
+
+            setattr(self, k, v)
+
 
 config = Config()
 
