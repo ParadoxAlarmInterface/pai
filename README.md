@@ -32,7 +32,7 @@
 Middleware that aims to connect to a Paradox Alarm panel, exposing the interface for monitoring and control via several technologies.
 With this interface it is possible to integrate Paradox panels with HomeAssistant, OpenHAB, Homebridge or other domotics system that supports MQTT, as well as several IM methods.
 
-It supports MG/SP/EVO panels connected through a serial port, which is present in all panels (TTL 5V), or through a USB 307 module. It also supports connections using the IP150 module, both directly (firmware version < 4.0 or >= 4.40.004), and through the SITE ID (firmware versions >4.0).
+It supports MG/SP/EVO panels (firmwares below 7.50.000) connected through a serial port, which is present in all panels (TTL 5V), or through a USB 307 module. It also supports connections using the IP150 module, both directly (ip module firmware version < 4.0 or >= 4.40.004), and through the SITE ID (firmware versions >4.0).
 
 Support for Magellan, Spectra and EVO panels is very stable. If you find a bug, please report it.
 
