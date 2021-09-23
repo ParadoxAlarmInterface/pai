@@ -107,14 +107,7 @@ The code is provided AS IS and the developers will not be held responsible for f
 
 ## Donations
 
-João Paulo Barraca [@jpbarraca](https://github.com/jpbarraca) does not accept any donations.
-
-If you want to support Jevgeni Kiski [@yozik04](https://github.com/yozik04), click here:
-<a href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=LEEAKPRMN3W5E&currency_code=EUR&source=url">
-    <img alt="Paypal donation" src="https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif">
-</a>
-
-Raised money will be spent on different hardware required for PAI development.
+We have fully stopped accepting donations due to lack of free time to spend on this project.
 
 ## With support from
 
