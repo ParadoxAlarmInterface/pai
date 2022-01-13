@@ -16,7 +16,7 @@ def test_alarm_control_panel_serialize(mqtt_entity_factory):
     alarm_control_panel = mqtt_entity_factory.make_alarm_control_panel_config({"key": "Partition_1", "label": "Partition 1"})
     assert _serialize_deserialize(alarm_control_panel) == {
         'unique_id': 'paradox_1234abcd_partition_partition_1',
-        'name': 'Paradox 1234abcd Partition Partition 1',
+        'name': 'Partition Partition 1',
         'availability_topic': 'paradox/interface/availability',
         'state_topic': 'paradox/states/partitions/Partition_1/current_state',
         'command_topic': 'paradox/control/partitions/Partition_1',
@@ -34,7 +34,7 @@ def test_partition_binary_sensor_serialize(mqtt_entity_factory):
     binary_sensor = mqtt_entity_factory.make_partition_status_binary_sensor({"key": "Partition_1", "label": "Partition 1"}, "arm")
     assert _serialize_deserialize(binary_sensor) == {
         'unique_id': 'paradox_1234abcd_partition_partition_1_arm',
-        'name': 'Paradox 1234abcd Partition Partition 1 Arm',
+        'name': 'Partition Partition 1 Arm',
         'availability_topic': 'paradox/interface/availability',
         'state_topic': 'paradox/states/partitions/Partition_1/arm',
         'device': _get_expected_device_block(),
@@ -49,7 +49,7 @@ def test_zone_binary_sensor_serialize(mqtt_entity_factory):
     binary_sensor = mqtt_entity_factory.make_zone_status_binary_sensor({"key": "Zone_1", "label": "Zone 1"}, "open")
     assert _serialize_deserialize(binary_sensor) == {
         'unique_id': 'paradox_1234abcd_zone_zone_1_open',
-        'name': 'Paradox 1234abcd Zone Zone 1 Open',
+        'name': 'Zone Zone 1 Open',
         'availability_topic': 'paradox/interface/availability',
         'state_topic': 'paradox/states/zones/Zone_1/open',
         'device': _get_expected_device_block(),
@@ -65,7 +65,7 @@ def test_trouble_binary_sensor_serialize(mqtt_entity_factory):
     binary_sensor = mqtt_entity_factory.make_system_status("troubles", "ac_trouble")
     assert _serialize_deserialize(binary_sensor) == {
         'unique_id': 'paradox_1234abcd_system_troubles_ac_trouble',
-        'name': 'Paradox 1234abcd System troubles Ac Trouble',
+        'name': 'System troubles Ac Trouble',
         'availability_topic': 'paradox/interface/availability',
         'state_topic': 'paradox/states/system/troubles/ac_trouble',
         'device': _get_expected_device_block(),
@@ -80,7 +80,7 @@ def test_pai_status_sensor_serialize(mqtt_entity_factory):
     sensor = mqtt_entity_factory.make_pai_status_sensor("paradox/interface/pai_status")
     assert _serialize_deserialize(sensor) == {
         'unique_id': 'paradox_1234abcd_pai_status',
-        'name': 'Paradox 1234abcd PAI Status',
+        'name': 'PAI Status',
         'state_topic': 'paradox/interface/pai_status',
         'device': _get_expected_device_block()
     }
@@ -92,7 +92,7 @@ def test_run_system_status_sensor_serialize(mqtt_entity_factory):
     sensor = mqtt_entity_factory.make_system_status("power", "vdc")
     assert _serialize_deserialize(sensor) == {
         'unique_id': 'paradox_1234abcd_system_power_vdc',
-        'name': 'Paradox 1234abcd System Power Vdc',
+        'name': 'System Power Vdc',
         'availability_topic': 'paradox/interface/availability',
         'state_topic': 'paradox/states/system/power/vdc',
         'device': _get_expected_device_block(),
@@ -106,7 +106,7 @@ def test_pgm_switch_serialize(mqtt_entity_factory):
     sensor = mqtt_entity_factory.make_pgm_switch({"key": "PGM_1", "label": "PGM 1"})
     assert _serialize_deserialize(sensor) == {
         'unique_id': 'paradox_1234abcd_pgm_pgm_1_on',
-        'name': 'Paradox 1234abcd Pgm PGM 1 On',
+        'name': 'Pgm PGM 1 On',
         'availability_topic': 'paradox/interface/availability',
         'state_topic': 'paradox/states/outputs/PGM_1/on',
         'command_topic': 'paradox/control/outputs/PGM_1',
@@ -122,7 +122,7 @@ def test_zone_bypass_switch_serialize(mqtt_entity_factory):
     sensor = mqtt_entity_factory.make_zone_bypass_switch({"key": "Zone_1", "label": "Zone 1"})
     assert _serialize_deserialize(sensor) == {
         'unique_id': 'paradox_1234abcd_zone_zone_1_bypassed',
-        'name': 'Paradox 1234abcd Zone Zone 1 Bypassed',
+        'name': 'Zone Zone 1 Bypassed',
         'availability_topic': 'paradox/interface/availability',
         'state_topic': 'paradox/states/zones/Zone_1/bypassed',
         'command_topic': 'paradox/control/zones/Zone_1',

@@ -48,6 +48,11 @@ ProductIdEnum = Enum(
     MAGELLAN_MG5075=66,
 )
 
+FamilyIdEnum = Enum(
+    Int8ub,
+
+)
+
 SerialPrefixToPanelType = Enum(
     Int8ub,
     DIGIPLEX_EVO_48=0x03,
@@ -61,6 +66,7 @@ SerialPrefixToPanelType = Enum(
     SPECTRA_SP6000=0x29,
     SPECTRA_SP65=0x45,
     SPECTRA_SP7000=0x2a,
+    SPECTRA_UNIFIED=0x06,
 )
 
 CommunicationSourceIDEnum = Enum(

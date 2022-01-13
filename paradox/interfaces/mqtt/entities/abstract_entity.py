@@ -40,7 +40,7 @@ class AbstractEntity:
         return dict(
             availability_topic=self.availability_topic,
             device=self.device,
-            name=f'Paradox {self.device.serial_number} {self.entity_name}',
+            name=f'{self.entity_name}',
             unique_id=f'paradox_{self.device.serial_number}_{self.entity_id}',
             state_topic=self.state_topic,
         )

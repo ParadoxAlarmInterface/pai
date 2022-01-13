@@ -2,7 +2,7 @@ from construct import (BitsInteger, BitStruct, Bytes, Const, Default, Enum,
                        Flag, Int8ub, Int16ub, Nibble, Padding, RawCopy, Struct)
 
 from .common import (CommunicationSourceIDEnum, HexInt, PacketChecksum,
-                     PacketLength, ProductIdEnum)
+                     PacketLength, ProductIdEnum, FamilyIdEnum)
 
 InitiateCommunication = Struct(
     "fields"
@@ -25,7 +25,7 @@ InitiateCommunicationResponse = Struct(
             "protocol_id" / Int8ub,
             "protocol"
             / Struct("version" / Int8ub, "revision" / Int8ub, "build" / Int8ub),
-            "family_id" / Int8ub,
+            "family_id" / FamilyIdEnum,
             "product_id" / ProductIdEnum,
             "talker"
             / Enum(

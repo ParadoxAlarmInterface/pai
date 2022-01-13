@@ -55,7 +55,7 @@ async def test_hass(mocker):
         assert_any_call_with_json(interface.mqtt.publish,
             "homeassistant/sensor/aabbccdd/pai_status/config",
             {
-                "name": "Paradox aabbccdd PAI Status",
+                "name": "PAI Status",
                 "unique_id": "paradox_aabbccdd_pai_status",
                 "state_topic": "paradox/interface/pai_status",
                 "device": {
@@ -73,7 +73,7 @@ async def test_hass(mocker):
         assert_any_call_with_json(interface.mqtt.publish,
             "homeassistant/alarm_control_panel/aabbccdd/partition_partition_1/config",
             {
-                "name": "Paradox aabbccdd Partition Partition 1",
+                "name": "Partition Partition 1",
                 "unique_id": "paradox_aabbccdd_partition_partition_1",
                 "command_topic": "paradox/control/partitions/Partition_1",
                 "state_topic": "paradox/states/partitions/Partition_1/current_state",
