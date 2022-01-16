@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: CI
+name: Build and push dev branch
 
 # Controls when the workflow will run
 on:
@@ -38,5 +38,5 @@ jobs:
         with:
           context: .
           platforms: linux/386,linux/amd64,linux/arm/v6,linux/arm64/v8
-          push: false
+          push: true
           tags: paradoxalarminterface/pai:dev-latest
