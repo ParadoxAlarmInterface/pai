@@ -50,7 +50,7 @@ async def test_hass(mocker):
 
         sendMessage("status_update", status=dict(partition={1: dict(arm=False)}))
 
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.1)
 
         assert_any_call_with_json(interface.mqtt.publish,
             "homeassistant/sensor/aabbccdd/pai_status/config",
