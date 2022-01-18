@@ -10,7 +10,7 @@ on:
   pull_request:
     branches: 
       - dev
-  workflow_call:
+  workflow_dispatch:
 
 jobs:
   test:
