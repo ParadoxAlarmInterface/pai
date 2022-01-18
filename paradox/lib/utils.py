@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 import asyncio
-import collections
 import functools
 import json
 import re
 import threading
 import typing
+from collections.abc import Hashable
+
 from slugify import slugify
 
 from copy import deepcopy
@@ -117,7 +118,7 @@ class memoized(object):
         if args in self.cache:
             return self.cache[args]
         else:
-            if not isinstance(args, collections.Hashable):
+            if not isinstance(args, Hashable):
                 # uncacheable. a list, for instance.
                 # better to not cache than blow up.
                 return self.func(*args)
