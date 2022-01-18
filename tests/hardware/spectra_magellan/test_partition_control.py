@@ -5,6 +5,7 @@ import threading
 import typing
 
 import pytest
+import pytest_asyncio
 from construct import Container
 
 from paradox.config import config as cfg
@@ -97,7 +98,7 @@ class MockClient(threading.Thread):
         #     raise Exception(str(self.result))
 
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 async def setup_panel(mocker):
     mocker.patch.multiple(
         cfg, LOGGING_LEVEL_CONSOLE=logging.DEBUG, LOGGING_DUMP_PACKETS=True

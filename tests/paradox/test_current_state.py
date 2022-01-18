@@ -2,6 +2,7 @@ import asyncio
 import binascii
 
 import pytest
+import pytest_asyncio
 from mock import MagicMock
 
 from paradox.hardware.evo.parsers import LiveEvent
@@ -35,7 +36,7 @@ def send_initial_status(alarm):
     )
 
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 def alarm(mocker):
     mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_event_loop())
     # conn = mocker.patch("paradox.interfaces.mqtt.core.MQTTConnection")

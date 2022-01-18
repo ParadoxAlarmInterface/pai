@@ -1,6 +1,6 @@
 import json
 
-import pytest
+import pytest_asyncio
 
 from paradox.data.model import DetectedPanel
 from paradox.interfaces.mqtt.entities.device import Device
@@ -8,7 +8,7 @@ from paradox.interfaces.mqtt.entities.factory import MQTTAutodiscoveryEntityFact
 from paradox.lib.utils import SerializableToJSONEncoder
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 def mqtt_entity_factory():
     return MQTTAutodiscoveryEntityFactory("paradox/interface/availability", _make_device())
 

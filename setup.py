@@ -28,7 +28,7 @@ setup(
     setup_requires=["wheel"] + pytest_runner,
     tests_require=[
         "pytest",
-        "pytest-asyncio",
+        "pytest-asyncio>=0.17",
         "pytest-env",
         "pytest-mock",
         "mock",
