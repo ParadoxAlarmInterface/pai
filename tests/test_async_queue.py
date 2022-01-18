@@ -100,7 +100,7 @@ def test_handler_two_messages():
     # assert 2 == len(mh.handlers)
 
     loop.run_until_complete(
-        asyncio.gather(task_handle_wait, task_get_eeprom, loop=loop)
+        asyncio.gather(task_handle_wait, task_get_eeprom)
     )
 
     assert 1 == len(mh.handler_registry)
