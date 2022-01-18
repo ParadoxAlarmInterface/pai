@@ -1,17 +1,19 @@
-# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
-# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
-
 name: Test and Lint
 
 on:
   push:
-    branches: [ master, dev ]
+    branches:
+      - master
+      - dev
+    tags:
+      - '*'
   pull_request:
-    branches: [ master, dev ]
+    branches: 
+      - dev
+  workflow_call:
 
 jobs:
-  build:
-
+  test:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
