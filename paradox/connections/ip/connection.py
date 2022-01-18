@@ -40,7 +40,7 @@ class MultiAttemptConnection(Connection):
                 )
             except PAICriticalException:
                 raise
-            except Exception:
+            except Exception as e:
                 logger.exception(
                     "Unhandled exception while connecting (try %d/%d): %s"
                     % (tries, max_tries, str(e))
