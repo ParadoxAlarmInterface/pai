@@ -109,6 +109,7 @@ The code is provided AS IS and the developers will not be held responsible for f
 
 We have fully stopped accepting donations due to lack of free time to spend on this project.
 
-## With support from
+[//]: # (## With support from)
 
-<a href="https://www.jetbrains.com/?from=PAI-ParadoxAlarmInterface"><img src="/docs/jetbrains.svg" alt="JetBrains"/></a>
+[//]: # ()
+[//]: # (<a href="https://www.jetbrains.com/?from=PAI-ParadoxAlarmInterface"><img src="/docs/jetbrains.svg" alt="JetBrains"/></a>)
