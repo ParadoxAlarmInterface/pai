@@ -1,5 +1,6 @@
+from unittest.mock import AsyncMock
+
 import pytest
-from asynctest import CoroutineMock
 
 from paradox.connections.ip.connection import BareIPConnection
 from paradox.connections.protocols import ConnectionProtocol
@@ -12,7 +13,7 @@ async def test_connect(mocker):
     protocol = mocker.Mock(spec=ConnectionProtocol)
     protocol.is_active.return_value = True
 
-    create_connection_mock = CoroutineMock(return_value=(None, protocol))
+    create_connection_mock = AsyncMock(return_value=(None, protocol))
     mocker.patch.object(connection.loop, "create_connection", create_connection_mock)
 
     assert connection.connected is False

@@ -1,5 +1,6 @@
+from unittest.mock import AsyncMock
+
 import pytest
-from asynctest import CoroutineMock
 
 from paradox.hardware import Panel
 from paradox.paradox import Paradox
@@ -9,7 +10,7 @@ from paradox.paradox import Paradox
 async def test_send_panic(mocker):
     alarm = Paradox()
     alarm.panel = mocker.Mock(spec=Panel)
-    alarm.panel.send_panic = CoroutineMock()
+    alarm.panel.send_panic = AsyncMock()
 
     alarm.storage.get_container("partition").deep_merge(
         {1: {"id": 1, "key": "Partition 1"}}
@@ -28,7 +29,7 @@ async def test_send_panic(mocker):
 async def test_control_doors(mocker):
     alarm = Paradox()
     alarm.panel = mocker.Mock(spec=Panel)
-    alarm.panel.control_doors = CoroutineMock()
+    alarm.panel.control_doors = AsyncMock()
 
     alarm.storage.get_container("door").deep_merge({1: {"id": 1, "key": "Door 1"}})
 
