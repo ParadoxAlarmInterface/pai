@@ -1,0 +1,23 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  test:
+    name: Test
+    uses: ./.github/workflows/test.yml
+  publish_docker:
+    name: Publish to Docker Hub
+    uses: ./.github/workflows/publish_docker.yml
+    needs: test
+    with:
+      tag: ${{ github.event.release.tag_name }}
+  publish_pypi:
+    name: Publish to PyPI
+    uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
+    needs: test
+    with:
+      user: __token__
+      password: ${{ secrets.PYPI_API_TOKEN }}

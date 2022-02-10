@@ -1,0 +1,23 @@
+# This is a basic workflow to help you get started with Actions
+
+name: CI/CD dev
+
+on:
+  push:
+    branches: [ dev ]
+
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test
+    uses: ./.github/workflows/test.yml
+  publish:
+    name: Publish to Docker Hub
+    uses: ./.github/workflows/publish_docker.yml
+    needs: test
+    with:
+      tag: dev-latest
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
