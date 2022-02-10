@@ -16,8 +16,8 @@ jobs:
       tag: ${{ github.event.release.tag_name }}
   publish_pypi:
     name: Publish to PyPI
-    uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
+    uses: ./.github/workflows/publish_pypi.yml
     needs: test
-    with:
-      user: __token__
-      password: ${{ secrets.PYPI_API_TOKEN }}
+    secrets:
+      TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
+      TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
