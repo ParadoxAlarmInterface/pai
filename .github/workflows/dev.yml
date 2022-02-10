@@ -13,5 +13,6 @@ jobs:
     uses: ./.github/workflows/test.yml
   publish:
     uses: ./.github/workflows/publish_docker.yml
+    needs: test
     with:
       tag: dev-latest
