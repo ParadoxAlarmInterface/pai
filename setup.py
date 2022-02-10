@@ -24,7 +24,7 @@ setup(
     download_url=f"https://github.com/ParadoxAlarmInterface/pai/archive/{VERSION}.tar.gz",
     packages=find_packages(exclude=["tests", "tests.*", "config.*", "docs.*"]),
     install_requires=["construct~=2.9.43", "argparse>=1.4.0", "python-slugify>=4.0.1"],
-    python_requires=">=3.8",
+    python_requires=">=3.7",
     setup_requires=["wheel"] + pytest_runner,
     tests_require=[
         "pytest",
