@@ -200,7 +200,7 @@ class MQTTConnection():
         else:
             logger.error(f"Failed to connect to MQTT: {connack_string(result)} ({result})")
 
-    def _on_disconnect_cb(self, client, userdata, rc):
+    def _on_disconnect_cb(self, userdata, rc, properties=None):
         # called on Thread-6
         if rc == MQTT_ERR_SUCCESS:
             logger.info("MQTT Broker Disconnected")
@@ -208,7 +208,7 @@ class MQTTConnection():
             logger.error(f"MQTT Broker unexpectedly disconnected. Code: {rc}")
 
         self.state = ConnectionState.NEW
-        self._call_registars("on_disconnect", client, userdata, rc)
+        self._call_registars("on_disconnect", self.client, userdata, rc)
 
     def disconnect(self, reasoncode=None, properties=None):
         self.state = ConnectionState.DISCONNECTING
