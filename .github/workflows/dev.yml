@@ -10,8 +10,10 @@ on:
 
 jobs:
   test:
+    name: Test
     uses: ./.github/workflows/test.yml
   publish:
+    name: Publish to Docker Hub
     uses: ./.github/workflows/publish_docker.yml
     needs: test
     with:

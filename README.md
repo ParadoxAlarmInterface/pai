@@ -1,4 +1,4 @@
-<div align="left">
+<div align="center">
     <div style="display: flex;">
         <a href="https://gitter.im/paradox-alarm-interface/community">
             <img alt="Gitter" src="https://img.shields.io/gitter/room/paradox-alarm-interface/community?logo=gitter">
@@ -23,12 +23,16 @@
     </div>
 </div>
 
-# PAI - Paradox Alarm Interface
+<br/>
+<p align="center"> 
+<img src="https://github.com/ParadoxAlarmInterface/pai/raw/master/docs/pai_logo.png">
+</p>
+<h1 align="center">PAI - Paradox Alarm Interface</h1>
 
 Middleware that aims to connect to a Paradox Alarm panel, exposing the interface for monitoring and control via several technologies.
 With this interface it is possible to integrate Paradox panels with HomeAssistant, OpenHAB, Homebridge or other domotics system that supports MQTT, as well as several IM methods.
 
-It supports MG/SP/EVO panels connected through a serial port, which is present in all panels (TTL 5V), or through a USB 307 module. It also supports connections using the IP150 module, both directly (firmware version <4.0), and through the SITE ID (firmware versions >4.0).
+It supports MG/SP/EVO panels (firmwares below 7.50.000) connected through a serial port, which is present in all panels (TTL 5V), or through a USB 307 module. It also supports connections using the IP150 module, both directly (ip module firmware version < 4.0 or >= 4.40.004), and through the SITE ID (firmware versions >4.0).
 
 Support for Magellan, Spectra and EVO panels is very stable. If you find a bug, please report it.
 
@@ -41,7 +45,7 @@ On Android, if you install [MQTT Dash](https://play.google.com/store/apps/detail
 ![mqtt_dash](https://user-images.githubusercontent.com/497717/52603920-d4984d80-2e60-11e9-9772-578b10576b3c.jpg)
 
 ## Things you need to have to be able to connect
-We support two connection options: via Serial and via IP150 Module
+We support two [connection options](https://github.com/ParadoxAlarmInterface/pai/wiki/Connection-methods): via [Serial](https://github.com/ParadoxAlarmInterface/pai/wiki/Connection-methods#serial-connection) and via [IP150 Module](https://github.com/ParadoxAlarmInterface/pai/wiki/Connection-methods#ip-module-connection-IP100-IP150).
 
 #### For all connection methods
 - **PC Password:** 4 digit `[0-9a-f]` password.
@@ -51,6 +55,11 @@ Can be looked up in Babyware (_Right click on a panel ⇾ Properties ⇾ PC Comm
 ##### For IP150 firmware > 4.0 if you connect via Paradox Cloud (SWAN)
 - **SITE ID**
 - **Email registered in the site**
+
+We do not recommend using SWAN because of https://github.com/CriticalSecurity/paradox
+
+## Firmware Upgrade WARNING:
+**Do not upgrade EVO firmware versions to 7.50.000+ if you use Serial connection. Process is irreversible! Paradox introduces serial communication encryption which most probably will break our PAI ability to talk to the panel.**
 
 ## How to use
 See [wiki](https://github.com/ParadoxAlarmInterface/pai/wiki/Installation)
@@ -72,7 +81,7 @@ Tested in the following environment:
 
 * João Paulo Barraca - [@jpbarraca](https://github.com/jpbarraca) - Main code and MG/SP devices
 * Jevgeni Kiski - [@yozik04](https://github.com/yozik04) - Main code and EVO devices
-* Ion Darie - [@iondarie](https://github.com/iondarie) - Homebridge integration
+* Ion Darie - [@iondarie](https://github.com/iondarie) - PAI Logo, Homebridge integration, testing
 
 
 ## Acknowledgments
@@ -84,6 +93,8 @@ This work is inspired or uses parts from the following projects:
 
 ## Thanks
 * Ivan Markov - [@ivmarkov](https://github.com/ivmarkov) - Multi-platform Docker builds with Travis
+* Claudiu Bucur - [@clau-bucur](https://github.com/clau-bucur) - For fixing HomeAssistant plugin after Supervisor(2021.02.5) upgrade [#199](https://github.com/ParadoxAlarmInterface/pai/issues/199)
+* David Tekan - [@tekand](https://github.com/tekand) - For supporting different label encodings.
 
 ## Disclaimer
 
@@ -93,3 +104,12 @@ The code was developed as a way of integrating personally owned Paradox systems,
 It is not affiliated with any company and it doesn't have have commercial intent.
 
 The code is provided AS IS and the developers will not be held responsible for failures in the alarm systems, or any other malfunction.
+
+## Donations
+
+We have fully stopped accepting donations due to lack of free time to spend on this project.
+
+[//]: # (## With support from)
+
+[//]: # ()
+[//]: # (<a href="https://www.jetbrains.com/?from=PAI-ParadoxAlarmInterface"><img src="/docs/jetbrains.svg" alt="JetBrains"/></a>)
