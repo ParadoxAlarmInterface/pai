@@ -1,0 +1,23 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  test:
+    name: Test
+    uses: ./.github/workflows/test.yml
+  publish_docker:
+    name: Publish to Docker Hub
+    uses: ./.github/workflows/publish_docker.yml
+    needs: test
+    with:
+      tag: ${{ github.event.release.tag_name }}
+  publish_pypi:
+    name: Publish to PyPI
+    uses: ./.github/workflows/publish_pypi.yml
+    needs: test
+    secrets:
+      TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
+      TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
