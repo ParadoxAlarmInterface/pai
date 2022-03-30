@@ -88,7 +88,6 @@ async def test_wait_for_message(mocker):
 
 @pytest.mark.asyncio
 async def test_handler_exception(mocker):
-    loop = asyncio.get_event_loop()
     msg = Container(
         fields=Container(value=Container(po=Container(command=0xE), event_source=0xFF))
     )

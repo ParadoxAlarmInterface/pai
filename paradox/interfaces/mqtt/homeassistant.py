@@ -102,6 +102,8 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             
             # Publish individual entities
             for property_name in partition_status:
+                if property_name not in cfg.HOMEASSISTANT_PUBLISH_PARTITION_PROPERTIES:
+                    continue
                 partition_property_binary_sensor_config = self.entity_factory.make_partition_status_binary_sensor(partition, property_name)
                 self._publish_config(partition_property_binary_sensor_config)
 
@@ -114,6 +116,8 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
 
             # Publish Status
             for property_name in zone_status:
+                if property_name not in cfg.HOMEASSISTANT_PUBLISH_ZONE_PROPERTIES:
+                    continue
                 if property_name == "bypassed":
                     zone_status_binary_sensor = self.entity_factory.make_zone_bypass_switch(zone)
                 else:

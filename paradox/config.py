@@ -170,6 +170,14 @@ class Config(object):
             str,
             ["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"],
         ),
+        "HOMEASSISTANT_PUBLISH_PARTITION_PROPERTIES": [  # List of partition properties to publish
+            'target_state',
+            'current_state'
+        ],
+        "HOMEASSISTANT_PUBLISH_ZONE_PROPERTIES": [  # List of zone properties to publish
+            'open',
+            'tamper'
+        ],
         "HOMEASSISTANT_NOTIFICATIONS_IGNORE_EVENTS": [],  # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
         "HOMEASSISTANT_NOTIFICATIONS_ALLOW_EVENTS": [],  # Same as before but as a white list. Default is use EVENT_FILTERS
         "HOMEASSISTANT_NOTIFICATIONS_EVENT_FILTERS": [  # list of tags, property changes to include or exclude. See event.py for tag list
