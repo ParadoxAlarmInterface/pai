@@ -14,6 +14,9 @@ jobs:
     needs: test
     with:
       tag: ${{ github.event.release.tag_name }}
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
   publish_pypi:
     name: Publish to PyPI
     uses: ./.github/workflows/publish_pypi.yml
