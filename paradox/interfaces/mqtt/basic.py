@@ -439,7 +439,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         if cfg.MQTT_USE_NUMERIC_STATES:
             try:
                 publish_value = int(value)
-            except TypeError:
+            except (TypeError, ValueError):
                 logger.debug('Conversion int(%s) failed, use original value', value)
                 publish_value = value
         else:
