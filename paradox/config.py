@@ -73,6 +73,7 @@ class Config(object):
                 int,
                 (60, 0xFFFFFFFF)
         ), # Minimum time drift in seconds to initiate time sync
+        "PANEL_TIMEZONE": "",  # Panel use same timezone as pai host
         "PASSWORD": (
             None,
             [int, str, bytes, type(None)],
