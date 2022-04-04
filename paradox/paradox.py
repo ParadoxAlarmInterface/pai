@@ -246,12 +246,12 @@ class Paradox:
 
     async def sync_time(self):
         now = datetime.now().astimezone()
-        if cfg.PANEL_TIMEZONE:
+        if cfg.SYNC_TIME_TIMEZONE:
             try:
-                tzinfo = pytz.timezone(cfg.PANEL_TIMEZONE)
+                tzinfo = pytz.timezone(cfg.SYNC_TIME_TIMEZONE)
                 now = now.astimezone(tzinfo)
             except pytz.exceptions.UnknownTimeZoneError:
-                logger.debug(f"Panel Timezone Unknown ('{cfg.PANEL_TIMEZONE}'). Skipping sync")
+                logger.debug(f"Panel Timezone Unknown ('{cfg.SYNC_TIME_TIMEZONE}'). Skipping sync")
                 return
 
         if not self._is_time_sync_required(now.replace(tzinfo=None)):
