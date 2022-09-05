@@ -104,3 +104,6 @@ ENV/
 /config/*.yaml
 /eeprom.bin
 /ram.bin
+
+# OS X
+.DS_Store
