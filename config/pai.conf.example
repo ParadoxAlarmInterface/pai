@@ -149,7 +149,7 @@ import logging
 ## Event filtering by tags:
 # HOMEASSISTANT_NOTIFICATIONS_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
 #     'live,alarm,-restore', # or
-#     'live,trouble,-clock', # or
+#     'trouble,-clock', # or
 #     'live,tamper'
 # ]
 ## - OR - event filtering using regexp. Cannot be used together with _EVENT_FILTERS
@@ -167,7 +167,7 @@ import logging
 ## Event filtering by tags:
 # PUSHBULLET_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
 #     'live,alarm,-restore', # or
-#     'live,trouble,-clock', # or
+#     'trouble,-clock', # or
 #     'live,tamper'
 # ]
 ## - OR - event filtering using regexp. Cannot be used together with _EVENT_FILTERS
@@ -189,7 +189,7 @@ import logging
 ## Event filtering by tags:
 # PUSHOVER_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
 #     'live,alarm,-restore', # or
-#     'live,trouble,-clock', # or
+#     'trouble,-clock', # or
 #     'live,tamper'
 # ]
 ## - OR - event filtering using regexp. Cannot be used together with _EVENT_FILTERS
@@ -208,7 +208,7 @@ import logging
 ## Event filtering by tags:
 # SIGNAL_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
 #     'live,alarm,-restore', # or
-#     'live,trouble,-clock', # or
+#     'trouble,-clock', # or
 #     'live,tamper'
 # ]
 ## - OR - event filtering using regexp. Cannot be used together with _EVENT_FILTERS
