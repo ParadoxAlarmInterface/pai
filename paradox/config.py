@@ -71,8 +71,9 @@ class Config(object):
         "SYNC_TIME_MIN_DRIFT": (
                 120,
                 int,
-                (60, 0xFFFFFFFF)
+                (120, 0xFFFFFFFF)
         ), # Minimum time drift in seconds to initiate time sync
+        "SYNC_TIME_TIMEZONE": "",  # By default pai uses the same timezone as pai host
         "PASSWORD": (
             None,
             [int, str, bytes, type(None)],
@@ -182,7 +183,7 @@ class Config(object):
         "HOMEASSISTANT_NOTIFICATIONS_ALLOW_EVENTS": [],  # Same as before but as a white list. Default is use EVENT_FILTERS
         "HOMEASSISTANT_NOTIFICATIONS_EVENT_FILTERS": [  # list of tags, property changes to include or exclude. See event.py for tag list
             "live,alarm,-restore",
-            "live,trouble,-clock",
+            "trouble,-clock",
             "live,tamper",
         ],
         # Pushbullet
@@ -194,7 +195,7 @@ class Config(object):
         "PUSHBULLET_ALLOW_EVENTS": [],  # Same as before but as a white list. Default is use EVENT_FILTERS
         "PUSHBULLET_EVENT_FILTERS": [  # list of tags, property changes to include or exclude. See event.py for tag list
             "live,alarm,-restore",
-            "live,trouble,-clock",
+            "trouble,-clock",
             "live,tamper",
         ],
         "PUSHBULLET_MIN_EVENT_LEVEL": (
@@ -212,7 +213,7 @@ class Config(object):
         "PUSHOVER_ALLOW_EVENTS": [],  # Same as before but as a white list. Default is use EVENT_FILTERS
         "PUSHOVER_EVENT_FILTERS": [  # list of tags, property changes to include or exclude. See event.py for tag list
             "live,alarm,-restore",
-            "live,trouble,-clock",
+            "trouble,-clock",
             "live,tamper",
         ],
         "PUSHOVER_MIN_EVENT_LEVEL": (
@@ -227,7 +228,7 @@ class Config(object):
         "SIGNAL_ALLOW_EVENTS": [],  # Same as before but as a white list. Default is use EVENT_FILTERS
         "SIGNAL_EVENT_FILTERS": [  # list of tags, property changes to include or exclude. See event.py for tag list
             "live,alarm,-restore",
-            "live,trouble,-clock",
+            "trouble,-clock",
             "live,tamper",
         ],
         "SIGNAL_MIN_EVENT_LEVEL": (

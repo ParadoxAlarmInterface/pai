@@ -27,7 +27,7 @@ def get_format(level):
         return "%(asctime)s - %(levelname)-8s - %(name)s - %(message)s"
 
 
-def config_logger(logger):
+def configure_logger(logger):
     logger_level = cfg.LOGGING_LEVEL_CONSOLE
 
     if cfg.LOGGING_FILE:
@@ -119,7 +119,7 @@ def main(args):
     else:
         cfg.load()
 
-    config_logger(logger)
+    configure_logger(logger)
 
     logger.info(f"Starting Paradox Alarm Interface {VERSION}")
     logger.info(f"Config loaded from {cfg.CONFIG_FILE_LOCATION}")

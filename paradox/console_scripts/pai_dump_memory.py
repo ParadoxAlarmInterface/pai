@@ -16,6 +16,7 @@ import sys
 
 from paradox.config import config as cfg
 from paradox.lib import help
+from paradox.lib.encodings import register_encodings
 from paradox.paradox import Paradox
 
 if sys.version_info < (3, 6,):
@@ -73,6 +74,9 @@ def main():
         cfg.load(config_file)
     else:
         cfg.load()
+
+    # Registering additional encodings
+    register_encodings()
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(dump_memory(args.file, args.type))

@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import time
+import pytz
 from binascii import hexlify
 from datetime import datetime
 from typing import Callable, Iterable, Optional, Sequence
@@ -244,18 +245,28 @@ class Paradox:
             )
 
     async def sync_time(self):
-        logger.debug("Synchronizing panel time")
+        now = datetime.now().astimezone()
+        if cfg.SYNC_TIME_TIMEZONE:
+            try:
+                tzinfo = pytz.timezone(cfg.SYNC_TIME_TIMEZONE)
+                now = now.astimezone(tzinfo)
+            except pytz.exceptions.UnknownTimeZoneError:
+                logger.debug(f"Panel Timezone Unknown ('{cfg.SYNC_TIME_TIMEZONE}'). Skipping sync")
+                return
 
-        now = time.localtime()
+        if not self._is_time_sync_required(now.replace(tzinfo=None)):
+            return
+
         args = dict(
-            century=int(now.tm_year / 100),
-            year=int(now.tm_year % 100),
-            month=now.tm_mon,
-            day=now.tm_mday,
-            hour=now.tm_hour,
-            minute=now.tm_min,
+            century=int(now.year / 100),
+            year=int(now.year % 100),
+            month=now.month,
+            day=now.day,
+            hour=now.hour,
+            minute=now.minute,
         )
 
+        logger.debug("Synchronizing panel time")
         reply = await self.send_wait(
             self.panel.get_message("SetTimeDate"), args, reply_expected=0x03, timeout=10
         )
@@ -713,8 +724,7 @@ class Paradox:
         self._update_partition_states()
 
         if cfg.SYNC_TIME:
-            if self._check_if_time_sync_required():
-                self.work_loop.create_task(self.sync_time())
+            self.work_loop.create_task(self.sync_time())
 
     def _process_trouble_statuses(self, trouble_statuses):
         global_trouble = False
@@ -733,20 +743,21 @@ class Paradox:
             "system", "troubles", {"trouble": global_trouble}
         )
 
-    def _check_if_time_sync_required(self):
+    def _is_time_sync_required(self, now) -> bool:
+        assert now.tzinfo is None
         try:
-            drift = (
-                datetime.now() - self.storage.get_container("system")["date"]["time"]
-            ).total_seconds()
+           drift = (now - self.storage.get_container("system")["date"]["time"]).total_seconds()
 
-            if abs(drift) > cfg.SYNC_TIME_MIN_DRIFT:
-                logger.info(f"Time drifted more than allowed: {drift} seconds")
-                return True
-            else:
-                logger.debug(f"Time drifted within allowed range: {drift} seconds")
+           if abs(drift) > cfg.SYNC_TIME_MIN_DRIFT:
+              logger.info(f"Time drifted more than allowed: {drift} seconds")
+              return True
+           else:
+              logger.debug(f"Time drifted within allowed range: {drift} seconds")
 
         except KeyError:
-            return False
+            pass
+
+        return False
 
     def _update_partition_states(self):
         """

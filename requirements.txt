@@ -5,6 +5,7 @@ require-python-3
 construct~=2.9.43
 argparse>=1.4.0
 python-slugify>=4.0.1
+pytz>=2021.3
 #
 # Optional
 #

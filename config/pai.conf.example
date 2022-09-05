@@ -56,6 +56,7 @@ import logging
 # OUTPUT_PULSE_DURATION = 1               # Duration of a PGM pulse in seconds
 # SYNC_TIME = False    			# Update panel time periodically when time drifts more than SYNC_TIME_MIN_DRIFT
 # SYNC_TIME_MIN_DRIFT = 60    	# Minimum time drift in seconds to initiate time sync
+# SYNC_TIME_TIMEZONE=''             # Timezone used for panel time synchronisation. PAI host timezone is used by default
 # PASSWORD = '0000'   			# PC Password. Set to None if Panel has no Password.
 #                                 # In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) ->
 #                                 # PC Communication (Babyware) Tab.
@@ -149,7 +150,7 @@ import logging
 ## Event filtering by tags:
 # HOMEASSISTANT_NOTIFICATIONS_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
 #     'live,alarm,-restore', # or
-#     'live,trouble,-clock', # or
+#     'trouble,-clock', # or
 #     'live,tamper'
 # ]
 ## - OR - event filtering using regexp. Cannot be used together with _EVENT_FILTERS
@@ -167,7 +168,7 @@ import logging
 ## Event filtering by tags:
 # PUSHBULLET_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
 #     'live,alarm,-restore', # or
-#     'live,trouble,-clock', # or
+#     'trouble,-clock', # or
 #     'live,tamper'
 # ]
 ## - OR - event filtering using regexp. Cannot be used together with _EVENT_FILTERS
@@ -189,7 +190,7 @@ import logging
 ## Event filtering by tags:
 # PUSHOVER_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
 #     'live,alarm,-restore', # or
-#     'live,trouble,-clock', # or
+#     'trouble,-clock', # or
 #     'live,tamper'
 # ]
 ## - OR - event filtering using regexp. Cannot be used together with _EVENT_FILTERS
@@ -208,7 +209,7 @@ import logging
 ## Event filtering by tags:
 # SIGNAL_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
 #     'live,alarm,-restore', # or
-#     'live,trouble,-clock', # or
+#     'trouble,-clock', # or
 #     'live,tamper'
 # ]
 ## - OR - event filtering using regexp. Cannot be used together with _EVENT_FILTERS
