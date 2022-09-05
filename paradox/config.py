@@ -71,8 +71,9 @@ class Config(object):
         "SYNC_TIME_MIN_DRIFT": (
                 120,
                 int,
-                (60, 0xFFFFFFFF)
+                (120, 0xFFFFFFFF)
         ), # Minimum time drift in seconds to initiate time sync
+        "SYNC_TIME_TIMEZONE": "",  # By default pai uses the same timezone as pai host
         "PASSWORD": (
             None,
             [int, str, bytes, type(None)],
