@@ -26,7 +26,7 @@ import logging
 #
 ### Serial Connection Details
 # SERIAL_PORT = '/dev/ttyS1' 		# Pathname of the Serial Port
-# SERIAL_BAUD = 9600              # 9600 for SP/MG. For EVO: Use 38400(default setting) or 57600
+# SERIAL_BAUD = 9600              # 9600 for SP/MG. For EVO: Use 38400(default setting) or 57600. 115200 for SP6000+
 #
 ### IP Connection Details
 # IP_CONNECTION_HOST = '127.0.0.1'	# IP Module address when using direct IP Connection
