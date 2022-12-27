@@ -1,6 +1,6 @@
 import binascii
 
-from mock import MagicMock, call
+from unittest.mock import MagicMock, call
 
 from paradox.connections.serial_connection import SerialConnectionProtocol
 

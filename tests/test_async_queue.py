@@ -1,7 +1,7 @@
 import asyncio
 import binascii
 
-import mock
+from unittest import mock
 import pytest
 from construct import Container
 

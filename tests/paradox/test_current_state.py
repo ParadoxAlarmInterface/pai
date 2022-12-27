@@ -3,7 +3,7 @@ import binascii
 
 import pytest
 import pytest_asyncio
-from mock import MagicMock
+from unittest.mock import MagicMock
 
 from paradox.hardware.evo.parsers import LiveEvent
 from paradox.paradox import Paradox
