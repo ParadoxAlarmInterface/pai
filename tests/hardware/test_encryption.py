@@ -20,7 +20,8 @@ Encrypted = Struct(
             "source" / Const(0xFE, Int8ub),
             "length" / PacketLength(Int8ub),
             "_not_used0" / Bytes(1),
-            "data" / Bytes(lambda this: this.length - 6)
+            "request_nr" / Int8ub,
+            "data" / Bytes(lambda this: this.length - 7)
         )
     ),
     "checksum"
@@ -74,8 +75,8 @@ Encrypted = Struct(
 def test_parse(payload_hex: str):
     payload = bytes.fromhex(payload_hex)
     data = Encrypted.parse(payload)
-    print(f"Expected length: {len(payload[4:-2])}, actual length: {len(data.fields.value.data)}")
-    assert data.fields.value.data == payload[4:-2]
+    print(f"Expected length: {len(payload[5:-2])}, actual length: {len(data.fields.value.data)}")
+    assert data.fields.value.data == payload[5:-2]
     print(data)
 
 # def test_payload_decryption():
