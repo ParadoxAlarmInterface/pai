@@ -106,7 +106,7 @@ class Panel(PanelBase):
             reply = await self.core.send_wait(
                 parsers.ReadEEPROM,
                 args,
-                reply_expected=lambda m: m.fields.value.po.command == 0x05
+                reply_expected=lambda m: m.fields.value.po.command == 0x5
                 and m.fields.value.address == address,
             )
 
@@ -156,20 +156,20 @@ class Panel(PanelBase):
                     return parsers.InitializeCommunicationResponse.parse(message)
                 elif message[0] >> 4 == 0x7 and message[-5] == 0:
                     return parsers.ErrorMessage.parse(message)
-                elif message[0] >> 4 == 0x03:
+                elif message[0] >> 4 == 0x3:
                     return parsers.SetTimeDateResponse.parse(message)
-                elif message[0] >> 4 == 0x04:
+                elif message[0] >> 4 == 0x4:
                     return parsers.PerformActionResponse.parse(message)
-                elif message[0] >> 4 == 0x05 and message[2] == 0x80:
+                elif message[0] >> 4 == 0x5 and message[2] == 0x80:
                     return parsers.ReadStatusResponse.parse(message)
-                elif message[0] >> 4 == 0x05 and message[2] < 0x80:
+                elif message[0] >> 4 == 0x5 and message[2] < 0x80:
                     return parsers.ReadEEPROMResponse.parse(message)
 
                 #        elif message[0] == 0x60 and message[2] < 0x80:
                 #            return WriteEEPROM.parse(message)
-                #        elif message[0] >> 4 == 0x06 and message[2] < 0x80:
+                #        elif message[0] >> 4 == 0x6 and message[2] < 0x80:
                 #            return WriteEEPROMResponse.parse(message)
-                elif message[0] >> 4 == 0x0E:
+                elif message[0] >> 4 == 0xE:
                     return parsers.LiveEvent.parse(message)
 
         except ChecksumError as e:
@@ -220,7 +220,7 @@ class Panel(PanelBase):
     def _request_status_reply_check(message: Container, address: int):
         mvars = message.fields.value
 
-        if mvars.po.command == 0x05 and mvars.address == address:
+        if mvars.po.command == 0x5 and mvars.address == address:
             return True
 
         return False
@@ -253,7 +253,7 @@ class Panel(PanelBase):
         for zone in zones:
             args = dict(action=ZONE_ACTIONS[command], argument=(zone - 1))
             reply = await self.core.send_wait(
-                parsers.PerformAction, args, reply_expected=0x04
+                parsers.PerformAction, args, reply_expected=0x4
             )
 
             if reply is not None:
@@ -276,7 +276,7 @@ class Panel(PanelBase):
         for partition in partitions:
             args = dict(action=PARTITION_ACTIONS[command], argument=(partition - 1))
             reply = await self.core.send_wait(
-                parsers.PerformAction, args, reply_expected=0x04
+                parsers.PerformAction, args, reply_expected=0x4
             )
 
             if reply is not None:
@@ -300,7 +300,7 @@ class Panel(PanelBase):
             if command == "pulse":
                 args = dict(action=PGM_ACTIONS["on"], argument=(output - 1))
                 reply = await self.core.send_wait(
-                    parsers.PerformAction, args, reply_expected=0x04
+                    parsers.PerformAction, args, reply_expected=0x4
                 )
                 if reply is None:
                     continue
@@ -308,14 +308,14 @@ class Panel(PanelBase):
                 await asyncio.sleep(cfg.OUTPUT_PULSE_DURATION)
                 args = dict(action=PGM_ACTIONS["off"], argument=(output - 1))
                 reply = await self.core.send_wait(
-                    parsers.PerformAction, args, reply_expected=0x04
+                    parsers.PerformAction, args, reply_expected=0x4
                 )
                 if reply is not None:
                     accepted = True
             else:
                 args = dict(action=PGM_ACTIONS[command], argument=(output - 1))
                 reply = await self.core.send_wait(
-                    parsers.PerformAction, args, reply_expected=0x04
+                    parsers.PerformAction, args, reply_expected=0x4
                 )
                 if reply is not None:
                     accepted = True
@@ -328,7 +328,7 @@ class Panel(PanelBase):
         args = {"partitions": partitions, "panic_type": panic_type, "user_id": user_id}
 
         reply = await self.core.send_wait(
-            parsers.SendPanicAction, args, reply_expected=0x04
+            parsers.SendPanicAction, args, reply_expected=0x4
         )
 
         if reply is not None:
