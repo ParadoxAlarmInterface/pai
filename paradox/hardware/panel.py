@@ -214,7 +214,7 @@ class Panel:
         reply = await self.core.send_wait(
             self.get_message("ReadEEPROM"),
             args,
-            reply_expected=lambda m: m.fields.value.po.command == 0x05
+            reply_expected=lambda m: m.fields.value.po.command == 0x5
             and m.fields.value.address == address,
         )
 

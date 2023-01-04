@@ -140,7 +140,7 @@ class Paradox:
             initiate_reply = await self.send_wait(
                 self.panel.get_message("InitiateCommunication"),
                 None,
-                reply_expected=0x07,
+                reply_expected=0x7
             )
 
             if initiate_reply:
@@ -165,8 +165,8 @@ class Paradox:
             logger.info("Initiating panel connection")
             reply = await self.send_wait(
                 self.panel.get_message("StartCommunication"),
-                args=dict(source_id=0x02),
-                reply_expected=0x00,
+                args=dict(source_id=0x2),
+                reply_expected=0x0,
             )
 
             if reply is None:
@@ -268,7 +268,7 @@ class Paradox:
 
         logger.debug("Synchronizing panel time")
         reply = await self.send_wait(
-            self.panel.get_message("SetTimeDate"), args, reply_expected=0x03, timeout=10
+            self.panel.get_message("SetTimeDate"), args, reply_expected=0x3, timeout=10
         )
         if reply is None:
             logger.warning("Could not set panel time")

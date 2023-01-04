@@ -82,7 +82,7 @@ class Panel_EVOBase(PanelBase):
             reply = await self.core.send_wait(
                 parsers.ReadEEPROM,
                 args,
-                reply_expected=lambda m: m.fields.value.po.command == 0x05
+                reply_expected=lambda m: m.fields.value.po.command == 0x5
                 and m.fields.value.address == address,
             )
 
@@ -121,7 +121,7 @@ class Panel_EVOBase(PanelBase):
                     return parsers.ErrorMessage.parse(message)
                 elif message[0] >> 4 == 0x1:
                     return parsers.LoginConfirmationResponse.parse(message)
-                elif message[0] >> 4 == 0x03:
+                elif message[0] >> 4 == 0x3:
                     return parsers.SetTimeDateResponse.parse(message)
                 elif message[0] >> 4 == 4:  # Used for partitions and PGMs
                     return parsers.PerformActionResponse.parse(message)
@@ -134,13 +134,13 @@ class Panel_EVOBase(PanelBase):
                 # elif message[0] >> 4 == 0x05 and message[2] == 0x80:
                 #     return PanelStatusResponse[message[3]].parse(message)
                 # elif message[0] >> 4 == 0x05 and message[2] < 0x80:
-                elif message[0] >> 4 == 0x05:
+                elif message[0] >> 4 == 0x5:
                     return parsers.ReadEEPROMResponse.parse(message)
                 # elif message[0] == 0x60 and message[2] < 0x80:
                 #     return WriteEEPROM.parse(message)
                 # elif message[0] >> 4 == 0x06 and message[2] < 0x80:
                 #     return WriteEEPROMResponse.parse(message)
-                elif message[0] >> 4 == 0x0E:
+                elif message[0] >> 4 == 0xE:
                     if message[1] == 0xFF:
                         return parsers.LiveEvent.parse(message)
                     else:
@@ -227,7 +227,7 @@ class Panel_EVOBase(PanelBase):
 
         try:
             reply = await self.core.send_wait(
-                parsers.PerformPartitionAction, args, reply_expected=0x04
+                parsers.PerformPartitionAction, args, reply_expected=0x4
             )
         except MappingError:
             logger.error('Partition command: "%s" is not supported' % command)
@@ -278,7 +278,7 @@ class Panel_EVOBase(PanelBase):
 
         try:
             reply = await self.core.send_wait(
-                parsers.PerformPGMAction, args, reply_expected=0x04
+                parsers.PerformPGMAction, args, reply_expected=0x4
             )
         except MappingError:
             logger.error('PGM command: "%s" is not supported' % command)
@@ -302,7 +302,7 @@ class Panel_EVOBase(PanelBase):
 
         try:
             reply = await self.core.send_wait(
-                parsers.PerformDoorAction, args, reply_expected=0x04
+                parsers.PerformDoorAction, args, reply_expected=0x4
             )
         except MappingError:
             logger.error('Door command: "%s" is not supported' % command)
@@ -320,7 +320,7 @@ class Panel_EVOBase(PanelBase):
         args = {"partitions": partitions, "panic_type": panic_type, "user_id": user_id}
 
         reply = await self.core.send_wait(
-            parsers.SendPanicAction, args, reply_expected=0x04
+            parsers.SendPanicAction, args, reply_expected=0x4
         )
 
         if reply is not None:
