@@ -36,7 +36,7 @@ class Panel:
         if message is None or len(message) == 0:
             return None
 
-        if message[0] == 0xE0 and message[1] == 0xFE:
+        if message[0] >> 4 == 0xE and message[1] == 0xFE:
             return parsers.Encrypted.parse(message)
 
         if direction == "topanel":
