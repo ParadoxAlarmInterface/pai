@@ -1,16 +1,33 @@
-# -*- coding: utf-8 -*-
-
 import datetime
 
-from construct import (Adapter, Array, BitsInteger, BitStruct, Bitwise, Bytes,
-                       ByteSwapped, Bytewise, Computed, Construct, Container,
-                       Default, ExprSymmetricAdapter, Flag, Int24ub,
-                       ListContainer, Struct, Subconstruct, SymmetricAdapter,
-                       obj_, this)
+from construct import (
+    Adapter,
+    Array,
+    BitsInteger,
+    BitStruct,
+    Bitwise,
+    Bytes,
+    ByteSwapped,
+    Bytewise,
+    Computed,
+    Construct,
+    Container,
+    Default,
+    ExprSymmetricAdapter,
+    Flag,
+    Int24ub,
+    ListContainer,
+    Struct,
+    Subconstruct,
+    this,
+)
 
 
 class DateAdapter(Adapter):
     def _decode(self, obj, context, path):
+        if obj[2] == 0:
+            return None
+
         return datetime.datetime(
             obj[0] * 100 + obj[1],
             obj[2],
@@ -38,7 +55,7 @@ class DateAdapter(Adapter):
 
 class DictArray(Adapter):
     def __init__(self, count, first_index, subcon, pick_key: str = None):
-        super(DictArray, self).__init__(Array(count, subcon))
+        super().__init__(Array(count, subcon))
         self._first_index = first_index
         self._pick_key = pick_key
 
@@ -77,7 +94,7 @@ class DictArray(Adapter):
 
 class EnumerationAdapter(Subconstruct):
     def __init__(self, subcon):
-        super(EnumerationAdapter, self).__init__(subcon)
+        super().__init__(subcon)
 
         def find_count(s):
             if hasattr(s, "count"):
@@ -88,7 +105,7 @@ class EnumerationAdapter(Subconstruct):
         self.size = find_count(subcon)
 
     def _build(self, obj, stream, context, path):
-        zones = list([i in obj for i in range(1, self.size + 1)])
+        zones = list(i in obj for i in range(1, self.size + 1))
 
         return self.subcon._build(zones, stream, context, path)
 
@@ -154,7 +171,7 @@ def PGMFlags(count, start_index_from=1):
                 "disabled"
                 / ExprSymmetricAdapter(
                     Default(Flag, False), lambda obj, ctx: not obj
-                ),  #  False when a relay is assigned
+                ),  # False when a relay is assigned
                 "_unknown2" / BitsInteger(2),
                 "timer_active" / Default(Flag, False),  # when timer is active
                 "on" / Default(Flag, False),  # when is activated
@@ -237,7 +254,7 @@ class PartitionStatus(Subconstruct):
         else:
             self.size = subcons_or_size
             subcons = Bytes(subcons_or_size)
-        super(PartitionStatus, self).__init__(subcons)
+        super().__init__(subcons)
 
     def _parse(self, stream, context, path):
         obj = Container()

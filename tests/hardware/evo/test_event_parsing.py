@@ -1,5 +1,7 @@
 import binascii
 
+import pytest
+
 from paradox import event
 from paradox.hardware.evo.event import event_map
 from paradox.hardware.evo.parsers import LiveEvent, RequestedEvent
@@ -16,7 +18,7 @@ def label_provider(type, id):
         assert id == 5
         return "Door 1"
     else:
-        assert False
+        raise AssertionError()
 
 
 def test_zone_ok(mocker):
@@ -70,7 +72,7 @@ def test_door_user2(mocker):
             assert id == 5
             return "Door 1"
         else:
-            assert False
+            raise AssertionError()
 
     mocker.patch.dict(
         event_map[6], {"message": "User {@user#minor} access on door {@door}"}
@@ -223,9 +225,24 @@ def test_door_access_granted():
     print(event_)
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        ("e2ff004316010002011e04000b00000000000000000000000000000000000000000000006b"),
+        ("e2ff004416010002011e2d000400000000000000000000000000000000000000000000008e"),
+    ],
+)
+def test_event_without_date(payload):
+    payload = bytes.fromhex(payload)
+    message = LiveEvent.parse(payload)
+    event_ = event.LiveEvent(message, event_map)
+    assert event_.timestamp is None
+    print(event_)
+
+
 def test_c2():
-    payload = binascii.unhexlify("c2001903000b00000001a96c7106152c00200132010000000b")
+    binascii.unhexlify("c2001903000b00000001a96c7106152c00200132010000000b")
 
 
 def test_8207000005fa88():
-    payload = binascii.unhexlify("8207000005fa88")
+    binascii.unhexlify("8207000005fa88")
