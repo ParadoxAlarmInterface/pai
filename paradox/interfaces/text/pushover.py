@@ -69,7 +69,7 @@ class PushoverTextInterface(ConfiguredAbstractTextInterface):
                         priority=_level_2_priority.get(level, chump.NORMAL),
                     )
                 except:
-                    logger.exception("pushbullet send message")
+                    logger.exception("Pushover send message")
 
             else:
                 devices = list(filter(bool, re.split(r"[\s]*,[\s]*", devices_raw)))
@@ -89,6 +89,6 @@ class PushoverTextInterface(ConfiguredAbstractTextInterface):
                             priority=_level_2_priority.get(level, chump.NORMAL),
                         )
                     except:
-                        logger.exception("pushbullet send message")
+                        logger.exception("Pushover send message")
 
         # TODO: Missing the message reception
