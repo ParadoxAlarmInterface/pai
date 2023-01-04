@@ -1,19 +1,19 @@
-import binascii
-import inspect
-import logging
-import typing
 from abc import abstractmethod
+import binascii
 from collections import defaultdict, namedtuple
+import inspect
 from itertools import chain
+import logging
 from time import time
+import typing
 
 from construct import Construct, Container, EnumIntegerString
 
 from paradox.config import config as cfg, get_limits_for_type
 from paradox.lib.utils import construct_free, sanitize_key
 
-from ..lib import ps
 from . import parsers
+from ..lib import ps
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -36,6 +36,9 @@ class Panel:
         if message is None or len(message) == 0:
             return None
 
+        if message[0] == 0xE0 and message[1] == 0xFE:
+            return parsers.Encrypted.parse(message)
+
         if direction == "topanel":
             if message[0] == 0x72 and message[1] == 0:
                 return parsers.InitiateCommunication.parse(message)
@@ -46,15 +49,15 @@ class Panel:
                 return parsers.InitiateCommunicationResponse.parse(message)
             elif message[0] == 0x00 and message[4] > 0:
                 return parsers.StartCommunicationResponse.parse(message)
-            else:
-                return None
+
+        return None
 
     def get_message(self, name) -> Construct:
         clsmembers = dict(inspect.getmembers(parsers))
         if name in clsmembers:
             return clsmembers[name]
         else:
-            raise ResourceWarning("{} parser not found".format(name))
+            raise ResourceWarning(f"{name} parser not found")
 
     @staticmethod
     def get_error_message(error_code) -> str:
@@ -170,7 +173,9 @@ class Panel:
                         if definition != "disabled":
                             enabled_indexes.add(index)
 
-                cfg.LIMITS[elem_type] = get_limits_for_type(elem_type, list(enabled_indexes))
+                cfg.LIMITS[elem_type] = get_limits_for_type(
+                    elem_type, list(enabled_indexes)
+                )
                 cfg.LIMITS[elem_type] = list(
                     set(cfg.LIMITS[elem_type]).intersection(enabled_indexes)
                 )
@@ -339,10 +344,8 @@ class Panel:
             if cfg.LOGGING_DUMP_MESSAGES:
                 logger.debug(f"Status parsed({mvars.address}): {res}")
             return res
-        except:
-            logger.exception(
-                "Unable to parse RAM Status Block ({})".format(mvars.address)
-            )
+        except Exception:
+            logger.exception(f"Unable to parse RAM Status Block ({mvars.address})")
             return
 
     @abstractmethod
