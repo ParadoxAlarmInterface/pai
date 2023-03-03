@@ -14,7 +14,7 @@
             <img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/paradoxalarminterface/pai?logo=docker">
         </a>
         <a href="https://travis-ci.org/ParadoxAlarmInterface/pai/branches">
-            <img alt="GitHub top language" src="https://img.shields.io/github/languages/top/ParadoxAlarmInterface/pai?label=python%203.6%2B&logo=python">
+            <img alt="GitHub top language" src="https://img.shields.io/github/languages/top/ParadoxAlarmInterface/pai?label=python%203.8%2B&logo=python">
         </a>
 	<a href="https://snyk.io/test/github/ParadoxAlarmInterface/pai?targetFile=requirements.txt">
 	    <img src="https://snyk.io/test/github/ParadoxAlarmInterface/pai/badge.svg?targetFile=requirements.txt" alt="Known Vulnerabilities" data-canonical-src="https://snyk.io/test/github/ParadoxAlarmInterface/pai?targetFile=requirements.txt" style="max-width:100%;">
@@ -24,7 +24,7 @@
 </div>
 
 <br/>
-<p align="center"> 
+<p align="center">
 <img src="https://github.com/ParadoxAlarmInterface/pai/raw/master/docs/pai_logo.png">
 </p>
 <h1 align="center">PAI - Paradox Alarm Interface</h1>
