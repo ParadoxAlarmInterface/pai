@@ -9,6 +9,7 @@ __pycache__/
 # Distribution / packaging
 /venv*
 .idea
+.vscode
 .Python
 env/
 build/
@@ -104,6 +105,7 @@ ENV/
 /config/*.yaml
 /eeprom.bin
 /ram.bin
+/captures
 
 # OS X
 .DS_Store
