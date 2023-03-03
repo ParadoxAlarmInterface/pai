@@ -1,6 +1,6 @@
 argparse>=1.4.0
 chump>=1.6.0
-construct~=2.9.43
+construct~=2.10.68
 flake8
 paho_mqtt>=1.5.0
 
