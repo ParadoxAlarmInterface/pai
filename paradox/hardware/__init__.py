@@ -34,6 +34,7 @@ def create_panel(core, start_communication_response: Container = None) -> Panel:
         "SPECTRA_SP7000",
         "SPECTRA_SP65",
         "SPECTRA_SP6000_PLUS",
+        "SPECTRA_SP7000_PLUS",
         "MAGELLAN_MG5000",
         "MAGELLAN_MG5050",
         "MAGELLAN_MG5050_PLUS",
