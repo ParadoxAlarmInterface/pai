@@ -23,7 +23,7 @@ def create_panel(core, start_communication_response: Container = None) -> Panel:
         from . import evo
 
         return evo.Panel_EVO192(core, start_communication_response, True)
-    elif product_id == "DIGIPLEX_EVO_HD":
+    elif product_id in ["DIGIPLEX_EVO_HD", "DIGIPLEX_EVO_HD_PLUS"]:
         from . import evo
 
         return evo.Panel_EVOHD(core, start_communication_response, True)
