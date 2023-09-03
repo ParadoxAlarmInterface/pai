@@ -777,7 +777,7 @@ class Paradox:
             elif properties.get("arm"):
                 if properties.get("arm_stay"):
                     change["current_state"] = "armed_home"
-                elif properties.get("arm_sleep"):
+                elif properties.get("arm_sleep") or properties.get("arm_no_entry"):
                     change["current_state"] = "armed_night"
                 elif properties.get("arm_away"):
                     change["current_state"] = "armed_away"
