@@ -46,7 +46,6 @@ MODULES = {
     "gi": dict(mandatory=False, desc="the Signal interface", install_name="gi>=1.2"),
     "pytz": dict(mandatory=False, desc="Panel time sync", install_name="pytz>=2023.3.post1"),
     "mqtt": dict(mandatory=False, desc="MQTT", install_name="paho_mqtt>=1.5.0"),
-    "chump": dict(mandatory=False, desc="Pushover notification", install_name="chump>=1.6.0"),
 
     "pre-commit": dict(mandatory=False, desc="Development", install_name="pre-commit"),
     "flake8": dict(mandatory=False, desc="Code checker", install_name="flake8"),
