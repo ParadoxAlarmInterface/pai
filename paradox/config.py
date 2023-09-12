@@ -345,7 +345,8 @@ class Config(object):
                     else:
                         err = "Error parsing configuration value: Invalid value for config argument {} (type {}). Allowed are in: {}".format(
                             k, type(v), expected_value
-                        )                        sys.stderr.write(err + "\n")
+                        )
+                        sys.stderr.write(err + "\n")
                         raise (Exception(err))
 
         self.CONFIG_LOADED = True
