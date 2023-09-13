@@ -9,7 +9,7 @@ pushbullet.py>=0.11.0
 pyserial>=3.4
 pyserial-asyncio>=0.4
 python-slugify>=4.0.1
-pytz>=2021.3
+pytz>=2023.3.post1
 # Signal support
 # pygobject>=3.20.0
 # pydbus>=0.6.0
