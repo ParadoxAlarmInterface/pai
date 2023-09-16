@@ -136,6 +136,7 @@ class Config(object):
         "MQTT_SEND_PANIC_TOPIC": "panic",
         "MQTT_PUBLISH_RAW_EVENTS": True,
         "MQTT_PUBLISH_DEFINITIONS": False,  # Publish definitions of partitions/zones/users to mqtt.
+        "MQTT_PREFIX_DEVICE_NAME": False,  # Add device ID as prefix to entity names: Paradox 12345678
         "MQTT_INTERFACE_TOPIC": "interface",
         "MQTT_TOGGLE_CODES": {},
         "MQTT_USE_NUMERIC_STATES": False,  # use 0 and 1 instead of True and False
