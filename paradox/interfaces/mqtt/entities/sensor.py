@@ -30,6 +30,19 @@ class PAIStatusSensor(AbstractEntity):
         return "PAI Status"
 
 
+class ZoneNumericSensor(AbstractEntity):
+    def __init__(self, entity, property, device, availability_topic):
+        super().__init__(device, availability_topic)
+
+        self.property = property
+        self.label = entity.get("label", entity["key"].replace("_", " "))
+
+        self.key = sanitize_key(entity["key"])
+
+        self.pai_entity_type = "zone"
+        self.hass_entity_type = "sensor"
+
+
 class SystemStatusSensor(AbstractEntity):
     def __init__(self, key, property, device, availability_topic):
         super().__init__(device, availability_topic)
