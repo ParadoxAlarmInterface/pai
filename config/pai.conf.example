@@ -81,7 +81,6 @@ import logging
 # MQTT_BIND_PORT = 0            # MQTT Client bind port. Default: 0 - pick automatically
 # MQTT_REPUBLISH_INTERVAL = 60 * 60 * 12  # Interval for republishing all data
 # MQTT_PUBLISH_DEFINITIONS = False        # Publish definitions of partitions/zones/users to MQTT. Not required in most cases.
-# MQTT_PREFIX_DEVICE_NAME = False         # Add device ID as prefix to entity names: Paradox 12345678
 #
 ### MQTT Topics
 # MQTT_BASE_TOPIC = 'paradox'             # Root of all topics
@@ -96,6 +95,7 @@ import logging
 # MQTT_CONTROL_TOPIC = 'control'          # Base for control of other elements (ROOT/CONTROL/TYPE)
 # MQTT_DEFINITIONS_TOPIC = 'control'      # Base for definitions
 # MQTT_HOMEASSISTANT_DISCOVERY_PREFIX = 'homeassistant'
+# MQTT_HOMEASSISTANT_ENTITY_PREFIX = ''   # If you want to prefix all entities you can use: "Paradox {serial_number} ", placeholders "serial_number" and "model" are supported. Default: "" - no prefix
 # MQTT_OUTPUT_TOPIC = 'outputs'
 # MQTT_DOOR_TOPIC = 'doors'
 # MQTT_KEYPAD_TOPIC = 'keypads'
