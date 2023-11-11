@@ -1,10 +1,10 @@
 import logging
 import os
-import sys
 import re
+import sys
 
 
-class Config(object):
+class Config:
     DEFAULTS = {
         "LOGGING_LEVEL_CONSOLE": logging.INFO,  # See documentation of Logging package
         "LOGGING_LEVEL_FILE": logging.ERROR,
@@ -69,10 +69,10 @@ class Config(object):
         ),  # Duration of a PGM pulse in seconds
         "SYNC_TIME": False,  # Update panel time periodically when time drifts more than SYNC_TIME_MIN_DRIFT
         "SYNC_TIME_MIN_DRIFT": (
-                120,
-                int,
-                (120, 0xFFFFFFFF)
-        ), # Minimum time drift in seconds to initiate time sync
+            120,
+            int,
+            (120, 0xFFFFFFFF),
+        ),  # Minimum time drift in seconds to initiate time sync
         "SYNC_TIME_TIMEZONE": "",  # By default pai uses the same timezone as pai host
         "PASSWORD": (
             None,
@@ -101,7 +101,11 @@ class Config(object):
         "MQTT_USERNAME": (None, [str, type(None)]),  # MQTT Username for authentication
         "MQTT_PASSWORD": (None, [str, type(None)]),  # MQTT Password
         "MQTT_RETAIN": True,  # Publish messages with Retain
-        "MQTT_QOS": (0, int, (0, 2)),  # Publish messages with QOS level (0 - fire and forget, 1 - at least once, 2 - exactly once)
+        "MQTT_QOS": (
+            0,
+            int,
+            (0, 2),
+        ),  # Publish messages with QOS level (0 - fire and forget, 1 - at least once, 2 - exactly once)
         "MQTT_PROTOCOL": ("3.1.1", str, ("3.1", "3.1.1", "5")),  # Protocol to use
         "MQTT_TRANSPORT": ("tcp", str, ("tcp", "websockets")),  # Transport to use
         "MQTT_BIND_ADDRESS": "",  # MQTT Bind address (Paho default)
@@ -113,6 +117,7 @@ class Config(object):
         ),  # Interval for republishing all data
         "MQTT_HOMEASSISTANT_AUTODISCOVERY_ENABLE": False,
         "MQTT_HOMEASSISTANT_CODE": (None, [str, type(None)]),
+        "MQTT_HOMEASSISTANT_ENTITY_PREFIX": "",  # If you want to prefix all entities you can use: "Paradox {serial_number} ", placeholders "serial_number" and "model" are supported. Default: "" - no prefix
         # MQTT Topics
         "MQTT_BASE_TOPIC": "paradox",  # Root of all topics
         "MQTT_ZONE_TOPIC": "zones",  # Base for zone states
@@ -136,6 +141,7 @@ class Config(object):
         "MQTT_SEND_PANIC_TOPIC": "panic",
         "MQTT_PUBLISH_RAW_EVENTS": True,
         "MQTT_PUBLISH_DEFINITIONS": False,  # Publish definitions of partitions/zones/users to mqtt.
+        "MQTT_PREFIX_DEVICE_NAME": False,  # Add device ID as prefix to entity names: Paradox 12345678
         "MQTT_INTERFACE_TOPIC": "interface",
         "MQTT_TOGGLE_CODES": {},
         "MQTT_USE_NUMERIC_STATES": False,  # use 0 and 1 instead of True and False
@@ -172,12 +178,12 @@ class Config(object):
             ["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"],
         ),
         "HOMEASSISTANT_PUBLISH_PARTITION_PROPERTIES": [  # List of partition properties to publish
-            'target_state',
-            'current_state'
+            "target_state",
+            "current_state",
         ],
         "HOMEASSISTANT_PUBLISH_ZONE_PROPERTIES": [  # List of zone properties to publish
-            'open',
-            'tamper'
+            "open",
+            "tamper",
         ],
         "HOMEASSISTANT_NOTIFICATIONS_IGNORE_EVENTS": [],  # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
         "HOMEASSISTANT_NOTIFICATIONS_ALLOW_EVENTS": [],  # Same as before but as a white list. Default is use EVENT_FILTERS
@@ -280,11 +286,7 @@ class Config(object):
     CONFIG_FILE_LOCATION = (None,)
 
     def __dir__(self):
-        return (
-            list(self.DEFAULTS.keys())
-            + list(self.__class__.__dict__)
-            + dir(super(Config, self))
-        )
+        return list(self.DEFAULTS.keys()) + list(self.__class__.__dict__) + dir(super())
 
     def __init__(self):
         self._reset_defaults()
@@ -314,9 +316,9 @@ class Config(object):
                 else:
                     default_type = [type(default)]
 
-                if float in default_type and not int in default_type:
+                if float in default_type and int not in default_type:
                     default_type.append(int)
-                if int in default_type and not float in default_type:
+                if int in default_type and float not in default_type:
                     default_type.append(float)
                 if type(v) in default_type:
                     setattr(self, k, v)
@@ -425,8 +427,9 @@ class Config(object):
 
 config = Config()
 
-comma_splitter_re = re.compile('\s*,\s*')
-range_re = re.compile('(\d+)\s*-(\d+)\s*$')
+comma_splitter_re = re.compile(r"\s*,\s*")
+range_re = re.compile(r"(\d+)\s*-(\d+)\s*$")
+
 
 def string_to_id_list(input: str):
     arr = []
@@ -442,6 +445,7 @@ def string_to_id_list(input: str):
                 pass
 
     return arr
+
 
 def get_limits_for_type(elem_type: str, default: list = None):
     limits = config.LIMITS.get(elem_type, default)
