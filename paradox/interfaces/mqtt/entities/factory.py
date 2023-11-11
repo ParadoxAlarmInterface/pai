@@ -1,7 +1,7 @@
 from paradox.interfaces.mqtt.entities.alarm_control_panel import AlarmControlPanel
 from paradox.interfaces.mqtt.entities.binary_sensors import ZoneStatusBinarySensor, \
     SystemBinarySensor, PartitionBinarySensor
-from paradox.interfaces.mqtt.entities.sensor import PAIStatusSensor, SystemStatusSensor
+from paradox.interfaces.mqtt.entities.sensor import PAIStatusSensor, SystemStatusSensor, ZoneNumericSensor
 from paradox.interfaces.mqtt.entities.switch import ZoneBypassSwitch, PGMSwitch
 
 
@@ -27,6 +27,9 @@ class MQTTAutodiscoveryEntityFactory:
 
     def make_zone_status_binary_sensor(self, zone, status):
         return ZoneStatusBinarySensor(zone, status, self.device, self.availability_topic)
+
+    def make_zone_status_numeric_sensor(self, zone, status):
+        return ZoneNumericSensor(zone, status, self.device, self.availability_topic)
 
     def make_pgm_switch(self, pgm):
         return PGMSwitch(pgm, self.device, self.availability_topic)

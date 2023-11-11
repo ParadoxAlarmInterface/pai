@@ -27,7 +27,7 @@ class StunSession:
 
     async def connect(self) -> None:
         self.connection_timestamp = 0
-        logger.info("Connecting to Site: {}".format(self.site_id))
+        logger.info("Connecting to Site: %s", self.site_id)
         if self.site_info is None:
             self.site_info = await self._get_site_info(
                 siteid=self.site_id, email=self.email
@@ -36,7 +36,7 @@ class StunSession:
         if self.site_info is None:
             raise ConnectToSiteFailed("Unable to get site info")
 
-        logger.debug("Site Info: {}".format(json.dumps(self.site_info, indent=4)))
+        logger.debug("Site Info: %s", json.dumps(self.site_info, indent=4))
         self.module = self._select_module()
 
         if self.module is None:
@@ -63,7 +63,7 @@ class StunSession:
                 f"STUN Connection Bind Request error: {stun.get_error(stun_r)}"
             )
 
-        logger.info("Connected to Site: {}".format(self.site_id))
+        logger.info("Connected to Site: %s", self.site_id)
 
     async def _stun_connect(self, xoraddr):
         logger.debug("STUN Connect Request")
@@ -102,9 +102,7 @@ class StunSession:
                     continue
 
                 logger.debug(
-                    "Found module with panel serial: {}".format(
-                        module["panelSerial"]
-                    )
+                    "Found module with panel serial: %s", module["panelSerial"]
                 )
 
                 if not self.panel_serial:  # Pick first available
@@ -133,18 +131,15 @@ class StunSession:
             self.connection_timestamp = time.time()
 
     def close(self):
+        self.site_info = None
+        self.module = None
+
         if self.stun_control:
-            try:
-                self.stun_control.close()
-                self.stun_control = None
-            except:
-                logger.exception("stun_control socket close failed")
+            self.stun_control.close()
+            self.stun_control = None
         if self.stun_tunnel:
-            try:
-                self.stun_tunnel.close()
-                self.stun_tunnel = None
-            except:
-                logger.exception("stun_tunnel socket close failed")
+            self.stun_tunnel.close()
+            self.stun_tunnel = None
 
         self.connection_timestamp = 0
 

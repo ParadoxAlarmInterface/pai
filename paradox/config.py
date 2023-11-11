@@ -345,8 +345,8 @@ class Config:
                     if valid:
                         setattr(self, k, v)
                     else:
-                        err = "Error parsing configuration value: Invalid value type {} for config argument {}. Allowed are: {}".format(
-                            type(v), k, expected_value
+                        err = "Error parsing configuration value: Invalid value for config argument {} (type {}). Allowed are in: {}".format(
+                            k, type(v), expected_value
                         )
                         sys.stderr.write(err + "\n")
                         raise (Exception(err))
