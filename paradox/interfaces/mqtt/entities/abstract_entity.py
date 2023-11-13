@@ -1,11 +1,17 @@
 from paradox.config import config as cfg
-from paradox.interfaces.mqtt.helpers import get_control_topic_prefix, get_state_topic_prefix
+from paradox.interfaces.mqtt.entities.device import Device
+from paradox.interfaces.mqtt.helpers import (
+    get_control_topic_prefix,
+    get_state_topic_prefix,
+)
+
 
 def to_label(txt):
-    return txt.replace('_', ' ').title()
+    return txt.replace("_", " ").title()
+
 
 class AbstractEntity:
-    def __init__(self, device, availability_topic):
+    def __init__(self, device: Device, availability_topic):
         self.availability_topic = availability_topic
         self.device = device
 
@@ -28,20 +34,30 @@ class AbstractEntity:
 
     @property
     def configuration_topic(self):
-        return "/".join([
-            cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
-            self.hass_entity_type,
-            self.device.serial_number,
-            self.entity_id,
-            "config"
-        ])
+        return "/".join(
+            [
+                cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX,
+                self.hass_entity_type,
+                self.device.serial_number,
+                self.entity_id,
+                "config",
+            ]
+        )
 
     def serialize(self):
+        prefix = cfg.MQTT_HOMEASSISTANT_ENTITY_PREFIX.format(
+            {
+                "serial_number",
+                self.device.serial_number,
+                "model",
+                self.device.model,
+            }
+        )
         return dict(
             availability_topic=self.availability_topic,
             device=self.device,
-            name=f'{self.entity_name}',
-            unique_id=f'paradox_{self.device.serial_number}_{self.entity_id}',
+            name=prefix + f"{self.entity_name}",
+            unique_id=f"paradox_{self.device.serial_number}_{self.entity_id}",
             state_topic=self.state_topic,
         )
 
@@ -59,7 +75,5 @@ class AbstractEntity:
 class AbstractControllableEntity(AbstractEntity):
     def serialize(self):
         config = super().serialize()
-        config.update(dict(
-            command_topic=self.command_topic
-        ))
+        config.update(dict(command_topic=self.command_topic))
         return config

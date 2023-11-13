@@ -119,10 +119,12 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 if property_name not in cfg.HOMEASSISTANT_PUBLISH_ZONE_PROPERTIES:
                     continue
                 if property_name == "bypassed":
-                    zone_status_binary_sensor = self.entity_factory.make_zone_bypass_switch(zone)
+                    zone_status_sensor = self.entity_factory.make_zone_bypass_switch(zone)
+                elif property_name == "signal_strength":
+                    zone_status_sensor = self.entity_factory.make_zone_status_numeric_sensor(zone, property_name)
                 else:
-                    zone_status_binary_sensor = self.entity_factory.make_zone_status_binary_sensor(zone, property_name)
-                self._publish_config(zone_status_binary_sensor)
+                    zone_status_sensor = self.entity_factory.make_zone_status_binary_sensor(zone, property_name)
+                self._publish_config(zone_status_sensor)
 
     def _publish_pgm_configs(self, pgm_statuses):
         for pgm_key, pgm_status in pgm_statuses.items():

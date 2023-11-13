@@ -38,12 +38,14 @@ ProductIdEnum = Enum(
     DIGIPLEX_EVO_96=4,
     DIGIPLEX_EVO_192=5,
     DIGIPLEX_EVO_HD=7,
+    DIGIPLEX_EVO_HD_PLUS=8,
     SPECTRA_SP5500=21,
     SPECTRA_SP6000=22,
     SPECTRA_SP7000=23,
     SPECTRA_SP4000=26,
     SPECTRA_SP65=27,
     SPECTRA_SP6000_PLUS=29,
+    SPECTRA_SP7000_PLUS=30,
     MAGELLAN_MG5000=64,
     MAGELLAN_MG5050=65,
     MAGELLAN_MG5075=66,
@@ -52,7 +54,6 @@ ProductIdEnum = Enum(
 
 FamilyIdEnum = Enum(
     Int8ub,
-
 )
 
 SerialPrefixToPanelType = Enum(
@@ -67,7 +68,7 @@ SerialPrefixToPanelType = Enum(
     SPECTRA_SP5500=0x28,
     SPECTRA_SP6000=0x29,
     SPECTRA_SP65=0x45,
-    SPECTRA_SP7000=0x2a,
+    SPECTRA_SP7000=0x2A,
     SPECTRA_UNIFIED=0x06,
 )
 

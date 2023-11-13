@@ -1,8 +1,9 @@
 <div align="center">
     <div style="display: flex;">
-        <a href="https://gitter.im/paradox-alarm-interface/community">
-            <img alt="Gitter" src="https://img.shields.io/gitter/room/paradox-alarm-interface/community?logo=gitter">
+        <a href="https://matrix.to/#/#paradox-alarm-interface_community:gitter.im">
+            <img alt="Matrix" src="https://img.shields.io/matrix/pai:gitter.im.svg">
         </a>
+        #paradox-alarm-interface_community:gitter.im
         <a href="https://github.com/ParadoxAlarmInterface/pai/actions/workflows/master.yml">
             <img alt="CI/CD master" src="https://github.com/ParadoxAlarmInterface/pai/actions/workflows/master.yml/badge.svg?branch=master">
         </a>
@@ -13,12 +14,9 @@
             <img alt="Docker Arch" src="https://img.shields.io/badge/docker_arch-386%7Camd64%7Carmv6%7Carmv7%7Carm64-green?logo=docker">
             <img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/paradoxalarminterface/pai?logo=docker">
         </a>
-        <a href="https://travis-ci.org/ParadoxAlarmInterface/pai/branches">
-            <img alt="GitHub top language" src="https://img.shields.io/github/languages/top/ParadoxAlarmInterface/pai?label=python%203.8%2B&logo=python">
+        <a href="https://snyk.io/test/github/ParadoxAlarmInterface/pai?targetFile=requirements.txt">
+            <img src="https://snyk.io/test/github/ParadoxAlarmInterface/pai/badge.svg?targetFile=requirements.txt" alt="Known Vulnerabilities" data-canonical-src="https://snyk.io/test/github/ParadoxAlarmInterface/pai?targetFile=requirements.txt" style="max-width:100%;">
         </a>
-	<a href="https://snyk.io/test/github/ParadoxAlarmInterface/pai?targetFile=requirements.txt">
-	    <img src="https://snyk.io/test/github/ParadoxAlarmInterface/pai/badge.svg?targetFile=requirements.txt" alt="Known Vulnerabilities" data-canonical-src="https://snyk.io/test/github/ParadoxAlarmInterface/pai?targetFile=requirements.txt" style="max-width:100%;">
-	</a>
         <img alt="GitHub" src="https://img.shields.io/github/license/ParadoxAlarmInterface/pai">
     </div>
 </div>
@@ -39,7 +37,7 @@ Support for Magellan, Spectra and EVO panels is very stable. If you find a bug, 
 
 For further information and detailed usage refer to the [Wiki](https://github.com/ParadoxAlarmInterface/pai/wiki).
 
-If you are having issues, or wish to discuss new features, join us at our [Gitter community](https://gitter.im/paradox-alarm-interface)
+If you are having issues, or wish to discuss new features, join us at our [Matrix community](https://matrix.to/#/#paradox-alarm-interface_community:gitter.im)
 
 On Android, if you install [MQTT Dash](https://play.google.com/store/apps/details?id=net.routix.mqttdash), and [follow the instructions](https://github.com/ParadoxAlarmInterface/pai/wiki#mqtt-dash) you will automatically get a panel like this:
 ![mqtt_dash](https://user-images.githubusercontent.com/497717/52603920-d4984d80-2e60-11e9-9772-578b10576b3c.jpg)
@@ -92,7 +90,7 @@ This work is inspired or uses parts from the following projects:
 * Spinza at https://github.com/spinza/paradox_mqtt
 
 ## Thanks
-* Ivan Markov - [@ivmarkov](https://github.com/ivmarkov) - Multi-platform Docker builds with Travis
+* Ivan Markov - [@ivmarkov](https://github.com/ivmarkov) - Multi-platform Docker builds
 * Claudiu Bucur - [@clau-bucur](https://github.com/clau-bucur) - For fixing HomeAssistant plugin after Supervisor(2021.02.5) upgrade [#199](https://github.com/ParadoxAlarmInterface/pai/issues/199)
 * David Tekan - [@tekand](https://github.com/tekand) - For supporting different label encodings.
 

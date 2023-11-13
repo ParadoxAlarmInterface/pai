@@ -95,6 +95,7 @@ import logging
 # MQTT_CONTROL_TOPIC = 'control'          # Base for control of other elements (ROOT/CONTROL/TYPE)
 # MQTT_DEFINITIONS_TOPIC = 'control'      # Base for definitions
 # MQTT_HOMEASSISTANT_DISCOVERY_PREFIX = 'homeassistant'
+# MQTT_HOMEASSISTANT_ENTITY_PREFIX = ''   # If you want to prefix all entities you can use: "Paradox {serial_number} ", placeholders "serial_number" and "model" are supported. Default: "" - no prefix
 # MQTT_OUTPUT_TOPIC = 'outputs'
 # MQTT_DOOR_TOPIC = 'doors'
 # MQTT_KEYPAD_TOPIC = 'keypads'
