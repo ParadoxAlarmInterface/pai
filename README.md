@@ -1,8 +1,9 @@
 <div align="center">
     <div style="display: flex;">
         <a href="https://matrix.to/#/#paradox-alarm-interface_community:gitter.im">
-            <img alt="Matrix" src="https://img.shields.io/matrix/paradox-alarm-interface_community:gitter.im.svg?server_fqdn=gitter.im">
+            <img alt="Matrix" src="https://img.shields.io/matrix/pai:gitter.im.svg">
         </a>
+        #paradox-alarm-interface_community:gitter.im
         <a href="https://github.com/ParadoxAlarmInterface/pai/actions/workflows/master.yml">
             <img alt="CI/CD master" src="https://github.com/ParadoxAlarmInterface/pai/actions/workflows/master.yml/badge.svg?branch=master">
         </a>
