@@ -11,7 +11,7 @@ Before creating a bug report look into wiki and FAQ page:
 - Wiki: https://github.com/ParadoxAlarmInterface/pai/wiki
 - FAQ: https://github.com/ParadoxAlarmInterface/pai/wiki/FAQ
 - Use search before posting. Maybe your issue was already solved.
-- You can always use https://gitter.im/paradox-alarm-interface/community to ask a quick question.
+- You can always use https://matrix.to/#/#paradox-alarm-interface_community:gitter.im to ask a quick question.
 -->
 
 ## Alarm system
