@@ -26,7 +26,7 @@ class Colors:  # You may need to change color settings
     BLUE = "\033[34m"
     MAGENTA = "\033[95m"
     CYAN = "\033[96m"
-    ON_WHITE = "\033[47m"
+    ON_WHITE = "\033[30m\033[47m"
 
 
 def ordered_load(stream, Loader=yaml.loader.SafeLoader, object_pairs_hook=OrderedDict):
@@ -59,6 +59,7 @@ class PayloadParser:
             elif message_type == IPMessageType.ip_response:
                 self._parse_ip_response(parsed)
         except Exception:
+            print(f"{Colors.RED}Failed to parse message: \n{parsed}{Colors.ENDC}")
             traceback.print_exc()
 
     def _parse_ip_response(self, parsed):
