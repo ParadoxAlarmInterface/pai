@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import binascii
 import inspect
 import logging
@@ -10,17 +8,26 @@ from construct import ChecksumError, Construct, Container, MappingError
 from paradox.config import config as cfg
 from paradox.exceptions import AuthenticationFailed, StatusRequestException
 
-from ..panel import Panel as PanelBase
 from . import parsers
+from ..panel import Panel as PanelBase
 from .event import event_map
 from .property import property_map
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
 ZONE_ACTIONS = dict(
-    bypass={"flags": {"bypassed": True}, "operation": "set",},
-    clear_bypass={"flags": {"bypassed": True}, "operation": "clear",},
-    clear_alarm_memory={"flags": {"generated_alarm": True}, "operation": "clear",},
+    bypass={
+        "flags": {"bypassed": True},
+        "operation": "set",
+    },
+    clear_bypass={
+        "flags": {"bypassed": True},
+        "operation": "clear",
+    },
+    clear_alarm_memory={
+        "flags": {"generated_alarm": True},
+        "operation": "clear",
+    },
 )
 
 
@@ -33,14 +40,14 @@ class Panel_EVOBase(PanelBase):
     def __init__(
         self, core, start_communication_response, variable_message_length=True
     ):
-        super(Panel_EVOBase, self).__init__(core, variable_message_length)
+        super().__init__(core, variable_message_length)
 
         self._populate_settings(start_communication_response)
 
     def _populate_settings(self, start_communication_response):
         raw_data = (
-                start_communication_response.fields.data
-                + start_communication_response.checksum
+            start_communication_response.fields.data
+            + start_communication_response.checksum
         )
         parsed = parsers.InitializeCommunication.parse(raw_data)
         if cfg.LOGGING_DUMP_MESSAGES:
@@ -55,7 +62,7 @@ class Panel_EVOBase(PanelBase):
         except ResourceWarning:
             pass
 
-        return super(Panel_EVOBase, self).get_message(name)
+        return super().get_message(name)
 
     async def dump_memory(self, file, memory_type):
         """
@@ -73,6 +80,12 @@ class Panel_EVOBase(PanelBase):
         mem_type = "RAM" if ram else "EEPROM"
         logger.info("Dump " + mem_type)
 
+        def expect(command, address):
+            return (
+                lambda m: m.fields.value.po.command == command
+                and m.fields.value.address == address
+            )
+
         packet_length = 64  # 64 is max
         for address in range_:
             args = dict(
@@ -82,8 +95,7 @@ class Panel_EVOBase(PanelBase):
             reply = await self.core.send_wait(
                 parsers.ReadEEPROM,
                 args,
-                reply_expected=lambda m: m.fields.value.po.command == 0x5
-                and m.fields.value.address == address,
+                reply_expected=expect(0x5, address),
             )
 
             if reply is None:
@@ -101,7 +113,7 @@ class Panel_EVOBase(PanelBase):
             if message is None or len(message) == 0:
                 return None
 
-            parent_parsed = super(Panel_EVOBase, self).parse_message(message, direction)
+            parent_parsed = super().parse_message(message, direction)
             if parent_parsed:
                 return parent_parsed
 
@@ -147,13 +159,9 @@ class Panel_EVOBase(PanelBase):
                         return parsers.RequestedEvent.parse(message)
 
         except ChecksumError as e:
-            logger.error(
-                "ChecksumError %s, message: %s" % (str(e), binascii.hexlify(message))
-            )
-        except:
-            logger.exception(
-                "Exception parsing message: %s" % (binascii.hexlify(message))
-            )
+            logger.error("ChecksumError %s, message: %s", e, binascii.hexlify(message))
+        except Exception:
+            logger.exception("Exception parsing message: %s", binascii.hexlify(message))
 
         return None
 
@@ -179,13 +187,17 @@ class Panel_EVOBase(PanelBase):
                 "(Babyware) Tab."
             )
             raise AuthenticationFailed("Wrong PASSWORD")
-        else:  # command == 0x1
-            if reply.fields.value.po.status.Winload_connected:
-                logger.info("Authentication Success")
-                return True
-            else:
-                logger.error("Authentication Failed")
-                return False
+
+        if reply.fields.value.po.command == 0x1:
+            logger.info("Authentication Success")
+
+            if not reply.fields.value.po.status.Winload_connected:
+                logger.warning("Winload_connected is still False")
+
+            return True
+
+        logger.error("Invalid response to InitializeCommunication: %s", reply)
+        return False
 
     @staticmethod
     def _request_status_reply_check(message: Container, address: int):
@@ -223,7 +235,7 @@ class Panel_EVOBase(PanelBase):
         :param str command: textual command
         :return: True if we have at least one success
         """
-        args = dict(partitions=dict((i, command) for i in partitions))
+        args = dict(partitions={i: command for i in partitions})
 
         try:
             reply = await self.core.send_wait(
