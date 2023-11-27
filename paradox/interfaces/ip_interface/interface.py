@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # IP Interface
 
 import asyncio
@@ -46,16 +44,14 @@ class IPInterface(Interface):
     async def run(self):
         try:
             self.server = await asyncio.start_server(
-                self.handle_client, self.addr, self.port, loop=self.alarm.work_loop
+                self.handle_client, self.addr, self.port
             )
             logger.info(
-                "IP Interface: serving on {}".format(
-                    self.server.sockets[0].getsockname()
-                )
+                "IP Interface: serving on %s", self.server.sockets[0].getsockname()
             )
             logger.info("IP Interface started")
         except Exception as e:
-            logger.error("Failed to start IP Interface {}".format(e))
+            logger.error("Failed to start IP Interface: %s", e)
 
     async def handle_client(self, reader, writer):
         """
@@ -67,10 +63,10 @@ class IPInterface(Interface):
         """
 
         self.client_nr = (self.client_nr + 1) % 256
-        logger.info("Client %d connected" % self.client_nr)
+        logger.info("Client %d connected", self.client_nr)
 
         connection = ClientConnection(reader, writer, self.alarm, self.key)
-        handler_name = "%s_%d" % (self.name, self.client_nr)
+        handler_name = f"{self.name}_{self.client_nr}"
         self.alarm.connection.register_raw_handler(
             PersistentHandler(connection.handle_panel_raw_message, name=handler_name)
         )
@@ -79,10 +75,10 @@ class IPInterface(Interface):
 
         try:
             await connection.handle()
-        except:
-            logger.exception("Client %d connection raised exception" % self.client_nr)
+        except Exception:
+            logger.exception("Client %d connection raised exception", self.client_nr)
         finally:
             self.alarm.connection.deregister_raw_handler(handler_name)
 
             asyncio.get_event_loop().create_task(self.alarm.resume())
-            logger.info("Client %d disconnected" % self.client_nr)
+            logger.info("Client %d disconnected", self.client_nr)
