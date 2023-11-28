@@ -30,6 +30,7 @@ def create_panel(core, start_communication_response: Container = None) -> Panel:
     elif product_id in [
         "SPECTRA_SP4000",
         "SPECTRA_SP5500",
+        "SPECTRA_SP550_PLUS",
         "SPECTRA_SP6000",
         "SPECTRA_SP7000",
         "SPECTRA_SP65",
