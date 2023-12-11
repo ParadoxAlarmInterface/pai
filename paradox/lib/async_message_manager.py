@@ -4,8 +4,7 @@ from typing import Callable, Optional
 
 from construct import Container
 
-from paradox.lib.handlers import (FutureHandler, HandlerRegistry,
-                                  PersistentHandler)
+from paradox.lib.handlers import FutureHandler, HandlerRegistry, PersistentHandler
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -14,7 +13,7 @@ class EventMessageHandler(PersistentHandler):
     def can_handle(self, data: Container) -> bool:
         assert isinstance(data, Container)
         values = data.fields.value
-        return values.po.command == 0xE and (not hasattr(values, "requested_event_nr"))
+        return values.po.command == 0xE and hasattr(values, "event")
 
 
 class ErrorMessageHandler(PersistentHandler):
@@ -27,7 +26,7 @@ class ErrorMessageHandler(PersistentHandler):
 
 class AsyncMessageManager:
     def __init__(self, loop=None):
-        super(AsyncMessageManager, self).__init__()
+        super().__init__()
 
         if not loop:
             loop = asyncio.get_event_loop()

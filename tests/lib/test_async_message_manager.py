@@ -1,10 +1,9 @@
 import asyncio
 
-import pytest
 from construct import Container
+import pytest
 
-from paradox.lib.async_message_manager import (AsyncMessageManager,
-                                               EventMessageHandler)
+from paradox.lib.async_message_manager import AsyncMessageManager, EventMessageHandler
 from paradox.lib.handlers import PersistentHandler
 
 
@@ -89,7 +88,11 @@ async def test_wait_for_message(mocker):
 @pytest.mark.asyncio
 async def test_handler_exception(mocker):
     msg = Container(
-        fields=Container(value=Container(po=Container(command=0xE), event_source=0xFF))
+        fields=Container(
+            value=Container(
+                po=Container(command=0xE), event_source=0xFF, event=Container()
+            )
+        )
     )
 
     mm = AsyncMessageManager()
