@@ -370,7 +370,7 @@ class Paradox:
         args=None,
         message=None,
         retries=5,
-        timeout=0.5,
+        timeout=1.5,
         reply_expected=None,
     ) -> Optional[Container]:
 
