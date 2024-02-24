@@ -374,6 +374,7 @@ class Paradox:
         reply_expected=None,
     ) -> Optional[Container]:
 
+        logger.debug("MDR Fork v0.0.1")
         # Connection closed
         if not self.connection.connected:
             raise ConnectionError("Not connected")
