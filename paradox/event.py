@@ -1,10 +1,10 @@
+from collections import namedtuple
+from copy import copy
 import datetime
+from enum import Enum
 import logging
 import time
 import typing
-from collections import namedtuple
-from copy import copy
-from enum import Enum
 
 from construct import Container
 
@@ -70,7 +70,7 @@ class Event:
         if label_provider is not None:
             self.label_provider = label_provider
         else:
-            self.label_provider = lambda type, value: "[{}:{}]".format(type, value)
+            self.label_provider = lambda type, value: f"[{type}:{value}]"
 
     def __repr__(self):
         lvars = {}
@@ -81,11 +81,7 @@ class Event:
             str(self.__class__)
             + "\n"
             + "\n".join(
-                (
-                    "{} = {}".format(item, lvars[item])
-                    for item in lvars
-                    if not item.startswith("_")
-                )
+                f"{item} = {lvars[item]}" for item in lvars if not item.startswith("_")
             )
         )
 
@@ -126,21 +122,21 @@ class Event:
             kwargs["event"] = self
             try:
                 self.hook_fn(*args, **kwargs)
-            except:
+            except Exception:
                 logger.exception("Failed to call event hook")
 
 
 class LiveEvent(Event):
     def __init__(self, event: Container, event_map: dict, label_provider=None):
         raw = event.fields.value
-        if raw.po.command != 0xE:
+        if raw.po.command != 0xE and hasattr(raw, "event"):
             raise AssertionError("Message is not an event")
 
         # parse event map
         if raw.event.major not in event_map:
-            raise AssertionError("Unknown event major: {}".format(raw))
+            raise AssertionError(f"Unknown event major: {raw}")
 
-        super(LiveEvent, self).__init__(label_provider=label_provider)
+        super().__init__(label_provider=label_provider)
 
         self.major = raw.event.major  # Event major code
         self.minor = raw.event.minor  # Event minor code
@@ -177,9 +173,7 @@ class LiveEvent(Event):
                 for k in sub:
                     if k == "message":
                         event_map[k] = (
-                            "{}: {}".format(event_map[k], sub[k])
-                            if k in event_map
-                            else sub[k]
+                            f"{event_map[k]}: {sub[k]}" if k in event_map else sub[k]
                         )
                     elif isinstance(sub[k], typing.List):  # for tags or other lists
                         event_map[k] = event_map.get(k, []) + sub[k]
