@@ -4,8 +4,8 @@ from typing import Callable, Optional
 
 from construct import Container
 
-from paradox.lib.handlers import (FutureHandler, HandlerRegistry,
-                                  PersistentHandler)
+from paradox.config import config as cfg
+from paradox.lib.handlers import FutureHandler, HandlerRegistry, PersistentHandler
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -27,7 +27,7 @@ class ErrorMessageHandler(PersistentHandler):
 
 class AsyncMessageManager:
     def __init__(self, loop=None):
-        super(AsyncMessageManager, self).__init__()
+        super().__init__()
 
         if not loop:
             loop = asyncio.get_event_loop()
@@ -37,7 +37,9 @@ class AsyncMessageManager:
         self.raw_handler_registry = HandlerRegistry()
 
     async def wait_for_message(
-        self, check_fn: Optional[Callable[[Container], bool]] = None, timeout=2
+        self,
+        check_fn: Optional[Callable[[Container], bool]] = None,
+        timeout=cfg.IO_TIMEOUT,
     ) -> Container:
         return await self.handler_registry.wait_until_complete(
             FutureHandler(check_fn), timeout
