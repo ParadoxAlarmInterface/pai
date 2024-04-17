@@ -461,7 +461,8 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                     if i not in labels:
                         continue
 
-                    for attribute in definitions[i]:  # attribute
+                    definition = {**(definitions[i]), "id": i}
+                    for attribute in definition:  # attribute
                         if element_type == "user" and attribute == "code":
                             continue
                         self._publish(
@@ -469,7 +470,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                             element_type,
                             labels[i]["key"],
                             attribute,
-                            definitions[i][attribute],
+                            definition[attribute],
                         )
 
         if (
