@@ -12,8 +12,6 @@ jobs:
     name: Publish to Docker Hub
     uses: ./.github/workflows/publish_docker.yml
     needs: test
-    with:
-      tag: ${{ github.event.release.tag_name }}
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
