@@ -39,6 +39,7 @@ import logging
 #
 ### Paradox
 # KEEP_ALIVE_INTERVAL = 10   		# Interval between status updates
+# IO_TIMEOUT = 0.5           		# Timeout for IO operations
 #
 # LIMITS = { # By default all zones will be monitored
 #     # 'zone': range(1, 17),     # Zones to monitor and control

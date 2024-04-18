@@ -33,7 +33,9 @@ MODULES = {
     "ws4py": dict(
         mandatory=False, desc="the Pushbullet interface", install_name="ws4py>=0.4.2"
     ),
-    "yaml": dict(mandatory=False, desc="the IP150 connection", install_name="pyyaml>=5.2.0"),
+    "yaml": dict(
+        mandatory=False, desc="the IP150 connection", install_name="pyyaml>=5.2.0"
+    ),
     "chump": dict(
         mandatory=False, desc="the Pushover interface", install_name="chump>=1.6.0"
     ),
@@ -44,9 +46,10 @@ MODULES = {
         mandatory=False, desc="the Signal interface", install_name="pygobject>=3.20.0"
     ),
     "gi": dict(mandatory=False, desc="the Signal interface", install_name="gi>=1.2"),
-    "pytz": dict(mandatory=False, desc="Panel time sync", install_name="pytz>=2023.3.post1"),
-    "mqtt": dict(mandatory=False, desc="MQTT", install_name="paho_mqtt>=1.5.0"),
-
+    "pytz": dict(
+        mandatory=False, desc="Panel time sync", install_name="pytz>=2023.3.post1"
+    ),
+    "mqtt": dict(mandatory=False, desc="MQTT", install_name="paho_mqtt>=1.5.0,<2"),
     "pre-commit": dict(mandatory=False, desc="Development", install_name="pre-commit"),
     "flake8": dict(mandatory=False, desc="Code checker", install_name="flake8"),
     "tox": dict(mandatory=False, desc="virtual env / testing", install_name="tox"),
@@ -54,7 +57,7 @@ MODULES = {
 
 
 def import_error_help(error):
-    logger.error("Could not import Python3 module '{}': {}\n".format(error.name, error))
+    logger.error(f"Could not import Python3 module '{error.name}': {error}\n")
 
     if error.name in MODULES:
         m = MODULES[error.name]

@@ -1,14 +1,12 @@
-# -*- coding: utf-8 -*-
-
 import asyncio
-import logging
-import time
-import pytz
 from binascii import hexlify
 from datetime import datetime
-from typing import Callable, Iterable, Optional, Sequence
+import logging
+import time
+from typing import Callable, Iterable, Optional
 
 from construct import Container
+import pytz
 
 from paradox.config import config as cfg, get_limits_for_type
 from paradox.connections.connection import Connection
@@ -16,13 +14,16 @@ from paradox.data.enums import RunState
 from paradox.data.memory_storage import MemoryStorage as Storage
 from paradox.data.model import DetectedPanel
 from paradox.event import Change, ChangeEvent, Event, LiveEvent
-from paradox.exceptions import (AuthenticationFailed, PanelNotDetected,
-                                StatusRequestException,
-                                async_loop_unhandled_exception_handler, CodeLockout)
+from paradox.exceptions import (
+    AuthenticationFailed,
+    CodeLockout,
+    PanelNotDetected,
+    StatusRequestException,
+    async_loop_unhandled_exception_handler,
+)
 from paradox.hardware import Panel, create_panel
 from paradox.lib import ps
-from paradox.lib.async_message_manager import (ErrorMessageHandler,
-                                               EventMessageHandler)
+from paradox.lib.async_message_manager import ErrorMessageHandler, EventMessageHandler
 from paradox.lib.handlers import PersistentHandler
 from paradox.lib.utils import deep_merge
 from paradox.parsers.status import convert_raw_status
@@ -35,7 +36,7 @@ class Paradox:
         self.panel: Panel = None
         self._connection: Connection = None
         self.retries = retries
-        self.work_loop = asyncio.get_event_loop()  # type: asyncio.AbstractEventLoop
+        self.work_loop = asyncio.get_event_loop()
         self.work_loop.set_exception_handler(async_loop_unhandled_exception_handler)
 
         self.storage = Storage()
@@ -70,7 +71,8 @@ class Paradox:
                 from paradox.connections.serial_connection import SerialCommunication
 
                 self._connection = SerialCommunication(
-                    port=cfg.SERIAL_PORT, baud=cfg.SERIAL_BAUD,
+                    port=cfg.SERIAL_PORT,
+                    baud=cfg.SERIAL_BAUD,
                 )
             elif cfg.CONNECTION_TYPE == "IP":
                 logger.info("Using IP Connection")
@@ -81,10 +83,7 @@ class Paradox:
                     self._connection = BareIPConnection(
                         host=cfg.IP_CONNECTION_HOST, port=cfg.IP_CONNECTION_PORT
                     )
-                elif (
-                    cfg.IP_CONNECTION_SITEID
-                    and cfg.IP_CONNECTION_EMAIL
-                ):
+                elif cfg.IP_CONNECTION_SITEID and cfg.IP_CONNECTION_EMAIL:
                     from paradox.connections.ip.connection import StunIPConnection
 
                     self._connection = StunIPConnection(
@@ -102,9 +101,7 @@ class Paradox:
                         password=cfg.IP_CONNECTION_PASSWORD,
                     )
             else:
-                raise AssertionError(
-                    "Invalid connection type: {}".format(cfg.CONNECTION_TYPE)
-                )
+                raise AssertionError(f"Invalid connection type: {cfg.CONNECTION_TYPE}")
 
             self._register_connection_handlers()
 
@@ -140,7 +137,7 @@ class Paradox:
             initiate_reply = await self.send_wait(
                 self.panel.get_message("InitiateCommunication"),
                 None,
-                reply_expected=0x7
+                reply_expected=0x7,
             )
 
             if initiate_reply:
@@ -156,9 +153,7 @@ class Paradox:
                     initiate_reply.fields.value.serial_number
                 ).decode()
 
-                logger.info(
-                    "Panel Identified {} version {}".format(model, firmware_version)
-                )
+                logger.info(f"Panel Identified {model} version {firmware_version}")
             else:
                 raise ConnectionError("Panel did not replied to InitiateCommunication")
 
@@ -251,7 +246,9 @@ class Paradox:
                 tzinfo = pytz.timezone(cfg.SYNC_TIME_TIMEZONE)
                 now = now.astimezone(tzinfo)
             except pytz.exceptions.UnknownTimeZoneError:
-                logger.debug(f"Panel Timezone Unknown ('{cfg.SYNC_TIME_TIMEZONE}'). Skipping sync")
+                logger.debug(
+                    f"Panel Timezone Unknown ('{cfg.SYNC_TIME_TIMEZONE}'). Skipping sync"
+                )
                 return
 
         if not self._is_time_sync_required(now.replace(tzinfo=None)):
@@ -297,13 +294,13 @@ class Paradox:
                         logger.error("Lost communication with panel")
                         await self.disconnect()
                         return
-                except:
+                except Exception:
                     logger.exception("Loop")
                 finally:
                     self.busy.release()
 
                 if replies_missing > 0:
-                    logger.debug("Loop: Replies missing: {}".format(replies_missing))
+                    logger.debug(f"Loop: Replies missing: {replies_missing}")
 
             # cfg.Listen for events
 
@@ -353,15 +350,14 @@ class Paradox:
             # No message
             if recv_message is None:
                 logger.debug(
-                    "Unknown message: %s"
-                    % (" ".join("{:02x} ".format(c) for c in message))
+                    "Unknown message: %s" % (" ".join(f"{c:02x} " for c in message))
                 )
                 return
 
             self.connection.schedule_message_handling(
                 recv_message
             )  # schedule handling in the loop
-        except:
+        except Exception:
             logger.exception("Error parsing message")
 
     async def send_wait(
@@ -370,10 +366,9 @@ class Paradox:
         args=None,
         message=None,
         retries=5,
-        timeout=0.5,
+        timeout=cfg.IO_TIMEOUT,
         reply_expected=None,
     ) -> Optional[Container]:
-
         # Connection closed
         if not self.connection.connected:
             raise ConnectionError("Not connected")
@@ -422,12 +417,12 @@ class Paradox:
                 except ConnectionError:
                     result = "connection error"
                     raise
-                except:
+                except Exception:
                     result = "exception"
                     logger.exception("Unexpected exception during send_wait")
                     raise
-                #finally:
-                    #logger.debug("send/receive %s in %.4f s", result, time.time() - t1)
+                finally:
+                    logger.debug("send/receive %s in %.4f s", result, time.time() - t1)
 
             attempt += 1
 
@@ -435,11 +430,9 @@ class Paradox:
 
     async def control_zone(self, zone: str, command: str) -> bool:
         command = command.lower()
-        logger.debug("Control Zone: {} - {}".format(zone, command))
+        logger.debug(f"Control Zone: {zone} - {command}")
 
-        zones_selected = self.storage.get_container("zone").select(
-            zone
-        )  # type: Sequence[int]
+        zones_selected = self.storage.get_container("zone").select(zone)
 
         # Not Found
         if len(zones_selected) == 0:
@@ -464,11 +457,9 @@ class Paradox:
 
     async def control_partition(self, partition: str, command: str) -> bool:
         command = command.lower()
-        logger.debug("Control Partition: {} - {}".format(partition, command))
+        logger.debug(f"Control Partition: {partition} - {command}")
 
-        partitions_selected = self.storage.get_container("partition").select(
-            partition
-        )  # type: Sequence[int]
+        partitions_selected = self.storage.get_container("partition").select(partition)
 
         # Not Found
         if len(partitions_selected) == 0:
@@ -493,7 +484,7 @@ class Paradox:
 
     async def control_output(self, output, command) -> bool:
         command = command.lower()
-        logger.debug("Control Output: {} - {}".format(output, command))
+        logger.debug(f"Control Output: {output} - {command}")
 
         outputs_selected = self.storage.get_container("pgm").select(output)
 
@@ -545,7 +536,7 @@ class Paradox:
 
     async def control_door(self, door, command) -> bool:
         command = command.lower()
-        logger.debug("Control Door: {} - {}".format(door, command))
+        logger.debug(f"Control Door: {door} - {command}")
 
         doors_selected = self.storage.get_container("door").select(door)
 
@@ -585,7 +576,7 @@ class Paradox:
                     event_map=self.panel.event_map,
                     label_provider=self.get_label,
                 )
-            except AssertionError as e:
+            except AssertionError:
                 logger.debug("Error creating event")
                 return
 
@@ -633,7 +624,7 @@ class Paradox:
 
             ps.sendEvent(evt)
 
-        except:
+        except Exception:
             logger.exception("Handle live event")
 
     def handle_error_message(self, message):
@@ -644,7 +635,7 @@ class Paradox:
             asyncio.get_event_loop().create_task(self.disconnect())
         else:
             message = self.panel.get_error_message(error_enum)
-            logger.error("Got ERROR Message: {}".format(message))
+            logger.error(f"Got ERROR Message: {message}")
             if message == "Invalid PC Password":
                 raise AuthenticationFailed()
             elif "code lockout" in message:
@@ -709,7 +700,13 @@ class Paradox:
             if element_type in ["troubles"]:  # troubles was already parsed
                 continue
             for element_item_key, element_item_status in element_items.items():
-                if isinstance(element_item_status, (dict, list,)):
+                if isinstance(
+                    element_item_status,
+                    (
+                        dict,
+                        list,
+                    ),
+                ):
                     self.storage.update_container_object(
                         element_type, element_item_key, element_item_status
                     )
@@ -746,13 +743,15 @@ class Paradox:
     def _is_time_sync_required(self, now) -> bool:
         assert now.tzinfo is None
         try:
-           drift = (now - self.storage.get_container("system")["date"]["time"]).total_seconds()
+            drift = (
+                now - self.storage.get_container("system")["date"]["time"]
+            ).total_seconds()
 
-           if abs(drift) > cfg.SYNC_TIME_MIN_DRIFT:
-              logger.info(f"Time drifted more than allowed: {drift} seconds")
-              return True
-           else:
-              logger.debug(f"Time drifted within allowed range: {drift} seconds")
+            if abs(drift) > cfg.SYNC_TIME_MIN_DRIFT:
+                logger.info(f"Time drifted more than allowed: {drift} seconds")
+                return True
+            else:
+                logger.debug(f"Time drifted within allowed range: {drift} seconds")
 
         except KeyError:
             pass
@@ -795,7 +794,7 @@ class Paradox:
 
     def _on_event(self, event: Event):
         if cfg.LOGGING_DUMP_EVENTS:
-            logger.debug("LiveEvent: {}".format(event))
+            logger.debug(f"LiveEvent: {event}")
 
         event.call_hook(storage=self.storage, alarm=self)
 
@@ -813,7 +812,7 @@ class Paradox:
                 label_provider=self.get_label,
             )
             if cfg.LOGGING_DUMP_EVENTS:
-                logger.debug("ChangeEvent: {}".format(event))
+                logger.debug(f"ChangeEvent: {event}")
             ps.sendEvent(event)
         except AssertionError:
             logger.debug("Could not create event from change")

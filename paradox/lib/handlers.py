@@ -1,7 +1,9 @@
+from abc import abstractmethod
 import asyncio
 import logging
-from abc import abstractmethod
 from typing import Any, Awaitable, Callable, List, Optional, Union
+
+from paradox.config import config as cfg
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -30,7 +32,9 @@ class AlreadyHandledError(Exception):
 
 class FutureHandler(Handler, asyncio.Future):
     def __init__(
-        self, check_fn: Optional[Callable[[Any], bool]] = None, name=None,
+        self,
+        check_fn: Optional[Callable[[Any], bool]] = None,
+        name=None,
     ):
         super().__init__()
         self.name = name if name is not None else self.__class__.__name__
@@ -53,7 +57,7 @@ class PersistentHandler(Handler):
     def __init__(
         self, callback: Callable[[Any], Union[None, Awaitable[None]]], name=None
     ):
-        super(PersistentHandler, self).__init__(name)
+        super().__init__(name)
         self._handle = callback
         self.persistent = True
 
@@ -90,7 +94,7 @@ class HandlerRegistry:
         for handler in to_remove:
             self.remove(handler)
 
-    async def wait_until_complete(self, handler: Handler, timeout=2):
+    async def wait_until_complete(self, handler: Handler, timeout=cfg.IO_TIMEOUT):
         self.append(handler)
         try:
             return await asyncio.wait_for(handler, timeout=timeout)
@@ -112,7 +116,7 @@ class HandlerRegistry:
                     await handler(data)
             except AlreadyHandledError:
                 logger.error("Already handled")
-            except:
+            except Exception:
                 logger.exception("Exception caught during message handling")
                 raise
 

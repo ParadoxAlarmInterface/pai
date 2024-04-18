@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-
-
 import datetime
+from enum import Enum
 
 from construct import Adapter
-from enum import Enum
+
 
 class DateAdapter(Adapter):
     def _decode(self, obj, context, path):
@@ -35,7 +34,6 @@ class PartitionStateAdapter(Adapter):
     states = dict(arm=4, disarm=5, arm_sleep=3, arm_stay=1, none=0)
 
     def _decode(self, obj, context, path):
-
         for k, v in enumerate(self.states):
             if v == obj[0]:
                 return k
@@ -53,7 +51,6 @@ class ZoneStateAdapter(Adapter):
     states = dict(bypass=0x10)
 
     def _decode(self, obj, context, path):
-
         for k, v in enumerate(self.states):
             if v == obj[0]:
                 return k
@@ -227,16 +224,24 @@ class PGMDefinitionAdapter(Adapter):
         disabled = sum(obj) == 0
 
         if disabled:
-            return 'disabled'
+            return "disabled"
 
         try:
-            activation_event = PGMDefinitionAdapter.PGMEvent(obj[0]) if sum(obj[:3]) != 0 else 'disabled'
-        except:
-            activation_event = 'unknown'
+            activation_event = (
+                PGMDefinitionAdapter.PGMEvent(obj[0])
+                if sum(obj[:3]) != 0
+                else "disabled"
+            )
+        except Exception:
+            activation_event = "unknown"
 
         try:
-            deactivation_event = PGMDefinitionAdapter.PGMEvent(obj[3]) if sum(obj[3:]) != 0 else 'disabled'
-        except:
-            deactivation_event = 'unknown'
+            deactivation_event = (
+                PGMDefinitionAdapter.PGMEvent(obj[3])
+                if sum(obj[3:]) != 0
+                else "disabled"
+            )
+        except Exception:
+            deactivation_event = "unknown"
 
         return dict(activation=activation_event, deactivation=deactivation_event)

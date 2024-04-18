@@ -1,12 +1,16 @@
+from abc import abstractmethod
 import asyncio
 import binascii
 import logging
-from abc import abstractmethod
 
 from paradox.config import config as cfg
 from paradox.connections.handler import ConnectionHandler, IPConnectionHandler
-from paradox.connections.ip.parsers import (IPMessageCommand, IPMessageRequest,
-                                            IPMessageResponse, IPMessageType)
+from paradox.connections.ip.parsers import (
+    IPMessageCommand,
+    IPMessageRequest,
+    IPMessageResponse,
+    IPMessageType,
+)
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -52,11 +56,11 @@ class ConnectionProtocol(asyncio.Protocol):
         if self.transport:
             try:
                 self.transport.close()
-            except:
+            except Exception:
                 logger.exception("Connection transport close raised Exception")
             self.transport = None
 
-        await asyncio.wait_for(self._closed, timeout=1)
+        await asyncio.wait_for(self._closed, timeout=cfg.IO_TIMEOUT)
 
     @abstractmethod
     def send_message(self, message):
@@ -94,7 +98,7 @@ class ConnectionProtocol(asyncio.Protocol):
 class SerialConnectionProtocol(ConnectionProtocol):
     def send_message(self, message):
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("PAI -> SER {}".format(binascii.hexlify(message)))
+            logger.debug(f"PAI -> SER {binascii.hexlify(message)}")
 
         self.check_active()
 
@@ -137,7 +141,7 @@ class SerialConnectionProtocol(ConnectionProtocol):
             if checksum(frame, min_length):
                 self.buffer = self.buffer[len(frame) :]  # Remove message
                 if cfg.LOGGING_DUMP_PACKETS:
-                    logger.debug("SER -> PAI {}".format(binascii.hexlify(frame)))
+                    logger.debug(f"SER -> PAI {binascii.hexlify(frame)}")
 
                 self.handler.on_message(frame)
             else:
@@ -146,14 +150,14 @@ class SerialConnectionProtocol(ConnectionProtocol):
 
 class IPConnectionProtocol(ConnectionProtocol):
     def __init__(self, handler: IPConnectionHandler, key):
-        super(IPConnectionProtocol, self).__init__(handler)
+        super().__init__(handler)
 
         self.handler = handler
         self.key = key
 
     def send_raw(self, raw):
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("PAI -> IP (raw) {}".format(binascii.hexlify(raw)))
+            logger.debug(f"PAI -> IP (raw) {binascii.hexlify(raw)}")
 
         self.check_active()
 
@@ -161,7 +165,7 @@ class IPConnectionProtocol(ConnectionProtocol):
 
     def send_message(self, message):
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("PAI -> IP (payload) {}".format(binascii.hexlify(message)))
+            logger.debug(f"PAI -> IP (payload) {binascii.hexlify(message)}")
 
         self.check_active()
 
@@ -180,7 +184,7 @@ class IPConnectionProtocol(ConnectionProtocol):
             password=self.key,
         )
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("PAI -> IP (raw) {}".format(binascii.hexlify(msg)))
+            logger.debug(f"PAI -> IP (raw) {binascii.hexlify(msg)}")
 
         self.transport.write(msg)
 
@@ -188,9 +192,7 @@ class IPConnectionProtocol(ConnectionProtocol):
         message = IPMessageResponse.parse(data, password=self.key)
 
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug(
-                "IP -> PAI (payload) {}".format(binascii.hexlify(message.payload))
-            )
+            logger.debug(f"IP -> PAI (payload) {binascii.hexlify(message.payload)}")
 
         if message.header.message_type == IPMessageType.serial_passthrough_response:
             self.handler.on_message(message.payload)
@@ -218,7 +220,7 @@ class IPConnectionProtocol(ConnectionProtocol):
             return
 
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("IP -> PAI (raw) {}".format(binascii.hexlify(self.buffer)))
+            logger.debug(f"IP -> PAI (raw) {binascii.hexlify(self.buffer)}")
 
         self._process_message(self.buffer)
         self.buffer = b""

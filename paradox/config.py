@@ -55,6 +55,7 @@ class Config:
         "IP_CONNECTION_BARE": False,  # IP endpoint connects directly to panel. Used for Serial Tunnels over TCP
         # Paradox
         "KEEP_ALIVE_INTERVAL": 10,  # Interval between status updates
+        "IO_TIMEOUT": 0.5,  # Timeout for IO operations
         "LIMITS": {},  # By default all zones will be monitored
         "LABEL_ENCODING": "paradox-en",  # Encoding to use when decoding labels. paradox-* or https://docs.python.org/3/library/codecs.html#standard-encodings
         "LABEL_REFRESH_INTERVAL": (

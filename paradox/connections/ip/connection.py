@@ -1,17 +1,15 @@
-# -*- coding: utf-8 -*-
-
+from abc import ABC, abstractmethod
 import asyncio
 import logging
-from abc import ABC, abstractmethod
 
 from construct import Container
 
+from paradox.config import config as cfg
 from paradox.connections.connection import Connection
 from paradox.connections.handler import IPConnectionHandler
 from paradox.connections.ip.commands import IPModuleConnectCommand
 from paradox.connections.ip.stun_session import StunSession
-from paradox.connections.protocols import (IPConnectionProtocol,
-                                           SerialConnectionProtocol)
+from paradox.connections.protocols import IPConnectionProtocol, SerialConnectionProtocol
 from paradox.exceptions import PAICriticalException
 from paradox.lib.handlers import FutureHandler, HandlerRegistry
 
@@ -94,7 +92,7 @@ class IPConnectionWithEncryption(MultiAttemptConnection, IPConnectionHandler, AB
     def on_ip_message(self, container: Container):
         return self.loop.create_task(self.ip_handler_registry.handle(container))
 
-    async def wait_for_ip_message(self, timeout=2) -> Container:
+    async def wait_for_ip_message(self, timeout=cfg.IO_TIMEOUT) -> Container:
         future = FutureHandler()
         return await self.ip_handler_registry.wait_until_complete(future, timeout)
 
@@ -107,7 +105,10 @@ class IPConnectionWithEncryption(MultiAttemptConnection, IPConnectionHandler, AB
 
 class LocalIPConnection(IPConnectionWithEncryption):
     def __init__(
-        self, host, port, password,
+        self,
+        host,
+        port,
+        password,
     ):
         super().__init__(password)
         self.host = host
