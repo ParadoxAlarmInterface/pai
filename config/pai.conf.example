@@ -62,8 +62,6 @@ import logging
 #                                 # In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) ->
 #                                 # PC Communication (Babyware) Tab.
 #
-# POWER_UPDATE_INTERVAL = 60      	# Interval between updates of the battery, DC and VDC voltages
-# PUSH_POWER_UPDATE_WITHOUT_CHANGE = True # Always notify interfaces of power changes
 # PUSH_UPDATE_WITHOUT_CHANGE = False      # Always notify interfaces of all changes
 #
 ### MQTT

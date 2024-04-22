@@ -325,10 +325,6 @@ class Paradox:
             if limit_arr is not None:
                 status[limit_key].filter(limit_arr)
 
-        #     # TODO: throttle power update messages
-        #     if time.time() - self.last_power_update >= cfg.POWER_UPDATE_INTERVAL:
-        #         force = PublishPropertyChange.YES if cfg.PUSH_POWER_UPDATE_WITHOUT_CHANGE else PublishPropertyChange.NO
-
         if cfg.LOGGING_DUMP_STATUS:
             logger.debug("properties: %s", status)
 

@@ -79,12 +79,6 @@ class Config:
             None,
             [int, str, bytes, type(None)],
         ),  # PC Password. Set to None if Panel has no Password. In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) -> PC Communication (Babyware) Tab.
-        "POWER_UPDATE_INTERVAL": (
-            60,
-            int,
-            (0, 0xFFFFFFFF),
-        ),  # Interval between updates of the Power voltages
-        "PUSH_POWER_UPDATE_WITHOUT_CHANGE": True,  # Always notify interfaces of power changes
         "PUSH_UPDATE_WITHOUT_CHANGE": False,  # Always notify interfaces of all changes
         # MQTT
         "MQTT_ENABLE": False,  # Enable MQTT Interface
