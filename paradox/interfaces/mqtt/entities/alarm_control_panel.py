@@ -26,6 +26,12 @@ class AlarmControlPanel(AbstractControllableEntity):
         ))
         if self.code is not None:
             config['code']=self.code
+        else:
+             config.update(dict(
+                 code_arm_required=False,
+                 code_disarm_required=False,
+                 code_trigger_required=False
+             ))
         return config
 
     @property
