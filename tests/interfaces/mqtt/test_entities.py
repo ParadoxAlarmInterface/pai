@@ -25,6 +25,9 @@ def test_alarm_control_panel_serialize(mqtt_entity_factory):
         'payload_arm_home': 'arm_stay',
         'payload_arm_night': 'arm_sleep',
         'payload_disarm': 'disarm',
+        'code_arm_required': False,
+        'code_disarm_required': False,
+        'code_trigger_required': False
     }
 
     assert alarm_control_panel.configuration_topic == "homeassistant/alarm_control_panel/1234abcd/partition_partition_1/config"
