@@ -371,7 +371,7 @@ event_map = {
         level=EventLevel.INFO,
         tags=["tamper", "restore"],
         type="zone",
-        change=dict(zone_tamper_trouble=True),
+        change=dict(zone_tamper_trouble=False),
         message="Zone {label} tamper restore",
     ),
     35: dict(
