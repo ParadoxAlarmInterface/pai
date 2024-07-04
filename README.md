@@ -57,7 +57,8 @@ Can be looked up in Babyware (_Right click on a panel ⇾ Properties ⇾ PC Comm
 We do not recommend using SWAN because of https://github.com/CriticalSecurity/paradox
 
 ## Firmware Upgrade WARNING:
-**Do not upgrade EVO firmware versions to 7.50.000+ if you use Serial connection. Process is irreversible! Paradox introduces serial communication encryption which most probably will break our PAI ability to talk to the panel.**
+**Do not upgrade EVO firmware versions to 7.50.000+ if you use Serial connection. Process is irreversible! Paradox introduces serial communication encryption which most probably will break our PAI ability to talk to the panel.** 
+Note: Paradox sells unlock code to re-enable the unencrypted serial port.
 
 ## How to use
 See [wiki](https://github.com/ParadoxAlarmInterface/pai/wiki/Installation)
