@@ -1,0 +1,39 @@
+name: GH-ACTION-REMOVE-AND-IGNORE
+on: push
+
+jobs:
+  GH-ACTION-REMOVE-AND-IGNORE:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Remove log
+        uses: TheKitoInc/gh-action-remove-and-ignore@master
+        with:
+          path-remove: log
+
+      - name: Remove tmp
+        uses: TheKitoInc/gh-action-remove-and-ignore@master
+        with:
+          path-remove: tmp
+
+      - name: Remove data
+        uses: TheKitoInc/gh-action-remove-and-ignore@master
+        with:
+          path-remove: data
+
+      - name: Remove .php-cs-fixer.cache
+        uses: TheKitoInc/gh-action-remove-and-ignore@master
+        with:
+          path-remove: .php-cs-fixer.cache
+
+      - name: Remove node_modules
+        uses: TheKitoInc/gh-action-remove-and-ignore@master
+        with:
+          path-remove: node_modules
+
+      - name: Remove package-lock.json
+        uses: TheKitoInc/gh-action-remove-and-ignore@master
+        with:
+          path-remove: package-lock.json
