@@ -12,10 +12,3 @@ jobs:
   test:
     name: Test
     uses: ./.github/workflows/test.yml
-  publish:
-    name: Publish to Docker Hub
-    uses: ./.github/workflows/publish_docker.yml
-    needs: test
-    secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
