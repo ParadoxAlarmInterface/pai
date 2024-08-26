@@ -4,8 +4,7 @@ from paradox.config import config as cfg
 from paradox.event import Event, EventLevel, Notification
 from paradox.interfaces import ThreadQueueInterface
 from paradox.lib import ps
-from paradox.lib.event_filter import (EventFilter, EventTagFilter,
-                                      LiveEventRegexpFilter)
+from paradox.lib.event_filter import EventFilter, EventTagFilter, LiveEventRegexpFilter
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -25,7 +24,7 @@ class AbstractTextInterface(ThreadQueueInterface):
         super().stop()
 
     def _run(self):
-        super(AbstractTextInterface, self)._run()
+        super()._run()
 
         ps.subscribe(self.handle_panel_event, "events")
         ps.subscribe(self.handle_notify, "notifications")
@@ -38,11 +37,17 @@ class AbstractTextInterface(ThreadQueueInterface):
 
     def handle_notify(self, notification: Notification):
         if self.notification_filter(notification):
-            self.send_message(notification.message, notification.level)
+            try:
+                self.send_message(notification.message, notification.level)
+            except Exception as e:
+                logger.exception(f"Error handling notification: {e}")
 
     def handle_panel_event(self, event: Event):
         if self.event_filter.match(event):
-            self.send_message(event.message, event.level)
+            try:
+                self.send_message(event.message, event.level)
+            except Exception as e:
+                logger.exception(f"Error handling event: {e}")
 
     async def handle_command(self, message_raw):
         message = cfg.COMMAND_ALIAS.get(message_raw, message_raw)
@@ -50,7 +55,7 @@ class AbstractTextInterface(ThreadQueueInterface):
         tokens = message.split(" ")
 
         if len(tokens) != 3:
-            m = "Invalid: {}".format(message_raw)
+            m = f"Invalid: {message_raw}"
             logger.warning(m)
             return m
 
@@ -66,29 +71,29 @@ class AbstractTextInterface(ThreadQueueInterface):
         # Process a Zone Command
         if element_type == "zone":
             if not await self.alarm.control_zone(element, command):
-                m = "Zone command error: {}={}".format(element, command)
+                m = f"Zone command error: {element}={command}"
                 logger.warning(m)
                 return m
 
         # Process a Partition Command
         elif element_type == "partition":
             if not await self.alarm.control_partition(element, command):
-                m = "Partition command error: {}={}".format(element, command)
+                m = f"Partition command error: {element}={command}"
                 logger.warning(m)
                 return m
 
         # Process an Output Command
         elif element_type == "output":
             if not await self.alarm.control_output(element, command):
-                m = "Output command error: {}={}".format(element, command)
+                m = f"Output command error: {element}={command}"
                 logger.warning(m)
                 return m
         else:
-            m = "Invalid control element: {}".format(element)
+            m = f"Invalid control element: {element}"
             logger.error(m)
             return m
 
-        logger.info("OK: {}".format(message_raw))
+        logger.info(f"OK: {message_raw}")
         return "OK"
 
     # TODO: Remove this (to panels?)
