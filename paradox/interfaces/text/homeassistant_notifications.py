@@ -23,13 +23,12 @@ class HomeAssistantNotificationsTextInterface(ConfiguredAbstractTextInterface):
         )
 
         self.api_url = "http://supervisor/core/api/services/:domain/:service"
-        self.token = os.environ.get("SUPERVISOR_TOKEN")
-        if cfg.HOMEASSISTANT_NOTIFICATIONS_API_TOKEN:
-            self.token = cfg.HOMEASSISTANT_NOTIFICATIONS_API_TOKEN
-
         if cfg.HOMEASSISTANT_NOTIFICATIONS_API_URL:
             self.api_url = cfg.HOMEASSISTANT_NOTIFICATIONS_API_URL
 
+        self.token = os.environ.get("SUPERVISOR_TOKEN")
+        if cfg.HOMEASSISTANT_NOTIFICATIONS_API_TOKEN:
+            self.token = cfg.HOMEASSISTANT_NOTIFICATIONS_API_TOKEN
         if not self.token:
             logger.error(
                 f'"SUPERVISOR_TOKEN" environment variable must be set to use {__class__.__name__}'
