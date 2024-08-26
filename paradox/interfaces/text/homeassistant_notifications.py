@@ -38,7 +38,7 @@ class HomeAssistantNotificationsTextInterface(ConfiguredAbstractTextInterface):
     def send_message(self, message: str, level: EventLevel):
         if not self.token:
             logger.warning(
-                'Unable to send a notification to Home Assistant. "SUPERVISOR_TOKEN" environment variable is not set'
+                "Unable to send a notification to Home Assistant. No token is set."
             )
             return
 
