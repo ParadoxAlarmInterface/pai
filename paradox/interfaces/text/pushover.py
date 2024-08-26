@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import logging
 import re
 
@@ -37,7 +35,7 @@ class PushoverTextInterface(ConfiguredAbstractTextInterface):
         self.users = {}
 
     def _run(self):
-        super(PushoverTextInterface, self)._run()
+        super()._run()
 
         self.app = chump.Application(cfg.PUSHOVER_KEY)
         if not self.app.is_authenticated:
@@ -50,7 +48,7 @@ class PushoverTextInterface(ConfiguredAbstractTextInterface):
             user_key = settings["user_key"]
             devices_raw = settings["devices"]
 
-            user = self.users.get(user_key)  # type: chump.User
+            user = self.users.get(user_key)
 
             if user is None:
                 user = self.users[user_key] = self.app.get_user(user_key)
@@ -68,7 +66,8 @@ class PushoverTextInterface(ConfiguredAbstractTextInterface):
                         title="Alarm",
                         priority=_level_2_priority.get(level, chump.NORMAL),
                     )
-                except:
+                    logger.info(f"Notification sent: {message}, level={level}")
+                except Exception:
                     logger.exception("Pushover send message")
 
             else:
@@ -88,7 +87,10 @@ class PushoverTextInterface(ConfiguredAbstractTextInterface):
                             device=device,
                             priority=_level_2_priority.get(level, chump.NORMAL),
                         )
-                    except:
+                        logger.info(
+                            f"Notification sent: {message}, level={level}, device={device}"
+                        )
+                    except Exception:
                         logger.exception("Pushover send message")
 
         # TODO: Missing the message reception

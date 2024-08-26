@@ -74,7 +74,7 @@ class HomeAssistantNotificationsTextInterface(ConfiguredAbstractTextInterface):
 
         res = requests.post(url, json=payload, headers=headers)
         if res.status_code == 200:
-            logger.debug(f"Notification sent: {message}, level={level}")
+            logger.info(f"Notification sent: {message}, level={level}")
         else:
             logger.error(
                 f"Failed to send notification: code={res.status_code}, text: {res.text}"
