@@ -116,6 +116,14 @@ import logging
 ### MQTT Home Assistant Auto Discovery
 # MQTT_HOMEASSISTANT_AUTODISCOVERY_ENABLE = False
 # MQTT_HOMEASSISTANT_CODE = None
+# HOMEASSISTANT_PUBLISH_PARTITION_PROPERTIES = [
+#     'target_state',
+#     'current_state'
+# ]
+# HOMEASSISTANT_PUBLISH_ZONE_PROPERTIES = [
+#     'open',
+#     'tamper'
+# ]
 #
 ### Dash App
 # MQTT_DASH_PUBLISH = False
@@ -139,16 +147,11 @@ import logging
 #
 ### Home Assistant Notifications (HASS.io required)
 # HOMEASSISTANT_NOTIFICATIONS_ENABLE = False
+# HOMEASSISTANT_NOTIFICATIONS_API_URL = "http://supervisor/core/api/services/:domain/:service"
+# HOMEASSISTANT_NOTIFICATIONS_API_TOKEN = "" # Long-Lived Access Token. Required if you do not use HA Supervisor
+# HOMEASSISTANT_NOTIFICATIONS_LOVELACE_URI = "" # URI to open when notification is clicked
 # HOMEASSISTANT_NOTIFICATIONS_NOTIFIER_NAME = 'notify'
 # HOMEASSISTANT_NOTIFICATIONS_MIN_EVENT_LEVEL = 'INFO'
-# HOMEASSISTANT_PUBLISH_PARTITION_PROPERTIES = [
-#     'target_state',
-#     'current_state'
-# ]
-# HOMEASSISTANT_PUBLISH_ZONE_PROPERTIES = [
-#     'open',
-#     'tamper'
-# ]
 ## Event filtering by tags:
 # HOMEASSISTANT_NOTIFICATIONS_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
 #     'live,alarm,-restore', # or
