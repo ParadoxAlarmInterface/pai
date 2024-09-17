@@ -1,13 +1,10 @@
-# -*- coding: utf-8 -*-
-
-
+import asyncio
 import logging
 import os
 import stat
-import typing
 
-import serial_asyncio
 from serial import SerialException
+import serial_asyncio
 
 from ..exceptions import SerialConnectionOpenFailed
 from .connection import Connection
@@ -67,12 +64,12 @@ class SerialCommunication(Connection, ConnectionHandler):
                 logger.error(f"Failed to update file {self.port_path} permissions")
                 return False
 
-        self.connected_future = self.loop.create_future()
-        open_timeout_handler = self.loop.call_later(5, self.open_timeout)
+        self.connected_future = asyncio.get_event_loop().create_future()
+        open_timeout_handler = asyncio.get_event_loop().call_later(5, self.open_timeout)
 
         try:
             _, self._protocol = await serial_asyncio.create_serial_connection(
-                self.loop, self.make_protocol, self.port_path, self.baud
+                asyncio.get_event_loop(), self.make_protocol, self.port_path, self.baud
             )
 
             return await self.connected_future
@@ -81,7 +78,7 @@ class SerialCommunication(Connection, ConnectionHandler):
             raise SerialConnectionOpenFailed(
                 "Connection to serial port failed"
             ) from e  # PAICriticalException
-        except:
+        except Exception:
             logger.exception("Unable to connect to Serial")
         finally:
             open_timeout_handler.cancel()

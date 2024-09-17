@@ -60,7 +60,7 @@ class BareIPConnection(MultiAttemptConnection):
         self.port = port
 
     async def _try_connect(self):
-        _, self._protocol = await self.loop.create_connection(
+        _, self._protocol = await asyncio.get_event_loop().create_connection(
             self._make_protocol, host=self.host, port=self.port
         )
 
@@ -90,7 +90,9 @@ class IPConnectionWithEncryption(MultiAttemptConnection, IPConnectionHandler, AB
         self._protocol.key = value
 
     def on_ip_message(self, container: Container):
-        return self.loop.create_task(self.ip_handler_registry.handle(container))
+        return asyncio.get_event_loop().create_task(
+            self.ip_handler_registry.handle(container)
+        )
 
     async def wait_for_ip_message(self, timeout=cfg.IO_TIMEOUT) -> Container:
         future = FutureHandler()
@@ -115,7 +117,7 @@ class LocalIPConnection(IPConnectionWithEncryption):
         self.port = port
 
     async def _try_connect(self) -> None:
-        _, self._protocol = await self.loop.create_connection(
+        _, self._protocol = await asyncio.get_event_loop().create_connection(
             self._make_protocol, host=self.host, port=self.port
         )
 
@@ -146,7 +148,7 @@ class StunIPConnection(IPConnectionWithEncryption):
 
     async def _try_connect(self) -> None:
         await self.stun_session.connect()
-        _, self._protocol = await self.loop.create_connection(
+        _, self._protocol = await asyncio.get_event_loop().create_connection(
             self._make_protocol, sock=self.stun_session.get_socket()
         )
 

@@ -28,12 +28,12 @@ class SignalTextInterface(ConfiguredAbstractTextInterface):
         )
 
         self.signal = None
-        self.loop = None
+        self.glib_loop = None
 
     def stop(self):
         """Stops the Signal Interface Thread"""
-        if self.loop is not None:
-            self.loop.quit()
+        if self.glib_loop is not None:
+            self.glib_loop.quit()
 
         super().stop()
 
@@ -46,11 +46,11 @@ class SignalTextInterface(ConfiguredAbstractTextInterface):
 
         self.signal = bus.get("org.asamk.Signal")
         self.signal.onMessageReceived = self.handle_message
-        self.loop = GLib.MainLoop()
+        self.glib_loop = GLib.MainLoop()
 
         logger.debug("Signal Interface Running")
 
-        asyncio.get_event_loop().run_in_executor(None, self.loop.run)
+        asyncio.get_event_loop().run_in_executor(None, self.glib_loop.run)
 
     def send_message(self, message: str, level: EventLevel):
         if self.signal is None:
