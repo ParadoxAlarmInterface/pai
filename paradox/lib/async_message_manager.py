@@ -26,12 +26,8 @@ class ErrorMessageHandler(PersistentHandler):
 
 
 class AsyncMessageManager:
-    def __init__(self, loop=None):
+    def __init__(self):
         super().__init__()
-
-        if not loop:
-            loop = asyncio.get_event_loop()
-        self.loop = loop
 
         self.handler_registry = HandlerRegistry()
         self.raw_handler_registry = HandlerRegistry()
@@ -58,7 +54,11 @@ class AsyncMessageManager:
         self.handler_registry.remove_by_name(name)
 
     def schedule_message_handling(self, message: Container):
-        return self.loop.create_task(self.handler_registry.handle(message))
+        return asyncio.get_event_loop().create_task(
+            self.handler_registry.handle(message)
+        )
 
     def schedule_raw_message_handling(self, message: Container):
-        return self.loop.create_task(self.raw_handler_registry.handle(message))
+        return asyncio.get_event_loop().create_task(
+            self.raw_handler_registry.handle(message)
+        )

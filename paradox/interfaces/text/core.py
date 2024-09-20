@@ -2,14 +2,14 @@ import logging
 
 from paradox.config import config as cfg
 from paradox.event import Event, EventLevel, Notification
-from paradox.interfaces import ThreadQueueInterface
+from paradox.interfaces import AsyncInterface
 from paradox.lib import ps
 from paradox.lib.event_filter import EventFilter, EventTagFilter, LiveEventRegexpFilter
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
 
-class AbstractTextInterface(ThreadQueueInterface):
+class AbstractTextInterface(AsyncInterface):
     """Interface Class using any Text interface"""
 
     def __init__(self, alarm, event_filter: EventFilter, min_level=EventLevel.INFO):
@@ -20,12 +20,7 @@ class AbstractTextInterface(ThreadQueueInterface):
         self.min_level = min_level
         self.alarm = alarm
 
-    def stop(self):
-        super().stop()
-
-    def _run(self):
-        super()._run()
-
+    async def run(self):
         ps.subscribe(self.handle_panel_event, "events")
         ps.subscribe(self.handle_notify, "notifications")
 
