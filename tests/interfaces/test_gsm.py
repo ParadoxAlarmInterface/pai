@@ -104,7 +104,7 @@ async def test_gsm_text_interface(connected_serial_communication):
     interface.modem_connected = True
 
     data = b"+CMT: test_data"
-    await interface.data_received(data)
+    interface.data_received(data)
     assert interface.message_cmt == data.decode()
 
     # level = EventLevel.INFO

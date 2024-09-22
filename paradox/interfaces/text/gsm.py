@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+from typing import Callable, Optional
 
 import serial_asyncio
 
@@ -90,7 +91,7 @@ class SerialCommunication(ConnectionHandler):
         else:
             self.queue.put_nowait(message)
 
-    def set_recv_callback(self, callback):
+    def set_recv_callback(self, callback: Optional[Callable[[str], bool]]):
         self.recv_callback = callback
 
     def open_timeout(self):
@@ -219,7 +220,7 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
 
             await asyncio.sleep(5)
 
-    async def data_received(self, data: str) -> bool:
+    def data_received(self, data: str) -> bool:
         logger.debug(f"Data Received: {data}")
 
         data = data.decode()
