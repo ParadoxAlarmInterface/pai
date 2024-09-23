@@ -2,6 +2,7 @@ import logging
 
 from paradox.config import config as cfg
 from paradox.event import Event, EventLevel, Notification
+from paradox.exceptions import InvalidCommand
 from paradox.interfaces import AsyncInterface
 from paradox.lib import ps
 from paradox.lib.event_filter import EventFilter, EventTagFilter, LiveEventRegexpFilter
@@ -61,7 +62,7 @@ class AbstractTextInterface(AsyncInterface):
 
         element_type = tokens[0].lower()
         element = tokens[1]
-        command = self.normalize_payload(tokens[2].lower())
+        command = self.normalize_command(tokens[2].lower())
 
         # Process a Zone Command
         if element_type == "zone":
@@ -91,16 +92,15 @@ class AbstractTextInterface(AsyncInterface):
         logger.info(f"OK: {message_raw}")
         return "OK"
 
-    # TODO: Remove this (to panels?)
     @staticmethod
-    def normalize_payload(message):
-        message = message.strip().lower()
+    def normalize_command(command):
+        command = command.strip().lower()
 
-        if message in ["true", "on", "1", "enable"]:
+        if command in ["true", "on", "1", "enable"]:
             return "on"
-        elif message in ["false", "off", "0", "disable"]:
+        elif command in ["false", "off", "0", "disable"]:
             return "off"
-        elif message in [
+        elif command in [
             "pulse",
             "arm",
             "disarm",
@@ -109,9 +109,9 @@ class AbstractTextInterface(AsyncInterface):
             "bypass",
             "clear_bypass",
         ]:
-            return message
+            return command
 
-        return None
+        raise InvalidCommand(f'Invalid command: "{command}"')
 
 
 class ConfiguredAbstractTextInterface(AbstractTextInterface):
