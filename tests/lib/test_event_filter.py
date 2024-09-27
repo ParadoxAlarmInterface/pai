@@ -16,6 +16,7 @@ def test_tag_match():
 
     assert EventTagFilter(["partition+arm"]).match(event) is True
     assert EventTagFilter(["partition+arm+restore"]).match(event) is True
+    assert EventTagFilter(["partition,arm,-restore"]).match(event) is False
     assert EventTagFilter(["partition"]).match(event) is True
     assert EventTagFilter(["arm"]).match(event) is True
     assert EventTagFilter(["arm-zone"]).match(event) is True
