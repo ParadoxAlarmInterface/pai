@@ -14,9 +14,9 @@ jobs:
     uses: ./.github/workflows/test.yml
   publish:
     name: Publish to Docker Hub
+    if: github.repository == 'ParadoxAlarmInterface/pai' && github.ref == 'refs/heads/dev'
     uses: ./.github/workflows/publish_docker.yml
     needs: test
-    if: github.repository_owner == 'ParadoxAlarmInterface'
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
