@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import asyncio
 import json
 import logging
@@ -23,7 +22,7 @@ class PushBulletWSClient(WebSocketBaseClient):
     name = "pushbullet"
 
     def __init__(self, interface, url):
-        """ Initializes the PB WS Client"""
+        """Initializes the PB WS Client"""
         super().__init__(url)
 
         self.pb = Pushbullet(cfg.PUSHBULLET_KEY)
@@ -31,7 +30,7 @@ class PushBulletWSClient(WebSocketBaseClient):
         self.interface = interface
 
         self.device = None
-        for i, device in enumerate(self.pb.devices):
+        for _, device in enumerate(self.pb.devices):
             if device.nickname == cfg.PUSHBULLET_DEVICE:
                 logger.debug("Device found")
                 self.device = device
@@ -45,12 +44,12 @@ class PushBulletWSClient(WebSocketBaseClient):
         self.manager.stop()
 
     def handshake_ok(self):
-        """ Callback trigger when connection succeeded"""
+        """Callback trigger when connection succeeded"""
         logger.info("Handshake OK")
         self.manager.add(self)
         self.manager.start()
         for chat in self.pb.chats:
-            logger.debug("Associated contacts: {}".format(chat))
+            logger.debug(f"Associated contacts: {chat}")
 
         # Receiving pending messages
         self.received_message(json.dumps({"type": "tickle", "subtype": "push"}))
@@ -58,12 +57,12 @@ class PushBulletWSClient(WebSocketBaseClient):
         self.send_message("Active")
 
     def received_message(self, message):
-        """ Handle Pushbullet message. It should be a command """
-        logger.debug("Received Message {}".format(message))
+        """Handle Pushbullet message. It should be a command"""
+        logger.debug(f"Received Message {message}")
 
         try:
             message = json.loads(str(message))
-        except:
+        except Exception:
             logger.exception("Unable to parse message")
             return
 
@@ -107,11 +106,11 @@ class PushBulletWSClient(WebSocketBaseClient):
                 )
 
     def unhandled_error(self, error):
-        logger.error("{}".format(error))
+        logger.error(f"{error}")
 
         try:
             self.terminate()
-        except:
+        except Exception:
             logger.exception("Closing Pushbullet WS")
 
         self.close()
@@ -129,7 +128,7 @@ class PushBulletWSClient(WebSocketBaseClient):
             if chat.email in cfg.PUSHBULLET_CONTACTS:
                 try:
                     self.pb.push_note(cfg.PUSHBULLET_DEVICE, msg, chat=chat)
-                except:
+                except Exception:
                     logger.exception("Sending message")
                     time.sleep(5)
 
@@ -148,21 +147,21 @@ class PushbulletTextInterface(ConfiguredAbstractTextInterface):
         self.name = PushBulletWSClient.name
         self.pb_ws = None
 
-    def _run(self):
-        super(PushbulletTextInterface, self)._run()
+    async def run(self):
+        await super().run()
         try:
             self.pb_ws = PushBulletWSClient(
                 self,
-                "wss://stream.pushbullet.com/websocket/{}".format(cfg.PUSHBULLET_KEY),
+                f"wss://stream.pushbullet.com/websocket/{cfg.PUSHBULLET_KEY}",
             )
             self.pb_ws.connect()
-        except:
+        except Exception:
             logger.exception("Could not connect to Pushbullet service")
 
         logger.info("Pushbullet Interface Started")
 
     def stop(self):
-        """ Stops the Pushbullet interface"""
+        """Stops the Pushbullet interface"""
         super().stop()
         if self.pb_ws is not None:
             self.pb_ws.stop()

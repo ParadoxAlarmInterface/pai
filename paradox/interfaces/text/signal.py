@@ -1,15 +1,16 @@
-# -*- coding: utf-8 -*-
 import asyncio
 import logging
 
 from gi.repository import GLib
+from pydbus import SystemBus
+
 from paradox.config import config as cfg
 from paradox.event import EventLevel, Notification
+
 # Signal interface.
 # Only exposes critical status changes and accepts commands
 from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
 from paradox.lib import ps
-from pydbus import SystemBus
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -27,30 +28,29 @@ class SignalTextInterface(ConfiguredAbstractTextInterface):
         )
 
         self.signal = None
-        self.loop = None
+        self.glib_loop = None
 
     def stop(self):
-
-        """ Stops the Signal Interface Thread"""
-        if self.loop is not None:
-            self.loop.quit()
+        """Stops the Signal Interface Thread"""
+        if self.glib_loop is not None:
+            self.glib_loop.quit()
 
         super().stop()
 
         logger.debug("Signal Stopped")
 
-    def _run(self):
-        super(SignalTextInterface, self)._run()
+    async def run(self):
+        await super().run()
 
         bus = SystemBus()
 
         self.signal = bus.get("org.asamk.Signal")
         self.signal.onMessageReceived = self.handle_message
-        self.loop = GLib.MainLoop()
+        self.glib_loop = GLib.MainLoop()
 
         logger.debug("Signal Interface Running")
 
-        self.loop.run()
+        asyncio.get_event_loop().run_in_executor(None, self.glib_loop.run)
 
     def send_message(self, message: str, level: EventLevel):
         if self.signal is None:
@@ -59,11 +59,11 @@ class SignalTextInterface(ConfiguredAbstractTextInterface):
 
         try:
             self.signal.sendMessage(str(message), [], cfg.SIGNAL_CONTACTS)
-        except:
+        except Exception:
             logger.exception("Signal send message")
 
     def handle_message(self, timestamp, source, groupID, message, attachments):
-        """ Handle Signal message. It should be a command """
+        """Handle Signal message. It should be a command"""
 
         logger.debug(
             "Received Message {} {} {} {} {}".format(
@@ -77,10 +77,10 @@ class SignalTextInterface(ConfiguredAbstractTextInterface):
             )
             ret = future.result(10)
 
-            m = "Signal {} : {}".format(source, ret)
+            m = f"Signal {source} : {ret}"
             logger.info(m)
         else:
-            m = "Signal {} (UNK): {}".format(source, message)
+            m = f"Signal {source} (UNK): {message}"
             logger.warning(m)
 
         self.send_message(m, EventLevel.INFO)

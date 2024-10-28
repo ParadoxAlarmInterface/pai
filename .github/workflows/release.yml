@@ -12,7 +12,7 @@ jobs:
     name: Publish to Docker Hub
     uses: ./.github/workflows/publish_docker.yml
     needs: test
-    if: github.repository_owner == 'ParadoxAlarmInterface'
+    if: github.repository == 'ParadoxAlarmInterface/pai'
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -20,6 +20,6 @@ jobs:
     name: Publish to PyPI
     uses: ./.github/workflows/publish_pypi.yml
     needs: test
-    if: github.repository_owner == 'ParadoxAlarmInterface'
+    if: github.repository == 'ParadoxAlarmInterface/pai'
     secrets:
       PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}

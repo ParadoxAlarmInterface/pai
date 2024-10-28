@@ -36,9 +36,6 @@ MODULES = {
     "yaml": dict(
         mandatory=False, desc="the IP150 connection", install_name="pyyaml>=5.2.0"
     ),
-    "chump": dict(
-        mandatory=False, desc="the Pushover interface", install_name="chump>=1.6.0"
-    ),
     "pydbus": dict(
         mandatory=False, desc="the Signal interface", install_name="pydbus>=0.6.0"
     ),

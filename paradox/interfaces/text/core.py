@@ -2,15 +2,15 @@ import logging
 
 from paradox.config import config as cfg
 from paradox.event import Event, EventLevel, Notification
-from paradox.interfaces import ThreadQueueInterface
+from paradox.exceptions import InvalidCommand
+from paradox.interfaces import AsyncInterface
 from paradox.lib import ps
-from paradox.lib.event_filter import (EventFilter, EventTagFilter,
-                                      LiveEventRegexpFilter)
+from paradox.lib.event_filter import EventFilter, EventTagFilter, LiveEventRegexpFilter
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
 
-class AbstractTextInterface(ThreadQueueInterface):
+class AbstractTextInterface(AsyncInterface):
     """Interface Class using any Text interface"""
 
     def __init__(self, alarm, event_filter: EventFilter, min_level=EventLevel.INFO):
@@ -21,12 +21,7 @@ class AbstractTextInterface(ThreadQueueInterface):
         self.min_level = min_level
         self.alarm = alarm
 
-    def stop(self):
-        super().stop()
-
-    def _run(self):
-        super(AbstractTextInterface, self)._run()
-
+    async def run(self):
         ps.subscribe(self.handle_panel_event, "events")
         ps.subscribe(self.handle_notify, "notifications")
 
@@ -38,11 +33,17 @@ class AbstractTextInterface(ThreadQueueInterface):
 
     def handle_notify(self, notification: Notification):
         if self.notification_filter(notification):
-            self.send_message(notification.message, notification.level)
+            try:
+                self.send_message(notification.message, notification.level)
+            except Exception as e:
+                logger.exception(f"Error handling notification: {e}")
 
     def handle_panel_event(self, event: Event):
         if self.event_filter.match(event):
-            self.send_message(event.message, event.level)
+            try:
+                self.send_message(event.message, event.level)
+            except Exception as e:
+                logger.exception(f"Error handling event: {e}")
 
     async def handle_command(self, message_raw):
         message = cfg.COMMAND_ALIAS.get(message_raw, message_raw)
@@ -50,7 +51,7 @@ class AbstractTextInterface(ThreadQueueInterface):
         tokens = message.split(" ")
 
         if len(tokens) != 3:
-            m = "Invalid: {}".format(message_raw)
+            m = f"Invalid: {message_raw}"
             logger.warning(m)
             return m
 
@@ -61,46 +62,45 @@ class AbstractTextInterface(ThreadQueueInterface):
 
         element_type = tokens[0].lower()
         element = tokens[1]
-        command = self.normalize_payload(tokens[2].lower())
+        command = self.normalize_command(tokens[2].lower())
 
         # Process a Zone Command
         if element_type == "zone":
             if not await self.alarm.control_zone(element, command):
-                m = "Zone command error: {}={}".format(element, command)
+                m = f"Zone command error: {element}={command}"
                 logger.warning(m)
                 return m
 
         # Process a Partition Command
         elif element_type == "partition":
             if not await self.alarm.control_partition(element, command):
-                m = "Partition command error: {}={}".format(element, command)
+                m = f"Partition command error: {element}={command}"
                 logger.warning(m)
                 return m
 
         # Process an Output Command
         elif element_type == "output":
             if not await self.alarm.control_output(element, command):
-                m = "Output command error: {}={}".format(element, command)
+                m = f"Output command error: {element}={command}"
                 logger.warning(m)
                 return m
         else:
-            m = "Invalid control element: {}".format(element)
+            m = f"Invalid control element: {element}"
             logger.error(m)
             return m
 
-        logger.info("OK: {}".format(message_raw))
+        logger.info(f"OK: {message_raw}")
         return "OK"
 
-    # TODO: Remove this (to panels?)
     @staticmethod
-    def normalize_payload(message):
-        message = message.strip().lower()
+    def normalize_command(command):
+        command = command.strip().lower()
 
-        if message in ["true", "on", "1", "enable"]:
+        if command in ["true", "on", "1", "enable"]:
             return "on"
-        elif message in ["false", "off", "0", "disable"]:
+        elif command in ["false", "off", "0", "disable"]:
             return "off"
-        elif message in [
+        elif command in [
             "pulse",
             "arm",
             "disarm",
@@ -109,9 +109,9 @@ class AbstractTextInterface(ThreadQueueInterface):
             "bypass",
             "clear_bypass",
         ]:
-            return message
+            return command
 
-        return None
+        raise InvalidCommand(f'Invalid command: "{command}"')
 
 
 class ConfiguredAbstractTextInterface(AbstractTextInterface):

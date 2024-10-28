@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
@@ -17,7 +18,9 @@ async def test_connect(mocker):
     protocol.is_active.return_value = True
 
     create_connection_mock = AsyncMock(return_value=(None, protocol))
-    mocker.patch.object(connection.loop, "create_connection", create_connection_mock)
+    mocker.patch.object(
+        asyncio.get_event_loop(), "create_connection", create_connection_mock
+    )
     connect_command_execute = mocker.patch.object(
         IPModuleConnectCommand, "execute", AsyncMock()
     )
@@ -74,7 +77,7 @@ async def assert_session_connect(mocker, session):
                         "serial": "bf4c1fe4",
                         "type": "HD77",
                         "port": 54321,
-                        "panelSerial": "0584b067"
+                        "panelSerial": "0584b067",
                     },
                     {
                         "lastUpdate": "2021-05-07T15:41:19Z",
@@ -85,7 +88,7 @@ async def assert_session_connect(mocker, session):
                         "serial": "465e81a0",
                         "type": "HD88",
                         "port": 12345,
-                        "panelSerial": "0584b067"
+                        "panelSerial": "0584b067",
                     },
                     {
                         "lastUpdate": "2021-05-07T15:41:19Z",
@@ -98,7 +101,7 @@ async def assert_session_connect(mocker, session):
                         "panelSerial": "a72ed4bf",
                         "xoraddr": "9a640069cda9b317",
                         "API": None,
-                        "ipAddress": "0.0.0.0"
+                        "ipAddress": "0.0.0.0",
                     },
                     {
                         "lastUpdate": "2021-05-07T15:41:19Z",
@@ -111,13 +114,13 @@ async def assert_session_connect(mocker, session):
                         "panelSerial": "0584b067",
                         "xoraddr": "c351472f48a5e1ba",
                         "API": None,
-                        "ipAddress": "0.0.0.0"
-                    }
+                        "ipAddress": "0.0.0.0",
+                    },
                 ],
                 "paid": 1,
                 "daysLeft": 364,
                 "sitePanelStatus": 1,
-                "email": "em@em.com"
+                "email": "em@em.com",
             }
         ]
     }
@@ -130,6 +133,8 @@ async def assert_session_connect(mocker, session):
 
     mocker.patch("requests.get").return_value = StubResponse()
     client = mocker.patch("paradox.lib.stun.StunClient")
-    client.return_value.receive_response.return_value = [{"attr_body": "abcdef", "name": "BEER"}]
+    client.return_value.receive_response.return_value = [
+        {"attr_body": "abcdef", "name": "BEER"}
+    ]
     await session.connect()
     return json_data

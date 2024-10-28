@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
@@ -15,7 +16,9 @@ async def test_connect(mocker):
     protocol.is_active.return_value = True
 
     create_connection_mock = AsyncMock(return_value=(None, protocol))
-    mocker.patch.object(connection.loop, "create_connection", create_connection_mock)
+    mocker.patch.object(
+        asyncio.get_event_loop(), "create_connection", create_connection_mock
+    )
     connect_command_execute = mocker.patch.object(
         IPModuleConnectCommand, "execute", AsyncMock()
     )
