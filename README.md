@@ -1,7 +1,7 @@
 <div align="center">
     <div style="display: flex;">
-        <a href="https://matrix.to/#/#paradox-alarm-interface_community:gitter.im">
-            <img alt="Matrix" src="https://img.shields.io/matrix/pai:gitter.im.svg">
+        <a href="https://discord.com/channels/1310653159596888064">
+            <img alt="Discord" src="https://img.shields.io/discord/1310653159596888064">
         </a>
         #paradox-alarm-interface_community:gitter.im
         <a href="https://github.com/ParadoxAlarmInterface/pai/actions/workflows/master.yml">
@@ -37,7 +37,7 @@ Support for Magellan, Spectra and EVO panels is very stable. If you find a bug, 
 
 For further information and detailed usage refer to the [Wiki](https://github.com/ParadoxAlarmInterface/pai/wiki).
 
-If you are having issues, or wish to discuss new features, join us at our [Matrix community](https://matrix.to/#/#paradox-alarm-interface_community:gitter.im)
+If you are having issues, or wish to discuss new features, join us at our [Discord community](https://discord.com/channels/1310653159596888064/1310653159596888067)
 
 On Android, if you install [MQTT Dash](https://play.google.com/store/apps/details?id=net.routix.mqttdash), and [follow the instructions](https://github.com/ParadoxAlarmInterface/pai/wiki#mqtt-dash) you will automatically get a panel like this:
 ![mqtt_dash](https://user-images.githubusercontent.com/497717/52603920-d4984d80-2e60-11e9-9772-578b10576b3c.jpg)
@@ -57,7 +57,7 @@ Can be looked up in Babyware (_Right click on a panel ⇾ Properties ⇾ PC Comm
 We do not recommend using SWAN because of https://github.com/CriticalSecurity/paradox
 
 ## Firmware Upgrade WARNING:
-**Do not upgrade EVO firmware versions to 7.50.000+ if you use Serial connection. Process is irreversible! Paradox introduces serial communication encryption which most probably will break our PAI ability to talk to the panel.** 
+**Do not upgrade EVO firmware versions to 7.50.000+ if you use Serial connection. Process is irreversible! Paradox introduces serial communication encryption which most probably will break our PAI ability to talk to the panel.**
 Note: Paradox sells unlock code to re-enable the unencrypted serial port.
 
 ## How to use
