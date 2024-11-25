@@ -3,7 +3,6 @@
         <a href="https://discord.com/channels/1310653159596888064">
             <img alt="Discord" src="https://img.shields.io/discord/1310653159596888064">
         </a>
-        #paradox-alarm-interface_community:gitter.im
         <a href="https://github.com/ParadoxAlarmInterface/pai/actions/workflows/master.yml">
             <img alt="CI/CD master" src="https://github.com/ParadoxAlarmInterface/pai/actions/workflows/master.yml/badge.svg?branch=master">
         </a>
