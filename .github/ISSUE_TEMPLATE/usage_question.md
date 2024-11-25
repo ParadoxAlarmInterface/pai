@@ -33,7 +33,7 @@ Python version
 If you wish to add a log (which will greatly help us), please follow the following instructions:
 
 1. Go to https://keybase.io/encrypt
-2. Write 'jpbarraca' as the recipient
+2. Write 'yozik04' as the recipient
 3. Write your log or add a link to the log file (if using services such as dropbox).
 4. Click Encrypt
 5. Save the result to a text file and add it as an attachment.-->
