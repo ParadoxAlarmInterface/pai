@@ -10,7 +10,7 @@ Before asking a question look into wiki and FAQ page:
 - Wiki: https://github.com/ParadoxAlarmInterface/pai/wiki
 - FAQ: https://github.com/ParadoxAlarmInterface/pai/wiki/FAQ
 - Use search before posting. Maybe your issue was already solved.
-- You can always use https://discord.com/channels/1310653159596888064 to ask a quick question.
+- You can always use https://discord.gg/7BWjravp to ask a quick question.
 -->
 
 ## Alarm system

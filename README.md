@@ -1,6 +1,6 @@
 <div align="center">
     <div style="display: flex;">
-        <a href="https://discord.com/channels/1310653159596888064">
+        <a href="https://discord.gg/7BWjravp">
             <img alt="Discord" src="https://img.shields.io/discord/1310653159596888064">
         </a>
         <a href="https://github.com/ParadoxAlarmInterface/pai/actions/workflows/master.yml">
@@ -36,7 +36,7 @@ Support for Magellan, Spectra and EVO panels is very stable. If you find a bug, 
 
 For further information and detailed usage refer to the [Wiki](https://github.com/ParadoxAlarmInterface/pai/wiki).
 
-If you are having issues, or wish to discuss new features, join us at our [Discord community](https://discord.com/channels/1310653159596888064/1310653159596888067)
+If you are having issues, or wish to discuss new features, join us at our [Discord community](https://discord.gg/7BWjravp/1310653159596888067)
 
 On Android, if you install [MQTT Dash](https://play.google.com/store/apps/details?id=net.routix.mqttdash), and [follow the instructions](https://github.com/ParadoxAlarmInterface/pai/wiki#mqtt-dash) you will automatically get a panel like this:
 ![mqtt_dash](https://user-images.githubusercontent.com/497717/52603920-d4984d80-2e60-11e9-9772-578b10576b3c.jpg)
