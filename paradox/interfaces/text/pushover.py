@@ -58,6 +58,10 @@ class PushoverTextInterface(ConfiguredAbstractTextInterface):
         if device:
             params["device"] = device
 
+        if params["priority"] == 2:
+            params["retry"] = 30
+            params["expire"] = 10800
+
         conn.request(
             "POST",
             "/1/messages.json",

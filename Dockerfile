@@ -36,4 +36,4 @@ EXPOSE ${PAI_MQTT_BIND_PORT}/tcp
 EXPOSE 10000/tcp
 
 # run process
-CMD pai-service
+CMD ["pai-service"]
