@@ -1,19 +1,18 @@
 import asyncio
 import binascii
+from collections import namedtuple
 import hashlib
 import json
 import logging
 import os
 import typing
-from collections import namedtuple
 
 from paho.mqtt.client import Client, MQTTMessage
 
 from paradox.config import config as cfg
 from paradox.event import Change, Event, EventLevel, Notification
 from paradox.lib import ps
-from paradox.lib.utils import (JSONByteEncoder, call_soon_in_main_loop,
-                               sanitize_key)
+from paradox.lib.utils import JSONByteEncoder, call_soon_in_main_loop, sanitize_key
 
 from .core import AbstractMQTTInterface
 from .helpers import ELEMENT_TOPIC_MAP, get_control_topic_prefix
@@ -32,7 +31,7 @@ def mqtt_handle_decorator(
     async def try_func(*args, **kwargs):
         try:
             return await func(*args, **kwargs)
-        except:
+        except Exception:
             logger.exception("Exception executing MQTT function")
 
     def wrapper(
@@ -66,7 +65,7 @@ def mqtt_handle_decorator(
             topics = topic.split("/")
 
             if len(topics) < 3:
-                logger.error("Invalid topic in mqtt message: {}".format(message.topic))
+                logger.error(f"Invalid topic in mqtt message: {message.topic}")
                 return
 
             content = message.payload.decode("utf-8").strip()
@@ -78,7 +77,7 @@ def mqtt_handle_decorator(
             call_soon_in_main_loop(
                 try_func(self, ParsedMessage(topics, element, content))
             )
-        except:
+        except Exception:
             logger.exception("Failed to execute command")
 
     return wrapper
@@ -119,19 +118,20 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         ps.subscribe(self._handle_panel_event, "events")
 
     def on_connect(self, mqttc, userdata, flags, result):
-        self.subscribe_callback(get_control_topic_prefix("output")+"/#",
+        self.subscribe_callback(
+            get_control_topic_prefix("output") + "/#",
             self._mqtt_handle_output_control,
         )
         self.subscribe_callback(
-            get_control_topic_prefix("door")+"/#",
+            get_control_topic_prefix("door") + "/#",
             self._mqtt_handle_door_control,
         )
         self.subscribe_callback(
-            get_control_topic_prefix("zone")+"/#",
+            get_control_topic_prefix("zone") + "/#",
             self._mqtt_handle_zone_control,
         )
         self.subscribe_callback(
-            get_control_topic_prefix("partition")+"/#",
+            get_control_topic_prefix("partition") + "/#",
             self._mqtt_handle_partition_control,
         )
         self.subscribe_callback(
@@ -172,7 +172,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         else:
             command, user = _extract_command_user(command)
 
-        message = "Zone command: {}={} user: {}".format(element, command, user)
+        message = f"Zone command: {element}={command} user: {user}"
         logger.debug(message)
         self._publish_command_status(message)
 
@@ -204,17 +204,17 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         if command.startswith("code_toggle-"):
             tokens = command.split("-")
             if len(tokens) < 2:
-                logger.warning("Invalid token length {}".format(len(tokens)))
+                logger.warning(f"Invalid token length {len(tokens)}")
                 return
 
             if tokens[1] not in cfg.MQTT_TOGGLE_CODES:
-                logger.warning("Invalid toggle code {}".format(tokens[1]))
+                logger.warning(f"Invalid toggle code {tokens[1]}")
                 return
 
             if element.lower() == "all":
                 command = "arm"
 
-                for k, v in self.partitions.items():
+                for k, _ in self.partitions.items():
                     # If "all" and a single partition is armed, default is
                     # to disarm
                     for k1, v1 in self.partitions[k].items():
@@ -239,7 +239,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                 else:
                     command = "arm"
             else:
-                logger.warning("Element {} not found".format(element))
+                logger.warning(f"Element {element} not found")
                 return
 
             ps.sendNotification(
@@ -252,7 +252,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                 )
             )
 
-        message = "Partition command: {}={} user: {}".format(element, command, user)
+        message = f"Partition command: {element}={command} user: {user}"
         logger.info(message)
         self._publish_command_status(message)
 
@@ -280,7 +280,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         else:
             command, user = _extract_command_user(command)
 
-        message = "Output command: {}={} user: {}".format(element, command, user)
+        message = f"Output command: {element}={command} user: {user}"
         logger.debug(message)
         self._publish_command_status(message)
 
@@ -310,15 +310,19 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         else:
             userid, user = _extract_command_user(userid)
 
-        message = "Send panic command: partition: {}, userid: {}, user: {}, type: {}".format(
-            partition, userid, user, panic_type
+        message = (
+            "Send panic command: partition: {}, userid: {}, user: {}, type: {}".format(
+                partition, userid, user, panic_type
+            )
         )
         logger.debug(message)
         self._publish_command_status(message)
 
         if not await self.alarm.send_panic(partition, panic_type, userid):
-            message = "Send panic command refused: {}, userid: {}, user: {}, type: {}".format(
-                partition, userid, user, panic_type
+            message = (
+                "Send panic command refused: {}, userid: {}, user: {}, type: {}".format(
+                    partition, userid, user, panic_type
+                )
             )
 
             logger.warning(message)
@@ -341,7 +345,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         else:
             command, user = _extract_command_user(command)
 
-        message = "Door command: {}={} user=".format(element, command, user)
+        message = f"Door command: {element}={command} user="
 
         logger.debug(message)
         self._publish_command_status(message)
@@ -440,14 +444,14 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             try:
                 publish_value = int(value)
             except (TypeError, ValueError):
-                logger.debug('Conversion int(%s) failed, use original value', value)
+                logger.debug("Conversion int(%s) failed, use original value", value)
                 publish_value = value
         else:
             publish_value = value
 
         self.publish(
-            "{}/{}/{}/{}".format(base, element_topic, sanitize_key(label), attribute),
-            "{}".format(publish_value),
+            f"{base}/{element_topic}/{sanitize_key(label)}/{attribute}",
+            f"{publish_value}",
             qos=cfg.MQTT_QOS,
             retain=cfg.MQTT_RETAIN,
         )
@@ -489,21 +493,19 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             return
 
         if os.path.exists(fname):
-            with open(fname, "r") as f:
+            with open(fname) as f:
                 data = f.read()
 
                 for k in partitions.keys():
                     data = data.replace(f"__PARTITION{k}__", partitions[k]["label"])
 
                 self.publish(cfg.MQTT_DASH_TOPIC, data, 2, True)
-                logger.info(
-                    "MQTT Dash panel published to {}".format(cfg.MQTT_DASH_TOPIC)
-                )
+                logger.info(f"MQTT Dash panel published to {cfg.MQTT_DASH_TOPIC}")
         else:
-            logger.warning("MQTT DASH Template not found: {}".format(fname))
+            logger.warning(f"MQTT DASH Template not found: {fname}")
 
     def _refresh_challenge(self):
-        self.challenge = binascii.hexlify(os.urandom(16))
+        self.challenge = binascii.hexlify(os.urandom(16)).decode("utf-8")
         self.publish(
             f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_STATES_TOPIC}/{cfg.MQTT_CHALLENGE_TOPIC}",
             self.challenge,
@@ -544,7 +546,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
         h = hashlib.new("SHA1")
         i = cfg.MQTT_CHALLENGE_ROUNDS
-        text = f"{challenge}{secret}".encode("utf-8")
+        text = f"{challenge}{secret}".encode()
 
         while i > 0:
             h.update(text)
