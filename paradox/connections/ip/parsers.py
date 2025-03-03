@@ -1,6 +1,23 @@
-from construct import (Adapter, Aligned, BitStruct, Bytes, Const, Default,
-                       Enum, Flag, GreedyBytes, IfThenElse, Int8ub, Int16ub,
-                       Int16ul, Padding, Pointer, Rebuild, Struct, len_, this)
+from construct import (
+    Adapter,
+    Aligned,
+    BitStruct,
+    Bytes,
+    Const,
+    Default,
+    Enum,
+    Flag,
+    GreedyBytes,
+    IfThenElse,
+    Int8ub,
+    Int16ub,
+    Int16ul,
+    Padding,
+    Pointer,
+    Rebuild,
+    Struct,
+    this,
+)
 
 from paradox.hardware.common import HexInt
 from paradox.lib.crypto import decrypt, encrypt
@@ -55,7 +72,7 @@ IPPayloadConnectResponse = Struct(
         Pointer(21, Enum(Int8ub, IP150=0x71, IP100=0x70)),
         lambda ctx: ctx.ip_module_serial[0],
     ),
-)
+).compile()
 
 
 class EncryptionAdapter(Adapter):
@@ -114,7 +131,7 @@ IPMessageRequest = Struct(
         ),
         b"",
     ),
-)
+).compile()
 
 
 IPMessageResponse = Struct(
@@ -157,4 +174,4 @@ IPMessageResponse = Struct(
         ),
         b"",
     ),
-)
+).compile()

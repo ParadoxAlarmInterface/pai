@@ -534,6 +534,8 @@ class Paradox:
         except asyncio.TimeoutError:
             logger.error("send_panic timeout")
 
+        return False
+
     async def control_door(self, door, command) -> bool:
         command = command.lower()
         logger.debug(f"Control Door: {door} - {command}")
