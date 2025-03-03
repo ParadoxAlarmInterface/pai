@@ -172,9 +172,9 @@ Si = (0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38,
       0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26,
       0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d)
 
-rcon = (0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 
+rcon = (0x01, 0x02, 0x04, 0x08, 0x10, 0x20,
         0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8,
-        0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 
+        0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc,
         0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4,
         0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91)
 
@@ -184,10 +184,30 @@ lt_b = Logtable[0xB]
 lt_d = Logtable[0xD]
 lt_9 = Logtable[0x9]
 
+# Pre-calculate the special case for zero values in decrypt
+# This avoids conditional checks in the decrypt function
+def _prepare_inverse_mix_column_parts():
+    """Create lookup tables for the inverse mix column operation."""
+    e_table = [0] * 256
+    b_table = [0] * 256
+    d_table = [0] * 256
+    nine_table = [0] * 256
+
+    for i in range(1, 256):  # Skip zero to handle separately
+        e_table[i] = Alogtable[(lt_e + Logtable[i]) % 255]
+        b_table[i] = Alogtable[(lt_b + Logtable[i]) % 255]
+        d_table[i] = Alogtable[(lt_d + Logtable[i]) % 255]
+        nine_table[i] = Alogtable[(lt_9 + Logtable[i]) % 255]
+
+    return e_table, b_table, d_table, nine_table
+
+# Initialize the lookup tables
+E_TABLE, B_TABLE, D_TABLE, NINE_TABLE = _prepare_inverse_mix_column_parts()
+
 @memoized
 def _keygen(k):
     rk = [0] * 240
-    
+
     if len(k) % 32:
         k += b'\xee' * (32 - (len(k) % 32))
 
@@ -229,7 +249,7 @@ def encrypt(ctxt, key):
 
     if len(ctxt) % 16 != 0:
         ctxt.extend([0xee] * (16 - (len(ctxt) % 16)))
-    
+
     rk = _keygen(key)
 
     blocks = len(ctxt) // 16
@@ -258,7 +278,7 @@ def encrypt(ctxt, key):
             r16 = r * 16
 
             # S BOX
-            a = (S[a[0]],  S[a[1]],  S[a[2]],  S[a[3]], 
+            a = (S[a[0]],  S[a[1]],  S[a[2]],  S[a[3]],
                  S[a[4]],  S[a[5]],  S[a[6]],  S[a[7]],
                  S[a[8]],  S[a[9]],  S[a[10]], S[a[11]],
                  S[a[12]], S[a[13]], S[a[14]], S[a[15]])
@@ -313,7 +333,7 @@ def encrypt(ctxt, key):
             r += 1
 
         # S BOX
-        a = (S[a[0]],  S[a[1]],  S[a[2]],  S[a[3]], 
+        a = (S[a[0]],  S[a[1]],  S[a[2]],  S[a[3]],
              S[a[4]],  S[a[5]],  S[a[6]],  S[a[7]],
              S[a[8]],  S[a[9]],  S[a[10]], S[a[11]],
              S[a[12]], S[a[13]], S[a[14]], S[a[15]])
@@ -323,7 +343,7 @@ def encrypt(ctxt, key):
              a[5],  a[6],  a[7],  a[4],
              a[10], a[11], a[8],  a[9],
              a[15], a[12], a[13], a[14])
-        
+
         # Key addition
         a = (a[0]  ^ rk[224],
              a[1]  ^ rk[225],
@@ -353,7 +373,7 @@ def decrypt(ctxt, key):
     rk = _keygen(key)
 
     ctxt = list(ctxt)
-    
+
     blocks = len(ctxt) // 16
 
     extend = dtxt.extend
@@ -378,117 +398,70 @@ def decrypt(ctxt, key):
             a[13] ^ rk[237],
             a[14] ^ rk[238],
             a[15] ^ rk[239])
-      
+
         # Si Box
-        a = (Si[a[0]],  Si[a[1]],  Si[a[2]],  Si[a[3]], 
+        a = (Si[a[0]],  Si[a[1]],  Si[a[2]],  Si[a[3]],
              Si[a[4]],  Si[a[5]],  Si[a[6]],  Si[a[7]],
              Si[a[8]],  Si[a[9]],  Si[a[10]], Si[a[11]],
              Si[a[12]], Si[a[13]], Si[a[14]], Si[a[15]])
 
         # Shift Row Invert
-        a = (a[0],  a[1],  a[2],  a[3], 
-             a[7],  a[4],  a[5],  a[6], 
-             a[10], a[11], a[8],  a[9], 
+        a = (a[0],  a[1],  a[2],  a[3],
+             a[7],  a[4],  a[5],  a[6],
+             a[10], a[11], a[8],  a[9],
              a[13], a[14], a[15], a[12])
 
         for r in range(13, 0, -1):
             r16 = r * 16
-            
+
             # Key Addition
             a = (a[0] ^ rk[r16],
-                    a[1]  ^ rk[1  + r16],
-                    a[2]  ^ rk[2  + r16],
-                    a[3]  ^ rk[3  + r16],
-                    a[4]  ^ rk[4  + r16],
-                    a[5]  ^ rk[5  + r16],
-                    a[6]  ^ rk[6  + r16],
-                    a[7]  ^ rk[7  + r16],
-                    a[8]  ^ rk[8  + r16],
-                    a[9]  ^ rk[9  + r16],
-                    a[10] ^ rk[10 + r16],
-                    a[11] ^ rk[11 + r16],
-                    a[12] ^ rk[12 + r16],
-                    a[13] ^ rk[13 + r16],
-                    a[14] ^ rk[14 + r16],
-                    a[15] ^ rk[15 + r16])
+                a[1]  ^ rk[1  + r16],
+                a[2]  ^ rk[2  + r16],
+                a[3]  ^ rk[3  + r16],
+                a[4]  ^ rk[4  + r16],
+                a[5]  ^ rk[5  + r16],
+                a[6]  ^ rk[6  + r16],
+                a[7]  ^ rk[7  + r16],
+                a[8]  ^ rk[8  + r16],
+                a[9]  ^ rk[9  + r16],
+                a[10] ^ rk[10 + r16],
+                a[11] ^ rk[11 + r16],
+                a[12] ^ rk[12 + r16],
+                a[13] ^ rk[13 + r16],
+                a[14] ^ rk[14 + r16],
+                a[15] ^ rk[15 + r16])
 
-            # Inv Mix Column
+            # Inv Mix Column - use pre-calculated tables to avoid conditionals
             a = (
-                (Alogtable[(lt_e + Logtable[a[0]])  % 255] if a[0]  else 0) ^
-                (Alogtable[(lt_b + Logtable[a[4]])  % 255] if a[4]  else 0) ^
-                (Alogtable[(lt_d + Logtable[a[8]])  % 255] if a[8]  else 0) ^
-                (Alogtable[(lt_9 + Logtable[a[12]]) % 255] if a[12] else 0),
-                (Alogtable[(lt_e + Logtable[a[1]])  % 255] if a[1]  else 0) ^
-                (Alogtable[(lt_b + Logtable[a[5]])  % 255] if a[5]  else 0) ^
-                (Alogtable[(lt_d + Logtable[a[9]])  % 255] if a[9]  else 0) ^
-                (Alogtable[(lt_9 + Logtable[a[13]]) % 255] if a[13] else 0),
-                (Alogtable[(lt_e + Logtable[a[2]])  % 255] if a[2]  else 0) ^
-                (Alogtable[(lt_b + Logtable[a[6]])  % 255] if a[6]  else 0) ^
-                (Alogtable[(lt_d + Logtable[a[10]]) % 255] if a[10] else 0) ^
-                (Alogtable[(lt_9 + Logtable[a[14]]) % 255] if a[14] else 0),
-                (Alogtable[(lt_e + Logtable[a[3]])  % 255] if a[3]  else 0) ^
-                (Alogtable[(lt_b + Logtable[a[7]])  % 255] if a[7]  else 0) ^
-                (Alogtable[(lt_d + Logtable[a[11]]) % 255] if a[11] else 0) ^
-                (Alogtable[(lt_9 + Logtable[a[15]]) % 255] if a[15] else 0),
-                (Alogtable[(lt_e + Logtable[a[4]])  % 255] if a[4]  else 0) ^
-                (Alogtable[(lt_b + Logtable[a[8]])  % 255] if a[8]  else 0) ^
-                (Alogtable[(lt_d + Logtable[a[12]]) % 255] if a[12] else 0) ^
-                (Alogtable[(lt_9 + Logtable[a[0]])  % 255] if a[0]  else 0),
-                (Alogtable[(lt_e + Logtable[a[5]])  % 255] if a[5]  else 0) ^
-                (Alogtable[(lt_b + Logtable[a[9]])  % 255] if a[9]  else 0) ^
-                (Alogtable[(lt_d + Logtable[a[13]]) % 255] if a[13] else 0) ^
-                (Alogtable[(lt_9 + Logtable[a[1]])  % 255] if a[1]  else 0),
-                (Alogtable[(lt_e + Logtable[a[6]])  % 255] if a[6]  else 0) ^
-                (Alogtable[(lt_b + Logtable[a[10]]) % 255] if a[10] else 0) ^
-                (Alogtable[(lt_d + Logtable[a[14]]) % 255] if a[14] else 0) ^
-                (Alogtable[(lt_9 + Logtable[a[2]])  % 255] if a[2]  else 0),
-                (Alogtable[(lt_e + Logtable[a[7]])  % 255] if a[7]  else 0) ^
-                (Alogtable[(lt_b + Logtable[a[11]]) % 255] if a[11] else 0) ^
-                (Alogtable[(lt_d + Logtable[a[15]]) % 255] if a[15] else 0) ^
-                (Alogtable[(lt_9 + Logtable[a[3]])  % 255] if a[3]  else 0),
-                (Alogtable[(lt_e + Logtable[a[8]])  % 255] if a[8]  else 0) ^
-                (Alogtable[(lt_b + Logtable[a[12]]) % 255] if a[12] else 0) ^
-                (Alogtable[(lt_d + Logtable[a[0]])  % 255] if a[0]  else 0) ^
-                (Alogtable[(lt_9 + Logtable[a[4]])  % 255] if a[4]  else 0),
-                (Alogtable[(lt_e + Logtable[a[9]])  % 255] if a[9]  else 0) ^
-                (Alogtable[(lt_b + Logtable[a[13]]) % 255] if a[13] else 0) ^
-                (Alogtable[(lt_d + Logtable[a[1]])  % 255] if a[1]  else 0) ^
-                (Alogtable[(lt_9 + Logtable[a[5]])  % 255] if a[5]  else 0),
-                (Alogtable[(lt_e + Logtable[a[10]]) % 255] if a[10] else 0) ^
-                (Alogtable[(lt_b + Logtable[a[14]]) % 255] if a[14] else 0) ^
-                (Alogtable[(lt_d + Logtable[a[2]])  % 255] if a[2]  else 0) ^
-                (Alogtable[(lt_9 + Logtable[a[6]])  % 255] if a[6]  else 0),
-                (Alogtable[(lt_e + Logtable[a[11]]) % 255] if a[11] else 0) ^
-                (Alogtable[(lt_b + Logtable[a[15]]) % 255] if a[15] else 0) ^
-                (Alogtable[(lt_d + Logtable[a[3]])  % 255] if a[3]  else 0) ^
-                (Alogtable[(lt_9 + Logtable[a[7]])  % 255] if a[7]  else 0),
-                (Alogtable[(lt_e + Logtable[a[12]]) % 255] if a[12] else 0) ^
-                (Alogtable[(lt_b + Logtable[a[0]])  % 255] if a[0]  else 0) ^
-                (Alogtable[(lt_d + Logtable[a[4]])  % 255] if a[4]  else 0) ^
-                (Alogtable[(lt_9 + Logtable[a[8]])  % 255] if a[8]  else 0),
-                (Alogtable[(lt_e + Logtable[a[13]]) % 255] if a[13] else 0) ^
-                (Alogtable[(lt_b + Logtable[a[1]])  % 255] if a[1]  else 0) ^
-                (Alogtable[(lt_d + Logtable[a[5]])  % 255] if a[5]  else 0) ^
-                (Alogtable[(lt_9 + Logtable[a[9]])  % 255] if a[9]  else 0),
-                (Alogtable[(lt_e + Logtable[a[14]]) % 255] if a[14] else 0) ^
-                (Alogtable[(lt_b + Logtable[a[2]])  % 255] if a[2]  else 0) ^
-                (Alogtable[(lt_d + Logtable[a[6]])  % 255] if a[6]  else 0) ^
-                (Alogtable[(lt_9 + Logtable[a[10]]) % 255] if a[10] else 0),
-                (Alogtable[(lt_e + Logtable[a[15]]) % 255] if a[15] else 0) ^
-                (Alogtable[(lt_b + Logtable[a[3]])  % 255] if a[3]  else 0) ^
-                (Alogtable[(lt_d + Logtable[a[7]])  % 255] if a[7]  else 0) ^
-                (Alogtable[(lt_9 + Logtable[a[11]]) % 255] if a[11] else 0))
+                (E_TABLE[a[0]] ^ B_TABLE[a[4]] ^ D_TABLE[a[8]] ^ NINE_TABLE[a[12]]),
+                (E_TABLE[a[1]] ^ B_TABLE[a[5]] ^ D_TABLE[a[9]] ^ NINE_TABLE[a[13]]),
+                (E_TABLE[a[2]] ^ B_TABLE[a[6]] ^ D_TABLE[a[10]] ^ NINE_TABLE[a[14]]),
+                (E_TABLE[a[3]] ^ B_TABLE[a[7]] ^ D_TABLE[a[11]] ^ NINE_TABLE[a[15]]),
+                (E_TABLE[a[4]] ^ B_TABLE[a[8]] ^ D_TABLE[a[12]] ^ NINE_TABLE[a[0]]),
+                (E_TABLE[a[5]] ^ B_TABLE[a[9]] ^ D_TABLE[a[13]] ^ NINE_TABLE[a[1]]),
+                (E_TABLE[a[6]] ^ B_TABLE[a[10]] ^ D_TABLE[a[14]] ^ NINE_TABLE[a[2]]),
+                (E_TABLE[a[7]] ^ B_TABLE[a[11]] ^ D_TABLE[a[15]] ^ NINE_TABLE[a[3]]),
+                (E_TABLE[a[8]] ^ B_TABLE[a[12]] ^ D_TABLE[a[0]] ^ NINE_TABLE[a[4]]),
+                (E_TABLE[a[9]] ^ B_TABLE[a[13]] ^ D_TABLE[a[1]] ^ NINE_TABLE[a[5]]),
+                (E_TABLE[a[10]] ^ B_TABLE[a[14]] ^ D_TABLE[a[2]] ^ NINE_TABLE[a[6]]),
+                (E_TABLE[a[11]] ^ B_TABLE[a[15]] ^ D_TABLE[a[3]] ^ NINE_TABLE[a[7]]),
+                (E_TABLE[a[12]] ^ B_TABLE[a[0]] ^ D_TABLE[a[4]] ^ NINE_TABLE[a[8]]),
+                (E_TABLE[a[13]] ^ B_TABLE[a[1]] ^ D_TABLE[a[5]] ^ NINE_TABLE[a[9]]),
+                (E_TABLE[a[14]] ^ B_TABLE[a[2]] ^ D_TABLE[a[6]] ^ NINE_TABLE[a[10]]),
+                (E_TABLE[a[15]] ^ B_TABLE[a[3]] ^ D_TABLE[a[7]] ^ NINE_TABLE[a[11]])
+            )
 
             # Si Box
-            a = (Si[a[0]],  Si[a[1]],  Si[a[2]],  Si[a[3]], 
+            a = (Si[a[0]],  Si[a[1]],  Si[a[2]],  Si[a[3]],
                  Si[a[4]],  Si[a[5]],  Si[a[6]],  Si[a[7]],
                  Si[a[8]],  Si[a[9]],  Si[a[10]], Si[a[11]],
                  Si[a[12]], Si[a[13]], Si[a[14]], Si[a[15]])
 
             # Shift Row Invert
-            a = (a[0],  a[1],  a[2],  a[3], 
-                 a[7],  a[4],  a[5],  a[6], 
-                 a[10], a[11], a[8],  a[9], 
+            a = (a[0],  a[1],  a[2],  a[3],
+                 a[7],  a[4],  a[5],  a[6],
+                 a[10], a[11], a[8],  a[9],
                  a[13], a[14], a[15], a[12])
 
 
