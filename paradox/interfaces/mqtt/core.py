@@ -200,7 +200,7 @@ class MQTTConnection():
         else:
             logger.error(f"Failed to connect to MQTT: {connack_string(result)} ({result})")
 
-    def _on_disconnect_cb(self, userdata, rc, properties=None):
+    def _on_disconnect_cb(self, client, userdata, rc, properties=None):
         # called on Thread-6
         if rc == MQTT_ERR_SUCCESS:
             logger.info("MQTT Broker Disconnected")
