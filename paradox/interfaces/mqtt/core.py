@@ -1,4 +1,5 @@
 import asyncio
+from enum import Enum
 import logging
 import os
 import socket
@@ -6,9 +7,16 @@ import ssl
 import sys
 import time
 import typing
-from enum import Enum
 
-from paho.mqtt.client import LOGGING_LEVEL, MQTT_ERR_SUCCESS, Client, connack_string, MQTTv311, MQTTv31, MQTTv5
+from paho.mqtt.client import (
+    LOGGING_LEVEL,
+    MQTT_ERR_SUCCESS,
+    Client,
+    MQTTv5,
+    MQTTv31,
+    MQTTv311,
+    connack_string,
+)
 
 from paradox.config import config as cfg
 from paradox.data.enums import RunState
@@ -34,13 +42,10 @@ RUN_STATE_2_PAYLOAD = {
     RunState.STOP: "stopped",
 }
 
-protocol_map = {
-    "3.1": MQTTv31,
-    "3.1.1": MQTTv311,
-    "5": MQTTv5
-}
+protocol_map = {"3.1": MQTTv31, "3.1.1": MQTTv311, "5": MQTTv5}
 
-class MQTTConnection():
+
+class MQTTConnection:
     client: Client
     _instance = None
 
@@ -53,7 +58,7 @@ class MQTTConnection():
 
     def __init__(self):
         self.client = Client(
-            "pai"+os.urandom(8).hex(),
+            "pai" + os.urandom(8).hex(),
             protocol=protocol_map.get(str(cfg.MQTT_PROTOCOL), MQTTv311),
             transport=cfg.MQTT_TRANSPORT,
         )
@@ -78,7 +83,9 @@ class MQTTConnection():
         self.registrars = []
 
         if cfg.MQTT_USERNAME is not None and cfg.MQTT_PASSWORD is not None:
-            self.client.username_pw_set(username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD)
+            self.client.username_pw_set(
+                username=cfg.MQTT_USERNAME, password=cfg.MQTT_PASSWORD
+            )
 
         if cfg.MQTT_TLS_CERT_PATH is not None:
             self.client.tls_set(
@@ -149,7 +156,7 @@ class MQTTConnection():
             logger.info("MQTT loop stopped")
 
     def publish(self, topic, payload=None, *args, **kwargs):
-        logger.debug("MQTT: {}={}".format(topic, payload))
+        logger.debug(f"MQTT: {topic}={payload}")
 
         self.client.publish(topic, payload, *args, **kwargs)
 
@@ -160,7 +167,7 @@ class MQTTConnection():
                     getattr(r, method), typing.Callable
                 ):
                     getattr(r, method)(*args, **kwargs)
-            except:
+            except Exception:
                 logger.exception(
                     'Failed to call "%s" on "%s"', method, r.__class__.__name__
                 )
@@ -198,10 +205,15 @@ class MQTTConnection():
             self._report_pai_status(self._last_pai_status)
             self._call_registars("on_connect", client, userdata, flags, result)
         else:
-            logger.error(f"Failed to connect to MQTT: {connack_string(result)} ({result})")
+            logger.error(
+                f"Failed to connect to MQTT: {connack_string(result)} ({result})"
+            )
 
-    def _on_disconnect_cb(self, client, userdata, rc, properties=None):
+    def _on_disconnect_cb(self, client, userdata, *args, **kwargs):
         # called on Thread-6
+        # Handle different MQTT version signatures by using the first argument as rc
+        rc = args[0] if args else MQTT_ERR_SUCCESS
+
         if rc == MQTT_ERR_SUCCESS:
             logger.info("MQTT Broker Disconnected")
         else:
@@ -237,7 +249,7 @@ class AbstractMQTTInterface(ThreadQueueInterface):
         logger.debug("Registars: %d", len(self.mqtt.registrars))
 
     def stop(self):
-        """ Stops the MQTT Interface Thread"""
+        """Stops the MQTT Interface Thread"""
 
         def stop_loop():
             self.republish_task.cancel()
@@ -261,7 +273,7 @@ class AbstractMQTTInterface(ThreadQueueInterface):
                 self.publish(k, v["value"], v["qos"], v["retain"])
 
     def _run(self):
-        super(AbstractMQTTInterface, self)._run()
+        super()._run()
 
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
@@ -294,9 +306,9 @@ class AbstractMQTTInterface(ThreadQueueInterface):
         self.mqtt.subscribe(sub)
 
     def on_disconnect(self, client, userdata, rc):
-        """ Called from MQTT connection """
+        """Called from MQTT connection"""
         pass
 
     def on_connect(self, client, userdata, flags, result):
-        """ Called from MQTT connection """
+        """Called from MQTT connection"""
         pass
