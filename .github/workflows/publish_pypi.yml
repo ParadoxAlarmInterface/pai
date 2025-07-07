@@ -2,14 +2,16 @@ name: Publish to PyPI
 
 on:
   workflow_call:
-    secrets:
-      PYPI_API_TOKEN:
-        required: true
 
 jobs:
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/paradox-alarm-interface
+    permissions:
+      id-token: write
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
@@ -24,6 +26,3 @@ jobs:
       run: python -m build
     - name: Publish package
       uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        user: __token__
-        password: ${{ secrets.PYPI_API_TOKEN }}
