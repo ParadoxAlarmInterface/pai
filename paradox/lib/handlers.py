@@ -115,7 +115,7 @@ class HandlerRegistry:
                     handled = True
                     await handler(data)
             except AlreadyHandledError:
-                logger.error("Already handled")
+                logger.warning("Already handled")
             except Exception:
                 logger.exception("Exception caught during message handling")
                 raise

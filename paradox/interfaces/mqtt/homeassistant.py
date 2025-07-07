@@ -1,21 +1,21 @@
 import asyncio
+from collections import namedtuple
 import json
 import logging
-from collections import namedtuple
 
 from paradox.config import config as cfg
+from paradox.data.model import DetectedPanel
 from paradox.lib import ps
 from paradox.lib.utils import SerializableToJSONEncoder
+
+from .core import AbstractMQTTInterface
 from .entities.abstract_entity import AbstractEntity
 from .entities.device import Device
 from .entities.factory import MQTTAutodiscoveryEntityFactory
 
-from ...data.model import DetectedPanel
-from .core import AbstractMQTTInterface
-
 logger = logging.getLogger("PAI").getChild(__name__)
 
-PreparseResponse = namedtuple("preparse_response", "topics element content")
+PreparseResponse = namedtuple("PreparseResponse", "topics element content")
 
 
 class HomeAssistantMQTTInterface(AbstractMQTTInterface):
@@ -26,7 +26,9 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         self.zones = {}
         self.pgms = {}
 
-        self.entity_factory = MQTTAutodiscoveryEntityFactory(self.mqtt.availability_topic)
+        self.entity_factory = MQTTAutodiscoveryEntityFactory(
+            self.mqtt.availability_topic
+        )
 
         self.run_status_topic = self.mqtt.pai_status_topic
 
@@ -79,14 +81,20 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         if "pgm" in status:
             self._publish_pgm_configs(status["pgm"])
         if "system" in status:
-            self._publish_system_property_configs(status['system'])
+            self._publish_system_property_configs(status["system"])
 
     def _publish_config(self, entity: AbstractEntity):
-        self.publish(entity.configuration_topic, json.dumps(entity, cls=SerializableToJSONEncoder), 0,
-                     cfg.MQTT_RETAIN)
+        self.publish(
+            entity.configuration_topic,
+            json.dumps(entity, cls=SerializableToJSONEncoder),
+            0,
+            cfg.MQTT_RETAIN,
+        )
 
     def _publish_pai_state_sensor_config(self):
-        pai_state_sensor_config = self.entity_factory.make_pai_status_sensor(self.run_status_topic)
+        pai_state_sensor_config = self.entity_factory.make_pai_status_sensor(
+            self.run_status_topic
+        )
         self._publish_config(pai_state_sensor_config)
 
     def _publish_partition_configs(self, partition_statuses):
@@ -95,16 +103,24 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 continue
 
             partition = self.partitions[partition_key]
-            code = cfg.MQTT_HOMEASSISTANT_CODE or None  # returns None on empty string. For HA Addon Schema parsing
+            code = (
+                cfg.MQTT_HOMEASSISTANT_CODE or None
+            )  # returns None on empty string. For HA Addon Schema parsing
 
-            partition_alarm_control_panel_config = self.entity_factory.make_alarm_control_panel_config(partition, code)
+            partition_alarm_control_panel_config = (
+                self.entity_factory.make_alarm_control_panel_config(partition, code)
+            )
             self._publish_config(partition_alarm_control_panel_config)
-            
+
             # Publish individual entities
             for property_name in partition_status:
                 if property_name not in cfg.HOMEASSISTANT_PUBLISH_PARTITION_PROPERTIES:
                     continue
-                partition_property_binary_sensor_config = self.entity_factory.make_partition_status_binary_sensor(partition, property_name)
+                partition_property_binary_sensor_config = (
+                    self.entity_factory.make_partition_status_binary_sensor(
+                        partition, property_name
+                    )
+                )
                 self._publish_config(partition_property_binary_sensor_config)
 
     def _publish_zone_configs(self, zone_statuses):
@@ -119,15 +135,25 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 if property_name not in cfg.HOMEASSISTANT_PUBLISH_ZONE_PROPERTIES:
                     continue
                 if property_name == "bypassed":
-                    zone_status_sensor = self.entity_factory.make_zone_bypass_switch(zone)
+                    zone_status_sensor = self.entity_factory.make_zone_bypass_switch(
+                        zone
+                    )
                 elif property_name == "signal_strength":
-                    zone_status_sensor = self.entity_factory.make_zone_status_numeric_sensor(zone, property_name)
+                    zone_status_sensor = (
+                        self.entity_factory.make_zone_status_numeric_sensor(
+                            zone, property_name
+                        )
+                    )
                 else:
-                    zone_status_sensor = self.entity_factory.make_zone_status_binary_sensor(zone, property_name)
+                    zone_status_sensor = (
+                        self.entity_factory.make_zone_status_binary_sensor(
+                            zone, property_name
+                        )
+                    )
                 self._publish_config(zone_status_sensor)
 
     def _publish_pgm_configs(self, pgm_statuses):
-        for pgm_key, pgm_status in pgm_statuses.items():
+        for pgm_key in pgm_statuses.keys():
             if pgm_key not in self.pgms:
                 continue
 
@@ -135,9 +161,11 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
 
             pgm_switch_config = self.entity_factory.make_pgm_switch(pgm)
             self._publish_config(pgm_switch_config)
-    
+
     def _publish_system_property_configs(self, system_statuses):
         for system_key, system_status in system_statuses.items():
             for property_name in system_status:
-                system_property_config = self.entity_factory.make_system_status(system_key, property_name)
+                system_property_config = self.entity_factory.make_system_status(
+                    system_key, property_name
+                )
                 self._publish_config(system_property_config)

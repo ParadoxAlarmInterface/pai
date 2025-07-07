@@ -1,17 +1,14 @@
-# -*- coding: utf-8 -*-
 import asyncio
+from collections.abc import Hashable
+from copy import deepcopy
 import functools
 import json
 import re
 import threading
 import typing
-from collections.abc import Hashable
-
-from slugify import slugify
-
-from copy import deepcopy
 
 from construct import Container, ListContainer
+from slugify import slugify
 
 main_thread_loop = asyncio.get_event_loop()
 
@@ -38,7 +35,7 @@ class JSONByteEncoder(json.JSONEncoder):
         if isinstance(o, bytes):
             return o.decode("utf-8")
 
-        return super(JSONByteEncoder, self).default(o)
+        return super().default(o)
 
 
 class SerializableToJSONEncoder(json.JSONEncoder):
@@ -66,15 +63,22 @@ def deep_merge(*dicts, extend_lists=False, initializer=None):
     def merge_into(d1, d2):
         if d1 is None:
             return d2
-        for key in d2:
+        for key, value in d2.items():
             if key not in d1:  # key is missing
-                d1[key] = deepcopy(d2[key])
+                d1[key] = deepcopy(value)
             elif extend_lists and isinstance(d1[key], list):
-                d1[key].extend(deepcopy(d2[key]))
+                if isinstance(value, list):
+                    # Use list concatenation instead of extend for better performance with large lists
+                    d1[key] = d1[key] + deepcopy(value)
+                else:
+                    # Keep original behavior for non-list values
+                    d1[key].extend(deepcopy(value))
             elif not isinstance(d1[key], dict):
-                d1[key] = deepcopy(d2[key])
-            else:
-                d1[key] = merge_into(d1[key], d2[key])
+                d1[key] = deepcopy(value)
+            elif isinstance(value, dict):  # Ensure both are dicts before recursion
+                d1[key] = merge_into(d1[key], value)
+            else:  # d1[key] is dict but value is not
+                d1[key] = deepcopy(value)
         return d1
 
     return functools.reduce(merge_into, dicts, initializer)
@@ -92,23 +96,23 @@ def sanitize_key(key):
 
 def construct_free(container: Container):
     if isinstance(container, (Container, typing.Mapping)):
-        return dict(
-            (k, construct_free(v))
+        return {
+            k: construct_free(v)
             for k, v in container.items()
             if not (isinstance(k, str) and k.startswith("_"))
-        )
+        }
     elif isinstance(container, (ListContainer, typing.List)):
         return list(construct_free(v) for v in container)
     else:
         return container
 
 
-class memoized(object):
+class memoized:
     """From: https://wiki.python.org/moin/PythonDecoratorLibrary#Memoize
-   Decorator. Caches a function's return value each time it is called.
-   If called later with the same arguments, the cached value is returned
-   (not reevaluated).
-   """
+    Decorator. Caches a function's return value each time it is called.
+    If called later with the same arguments, the cached value is returned
+    (not reevaluated).
+    """
 
     def __init__(self, func):
         self.func = func

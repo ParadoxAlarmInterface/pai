@@ -1,18 +1,60 @@
 import binascii
 from collections.abc import Mapping
+import logging
 
-from construct import (Array, BitsInteger, BitsSwapped, BitStruct, Bitwise,
-                       Byte, Bytes, ByteSwapped, Checksum, Computed, Const,
-                       Default, Embedded, Enum, ExprAdapter,
-                       ExprSymmetricAdapter, Flag, Int8ub, Int16ub, Int16ul,
-                       Int24ub, Nibble, Padding, RawCopy, Struct, Subconstruct,
-                       ValidationError, obj_, this)
+from construct import (
+    Array,
+    BitsInteger,
+    BitsSwapped,
+    BitStruct,
+    Bitwise,
+    Byte,
+    Bytes,
+    ByteSwapped,
+    Checksum,
+    Computed,
+    Const,
+    Default,
+    Embedded,
+    Enum,
+    ExprAdapter,
+    ExprSymmetricAdapter,
+    Flag,
+    Int8ub,
+    Int16ub,
+    Int16ul,
+    Int24ub,
+    Nibble,
+    Padding,
+    RawCopy,
+    Struct,
+    Subconstruct,
+    ValidationError,
+    obj_,
+    this,
+)
 
-from ..common import (CommunicationSourceIDEnum, PacketChecksum, PacketLength,
-                      ProductIdEnum, calculate_checksum)
-from .adapters import (DateAdapter, DictArray, EnumerationAdapter,
-                       EventAdapter, ModuleTroubles, PartitionStatus, PGMFlags,
-                       StatusFlags, ZoneFlagBitStruct, ZoneFlags)
+from ..common import (
+    CommunicationSourceIDEnum,
+    PacketChecksum,
+    PacketLength,
+    ProductIdEnum,
+    calculate_checksum,
+)
+from .adapters import (
+    DateAdapter,
+    DictArray,
+    EnumerationAdapter,
+    EventAdapter,
+    ModuleTroubles,
+    PartitionStatus,
+    PGMFlags,
+    StatusFlags,
+    ZoneFlagBitStruct,
+    ZoneFlags,
+)
+
+logger = logging.getLogger("PAI").getChild(__name__)
 
 LoginConfirmationResponse = Struct(
     "fields"
@@ -161,12 +203,13 @@ InitializeCommunication = Struct(
 RAMDataParserMap = {
     1: Struct(
         "_weekday" / Int8ub,
-        "_system_flags" / BitStruct(  # TODO: Do we need BitsSwapped here?
+        "_system_flags"
+        / BitStruct(  # TODO: Do we need BitsSwapped here?
             "chime_zone_partition" / BitsSwapped(StatusFlags(4)),
             "power_smoke" / Flag,
             "ground_start" / Flag,
             "kiss_off" / Flag,
-            "line_ring" / Flag
+            "line_ring" / Flag,
         ),
         "partition_bell" / BitsSwapped(Bitwise(StatusFlags(8))),
         "partition_fire_alarm" / BitsSwapped(Bitwise(StatusFlags(8))),
@@ -176,7 +219,7 @@ RAMDataParserMap = {
         "system"
         / Struct(
             "troubles"
-            / BitStruct( # time_lost_trouble when actually battery_failure
+            / BitStruct(  # time_lost_trouble when actually battery_failure
                 "time_lost_trouble" / Flag,
                 "zone_fault_trouble" / Flag,
                 "zone_low_battery_trouble" / Flag,
@@ -185,7 +228,6 @@ RAMDataParserMap = {
                 "module_trouble" / Flag,
                 "dialer_trouble" / Flag,
                 "system_trouble" / Flag,
-
                 "panel_tamper_trouble" / Flag,
                 "_future_use_0" / Flag,
                 "rom_error_trouble" / Flag,
@@ -194,7 +236,6 @@ RAMDataParserMap = {
                 "aux_limit_trouble" / Flag,
                 "battery_failure_trouble" / Flag,
                 "ac_trouble" / Flag,
-
                 "_future_use_1" / Flag,
                 "_future_use_2" / Flag,
                 "com_pc_trouble" / Flag,
@@ -203,7 +244,6 @@ RAMDataParserMap = {
                 "fail_central_2_trouble" / Flag,
                 "fail_central_1_trouble" / Flag,
                 "tlm_trouble" / Flag,
-
                 "module_aux_trouble" / Flag,
                 "module_battery_fail" / Flag,
                 "module_ac_trouble" / Flag,
@@ -212,7 +252,6 @@ RAMDataParserMap = {
                 "module_tlm_trouble" / Flag,
                 "module_rom_error_trouble" / Flag,
                 "module_tamper_trouble" / Flag,
-
                 "mdl_com_error" / Flag,
                 "bus_overload_trouble" / Flag,
                 "bus_global_fail" / Flag,
@@ -255,9 +294,15 @@ RAMDataParserMap = {
             "panel_status"
             / BitStruct("installer_lock_active" / Flag, "_free" / Padding(7)),
             "event"
-            / Struct("_event_pointer" / Int16ub, "_event_pointer_bus" / Int16ub,),
+            / Struct(
+                "_event_pointer" / Int16ub,
+                "_event_pointer_bus" / Int16ub,
+            ),
             "_recycle_system" / Array(8, Int8ub),
-            "report" / Struct("arm_disarm_delay_timer" / Int8ub,),
+            "report"
+            / Struct(
+                "arm_disarm_delay_timer" / Int8ub,
+            ),
         ),
         "_free" / Padding(34),
     ),
@@ -279,9 +324,10 @@ RAMDataParserMap = {
     ),
     10: Struct("zone_status" / ZoneFlags(64, start_index_from=125)),
     11: Struct(
-        "zone_status" / ZoneFlags(4, start_index_from=189), "_not_used" / Bytes(60),
+        "zone_status" / ZoneFlags(4, start_index_from=189),
+        "_not_used" / Bytes(60),
     ),
-    16: Struct( # TODO: here should be panel modules
+    16: Struct(  # TODO: here should be panel modules
         "module_assigned" / BitsSwapped(Bitwise(StatusFlags(256, start_index_from=1))),
         "module_missing" / BitsSwapped(Bitwise(StatusFlags(256, start_index_from=1))),
     ),
@@ -305,6 +351,16 @@ RAMDataParserMap = {
 # 51 ram address - Door Status
 # 56 ram address
 # 58 ram address
+
+# compile all RAMDataParserMap parsers if possible
+for key, parser in RAMDataParserMap.items():
+    try:
+        RAMDataParserMap[key] = parser.compile()
+    except Exception:
+        logger.debug(
+            "Could not compile parser for RAM address %s. Using the original version.",
+            key,
+        )
 
 
 def get_user_definition(settings):
@@ -575,7 +631,8 @@ ReadEEPROM = Struct(
             Struct(
                 "po"
                 / BitStruct(
-                    "command" / Const(0x5, Nibble), "block" / Default(Nibble, 0),
+                    "command" / Const(0x5, Nibble),
+                    "block" / Default(Nibble, 0),
                 ),
                 "packet_length" / PacketLength(Int8ub),
                 "control"
@@ -916,7 +973,13 @@ SendPanicAction = Struct(  # Supported on firmware versions 7.15+
             "unknown0" / Const(0x09, Int8ub),
             "_not_used" / Padding(3),
             "user_id" / Int16ub,
-            "panic_type" / Enum(Int8ub, emergency=0, medical=1, fire=2,),  # wild guess
+            "panic_type"
+            / Enum(
+                Int8ub,
+                emergency=0,
+                medical=1,
+                fire=2,
+            ),  # wild guess
             "partitions" / BitsSwapped(Bitwise(EnumerationAdapter(Array(8, Flag)))),
         )
     ),
