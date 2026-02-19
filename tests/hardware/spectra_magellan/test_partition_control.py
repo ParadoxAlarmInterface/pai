@@ -4,9 +4,9 @@ import logging
 import threading
 import typing
 
+from construct import Container
 import pytest
 import pytest_asyncio
-from construct import Container
 
 from paradox.config import config as cfg
 from paradox.data.enums import RunState
@@ -93,7 +93,7 @@ class MockClient(threading.Thread):
         call_soon_in_main_loop(self._control())
 
     def join(self, timeout=None):
-        super(MockClient, self).join(timeout)
+        super().join(timeout)
         # if isinstance(self.result, str) or not self.result:
         #     raise Exception(str(self.result))
 
@@ -103,7 +103,7 @@ async def setup_panel(mocker):
     mocker.patch.multiple(
         cfg, LOGGING_LEVEL_CONSOLE=logging.DEBUG, LOGGING_DUMP_PACKETS=True
     )
-    mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_event_loop())
+    mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_running_loop())
     # cfg.LOGGING_LEVEL_CONSOLE = logging.DEBUG
     # cfg.LOGGING_DUMP_PACKETS = True
 
@@ -117,11 +117,7 @@ async def setup_panel(mocker):
         fields=Container(
             value=Container(
                 product_id="MAGELLAN_MG5050",
-                firmware=Container(
-                    version=6,
-                    revision=1,
-                    build=0
-                )
+                firmware=Container(version=6, revision=1, build=0),
             )
         )
     )

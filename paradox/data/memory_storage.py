@@ -1,5 +1,5 @@
-import logging
 from collections import defaultdict
+import logging
 from typing import Callable
 
 from paradox.config import config as cfg
@@ -57,7 +57,7 @@ class MemoryStorage:
             ):  # function to make new value from the old one
                 try:
                     property_value = property_value(old)
-                except:
+                except Exception:
                     logger.exception(
                         'Exception caught during property "%s" convert. Ignoring',
                         property_name,

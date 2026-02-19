@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
-
 import asyncio
 import logging
 import threading
+from typing import Optional
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -22,7 +21,7 @@ class AsyncInterface(Interface):
         super().__init__(alarm)
 
         self._loop = asyncio.get_event_loop()
-        self._running_task = None  # type: asyncio.Task
+        self._running_task: Optional[asyncio.Task] = None
 
     def start(self):
         self._running_task = self._loop.create_task(self.run())
@@ -56,7 +55,7 @@ class ThreadQueueInterface(threading.Thread, Interface):
         except (KeyboardInterrupt, SystemExit):
             logger.debug("Interface loop stopping")
             self.stop()
-        except:
+        except Exception:
             logger.exception("Interface loop")
 
     def _run(self):

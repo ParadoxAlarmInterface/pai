@@ -1,12 +1,13 @@
 import asyncio
 import binascii
+from unittest.mock import MagicMock
 
 import pytest
 import pytest_asyncio
-from unittest.mock import MagicMock
 
 from paradox.hardware.evo.parsers import LiveEvent
 from paradox.paradox import Paradox
+
 from tests.hardware.evo.test_panel import create_evo192_panel
 
 
@@ -37,8 +38,8 @@ def send_initial_status(alarm):
 
 
 @pytest_asyncio.fixture(scope="function")
-def alarm(mocker):
-    mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_event_loop())
+async def alarm(mocker):
+    mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_running_loop())
     # conn = mocker.patch("paradox.interfaces.mqtt.core.MQTTConnection")
     # conn.connected = True
     alarm = Paradox(None)
@@ -89,7 +90,7 @@ async def test_current_arm_stay(alarm):
 
 @pytest.mark.asyncio
 async def test_current_alarm(mocker):
-    mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_event_loop())
+    mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_running_loop())
     alarm = Paradox(None)
 
     alarm.panel = create_evo192_panel(alarm)

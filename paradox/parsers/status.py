@@ -1,5 +1,5 @@
-import logging
 from collections import defaultdict
+import logging
 from typing import Dict
 
 from construct import Container
@@ -15,7 +15,9 @@ def _iterate_properties(data):
             yield (key, value)
     elif isinstance(data, dict):
         for key, value in data.items():
-            if type(key) == str and key.startswith("_"):  # ignore private properties
+            if isinstance(key, str) and key.startswith(
+                "_"
+            ):  # ignore private properties
                 continue
             yield (key, value)
 

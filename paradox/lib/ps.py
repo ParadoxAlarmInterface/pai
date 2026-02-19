@@ -1,7 +1,7 @@
 import asyncio
-import logging
 from asyncio import Future
 from collections import defaultdict
+import logging
 from typing import Awaitable, Callable, List, Mapping, Union
 
 from paradox.event import Change, Event, Notification
@@ -10,7 +10,6 @@ from paradox.lib.utils import call_soon_in_main_loop
 PREFIX = "pai_"
 
 logger = logging.getLogger("PAI").getChild(__name__)
-loop = asyncio.get_event_loop()
 
 
 class Listener:
@@ -56,7 +55,7 @@ class PubSub:
 
     async def sendMessage(self, topicName: str, **msgData):
         return await asyncio.gather(
-            *(l.call(**msgData) for l in self.listeners[topicName])
+            *(listener.call(**msgData) for listener in self.listeners[topicName])
         )
 
 

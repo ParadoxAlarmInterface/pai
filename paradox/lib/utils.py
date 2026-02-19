@@ -10,18 +10,20 @@ import typing
 from construct import Container, ListContainer
 from slugify import slugify
 
-main_thread_loop = asyncio.get_event_loop()
+main_thread_loop = None
 
 
 def call_soon_in_main_loop(fn: typing.Union[typing.Callable, typing.Coroutine]) -> None:
+    global main_thread_loop
     if threading.current_thread() is threading.main_thread():
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
+        main_thread_loop = loop
         if isinstance(fn, typing.Coroutine):
             loop.create_task(fn)
         else:
             loop.call_soon(fn)
     else:
-        assert main_thread_loop.is_running()
+        assert main_thread_loop is not None and main_thread_loop.is_running()
         if isinstance(fn, typing.Coroutine):
             asyncio.run_coroutine_threadsafe(
                 fn, loop=main_thread_loop

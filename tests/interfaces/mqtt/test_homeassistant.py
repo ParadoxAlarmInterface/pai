@@ -9,12 +9,13 @@ from paradox.data.model import DetectedPanel
 from paradox.hardware.common import ProductIdEnum
 from paradox.interfaces.mqtt.homeassistant import HomeAssistantMQTTInterface
 from paradox.lib.ps import sendMessage
+
 from tests.hardware.evo.test_panel import create_evo192_panel
 
 
 @pytest.mark.asyncio
 async def test_hass(mocker):
-    mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_event_loop())
+    mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_running_loop())
     mocker.patch.multiple(cfg, MQTT_HOMEASSISTANT_AUTODISCOVERY_ENABLE=True)
     con = mocker.patch("paradox.interfaces.mqtt.core.MQTTConnection")
     con.get_instance.return_value.availability_topic = "paradox/interface/availability"
@@ -52,7 +53,8 @@ async def test_hass(mocker):
 
         await asyncio.sleep(0.1)
 
-        assert_any_call_with_json(interface.mqtt.publish,
+        assert_any_call_with_json(
+            interface.mqtt.publish,
             "homeassistant/sensor/aabbccdd/pai_status/config",
             {
                 "name": "PAI Status",
@@ -67,10 +69,11 @@ async def test_hass(mocker):
                 },
             },
             0,
-            True
+            True,
         )
 
-        assert_any_call_with_json(interface.mqtt.publish,
+        assert_any_call_with_json(
+            interface.mqtt.publish,
             "homeassistant/alarm_control_panel/aabbccdd/partition_partition_1/config",
             {
                 "name": "Partition Partition 1",
@@ -89,12 +92,12 @@ async def test_hass(mocker):
                 "payload_arm_home": "arm_stay",
                 "payload_arm_away": "arm",
                 "payload_arm_night": "arm_sleep",
-                'code_arm_required': False,
-                'code_disarm_required': False,
-                'code_trigger_required': False
+                "code_arm_required": False,
+                "code_disarm_required": False,
+                "code_trigger_required": False,
             },
             0,
-            True
+            True,
         )
     finally:
         interface.stop()
@@ -103,7 +106,7 @@ async def test_hass(mocker):
 
 
 def _decode_json(value):
-    if isinstance(value, str) and value.startswith(('{', '[')):
+    if isinstance(value, str) and value.startswith(("{", "[")):
         try:
             return json.loads(value)
         except JSONDecodeError:
@@ -114,12 +117,14 @@ def _decode_json(value):
 
 def _decode_arguments(*args, **kwargs):
     new_arg = tuple(_decode_json(arg) for arg in args)
-    new_kwarg = dict((key, _decode_json(val)) for key, val in kwargs)
+    new_kwarg = {key: _decode_json(val) for key, val in kwargs}
     return new_arg, new_kwarg
 
 
 def assert_any_call_with_json(self, *args, **kwargs):
-    actual = [_decode_arguments(*args, **kwargs) for args, kwargs in self.call_args_list]
+    actual = [
+        _decode_arguments(*args, **kwargs) for args, kwargs in self.call_args_list
+    ]
     expected = (args, kwargs)
 
     assert expected in actual

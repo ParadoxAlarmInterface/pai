@@ -36,8 +36,11 @@ class Paradox:
         self.panel: Panel = None
         self._connection: Connection = None
         self.retries = retries
-        self.work_loop = asyncio.get_event_loop()
-        self.work_loop.set_exception_handler(async_loop_unhandled_exception_handler)
+        try:
+            self.work_loop = asyncio.get_running_loop()
+            self.work_loop.set_exception_handler(async_loop_unhandled_exception_handler)
+        except RuntimeError:
+            self.work_loop = None
 
         self.storage = Storage()
 
@@ -116,6 +119,10 @@ class Paradox:
         self.connection.register_handler(ErrorMessageHandler(self.handle_error_message))
 
     async def connect(self) -> bool:
+        if self.work_loop is None:
+            self.work_loop = asyncio.get_running_loop()
+            self.work_loop.set_exception_handler(async_loop_unhandled_exception_handler)
+
         if self._connection:
             await self.disconnect()  # socket needs to be also closed
         self.panel = None
@@ -284,7 +291,7 @@ class Paradox:
                     await self.busy.acquire()
                     result = await asyncio.gather(*self.panel.get_status_requests())
                     merged = deep_merge(*result, extend_lists=True, initializer={})
-                    self.work_loop.call_soon(self._process_status, merged)
+                    asyncio.get_running_loop().call_soon(self._process_status, merged)
                     replies_missing = max(0, replies_missing - 1)
                 except ConnectionError:
                     raise
@@ -634,7 +641,7 @@ class Paradox:
         error_enum = message.fields.value.message
 
         if error_enum == "panel_not_connected":
-            asyncio.get_event_loop().create_task(self.disconnect())
+            asyncio.create_task(self.disconnect())
         else:
             message = self.panel.get_error_message(error_enum)
             logger.error(f"Got ERROR Message: {message}")
@@ -723,7 +730,7 @@ class Paradox:
         self._update_partition_states()
 
         if cfg.SYNC_TIME:
-            self.work_loop.create_task(self.sync_time())
+            asyncio.create_task(self.sync_time())
 
     def _process_trouble_statuses(self, trouble_statuses):
         global_trouble = False

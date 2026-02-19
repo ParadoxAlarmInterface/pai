@@ -1,8 +1,8 @@
 import asyncio
 import hashlib
 
-import pytest
 from paho.mqtt.client import MQTTMessage
+import pytest
 
 from paradox.config import config as cfg
 from paradox.interfaces.mqtt.basic import BasicMQTTInterface
@@ -27,7 +27,7 @@ def get_interface(mocker, secret):
         lambda x: async_magic().__await__()
     )  # Deal with await error
 
-    mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_event_loop())
+    mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_running_loop())
     con = mocker.patch("paradox.interfaces.mqtt.core.MQTTConnection")
     con.get_instance.return_value.connected = True
     interface = BasicMQTTInterface(mocker.MagicMock())
@@ -40,7 +40,7 @@ def get_interface(mocker, secret):
 def calc_response(challenge, secret, rounds):
     h = hashlib.new("SHA1")
     i = rounds
-    text = f"{challenge}{secret}".encode("utf-8")
+    text = f"{challenge}{secret}".encode()
 
     while i > 0:
         h.update(text)
@@ -65,7 +65,7 @@ async def test_validate_challenge(mocker):
 
         res = interface._validate_command_with_challenge(f"arm {resp}")
         assert res[0] == "arm"
-        assert res[1] == None
+        assert res[1] is None
 
     finally:
         interface.stop()
@@ -83,7 +83,7 @@ async def test_validate_challenge_user(mocker):
 
         res = interface._validate_command_with_challenge(f"arm {SECRET_USER} XXXX")
         assert res[0] is None
-        assert res[1] == None
+        assert res[1] is None
 
         resp = calc_response(interface.challenge, SECRET, cfg.MQTT_CHALLENGE_ROUNDS)
 
@@ -138,7 +138,7 @@ async def test_auth_output_control(mocker):
         # Auth success
         interface.mqtt.publish.reset_mock()
         resp = calc_response(interface.challenge, SECRET, cfg.MQTT_CHALLENGE_ROUNDS)
-        message.payload = f"on {resp}".encode("utf-8")
+        message.payload = f"on {resp}".encode()
 
         interface._mqtt_handle_output_control(None, None, message)
         await asyncio.sleep(0.01)
@@ -161,13 +161,13 @@ async def test_auth_output_control(mocker):
         # Auth fail due to challenge reuse (and bad response)
         interface.mqtt.publish.reset_mock()
         message = MQTTMessage(topic=b"paradox/control/outputs/Output02")
-        message.payload = f"on {resp}".encode("utf-8")
+        message.payload = f"on {resp}".encode()
 
         interface._mqtt_handle_output_control(None, None, message)
         await asyncio.sleep(0.01)
         try:
             interface.alarm.control_output.assert_called_with("Output02", "on")
-            assert False
+            raise AssertionError()
         except AssertionError:
             pass
 
@@ -208,7 +208,7 @@ async def test_auth_output_control_user(mocker):
         )
 
         message = MQTTMessage(topic=b"paradox/control/outputs/Output01")
-        message.payload = f"on {SECRET_USER} XXX".encode("utf-8")
+        message.payload = f"on {SECRET_USER} XXX".encode()
 
         # Auth fail due to invalid response
         interface._mqtt_handle_output_control(None, None, message)
@@ -231,7 +231,7 @@ async def test_auth_output_control_user(mocker):
         # Auth success
         interface.mqtt.publish.reset_mock()
         resp = calc_response(interface.challenge, SECRET, cfg.MQTT_CHALLENGE_ROUNDS)
-        message.payload = f"on {SECRET_USER} {resp}".encode("utf-8")
+        message.payload = f"on {SECRET_USER} {resp}".encode()
 
         interface._mqtt_handle_output_control(None, None, message)
         await asyncio.sleep(0.01)
@@ -252,13 +252,13 @@ async def test_auth_output_control_user(mocker):
         # Auth fail due to challenge reuse (and bad response)
         interface.mqtt.publish.reset_mock()
         message = MQTTMessage(topic=b"paradox/control/outputs/Output02")
-        message.payload = f"on {SECRET_USER} {resp}".encode("utf-8")
+        message.payload = f"on {SECRET_USER} {resp}".encode()
 
         interface._mqtt_handle_output_control(None, None, message)
         await asyncio.sleep(0.01)
         try:
             interface.alarm.control_output.assert_called_with("Output02", "on")
-            assert False
+            raise AssertionError()
         except AssertionError:
             pass
         interface.mqtt.publish.assert_any_call(
@@ -319,7 +319,7 @@ async def test_auth_partition_control(mocker):
         # Auth success
         interface.mqtt.publish.reset_mock()
         resp = calc_response(interface.challenge, SECRET, cfg.MQTT_CHALLENGE_ROUNDS)
-        message.payload = f"arm {resp}".encode("utf-8")
+        message.payload = f"arm {resp}".encode()
 
         interface._mqtt_handle_partition_control(None, None, message)
         await asyncio.sleep(0.01)
@@ -341,13 +341,13 @@ async def test_auth_partition_control(mocker):
         # Auth fail due to challenge reuse (and bad response)
         interface.mqtt.publish.reset_mock()
         message = MQTTMessage(topic=b"paradox/control/partitions/Partition02")
-        message.payload = f"arm {resp}".encode("utf-8")
+        message.payload = f"arm {resp}".encode()
 
         interface._mqtt_handle_partition_control(None, None, message)
         await asyncio.sleep(0.01)
         try:
             interface.alarm.control_partition.assert_called_with("Partition02", "arm")
-            assert False
+            raise AssertionError()
         except AssertionError:
             pass
 
@@ -387,7 +387,7 @@ async def test_auth_partition_control_user(mocker):
         )
 
         message = MQTTMessage(topic=b"paradox/control/partitions/Partition01")
-        message.payload = f"arm {SECRET_USER} XXX".encode("utf-8")
+        message.payload = f"arm {SECRET_USER} XXX".encode()
 
         # Auth fail due to invalid response
         interface._mqtt_handle_partition_control(None, None, message)
@@ -409,7 +409,7 @@ async def test_auth_partition_control_user(mocker):
         # Auth success
         interface.mqtt.publish.reset_mock()
         resp = calc_response(interface.challenge, SECRET, cfg.MQTT_CHALLENGE_ROUNDS)
-        message.payload = f"arm {SECRET_USER} {resp}".encode("utf-8")
+        message.payload = f"arm {SECRET_USER} {resp}".encode()
 
         interface._mqtt_handle_partition_control(None, None, message)
         await asyncio.sleep(0.01)
@@ -430,13 +430,13 @@ async def test_auth_partition_control_user(mocker):
         # Auth fail due to challenge reuse (and bad response)
         interface.mqtt.publish.reset_mock()
         message = MQTTMessage(topic=b"paradox/control/partitions/Partition02")
-        message.payload = f"arm {SECRET_USER} {resp}".encode("utf-8")
+        message.payload = f"arm {SECRET_USER} {resp}".encode()
 
         interface._mqtt_handle_partition_control(None, None, message)
         await asyncio.sleep(0.01)
         try:
             interface.alarm.control_partition.assert_called_with("Partition02", "arm")
-            assert False
+            raise AssertionError()
         except AssertionError:
             pass
 
@@ -499,7 +499,7 @@ async def test_auth_zone_control(mocker):
         # Auth success
         interface.mqtt.publish.reset_mock()
         resp = calc_response(interface.challenge, SECRET, cfg.MQTT_CHALLENGE_ROUNDS)
-        message.payload = f"bypass {resp}".encode("utf-8")
+        message.payload = f"bypass {resp}".encode()
 
         interface._mqtt_handle_zone_control(None, None, message)
         await asyncio.sleep(0.01)
@@ -520,13 +520,13 @@ async def test_auth_zone_control(mocker):
         # Auth fail due to challenge reuse (and bad response)
         interface.mqtt.publish.reset_mock()
         message = MQTTMessage(topic=b"paradox/control/zones/zone02")
-        message.payload = f"bypass {resp}".encode("utf-8")
+        message.payload = f"bypass {resp}".encode()
 
         interface._mqtt_handle_zone_control(None, None, message)
         await asyncio.sleep(0.01)
         try:
             interface.alarm.control_zone.assert_called_with("zone02", "bypass")
-            assert False
+            raise AssertionError()
         except AssertionError:
             pass
 
@@ -566,7 +566,7 @@ async def test_auth_zone_control_user(mocker):
         )
 
         message = MQTTMessage(topic=b"paradox/control/zones/zone01")
-        message.payload = f"bypass {SECRET_USER} XXX".encode("utf-8")
+        message.payload = f"bypass {SECRET_USER} XXX".encode()
 
         # Auth fail due to invalid response
         interface._mqtt_handle_zone_control(None, None, message)
@@ -588,7 +588,7 @@ async def test_auth_zone_control_user(mocker):
         # Auth success
         interface.mqtt.publish.reset_mock()
         resp = calc_response(interface.challenge, SECRET, cfg.MQTT_CHALLENGE_ROUNDS)
-        message.payload = f"bypass {SECRET_USER} {resp}".encode("utf-8")
+        message.payload = f"bypass {SECRET_USER} {resp}".encode()
 
         interface._mqtt_handle_zone_control(None, None, message)
         await asyncio.sleep(0.01)
@@ -609,13 +609,13 @@ async def test_auth_zone_control_user(mocker):
         # Auth fail due to challenge reuse (and bad response)
         interface.mqtt.publish.reset_mock()
         message = MQTTMessage(topic=b"paradox/control/zones/zone02")
-        message.payload = f"bypass {SECRET_USER} {resp}".encode("utf-8")
+        message.payload = f"bypass {SECRET_USER} {resp}".encode()
 
         interface._mqtt_handle_zone_control(None, None, message)
         await asyncio.sleep(0.01)
         try:
             interface.alarm.control_zone.assert_called_with("zone02", "bypass")
-            assert False
+            raise AssertionError()
         except AssertionError:
             pass
 

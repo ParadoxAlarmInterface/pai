@@ -37,16 +37,21 @@ class ConnectionProtocol(asyncio.Protocol):
 
         self.handler = handler
 
-        self._closed = asyncio.get_event_loop().create_future()
+        self._closed: asyncio.Future = None  # type: ignore[assignment]
         self.buffer = b""
 
     def connection_made(self, transport):
+        self._closed = asyncio.get_running_loop().create_future()
         self.transport = transport
 
         self.handler.on_connection()
 
     def is_active(self) -> bool:
-        return bool(self.transport) and not self._closed.done()
+        return (
+            bool(self.transport)
+            and self._closed is not None
+            and not self._closed.done()
+        )
 
     def check_active(self):
         if not self.is_active():
@@ -60,7 +65,8 @@ class ConnectionProtocol(asyncio.Protocol):
                 logger.exception("Connection transport close raised Exception")
             self.transport = None
 
-        await asyncio.wait_for(self._closed, timeout=cfg.IO_TIMEOUT)
+        if self._closed is not None:
+            await asyncio.wait_for(self._closed, timeout=cfg.IO_TIMEOUT)
 
     @abstractmethod
     def send_message(self, message):
@@ -71,7 +77,7 @@ class ConnectionProtocol(asyncio.Protocol):
         self.buffer = b""
         self.transport = None
 
-        if not self._closed.done():
+        if self._closed is not None and not self._closed.done():
             if exc is None:
                 self._closed.set_result(None)
             else:
@@ -91,7 +97,7 @@ class ConnectionProtocol(asyncio.Protocol):
         # Prevent reports about unhandled exceptions.
         # Better than self._closed._log_traceback = False hack
         closed = self._closed
-        if closed.done() and not closed.cancelled():
+        if closed is not None and closed.done() and not closed.cancelled():
             closed.exception()
 
 

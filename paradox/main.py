@@ -1,9 +1,9 @@
 import asyncio
 import logging
+from logging.handlers import RotatingFileHandler
 import signal
 import sys
 import time
-from logging.handlers import RotatingFileHandler
 
 from paradox import VERSION
 from paradox.config import config as cfg
@@ -97,7 +97,7 @@ async def run_loop():
             break
         except (KeyboardInterrupt, SystemExit):
             break  # break exits the retry loop
-        except:
+        except Exception:
             logger.exception("Restarting")
             await asyncio.sleep(retry_time_wait)
 
@@ -135,7 +135,7 @@ def main(args):
     for signame in ("SIGINT", "SIGTERM"):
         sig = getattr(signal, signame)
         loop.add_signal_handler(
-            sig, lambda: asyncio.ensure_future(exit_handler(signame))
+            sig, lambda s=signame: asyncio.ensure_future(exit_handler(s))
         )
 
     interface_manager = InterfaceManager(alarm, config=cfg)

@@ -16,16 +16,20 @@ ELEMENT_TOPIC_MAP = dict(
 
 
 def get_control_topic_prefix(element_type):
-    return "/".join([
-        cfg.MQTT_BASE_TOPIC,
-        cfg.MQTT_CONTROL_TOPIC,
-        ELEMENT_TOPIC_MAP[element_type],
-    ])
+    return "/".join(
+        [
+            cfg.MQTT_BASE_TOPIC,
+            cfg.MQTT_CONTROL_TOPIC,
+            ELEMENT_TOPIC_MAP[element_type],
+        ]
+    )
 
 
 def get_state_topic_prefix(element_type):
-    return "/".join([
-        cfg.MQTT_BASE_TOPIC,
-        cfg.MQTT_STATES_TOPIC,
-        ELEMENT_TOPIC_MAP[element_type],
-    ])
+    return "/".join(
+        [
+            cfg.MQTT_BASE_TOPIC,
+            cfg.MQTT_STATES_TOPIC,
+            ELEMENT_TOPIC_MAP[element_type],
+        ]
+    )
