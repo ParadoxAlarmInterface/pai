@@ -15,7 +15,6 @@ from construct import (
     Computed,
     Const,
     Default,
-    Embedded,
     Enum,
     ExprAdapter,
     ExprSymmetricAdapter,
@@ -106,90 +105,68 @@ InitializeCommunication = Struct(
             "system_options"
             / BitsSwapped(
                 BitStruct(
-                    Embedded(
-                        Struct(  # EVO section data 3030
-                            "pgm1_smoke" / Flag,
-                            "no_bell_cut_off" / Flag,
-                            "daylight_saving_time" / Flag,
-                            "shabbat_feature" / Flag,
-                            "battery_charge_current" / Flag,
-                            "ac_failure_not_displayed_as_trouble" / Flag,
-                            "clear_bell_limit_trouble" / Flag,
-                            "combus_speed" / Flag,
-                        )
-                    ),
+                    # EVO section data 3030
+                    "pgm1_smoke" / Flag,
+                    "no_bell_cut_off" / Flag,
+                    "daylight_saving_time" / Flag,
+                    "shabbat_feature" / Flag,
+                    "battery_charge_current" / Flag,
+                    "ac_failure_not_displayed_as_trouble" / Flag,
+                    "clear_bell_limit_trouble" / Flag,
+                    "combus_speed" / Flag,
                     "partitions" / StatusFlags(8),  # EVO section data 3031
                     "siren_output_partition" / StatusFlags(8),  # EVO section data 3032
-                    Embedded(
-                        Struct(  # EVO section data 3033
-                            "multiple_actions_user_menu" / Flag,
-                            "user_code_length_flexible" / Flag,
-                            "user_code_length_6" / Flag,
-                            "power_save_mode" / Flag,
-                            "bypass_not_displayed_when_armed" / Flag,
-                            "trouble_latch" / Flag,
-                            "eol_resistor_on_harwire_zones" / Flag,
-                            "atz" / Flag,
-                        )
-                    ),
-                    Embedded(
-                        Struct(  # EVO section data 3034
-                            "wireless_transmitter_supervision_options" / BitsInteger(2),
-                            "generate_supervision_failure_on_bypassed_wireless_zone"
-                            / Flag,
-                            "restrict_arming_on_wireless_transmitter_supervision_failure"
-                            / Flag,
-                            "tamper_recognition_options" / BitsInteger(2),
-                            "generate_tamper_if_detected_on_bypassed_zone" / Flag,
-                            "restrict_arming_on_tamper" / Flag,
-                        )
-                    ),
-                    Embedded(
-                        Struct(  # EVO section data 3035
-                            "restrict_arming_on_ac_failure" / Flag,
-                            "restrict_arming_on_battery_failure" / Flag,
-                            "restrict_arming_on_bell_or_aux_failure" / Flag,
-                            "restrict_arming_on_tlm_failure" / Flag,
-                            "restrict_arming_on_module_troubles" / Flag,
-                            "account_number_transmission" / Flag,
-                            "transmit_zone_status_on_serial_port" / Flag,
-                            "serial_port_baud_rate_57600" / Flag,
-                        )
-                    ),
-                    Embedded(
-                        Struct(  # EVO section data 3036
-                            "telephone_line_monitoring" / BitsInteger(2),
-                            "dialer_reporting" / Flag,
-                            "dialing_method" / Flag,
-                            "pulse_ratio" / Flag,
-                            "busy_tone_detection" / Flag,
-                            "switch_to_pulse_dialing" / Flag,
-                            "bell_siren_upon_communication_failure" / Flag,
-                        )
-                    ),
-                    Embedded(
-                        Struct(  # EVO section data 3037
-                            "call_back" / Flag,
-                            "automatic_event_buffer_transmission" / Flag,
-                            "autotest_report_transmission_options" / BitsInteger(2),
-                            "keypad_beep_on_successful_arming_disarming_report" / Flag,
-                            "alternate_dialing" / Flag,
-                            "dial_tone_delay" / Flag,
-                            "report_zone_restore" / Flag,
-                        )
-                    ),
-                    Embedded(
-                        Struct(  # EVO section data 3038
-                            "access_control_feature" / Flag,
-                            "log_request_for_exit" / Flag,
-                            "log_door_left_open_restore" / Flag,
-                            "log_door_forced_restore" / Flag,
-                            "bulglar_alarm_on_forced_door" / Flag,
-                            "skip_exit_delay_when_arming_with_access_card" / Flag,
-                            "bulglar_alarm_on_door_left_open" / Flag,
-                            "who_has_access_during_clock_loss" / Flag,
-                        )
-                    ),
+                    # EVO section data 3033
+                    "multiple_actions_user_menu" / Flag,
+                    "user_code_length_flexible" / Flag,
+                    "user_code_length_6" / Flag,
+                    "power_save_mode" / Flag,
+                    "bypass_not_displayed_when_armed" / Flag,
+                    "trouble_latch" / Flag,
+                    "eol_resistor_on_harwire_zones" / Flag,
+                    "atz" / Flag,
+                    # EVO section data 3034
+                    "wireless_transmitter_supervision_options" / BitsInteger(2),
+                    "generate_supervision_failure_on_bypassed_wireless_zone" / Flag,
+                    "restrict_arming_on_wireless_transmitter_supervision_failure"
+                    / Flag,
+                    "tamper_recognition_options" / BitsInteger(2),
+                    "generate_tamper_if_detected_on_bypassed_zone" / Flag,
+                    "restrict_arming_on_tamper" / Flag,
+                    # EVO section data 3035
+                    "restrict_arming_on_ac_failure" / Flag,
+                    "restrict_arming_on_battery_failure" / Flag,
+                    "restrict_arming_on_bell_or_aux_failure" / Flag,
+                    "restrict_arming_on_tlm_failure" / Flag,
+                    "restrict_arming_on_module_troubles" / Flag,
+                    "account_number_transmission" / Flag,
+                    "transmit_zone_status_on_serial_port" / Flag,
+                    "serial_port_baud_rate_57600" / Flag,
+                    # EVO section data 3036
+                    "telephone_line_monitoring" / BitsInteger(2),
+                    "dialer_reporting" / Flag,
+                    "dialing_method" / Flag,
+                    "pulse_ratio" / Flag,
+                    "busy_tone_detection" / Flag,
+                    "switch_to_pulse_dialing" / Flag,
+                    "bell_siren_upon_communication_failure" / Flag,
+                    # EVO section data 3037
+                    "call_back" / Flag,
+                    "automatic_event_buffer_transmission" / Flag,
+                    "autotest_report_transmission_options" / BitsInteger(2),
+                    "keypad_beep_on_successful_arming_disarming_report" / Flag,
+                    "alternate_dialing" / Flag,
+                    "dial_tone_delay" / Flag,
+                    "report_zone_restore" / Flag,
+                    # EVO section data 3038
+                    "access_control_feature" / Flag,
+                    "log_request_for_exit" / Flag,
+                    "log_door_left_open_restore" / Flag,
+                    "log_door_forced_restore" / Flag,
+                    "bulglar_alarm_on_forced_door" / Flag,
+                    "skip_exit_delay_when_arming_with_access_card" / Flag,
+                    "bulglar_alarm_on_door_left_open" / Flag,
+                    "who_has_access_during_clock_loss" / Flag,
                 )
             ),
             "_not_used1" / Padding(4),

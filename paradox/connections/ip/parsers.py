@@ -72,7 +72,7 @@ IPPayloadConnectResponse = Struct(
         Pointer(21, Enum(Int8ub, IP150=0x71, IP100=0x70)),
         lambda ctx: ctx.ip_module_serial[0],
     ),
-).compile()
+)
 
 
 class EncryptionAdapter(Adapter):
@@ -131,7 +131,7 @@ IPMessageRequest = Struct(
         ),
         b"",
     ),
-).compile()
+)
 
 
 IPMessageResponse = Struct(
@@ -174,4 +174,4 @@ IPMessageResponse = Struct(
         ),
         b"",
     ),
-).compile()
+)
