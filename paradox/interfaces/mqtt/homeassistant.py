@@ -55,7 +55,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         ps.subscribe(self._handle_labels_loaded, "labels_loaded")
         ps.subscribe(first_status_update_future, "status_update")
 
-    def on_connect(self, client, userdata, flags, result):
+    def on_connect(self, client, userdata, connect_flags, reason_code, properties=None):
         # TODO: do not create connected_future, use some other
         if not self.connected_future.done():
             self.connected_future.set_result(True)
