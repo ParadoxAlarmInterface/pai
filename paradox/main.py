@@ -70,6 +70,16 @@ async def exit_handler(signame=None):
     logger.info("Good bye!")
 
 
+async def run_with_signals():
+    loop = asyncio.get_running_loop()
+    for signame in ("SIGINT", "SIGTERM"):
+        sig = getattr(signal, signame)
+        loop.add_signal_handler(
+            sig, lambda s=signame: asyncio.ensure_future(exit_handler(s))
+        )
+    await run_loop()
+
+
 async def run_loop():
     retry = 1
     while alarm is not None:
@@ -131,17 +141,10 @@ def main(args):
 
     # Start interacting with the alarm
     alarm = Paradox()
-    loop = asyncio.get_event_loop()
-    for signame in ("SIGINT", "SIGTERM"):
-        sig = getattr(signal, signame)
-        loop.add_signal_handler(
-            sig, lambda s=signame: asyncio.ensure_future(exit_handler(s))
-        )
 
     interface_manager = InterfaceManager(alarm, config=cfg)
     interface_manager.start()
 
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(run_loop())
+    asyncio.run(run_with_signals())
 
     sys.exit(0)
