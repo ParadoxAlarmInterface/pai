@@ -2,6 +2,75 @@
 requires = ["setuptools>=46.4.0"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "paradox-alarm-interface"
+dynamic = ["version"]
+authors = [
+    {name = "Jevgeni Kiski", email = "yozik04@gmail.com"},
+    {name = "João Paulo Barraca", email = "jpbarraca@gmail.com"},
+]
+description = "Interface to Paradox Alarm Panels"
+readme = "README.md"
+license = {file = "LICENSE"}
+keywords = ["paradox", "alarm", "ip150", "serial", "home-assistant", "smarthome", "mqtt"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Eclipse Public License 2.0 (EPL-2.0)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "construct~=2.10.70",
+    "argparse>=1.4.0",
+    "python-slugify>=4.0.1",
+    "pytz>=2021.3",
+    "paho_mqtt>=2.1.0,<3",
+    "requests>=2.20.0",
+    "pyserial-asyncio>=0.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/ParadoxAlarmInterface/pai"
+"Bug Tracker" = "https://github.com/ParadoxAlarmInterface/pai/issues"
+
+[project.scripts]
+ip150-connection-decrypt = "paradox.console_scripts.ip150_connection_decrypt:main"
+pai-service = "paradox.console_scripts.pai_run:main"
+pai-dump-memory = "paradox.console_scripts.pai_dump_memory:main"
+
+[project.optional-dependencies]
+YAML = [
+    "pyyaml>=5.2.0",
+]
+Pushbullet = [
+    "pushbullet.py>=0.11.0",
+    "ws4py>=0.4.2",
+]
+Signal = [
+    "pygobject>=3.20.0",
+    "pydbus>=0.6.0",
+    "gi>=1.2",
+]
+
+[tool.setuptools]
+zip-safe = true
+
+[tool.setuptools.packages.find]
+exclude = ["tests", "tests.*", "config.*", "docs.*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "paradox.__version__"}
+
 [tool.black]
 target-version = ["py38", "py39", "py310", "py311", "py312", "py313", "py314"]
 exclude = 'generated'
@@ -23,3 +92,9 @@ combine_as_imports = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.codespell]
+skip = "*.ipynb"
