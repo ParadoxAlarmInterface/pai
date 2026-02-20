@@ -12,9 +12,6 @@ from paradox.interfaces.interface_manager import InterfaceManager
 from paradox.lib.encodings import register_encodings
 from paradox.paradox import Paradox
 
-alarm = None
-interface_manager = None
-
 logger = logging.getLogger("PAI")
 
 
@@ -53,34 +50,33 @@ def configure_logger(logger):
     logger.setLevel(logger_level)
 
 
-async def exit_handler(signame=None):
-    global alarm, interface_manager
+async def _run(alarm: Paradox):
+    interface_manager = InterfaceManager(alarm, config=cfg)
+    interface_manager.start()
 
-    if signame is not None:
-        logger.info(f"Captured signal {signame}. Exiting")
+    async def exit_handler(signame=None):
+        nonlocal alarm, interface_manager
 
-    if alarm:
-        await alarm.disconnect()
-        alarm = None
+        if signame is not None:
+            logger.info(f"Captured signal {signame}. Exiting")
 
-    if interface_manager:
-        interface_manager.stop()
-        interface_manager = None
+        if alarm:
+            await alarm.disconnect()
+            alarm = None
 
-    logger.info("Good bye!")
+        if interface_manager:
+            interface_manager.stop()
+            interface_manager = None
 
+        logger.info("Good bye!")
 
-async def run_with_signals():
     loop = asyncio.get_running_loop()
     for signame in ("SIGINT", "SIGTERM"):
         sig = getattr(signal, signame)
         loop.add_signal_handler(
             sig, lambda s=signame: asyncio.ensure_future(exit_handler(s))
         )
-    await run_loop()
 
-
-async def run_loop():
     retry = 1
     while alarm is not None:
         logger.info("Starting...")
@@ -118,8 +114,6 @@ async def run_loop():
 
 
 def main(args):
-    global alarm, interface_manager
-
     time.tzset()
     if "config" in args and args.config is not None:
         import os
@@ -140,11 +134,6 @@ def main(args):
     register_encodings()
 
     # Start interacting with the alarm
-    alarm = Paradox()
-
-    interface_manager = InterfaceManager(alarm, config=cfg)
-    interface_manager.start()
-
-    asyncio.run(run_with_signals())
+    asyncio.run(_run(Paradox()))
 
     sys.exit(0)

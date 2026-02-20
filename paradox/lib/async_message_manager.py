@@ -54,11 +54,11 @@ class AsyncMessageManager:
         self.handler_registry.remove_by_name(name)
 
     def schedule_message_handling(self, message: Container):
-        return asyncio.get_event_loop().create_task(
+        return asyncio.get_running_loop().create_task(
             self.handler_registry.handle(message)
         )
 
     def schedule_raw_message_handling(self, message: Container):
-        return asyncio.get_event_loop().create_task(
+        return asyncio.get_running_loop().create_task(
             self.raw_handler_registry.handle(message)
         )

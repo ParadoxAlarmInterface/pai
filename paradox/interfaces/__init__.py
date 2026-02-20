@@ -20,7 +20,7 @@ class AsyncInterface(Interface):
     def __init__(self, alarm):
         super().__init__(alarm)
 
-        self._loop = asyncio.get_event_loop()
+        self._loop = asyncio.get_running_loop()
         self._running_task: Optional[asyncio.Task] = None
 
     def start(self):

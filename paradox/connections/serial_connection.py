@@ -64,12 +64,17 @@ class SerialCommunication(Connection, ConnectionHandler):
                 logger.error(f"Failed to update file {self.port_path} permissions")
                 return False
 
-        self.connected_future = asyncio.get_event_loop().create_future()
-        open_timeout_handler = asyncio.get_event_loop().call_later(5, self.open_timeout)
+        self.connected_future = asyncio.get_running_loop().create_future()
+        open_timeout_handler = asyncio.get_running_loop().call_later(
+            5, self.open_timeout
+        )
 
         try:
             _, self._protocol = await serial_asyncio.create_serial_connection(
-                asyncio.get_event_loop(), self.make_protocol, self.port_path, self.baud
+                asyncio.get_running_loop(),
+                self.make_protocol,
+                self.port_path,
+                self.baud,
             )
 
             return await self.connected_future

@@ -50,7 +50,7 @@ class SignalTextInterface(ConfiguredAbstractTextInterface):
 
         logger.debug("Signal Interface Running")
 
-        asyncio.get_event_loop().run_in_executor(None, self.glib_loop.run)
+        asyncio.get_running_loop().run_in_executor(None, self.glib_loop.run)
 
     def send_message(self, message: str, level: EventLevel):
         if self.signal is None:
