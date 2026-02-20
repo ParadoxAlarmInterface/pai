@@ -46,7 +46,7 @@ MODULES = {
     "pytz": dict(
         mandatory=False, desc="Panel time sync", install_name="pytz>=2023.3.post1"
     ),
-    "mqtt": dict(mandatory=False, desc="MQTT", install_name="paho_mqtt>=1.5.0,<2"),
+    "mqtt": dict(mandatory=False, desc="MQTT", install_name="paho_mqtt>=2.1.0,<3"),
     "pre-commit": dict(mandatory=False, desc="Development", install_name="pre-commit"),
     "flake8": dict(mandatory=False, desc="Code checker", install_name="flake8"),
     "tox": dict(mandatory=False, desc="virtual env / testing", install_name="tox"),

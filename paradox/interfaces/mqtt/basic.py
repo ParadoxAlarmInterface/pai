@@ -117,7 +117,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         ps.subscribe(self._handle_panel_change, "changes")
         ps.subscribe(self._handle_panel_event, "events")
 
-    def on_connect(self, mqttc, userdata, flags, result):
+    def on_connect(self, mqttc, userdata, connect_flags, reason_code, properties=None):
         self.subscribe_callback(
             get_control_topic_prefix("output") + "/#",
             self._mqtt_handle_output_control,
