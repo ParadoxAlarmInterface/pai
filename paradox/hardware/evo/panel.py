@@ -159,7 +159,9 @@ class Panel_EVOBase(PanelBase):
                         return parsers.RequestedEvent.parse(message)
 
         except ChecksumError as e:
-            logger.error("ChecksumError %s, message: %s", e, binascii.hexlify(message))
+            logger.warning(
+                "ChecksumError %s, message: %s", e, binascii.hexlify(message)
+            )
         except Exception:
             logger.exception("Exception parsing message: %s", binascii.hexlify(message))
 
