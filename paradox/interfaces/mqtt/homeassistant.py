@@ -25,6 +25,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         self.partitions = {}
         self.zones = {}
         self.pgms = {}
+        self.module_pgms = {}
 
         self.entity_factory = MQTTAutodiscoveryEntityFactory(
             self.mqtt.availability_topic
@@ -69,6 +70,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
 
         self.zones = data.get("zone", {})
         self.pgms = data.get("pgm", {})
+        self.module_pgms = data.get("module_pgm", {})
 
     def _publish_when_ready(self, panel: DetectedPanel, status):
         self.entity_factory.set_device(Device(panel))
@@ -80,6 +82,9 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             self._publish_zone_configs(status["zone"])
         if "pgm" in status:
             self._publish_pgm_configs(status["pgm"])
+        module_pgms = dict(self.alarm.storage.get_container("module_pgm"))
+        if module_pgms:
+            self._publish_module_pgm_configs(module_pgms)
         if "system" in status:
             self._publish_system_property_configs(status["system"])
 
@@ -161,6 +166,11 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
 
             pgm_switch_config = self.entity_factory.make_pgm_switch(pgm)
             self._publish_config(pgm_switch_config)
+
+    def _publish_module_pgm_configs(self, module_pgms):
+        for module_pgm_key, module_pgm in module_pgms.items():
+            module_pgm_switch_config = self.entity_factory.make_module_pgm_switch(module_pgm)
+            self._publish_config(module_pgm_switch_config)
 
     def _publish_system_property_configs(self, system_statuses):
         for system_key, system_status in system_statuses.items():

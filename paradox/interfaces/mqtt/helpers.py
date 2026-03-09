@@ -5,6 +5,7 @@ ELEMENT_TOPIC_MAP = dict(
     zone=cfg.MQTT_ZONE_TOPIC,
     output=cfg.MQTT_OUTPUT_TOPIC,
     pgm=cfg.MQTT_OUTPUT_TOPIC,
+    module_pgm=cfg.MQTT_OUTPUT_TOPIC,
     repeater=cfg.MQTT_REPEATER_TOPIC,
     bus=cfg.MQTT_BUS_TOPIC,
     module=cfg.MQTT_MODULE_TOPIC,

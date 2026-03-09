@@ -50,7 +50,7 @@ def test_pgm3_deactivate_and_monitor():
     assert a == expected_out
 
 
-def test_pgm4_activate_and_monitor():
+def test_module_pgm_activate_and_monitor():
     expected_out = unhexlify("40130600000008000000000000000300000064")
 
     pgms = [4]
@@ -60,7 +60,7 @@ def test_pgm4_activate_and_monitor():
     assert a == expected_out
 
 
-def test_pgm4_deactivate_and_monitor():
+def test_module_pgm_deactivate_and_monitor():
     expected_out = unhexlify("40130600000008000000000000000100000062")
 
     pgms = [4]

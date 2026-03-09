@@ -358,6 +358,10 @@ class Panel:
         raise NotImplementedError("override control_outputs in a subclass")
 
     @abstractmethod
+    def control_module_pgm_outputs(self, module_address, pgm_index, command) -> bool:
+        raise NotImplementedError("override control_module_pgm_outputs in a subclass")
+
+    @abstractmethod
     def control_doors(self, doors, command) -> bool:
         raise NotImplementedError("override control_doors in a subclass")
 

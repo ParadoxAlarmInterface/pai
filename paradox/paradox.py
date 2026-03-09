@@ -216,6 +216,7 @@ class Paradox:
 
             logger.info("Loading data from panel memory")
             await self.panel.load_memory()
+            self._init_module_pgms()
 
             logger.info("Running")
             self.run_state = RunState.RUN
@@ -489,33 +490,61 @@ class Paradox:
 
         return accepted
 
+    def _init_module_pgms(self):
+        for addr, pgm_count in cfg.MODULE_PGM_ADDRESSES.items():
+            for pgm_index in range(1, pgm_count + 1):
+                key = f"module{addr}_pgm{pgm_index}"
+                self.storage.get_container("module_pgm")[key] = {
+                    "id": pgm_index,
+                    "key": key,
+                    "label": f"Module {addr} PGM {pgm_index}",
+                    "module_address": addr,
+                    "pgm_index": pgm_index,
+                }
+                self.storage.update_container_object("module_pgm", key, {"on": False})
+
     async def control_output(self, output, command) -> bool:
         command = command.lower()
         logger.debug(f"Control Output: {output} - {command}")
 
         outputs_selected = self.storage.get_container("pgm").select(output)
+        if outputs_selected:
+            accepted = False
+            try:
+                accepted = await self.panel.control_outputs(outputs_selected, command)
+            except NotImplementedError:
+                logger.error("control_output is not implemented for this alarm type")
+            except asyncio.CancelledError:
+                logger.error("control_output canceled")
+            except asyncio.TimeoutError:
+                logger.error("control_output timeout")
+            self.request_status_refresh()
+            return accepted
 
-        # Not Found
-        if len(outputs_selected) == 0:
-            logger.error("No outputs selected")
-            return False
+        module_pgm_selected = self.storage.get_container("module_pgm").select(output)
+        if module_pgm_selected:
+            accepted = False
+            module_pgm_container = self.storage.get_container("module_pgm")
+            for key in module_pgm_selected:
+                out = module_pgm_container[key]
+                try:
+                    accepted = await self.panel.control_module_pgm_outputs(
+                        out["module_address"], out["pgm_index"], command
+                    )
+                except NotImplementedError:
+                    logger.error("control_module_pgm_outputs is not implemented for this alarm type")
+                except asyncio.CancelledError:
+                    logger.error("control_output canceled")
+                except asyncio.TimeoutError:
+                    logger.error("control_output timeout")
+                if accepted:
+                    is_on = command in ("on", "on_override")
+                    self.storage.update_container_object("module_pgm", out["key"], {"on": is_on})
+            self.request_status_refresh()
+            return accepted
 
-        # Apply state changes
-        accepted = False
-        try:
-            accepted = await self.panel.control_outputs(outputs_selected, command)
-        except NotImplementedError:
-            logger.error("control_output is not implemented for this alarm type")
-        except asyncio.CancelledError:
-            logger.error("control_output canceled")
-        except asyncio.TimeoutError:
-            logger.error("control_output timeout")
-        # Apply state changes
-
-        # Refresh status
-        self.request_status_refresh()  # Trigger status update
-
-        return accepted
+        logger.error("No outputs selected")
+        return False
 
     async def send_panic(self, partition_id, panic_type, user_id) -> bool:
         logger.debug(
