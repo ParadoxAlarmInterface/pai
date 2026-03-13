@@ -516,6 +516,7 @@ class Paradox:
                 logger.error("control_output is not implemented for this alarm type")
             except asyncio.CancelledError:
                 logger.error("control_output canceled")
+                raise
             except asyncio.TimeoutError:
                 logger.error("control_output timeout")
             self.request_status_refresh()
@@ -535,6 +536,7 @@ class Paradox:
                     logger.error("control_module_pgm_outputs is not implemented for this alarm type")
                 except asyncio.CancelledError:
                     logger.error("control_output canceled")
+                    raise
                 except asyncio.TimeoutError:
                     logger.error("control_output timeout")
                 if accepted:
