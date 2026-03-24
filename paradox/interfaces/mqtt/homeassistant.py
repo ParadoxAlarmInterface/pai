@@ -168,7 +168,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             self._publish_config(pgm_switch_config)
 
     def _publish_module_pgm_configs(self, module_pgms):
-        for module_pgm_key, module_pgm in module_pgms.items():
+        for _, module_pgm in module_pgms.items():
             module_pgm_switch_config = self.entity_factory.make_module_pgm_switch(module_pgm)
             self._publish_config(module_pgm_switch_config)
 
