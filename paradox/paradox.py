@@ -542,7 +542,6 @@ class Paradox:
                 if accepted:
                     is_on = command in ("on", "on_override")
                     self.storage.update_container_object("module_pgm", out["key"], {"on": is_on})
-            self.request_status_refresh()
             return accepted
 
         logger.error("No outputs selected")
