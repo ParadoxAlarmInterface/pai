@@ -316,7 +316,8 @@ class Panel_EVOBase(PanelBase):
         :param str command: textual command
         :return: True if accepted
         """
-        pgm_commands = ["release"] * parsers.MODULE_PGM_OUTPUTS_PER_MODULE
+        assert 1 <= pgm_index <= parsers.MODULE_PGM_PACKET_SLOTS, "pgm_index must be between 1 and %d" % parsers.MODULE_PGM_PACKET_SLOTS
+        pgm_commands = ["release"] * parsers.MODULE_PGM_PACKET_SLOTS
         pgm_commands[pgm_index - 1] = command
 
         args = {"module_address": module_address, "pgm_commands": pgm_commands}

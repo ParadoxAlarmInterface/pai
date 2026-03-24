@@ -823,7 +823,9 @@ PerformPGMAction = Struct(
     "checksum" / PacketChecksum(Bytes(1)),
 )
 
-MODULE_PGM_OUTPUTS_PER_MODULE = 4
+# Fixed number of PGM command slots in the 0xA4 packet — a protocol constant,
+# not the number of PGMs a specific module exposes (which is configured separately).
+MODULE_PGM_PACKET_SLOTS = 4
 
 PerformModulePGMAction = Struct(
     "fields"
@@ -834,7 +836,7 @@ PerformModulePGMAction = Struct(
             "_not_used0" / Padding(1),
             "module_address" / Default(Int8ub, 0),
             "_not_used1" / Padding(2),
-            "pgm_commands" / Array(MODULE_PGM_OUTPUTS_PER_MODULE, Default(_PGMCommandEnum, "release")),
+            "pgm_commands" / Array(MODULE_PGM_PACKET_SLOTS, Default(_PGMCommandEnum, "release")),
             "_not_used2" / Padding(12),
         )
     ),

@@ -39,3 +39,71 @@ async def test_control_doors(mocker):
 
     assert await alarm.control_door("Door 1", "unlock")
     alarm.panel.control_doors.assert_called_once_with([1], "unlock")
+
+
+def _add_module_pgm(alarm, module_address, pgm_index):
+    key = f"module{module_address}_pgm{pgm_index}"
+    alarm.storage.get_container("module_pgm")[key] = {
+        "id": pgm_index,
+        "key": key,
+        "label": f"Module {module_address} PGM {pgm_index}",
+        "module_address": module_address,
+        "pgm_index": pgm_index,
+    }
+    alarm.storage.update_container_object("module_pgm", key, {"on": False})
+    return key
+
+
+@pytest.mark.asyncio
+async def test_control_output_regular_pgm_routes_to_control_outputs(mocker):
+    """Regular PGM uses control_outputs, not control_module_pgm_outputs."""
+    alarm = Paradox()
+    alarm.panel = mocker.Mock(spec=Panel)
+    alarm.panel.control_outputs = AsyncMock(return_value=True)
+    alarm.panel.control_module_pgm_outputs = AsyncMock(return_value=True)
+
+    alarm.storage.get_container("pgm").deep_merge({1: {"id": 1, "key": "PGM 1"}})
+
+    assert await alarm.control_output("PGM 1", "on")
+    alarm.panel.control_outputs.assert_called_once()
+    alarm.panel.control_module_pgm_outputs.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_control_output_module_pgm_routes_to_control_module_pgm_outputs(mocker):
+    """Module PGM uses control_module_pgm_outputs with the correct address and index."""
+    alarm = Paradox()
+    alarm.panel = mocker.Mock(spec=Panel)
+    alarm.panel.control_outputs = AsyncMock(return_value=True)
+    alarm.panel.control_module_pgm_outputs = AsyncMock(return_value=True)
+
+    _add_module_pgm(alarm, module_address=4, pgm_index=2)
+
+    assert await alarm.control_output("module4_pgm2", "on_override")
+    alarm.panel.control_module_pgm_outputs.assert_called_once_with(4, 2, "on_override")
+    alarm.panel.control_outputs.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_control_output_module_pgm_optimistic_state(mocker):
+    """Accepted on_override sets on=True; off_override sets on=False."""
+    alarm = Paradox()
+    alarm.panel = mocker.Mock(spec=Panel)
+    alarm.panel.control_module_pgm_outputs = AsyncMock(return_value=True)
+
+    key = _add_module_pgm(alarm, module_address=4, pgm_index=1)
+
+    await alarm.control_output(key, "on_override")
+    assert alarm.storage.get_container("module_pgm")[key]["on"] is True
+
+    await alarm.control_output(key, "off_override")
+    assert alarm.storage.get_container("module_pgm")[key]["on"] is False
+
+
+@pytest.mark.asyncio
+async def test_control_output_no_match_returns_false(mocker):
+    """Returns False when the output key matches neither pgm nor module_pgm."""
+    alarm = Paradox()
+    alarm.panel = mocker.Mock(spec=Panel)
+
+    assert await alarm.control_output("nonexistent", "on") is False
