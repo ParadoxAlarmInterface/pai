@@ -22,6 +22,7 @@ from paradox.exceptions import (
     async_loop_unhandled_exception_handler,
 )
 from paradox.hardware import Panel, create_panel
+from paradox.hardware.evo.parsers import MODULE_PGM_PACKET_SLOTS
 from paradox.lib import ps
 from paradox.lib.async_message_manager import ErrorMessageHandler, EventMessageHandler
 from paradox.lib.handlers import PersistentHandler
@@ -492,6 +493,22 @@ class Paradox:
 
     def _init_module_pgms(self):
         for addr, pgm_count in cfg.MODULE_PGM_ADDRESSES.items():
+            if not isinstance(addr, int) or not (1 <= addr <= 254):
+                logger.warning(
+                    "MODULE_PGM_ADDRESSES: invalid module address %r (expected int 1-254), skipping",
+                    addr,
+                )
+                continue
+            if not isinstance(pgm_count, int) or not (
+                1 <= pgm_count <= MODULE_PGM_PACKET_SLOTS
+            ):
+                logger.warning(
+                    "MODULE_PGM_ADDRESSES: invalid pgm_count %r for address %d (expected int 1-%d), skipping",
+                    pgm_count,
+                    addr,
+                    MODULE_PGM_PACKET_SLOTS,
+                )
+                continue
             for pgm_index in range(1, pgm_count + 1):
                 key = f"module{addr}_pgm{pgm_index}"
                 self.storage.get_container("module_pgm")[key] = {
@@ -533,15 +550,19 @@ class Paradox:
                         out["module_address"], out["pgm_index"], command
                     )
                 except NotImplementedError:
-                    logger.error("control_module_pgm_outputs is not implemented for this alarm type")
+                    logger.error(
+                        "control_module_pgm_outputs is not implemented for this alarm type"
+                    )
                 except asyncio.CancelledError:
-                    logger.error("control_output canceled")
+                    logger.error("control_module_pgm_output canceled")
                     raise
                 except asyncio.TimeoutError:
                     logger.error("control_output timeout")
                 if accepted:
                     is_on = command in ("on", "on_override")
-                    self.storage.update_container_object("module_pgm", out["key"], {"on": is_on})
+                    self.storage.update_container_object(
+                        "module_pgm", out["key"], {"on": is_on}
+                    )
             return accepted
 
         logger.error("No outputs selected")
