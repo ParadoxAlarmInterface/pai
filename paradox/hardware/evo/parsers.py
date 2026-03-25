@@ -823,6 +823,44 @@ PerformPGMAction = Struct(
     "checksum" / PacketChecksum(Bytes(1)),
 )
 
+# Fixed number of PGM command slots in the 0xA4 packet — a protocol constant,
+# not the number of PGMs a specific module exposes (which is configured separately).
+MODULE_PGM_PACKET_SLOTS = 4
+
+PerformModulePGMAction = Struct(
+    "fields"
+    / RawCopy(
+        Struct(
+            "po" / Struct("command" / Const(0xA4, Int8ub)),
+            "packet_length" / PacketLength(Int8ub),
+            "_not_used0" / Padding(1),
+            "module_address" / Default(Int8ub, 0),
+            "_not_used1" / Padding(2),
+            "pgm_commands" / Array(MODULE_PGM_PACKET_SLOTS, Default(_PGMCommandEnum, "release")),
+            "_not_used2" / Padding(12),
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
+
+PerformModulePGMActionResponse = Struct(
+    "fields"
+    / RawCopy(
+        Struct(
+            "po"
+            / BitStruct(
+                "command" / Const(0xA, Nibble),
+                "_not_used" / Nibble,
+            ),
+            "packet_length" / PacketLength(Int8ub),
+            "_not_used0" / Padding(1),
+            "module_address" / Int8ub,
+            "_not_used1" / Padding(2),
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
+
 _PGMBroadcastCommandEnum = Enum(
     Int8ub,
     no_change=0,

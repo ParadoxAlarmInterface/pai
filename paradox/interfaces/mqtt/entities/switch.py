@@ -47,3 +47,23 @@ class PGMSwitch(Switch):
         self.property = "on"
 
         self.pai_entity_type = "pgm"
+
+
+class ModulePGMSwitch(Switch):
+    def __init__(self, module_pgm, device, availability_topic: str):
+        super().__init__(device, availability_topic)
+        self.module_pgm = module_pgm
+
+        self.key = sanitize_key(module_pgm["key"])
+        self.label = module_pgm["label"]
+        self.property = "on"
+
+        self.pai_entity_type = "pgm"
+
+    def serialize(self):
+        config = super().serialize()
+        config.update(dict(
+            payload_on="on_override",
+            payload_off="off_override",
+        ))
+        return config

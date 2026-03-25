@@ -1,9 +1,7 @@
-from binascii import hexlify, unhexlify
+from binascii import unhexlify
 
 from paradox.hardware.evo.adapters import PGMFlags
-from paradox.hardware.evo.parsers import (BroadcastRequest, BroadcastResponse,
-                                          PerformPGMAction,
-                                          PGMBroadcastCommand)
+from paradox.hardware.evo.parsers import PerformActionResponse, PerformPGMAction
 
 
 def test_pgm3_activate_and_monitor():
@@ -119,4 +117,10 @@ def test_pgm_flags_3():
 
 
 def test_pgm_confirmation():
-    payload = unhexlify("42070000000049")
+    raw = unhexlify("42070000000049")
+    parsed = PerformActionResponse.parse(raw)
+
+    assert parsed.fields.value.po.command == 0x4
+    assert parsed.fields.value.po.status.Winload_connected is True
+    assert parsed.fields.value.po.status.alarm_reporting_pending is False
+    assert parsed.fields.value.packet_length == 7
