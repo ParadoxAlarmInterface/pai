@@ -104,6 +104,15 @@ class Paradox:
                         port=cfg.IP_CONNECTION_PORT,
                         password=cfg.IP_CONNECTION_PASSWORD,
                     )
+            elif cfg.CONNECTION_TYPE == "PRT3":
+                logger.info("Using PRT3 Serial Connection")
+
+                from paradox.connections.prt3.connection import PRT3SerialConnection
+
+                self._connection = PRT3SerialConnection(
+                    port=cfg.PRT3_SERIAL_PORT,
+                    baud=cfg.PRT3_SERIAL_BAUD,
+                )
             else:
                 raise AssertionError(f"Invalid connection type: {cfg.CONNECTION_TYPE}")
 
@@ -136,6 +145,16 @@ class Paradox:
             return False
 
         logger.info("Connecting to Panel")
+
+        # PRT3 uses a completely different handshake — binary panel detection is not
+        # applicable.  Full PRT3 connect() is implemented in PRT3Paradox (hardware/prt3/).
+        if cfg.CONNECTION_TYPE == "PRT3":
+            logger.error(
+                "PRT3 runtime connect() not yet implemented; "
+                "see paradox/hardware/prt3/runtime.py"
+            )
+            self.run_state = RunState.ERROR
+            return False
 
         if not self.panel:
             self.panel = create_panel(self)

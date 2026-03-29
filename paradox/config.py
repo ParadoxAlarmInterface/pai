@@ -25,10 +25,16 @@ class Config:
         # Development
         "DEVELOPMENT_DUMP_MEMORY": False,
         # Connection Type
-        "CONNECTION_TYPE": ("Serial", str, ["IP", "Serial"]),  # Serial or IP
+        "CONNECTION_TYPE": ("Serial", str, ["IP", "Serial", "PRT3"]),  # Serial, IP, or PRT3
         # Serial Connection Details
         "SERIAL_PORT": "/dev/ttyS1",  # Pathname of the Serial Port
         "SERIAL_BAUD": 9600,  # Baud rate of the Serial Port. Use 38400(default setting) or 57600 for EVO
+        # PRT3 Connection Details (Paradox PRT3 Printer Module — ASCII serial protocol)
+        "PRT3_SERIAL_PORT": "/dev/ttyUSB0",  # Serial port for PRT3 module
+        "PRT3_SERIAL_BAUD": (9600, int, (2400, 115200)),  # Baud rate; 9600 or 19200 typical
+        "PRT3_MAX_AREAS": (8, int, (1, 8)),  # Number of areas on the panel
+        "PRT3_MAX_ZONES": (96, int, (1, 192)),  # Number of zones on the panel
+        "PRT3_MAX_USERS": (999, int, (1, 999)),  # Number of user codes on the panel
         # IP Connection Details
         "IP_CONNECTION_HOST": "127.0.0.1",  # IP Module address when using direct IP Connection
         "IP_CONNECTION_PORT": (

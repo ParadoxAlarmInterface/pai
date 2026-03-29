@@ -1,5 +1,21 @@
 # PRT3 Connection — Architecture Notes
 
+## Branch status
+
+**Scaffolding only — PRT3 is not yet functional.**
+
+The skeleton modules and config keys are in place (see layer layout below),
+but all protocol logic raises `NotImplementedError`.  Setting
+`CONNECTION_TYPE = "PRT3"` will open the serial port and then immediately
+return an error from `connect()`.
+
+Implementation phases:
+
+| Phase | What gets implemented |
+|---|---|
+| Phase 2 | `PRT3Protocol` framer, `PRT3Panel` init/labels/status, `PRT3Paradox.connect()` |
+| Phase 3 | Event map, arm/disarm/panic control, full async event pipeline |
+
 ## Why PRT3 is a separate connection type
 
 PRT3 is not a transport wrapper around the existing Paradox binary serial protocol.
