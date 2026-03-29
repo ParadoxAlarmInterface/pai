@@ -121,8 +121,8 @@ class HandlerRegistry:
                 raise
 
         if not handled and not self._should_ignore_no_handlers:
-            logger.error(
-                "No handler for message {}\nDetail: {}".format(
-                    data.fields.value.po.command, data
-                )
-            )
+            try:
+                cmd = data.fields.value.po.command
+            except AttributeError:
+                cmd = repr(data)
+            logger.error("No handler for message %s\nDetail: %s", cmd, data)

@@ -35,6 +35,8 @@ class Config:
         "PRT3_MAX_AREAS": (8, int, (1, 8)),  # Number of areas on the panel
         "PRT3_MAX_ZONES": (96, int, (1, 192)),  # Number of zones on the panel
         "PRT3_MAX_USERS": (999, int, (1, 999)),  # Number of user codes on the panel
+        "PRT3_USER_CODE": "",  # User code for arm/disarm commands (1-6 digits); empty = quick-arm only
+        "PRT3_COMM_TIMEOUT": (10, int, (1, 60)),  # Seconds to wait for COMM&ok on connect
         # IP Connection Details
         "IP_CONNECTION_HOST": "127.0.0.1",  # IP Module address when using direct IP Connection
         "IP_CONNECTION_PORT": (
