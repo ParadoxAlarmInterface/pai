@@ -1,8 +1,30 @@
-from construct import (BitsInteger, BitStruct, Bytes, Const, Default, Enum,
-                       Flag, Int8ub, Int16ub, Nibble, Padding, RawCopy, Struct)
+from construct import (
+    BitsInteger,
+    BitStruct,
+    Bytes,
+    Checksum,
+    Const,
+    Default,
+    Enum,
+    Flag,
+    Int8ub,
+    Int16ub,
+    Nibble,
+    Padding,
+    RawCopy,
+    Struct,
+    this,
+)
 
-from .common import (CommunicationSourceIDEnum, HexInt, PacketChecksum,
-                     PacketLength, ProductIdEnum, FamilyIdEnum)
+from .common import (
+    CommunicationSourceIDEnum,
+    FamilyIdEnum,
+    HexInt,
+    PacketChecksum,
+    PacketLength,
+    ProductIdEnum,
+    calculate_checksum,
+)
 
 InitiateCommunication = Struct(
     "fields"
@@ -119,4 +141,31 @@ CloseConnection = Struct(
         )
     ),
     "checksum" / PacketChecksum(Bytes(1)),
+)
+
+Encrypted = Struct(
+    "fields"
+    / RawCopy(
+        Struct(
+            "po"
+            / BitStruct(
+                "command" / Const(0xE, Nibble),
+                "status"
+                / Struct(
+                    "reserved" / Flag,
+                    "alarm_reporting_pending" / Flag,
+                    "Winload_connected" / Flag,
+                    "NeWare_connected" / Flag,
+                ),
+            ),
+            "source" / Const(0xFE, Int8ub),
+            "length" / PacketLength(Int8ub),
+            "_not_used0" / Bytes(1),
+            "request_nr" / Int8ub,
+            "data" / Bytes(lambda this: this.length - 7),
+        )
+    ),
+    "checksum"
+    / Checksum(Bytes(1), lambda data: calculate_checksum(data), this.fields.data),
+    "end" / Int8ub,
 )

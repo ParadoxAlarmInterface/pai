@@ -14,7 +14,7 @@ class EventMessageHandler(PersistentHandler):
     def can_handle(self, data: Container) -> bool:
         assert isinstance(data, Container)
         values = data.fields.value
-        return values.po.command == 0xE and (not hasattr(values, "requested_event_nr"))
+        return values.po.command == 0xE and hasattr(values, "event")
 
 
 class ErrorMessageHandler(PersistentHandler):

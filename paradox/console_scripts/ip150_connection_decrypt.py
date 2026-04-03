@@ -14,8 +14,10 @@ from paradox.connections.ip.parsers import (
     IPMessageType,
     IPPayloadConnectResponse,
 )
+from paradox.connections.serial_encryption import make_serial_key
 from paradox.hardware import create_panel
-from paradox.hardware.parsers import InitiateCommunicationResponse
+from paradox.hardware.parsers import Encrypted, InitiateCommunicationResponse
+from paradox.lib.crypto import decrypt_serial_message
 
 
 class Colors:  # You may need to change color settings
@@ -243,6 +245,90 @@ def decrypt_file(file, password, max_packets: int = None):
         print(f"{Colors.RED}{exc}{Colors.ENDC}")
 
 
+def decrypt_serial_file(file, pc_password=None, max_packets: int = None):
+    import re
+
+    line_re = re.compile(r"^(TX|RX) \[(\d+)\]: ([0-9A-Fa-f ]+)$")
+    panel = create_panel(None)
+    key_bytes = make_serial_key(pc_password) if pc_password else None
+    n = 0
+    for line in file:
+        line = line.strip()
+        if not line:
+            continue
+        m = line_re.match(line)
+        if not m:
+            print(f"{Colors.RED}Unrecognised line: {line}{Colors.ENDC}")
+            continue
+        direction, length, hex_data = m.group(1), int(m.group(2)), m.group(3)
+        message = bytes.fromhex(hex_data.replace(" ", ""))
+        if len(message) != length:
+            print(
+                f"{Colors.RED}Length mismatch: declared {length}, got {len(message)}{Colors.ENDC}"
+            )
+            continue
+
+        color = Colors.BLUE if direction == "TX" else Colors.GREEN
+        print(
+            f"{color}{direction} [{length}]: {binascii.hexlify(message).decode()}{Colors.ENDC}"
+        )
+
+        if len(message) >= 2 and message[0] >> 4 == 0xE and message[1] == 0xFE:
+            # Try full-AES decryption first (ESP32-style frames)
+            if key_bytes:
+                plaintext = decrypt_serial_message(message, key_bytes)
+                if plaintext:
+                    print(
+                        f"{Colors.ON_WHITE}  AES-256 decrypted ({len(message)}b → {len(plaintext)}b): "
+                        f"{binascii.hexlify(plaintext).decode()}{Colors.ENDC}"
+                    )
+                    try:
+                        inner = panel.parse_message(
+                            plaintext,
+                            "topanel" if direction == "TX" else "frompanel",
+                        )
+                        if inner:
+                            print(f"{Colors.ON_WHITE}  Parsed: {inner}{Colors.ENDC}")
+                            if inner.fields.value.po.command == 0:
+                                panel = create_panel(None, inner)
+                    except Exception:
+                        pass
+                    continue
+
+            # Fallback: BabyWare compact E0 FE (algorithm unknown, display structure only)
+            try:
+                parsed = Encrypted.parse(message)
+                print(
+                    f"{Colors.ON_WHITE}  Encrypted frame (compact): request_nr={parsed.fields.value.request_nr}"
+                    f" data({len(parsed.fields.value.data)}b)={binascii.hexlify(parsed.fields.value.data).decode()}{Colors.ENDC}"
+                )
+            except Exception:
+                print(
+                    f"{Colors.ON_WHITE}  E0 FE frame ({len(message)}b, no key provided or unknown format){Colors.ENDC}"
+                )
+        else:
+            try:
+                parsed = panel.parse_message(
+                    message, "topanel" if direction == "TX" else "frompanel"
+                )
+                if parsed:
+                    print(f"{Colors.ON_WHITE}  {parsed}{Colors.ENDC}")
+                    if parsed.fields.value.po.command == 0:
+                        panel = create_panel(None, parsed)
+                else:
+                    print(
+                        f"{Colors.RED}  No parser for message: {binascii.hexlify(message).decode()}{Colors.ENDC}"
+                    )
+            except Exception:
+                print(f"{Colors.RED}  Parse error{Colors.ENDC}")
+                traceback.print_exc()
+
+        n += 1
+        if max_packets is not None and n >= max_packets:
+            print(f"Force stopped on {max_packets} packets")
+            return
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -255,8 +341,9 @@ def main():
     parser.add_argument(
         "password",
         type=str,
+        nargs="?",
         default="paradox",
-        help="IP Module password for decryption",
+        help="IP Module password for decryption (not required in --serial mode)",
     )
     parser.add_argument(
         "-n",
@@ -264,10 +351,24 @@ def main():
         type=int,
         help="Packets to decrypt",
     )
+    parser.add_argument(
+        "--serial",
+        action="store_true",
+        help="Parse a .serial capture file (TX/RX hex lines) instead of IP YAML",
+    )
+    parser.add_argument(
+        "--pc-password",
+        type=str,
+        default=None,
+        help="PC password for E0 FE AES-256 decryption attempt (serial mode only)",
+    )
 
     args = parser.parse_args()
 
-    decrypt_file(args.file, args.password.encode("utf8"), args.packets)
+    if args.serial:
+        decrypt_serial_file(args.file, args.pc_password, args.packets)
+    else:
+        decrypt_file(args.file, args.password.encode("utf8"), args.packets)
 
 
 if __name__ == "__main__":

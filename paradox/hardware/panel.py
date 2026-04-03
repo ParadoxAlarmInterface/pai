@@ -36,6 +36,9 @@ class Panel:
         if message is None or len(message) == 0:
             return None
 
+        if message[0] >> 4 == 0xE and message[1] == 0xFE:
+            return parsers.Encrypted.parse(message)
+
         if direction == "topanel":
             if message[0] == 0x72 and message[1] == 0:
                 return parsers.InitiateCommunication.parse(message)
@@ -46,8 +49,8 @@ class Panel:
                 return parsers.InitiateCommunicationResponse.parse(message)
             elif message[0] == 0x00 and message[4] > 0:
                 return parsers.StartCommunicationResponse.parse(message)
-            else:
-                return None
+
+        return None
 
     def get_message(self, name) -> Construct:
         clsmembers = dict(inspect.getmembers(parsers))
