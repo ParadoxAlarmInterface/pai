@@ -11,6 +11,11 @@ from paradox.connections.ip.parsers import (
     IPMessageResponse,
     IPMessageType,
 )
+from paradox.connections.serial_encryption import (
+    EncryptedSerialTransport,
+    make_serial_key,
+)
+from paradox.lib.crypto import decrypt_serial_message
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -102,6 +107,15 @@ class ConnectionProtocol(asyncio.Protocol):
 
 
 class SerialConnectionProtocol(ConnectionProtocol):
+    def connection_made(self, transport):
+        if cfg.SERIAL_ENCRYPTED and cfg.PASSWORD:
+            self._serial_key = make_serial_key(cfg.PASSWORD)
+            transport = EncryptedSerialTransport(transport, self._serial_key)
+            logger.info("Serial encryption enabled (SERIAL_ENCRYPTED=True)")
+        else:
+            self._serial_key = None
+        super().connection_made(transport)
+
     def send_message(self, message):
         if cfg.LOGGING_DUMP_PACKETS:
             logger.debug(f"PAI -> SER {binascii.hexlify(message)}")
@@ -116,6 +130,7 @@ class SerialConnectionProtocol(ConnectionProtocol):
         min_length = 4 if self.use_variable_message_length else 37
 
         while len(self.buffer) >= min_length:
+            is_encrypted_frame = False
             if self.use_variable_message_length:
                 if self.buffer[0] >> 4 == 0:
                     potential_packet_length = 37
@@ -128,7 +143,31 @@ class SerialConnectionProtocol(ConnectionProtocol):
                 elif self.buffer[0] >> 4 == 0xC:
                     potential_packet_length = self.buffer[1] * 256 + self.buffer[2]
                 elif self.buffer[0] >> 4 == 0xE:
-                    if self.buffer[1] < 37 or self.buffer[1] == 0xFF:
+                    if self.buffer[1] == 0xFE:
+                        if cfg.SERIAL_ENCRYPTED:
+                            # Full-AES E0 FE: frame is [E0|x][FE][n*16 AES bytes][checksum].
+                            # Scan AES block boundaries for the first valid checksum to
+                            # determine frame length without a timeout.
+                            found = False
+                            for n_blocks in range(1, 8):
+                                frame_len = 2 + n_blocks * 16 + 1
+                                if len(self.buffer) < frame_len:
+                                    break
+                                candidate = self.buffer[:frame_len]
+                                if sum(candidate[:-1]) % 256 == candidate[-1]:
+                                    potential_packet_length = frame_len
+                                    is_encrypted_frame = True
+                                    found = True
+                                    break
+                            if not found:
+                                break  # Wait for more data
+                        else:
+                            # BabyWare compact E0 FE: length byte at [2]
+                            if len(self.buffer) < 3:
+                                break
+                            potential_packet_length = self.buffer[2]
+                            is_encrypted_frame = True
+                    elif self.buffer[1] < 37 or self.buffer[1] == 0xFF:
                         # MG/SP in 21st century and EVO Live Events. Probable values=0x13, 0x13, 0x00, 0xFF
                         potential_packet_length = 37
                     else:
@@ -144,12 +183,24 @@ class SerialConnectionProtocol(ConnectionProtocol):
 
             frame = self.buffer[:potential_packet_length]
 
-            if checksum(frame, min_length):
+            if is_encrypted_frame or checksum(frame, min_length):
                 self.buffer = self.buffer[len(frame) :]  # Remove message
                 if cfg.LOGGING_DUMP_PACKETS:
                     logger.debug(f"SER -> PAI {binascii.hexlify(frame)}")
 
-                self.handler.on_message(frame)
+                if cfg.SERIAL_ENCRYPTED and is_encrypted_frame:
+                    decrypted = decrypt_serial_message(frame, self._serial_key)
+                    if decrypted:
+                        logger.debug(
+                            f"SER DECRYPT: {len(frame)}b E0FE → {len(decrypted)}b"
+                        )
+                        self.handler.on_message(decrypted)
+                    else:
+                        logger.warning(
+                            f"SER: E0FE AES decrypt failed: {binascii.hexlify(frame)}"
+                        )
+                else:
+                    self.handler.on_message(frame)
             else:
                 self.buffer = self.buffer[1:]
 
