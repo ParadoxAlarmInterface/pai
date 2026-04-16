@@ -288,7 +288,8 @@ def parse_line(line: str) -> Optional[PRT3Message]:
             return _parse_label(line)
 
     # 8. Command echoes: {5 chars}&OK (8) or {5 chars}&fail (10)
-    if len(line) == _ECHO_OK_LEN and line.endswith("&OK"):
+    # Note: some panel firmware sends lowercase "&ok"; accept both.
+    if len(line) == _ECHO_OK_LEN and line.upper().endswith("&OK"):
         return PRT3CommandEcho(cmd=line[:5], ok=True)
     if len(line) == _ECHO_FAIL_LEN and line.endswith("&fail"):
         return PRT3CommandEcho(cmd=line[:5], ok=False)

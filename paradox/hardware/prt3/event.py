@@ -24,6 +24,7 @@ Event type / subtype conventions
 """
 
 import logging
+import time
 
 from paradox.event import Event, EventLevel
 
@@ -55,38 +56,40 @@ EVENT_MAP: dict = {
              message="Zone {label} fire loop trouble"),
 
     # Arm events (number = user ID, area = affected partition)
+    # exit_delay cleared because the panel is now fully armed (delay is over)
     10: dict(type="partition", subtype="arm",                level=EventLevel.INFO,
-             change={"arm": True},
+             change={"arm": True, "exit_delay": False},
              tags=["arm", "user"],
              message="Partition {label} armed by user"),
     11: dict(type="partition", subtype="arm",                level=EventLevel.INFO,
-             change={"arm": True},
+             change={"arm": True, "exit_delay": False},
              tags=["arm", "master"],
              message="Partition {label} armed by master"),
     12: dict(type="partition", subtype="arm",                level=EventLevel.INFO,
-             change={"arm": True},
+             change={"arm": True, "exit_delay": False},
              tags=["arm", "keyswitch"],
              message="Partition {label} armed via keyswitch"),
     13: dict(type="partition", subtype="arm",                level=EventLevel.INFO,
-             change={"arm": True},
+             change={"arm": True, "exit_delay": False},
              tags=["arm", "auto"],
              message="Partition {label} auto-armed"),
 
     # Disarm events (number = user ID, area = affected partition)
+    # exit_delay cleared because arming was cancelled
     14: dict(type="partition", subtype="disarm",             level=EventLevel.INFO,
-             change={"arm": False},
+             change={"arm": False, "exit_delay": False},
              tags=["disarm", "user"],
              message="Partition {label} disarmed by user"),
     15: dict(type="partition", subtype="disarm",             level=EventLevel.INFO,
-             change={"arm": False},
+             change={"arm": False, "exit_delay": False},
              tags=["disarm", "master"],
              message="Partition {label} disarmed by master"),
     16: dict(type="partition", subtype="disarm",             level=EventLevel.INFO,
-             change={"arm": False},
+             change={"arm": False, "exit_delay": False},
              tags=["disarm", "keyswitch"],
              message="Partition {label} disarmed via keyswitch"),
     17: dict(type="partition", subtype="disarm",             level=EventLevel.INFO,
-             change={"arm": False, "audible_alarm": False},
+             change={"arm": False, "exit_delay": False, "audible_alarm": False},
              tags=["disarm", "alarm_cancel"],
              message="Partition {label} disarmed after alarm"),
     18: dict(type="partition", subtype="alarm_cancelled",    level=EventLevel.INFO,
@@ -94,7 +97,7 @@ EVENT_MAP: dict = {
              tags=["alarm", "cancel"],
              message="Partition {label} alarm cancelled"),
     20: dict(type="partition", subtype="disarm",             level=EventLevel.INFO,
-             change={"arm": False},
+             change={"arm": False, "exit_delay": False},
              tags=["disarm", "special"],
              message="Partition {label} special disarm"),
 
@@ -201,15 +204,18 @@ EVENT_MAP: dict = {
              message="Zone {label} supervision restored"),
 
     # Status events — periodic armed/trouble state broadcasts
-    # area = affected partition; number = 0 (not used)
-    64: dict(type="partition", subtype="status_armed",       level=EventLevel.INFO,
-             change={"arm": True},
-             tags=["arm", "status"],
-             message="Partition {label} armed (status event)"),
-    65: dict(type="partition", subtype="status_armed",       level=EventLevel.INFO,
-             change={"arm": True},
-             tags=["arm", "status"],
-             message="Partition {label} armed steady state"),
+    # area = affected partition; number = bit index within the status word
+    # G064: Status 1 — N000=armed, N001=arm_stay, N002=arm_force, N003=arm_instant
+    64: dict(type="partition", subtype="status_armed",       level=EventLevel.DEBUG,
+             change={},
+             tags=["status"],
+             message="Partition {label} Status-1 event (N{number})"),
+    # G065: Status 2 — N001=exit_delay, N002=entry_delay, N003=trouble, N004=alarm_in_memory
+    # Per-N overrides are applied in from_prt3() below; this is the fallback.
+    65: dict(type="partition", subtype="status_update",      level=EventLevel.DEBUG,
+             change={},
+             tags=["status"],
+             message="Partition {label} Status-2 event (N{number})"),
     66: dict(type="system",    subtype="status_tamper",      level=EventLevel.CRITICAL,
              change={},
              tags=["trouble", "tamper", "status"],
@@ -243,6 +249,28 @@ class PRT3Event(Event):
                                tags, message, and additional_data populated.
         """
         descriptor = EVENT_MAP.get(prt3_event.group)
+
+        # G065 Status-2 per-N overrides
+        # The base descriptor is a no-op; specific N values carry state changes.
+        if prt3_event.group == 65:
+            n = prt3_event.number
+            if n == 1:   # exit delay started → show HA "arming" state
+                descriptor = dict(
+                    type="partition", subtype="exit_delay",
+                    level=EventLevel.INFO,
+                    change={"exit_delay": True},
+                    tags=["status", "exit_delay"],
+                    message="Partition {label} exit delay started",
+                )
+            elif n == 2:  # entry delay started
+                descriptor = dict(
+                    type="partition", subtype="entry_delay",
+                    level=EventLevel.INFO,
+                    change={"entry_delay": True},
+                    tags=["status", "entry_delay"],
+                    message="Partition {label} entry delay started",
+                )
+
         if descriptor is None:
             logger.debug(
                 "PRT3: unknown event group G%03d N%03d A%03d",
@@ -258,8 +286,15 @@ class PRT3Event(Event):
             )
 
         element_type = descriptor["type"]
-        element_id   = prt3_event.number  # zone/user/key ID
         area         = prt3_event.area    # 0=global, 1-8=specific, 255=any
+
+        # For partition events the element being updated IS the area/partition;
+        # prt3_event.number carries the user/key/flag index, not the partition ID.
+        # For zone/user/system events, number is the element ID.
+        if element_type == "partition":
+            element_id = area
+        else:
+            element_id = prt3_event.number
 
         # Resolve label
         if label_provider is not None:
@@ -268,8 +303,10 @@ class PRT3Event(Event):
             label = str(element_id)
 
         event = cls()
+        event.timestamp     = int(time.time())
         event.level         = descriptor["level"]
         event.type          = element_type
+        event.subtype       = descriptor.get("subtype", "unknown")
         event.id            = element_id
         event.partition     = area
         event.label         = label

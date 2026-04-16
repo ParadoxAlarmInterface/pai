@@ -26,7 +26,7 @@ from paradox.hardware.evo.parsers import MODULE_PGM_PACKET_SLOTS
 from paradox.lib import ps
 from paradox.lib.async_message_manager import ErrorMessageHandler, EventMessageHandler
 from paradox.lib.handlers import PersistentHandler
-from paradox.lib.utils import deep_merge
+from paradox.lib.utils import deep_merge, sanitize_key
 from paradox.parsers.status import convert_raw_status
 
 logger = logging.getLogger("PAI").getChild(__name__)
@@ -128,6 +128,11 @@ class Paradox:
         self.connection.register_handler(EventMessageHandler(self.handle_event_message))
         self.connection.register_handler(ErrorMessageHandler(self.handle_error_message))
 
+        if cfg.CONNECTION_TYPE == "PRT3":
+            self.connection.register_handler(
+                PersistentHandler(self.handle_prt3_event_message)
+            )
+
     async def connect(self) -> bool:
         if self.work_loop is None:
             self.work_loop = asyncio.get_running_loop()
@@ -146,13 +151,34 @@ class Paradox:
 
         logger.info("Connecting to Panel")
 
-        # PRT3 uses a completely different handshake — binary panel detection is not
-        # applicable.  Full PRT3 connect() is implemented in PRT3Paradox (hardware/prt3/).
+        # PRT3 uses ASCII framing — binary panel detection does not apply.
         if cfg.CONNECTION_TYPE == "PRT3":
-            logger.error(
-                "PRT3 runtime connect() not yet implemented; "
-                "see paradox/hardware/prt3/runtime.py"
-            )
+            from paradox.hardware.prt3.panel import PRT3Panel
+
+            self.panel = PRT3Panel(self)
+            try:
+                if not await self.panel.initialize_communication(None):
+                    raise ConnectionError("PRT3 panel did not respond with COMM&ok")
+                # PRT3 has no binary identification exchange; synthesise a
+                # DetectedPanel from the configured port so HA discovery has a
+                # stable device identity to anchor entity unique_ids to.
+                port_id = sanitize_key(cfg.PRT3_SERIAL_PORT) or "prt3"
+                ps.sendMessage(
+                    "panel_detected",
+                    panel=DetectedPanel(
+                        product_id=None,
+                        model="PRT3",
+                        firmware_version="N/A",
+                        serial_number=f"prt3_{port_id}",
+                    ),
+                )
+                self.run_state = RunState.CONNECTED
+                logger.info("PRT3 connection OK")
+                return True
+            except asyncio.TimeoutError:
+                logger.error("Timeout waiting for PRT3 COMM&ok")
+            except ConnectionError as e:
+                logger.error("PRT3 connect failed: %s", e)
             self.run_state = RunState.ERROR
             return False
 
@@ -268,6 +294,8 @@ class Paradox:
             )
 
     async def sync_time(self):
+        if cfg.CONNECTION_TYPE == "PRT3":
+            return  # PRT3 has no SetTimeDate command
         now = datetime.now().astimezone()
         if cfg.SYNC_TIME_TIMEZONE:
             try:
@@ -510,6 +538,31 @@ class Paradox:
 
         return accepted
 
+    async def control_utility_key(self, key: int) -> bool:
+        """
+        Send a PRT3 utility key command (UK{nnn}).
+
+        Only supported when CONNECTION_TYPE = 'PRT3'.  Utility keys trigger
+        actions programmed in the panel (1-251); consult panel programming for
+        the mapping.
+
+        :param key: Utility key number, 1-251.
+        :returns:   True if the panel accepted the command, False otherwise.
+        """
+        if cfg.CONNECTION_TYPE != "PRT3":
+            logger.error(
+                "control_utility_key is only supported with CONNECTION_TYPE = 'PRT3'"
+            )
+            return False
+        try:
+            return await self.panel.send_utility_key(key)
+        except NotImplementedError:
+            logger.error("send_utility_key not implemented for this panel type")
+            return False
+        except asyncio.CancelledError:
+            logger.error("control_utility_key canceled")
+            return False
+
     def _init_module_pgms(self):
         for addr, pgm_count in cfg.MODULE_PGM_ADDRESSES.items():
             if not isinstance(addr, int) or not (1 <= addr <= 254):
@@ -720,6 +773,24 @@ class Paradox:
             elif "code lockout" in message:
                 raise CodeLockout()
 
+    def handle_prt3_event_message(self, message):
+        """Dispatch an async PRT3 system event into PAI's event pipeline."""
+        from paradox.hardware.prt3.parser import PRT3SystemEvent
+        from paradox.hardware.prt3.event import PRT3Event
+
+        if not isinstance(message, PRT3SystemEvent):
+            return
+        try:
+            evt = PRT3Event.from_prt3(message, label_provider=self.get_label)
+            element = self.storage.get_container_object(evt.type, evt.id)
+            if evt.change and element:
+                self.storage.update_container_object(evt.type, evt.id, evt.change)
+            ps.sendEvent(evt)
+            if evt.type == "partition":
+                self._update_partition_states()
+        except Exception:
+            logger.exception("handle_prt3_event_message")
+
     async def disconnect(self):
         logger.info("Disconnecting from the Alarm Panel")
         self.run_state = RunState.STOP
@@ -746,6 +817,8 @@ class Paradox:
 
     def _clean_session(self):
         logger.info("Clean Session")
+        if cfg.CONNECTION_TYPE == "PRT3":
+            return  # PRT3 has no binary CloseConnection frame
         if self.connection.connected:
             if not self.panel:
                 logger.info("No panel, creating generic one")

@@ -37,6 +37,7 @@ class Config:
         "PRT3_MAX_USERS": (999, int, (1, 999)),  # Number of user codes on the panel
         "PRT3_USER_CODE": "",  # User code for arm/disarm commands (1-6 digits); empty = quick-arm only
         "PRT3_COMM_TIMEOUT": (10, int, (1, 60)),  # Seconds to wait for COMM&ok on connect
+        "PRT3_UTILITY_KEYS": {},  # Keys to expose as HA buttons: {key_num: "Label", …}
         # IP Connection Details
         "IP_CONNECTION_HOST": "127.0.0.1",  # IP Module address when using direct IP Connection
         "IP_CONNECTION_PORT": (
@@ -149,6 +150,7 @@ class Config:
         "MQTT_RAW_TOPIC": "raw",
         "MQTT_NOTIFICATIONS_TOPIC": "notifications",
         "MQTT_SEND_PANIC_TOPIC": "panic",
+        "MQTT_UTILITY_KEY_TOPIC": "utility_key",  # PRT3 only: topic for UK commands
         "MQTT_PUBLISH_RAW_EVENTS": True,
         "MQTT_PUBLISH_DEFINITIONS": False,  # Publish definitions of partitions/zones/users to mqtt.
         "MQTT_PREFIX_DEVICE_NAME": False,  # Add device ID as prefix to entity names: Paradox 12345678

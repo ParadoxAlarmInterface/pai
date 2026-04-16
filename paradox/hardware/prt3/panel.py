@@ -127,23 +127,39 @@ class PRT3Panel(Panel):
         command_bytes: bytes,
         predicate,
         timeout: Optional[float] = None,
+        retries: int = 1,
     ):
         """
         Write a PRT3 command and await a matching reply.
+
+        Serialization: the entire retry loop runs under ``core.request_lock``
+        so no other command can interleave between a send and its expected
+        reply, and no other command can interleave between retry attempts.
 
         :param command_bytes: Encoded command bytes (\\r-terminated).
         :param predicate:     callable(PRT3Message) → bool.  The first
                               message for which this returns True is returned.
         :param timeout:       Override the default IO_TIMEOUT.
-        :returns:             Matching PRT3Message, or None on timeout.
+        :param retries:       Total attempts (1 = no retry, 2 = one retry…).
+                              Retries are only performed on timeout; a received
+                              reply (ok or &fail) is returned immediately.
+        :returns:             Matching PRT3Message, or None if all attempts
+                              timed out.
         """
-        self.core.connection.write(command_bytes)
-        try:
-            return await self.core.connection.wait_for_message(
-                predicate,
-                timeout=timeout if timeout is not None else cfg.IO_TIMEOUT,
-            )
-        except asyncio.TimeoutError:
+        _timeout = timeout if timeout is not None else cfg.IO_TIMEOUT
+        async with self.core.request_lock:
+            for attempt in range(1, retries + 1):
+                self.core.connection.write(command_bytes)
+                try:
+                    return await self.core.connection.wait_for_message(
+                        predicate, timeout=_timeout
+                    )
+                except asyncio.TimeoutError:
+                    if attempt < retries:
+                        logger.warning(
+                            "PRT3: timeout on attempt %d/%d, retrying: %r",
+                            attempt, retries, command_bytes,
+                        )
             return None
 
     # ------------------------------------------------------------------
@@ -152,29 +168,65 @@ class PRT3Panel(Panel):
 
     async def initialize_communication(self, password) -> bool:
         """
-        Wait for COMM&ok from the panel.
+        Verify the PRT3 serial link is live.
 
-        The PRT3 module emits 'COMM&ok\\r' shortly after power-on or
-        reconnect.  There is no password exchange; the ``password`` argument
-        is accepted for interface compatibility but ignored.
+        The PRT3 module emits ``COMM&ok\\r`` only on its own power-up or when
+        the EVO panel reconnects to the module's combus — NOT when the host
+        opens the serial port.  If the module was already running before PAI
+        started, ``COMM&ok`` was sent before we opened the port and will never
+        be re-sent.
 
-        Returns True if COMM&ok is received before the timeout.
-        Returns False if COMM&fail arrives first, or on timeout.
+        Strategy:
+        1. Listen briefly (2 s) for spontaneous data (events or COMM&ok).
+           If the module is live, something usually arrives quickly.
+        2. If nothing spontaneous, send RA001 (area 1 status probe) and wait
+           for any response (ok, &fail, or CommStatus).
+        3. Accept any PRT3 message as proof that the link is live.
+        4. Return False only on hard failure: COMM&fail (panel not talking to
+           PRT3 module) or complete silence after PRT3_COMM_TIMEOUT.
+
+        The ``password`` argument is accepted for interface compatibility but
+        ignored — PRT3 has no password exchange.
         """
-        logger.info("PRT3: awaiting COMM&ok from panel")
+        from paradox.hardware.prt3.parser import PRT3SystemEvent
+
+        _any_prt3_msg = lambda m: isinstance(
+            m, (PRT3CommStatus, PRT3AreaStatus, PRT3ZoneStatus, PRT3LabelReply,
+                PRT3CommandEcho, PRT3SystemEvent)
+        )
+
+        logger.info("PRT3: checking serial link liveness")
+
+        # Phase 1: brief listen for spontaneous data (events, COMM&ok etc.)
         try:
             msg = await self.core.connection.wait_for_message(
-                lambda m: isinstance(m, PRT3CommStatus),
-                timeout=cfg.PRT3_COMM_TIMEOUT,
+                _any_prt3_msg, timeout=2.0
             )
-            if msg.ok:
-                logger.info("PRT3: panel ready (COMM&ok)")
-                return True
-            logger.error("PRT3: panel communication failure (COMM&fail)")
-            return False
+            if isinstance(msg, PRT3CommStatus) and not msg.ok:
+                logger.error("PRT3: panel communication failure (COMM&fail)")
+                return False
+            logger.info("PRT3: serial link live (spontaneous: %s)", type(msg).__name__)
+            return True
+        except asyncio.TimeoutError:
+            pass  # nothing spontaneous — fall through to probe
+
+        # Phase 2: probe with RA001 and wait for any response
+        logger.info("PRT3: no spontaneous data; sending RA001 probe")
+        probe = encoder.encode_area_status_request(1)
+        self.core.connection.write(probe)
+        try:
+            msg = await self.core.connection.wait_for_message(
+                _any_prt3_msg,
+                timeout=max(cfg.PRT3_COMM_TIMEOUT - 2.0, 3.0),
+            )
+            if isinstance(msg, PRT3CommStatus) and not msg.ok:
+                logger.error("PRT3: panel communication failure (COMM&fail)")
+                return False
+            logger.info("PRT3: serial link live (probe response: %s)", type(msg).__name__)
+            return True
         except asyncio.TimeoutError:
             logger.error(
-                "PRT3: timeout waiting for COMM&ok (%.0fs)", cfg.PRT3_COMM_TIMEOUT
+                "PRT3: serial link unresponsive after %.0fs probe", cfg.PRT3_COMM_TIMEOUT
             )
             return False
 
@@ -374,6 +426,7 @@ class PRT3Panel(Panel):
                 lambda m, ec=expected_echo: (
                     isinstance(m, PRT3CommandEcho) and m.cmd == ec
                 ),
+                retries=2,
             )
             if msg is None:
                 logger.warning("PRT3: timeout on %s partition %d", command, partition)
@@ -430,6 +483,7 @@ class PRT3Panel(Panel):
             lambda m, ec=expected_echo: (
                 isinstance(m, PRT3CommandEcho) and m.cmd == ec
             ),
+            retries=2,
         )
         if msg is None:
             logger.warning("PRT3: timeout on %s panic area %d", panic_type, partition)
@@ -440,4 +494,39 @@ class PRT3Panel(Panel):
             )
             return False
         logger.info("PRT3: %s panic area %d accepted", panic_type, partition)
+        return True
+
+    # ------------------------------------------------------------------
+    # Utility key
+    # ------------------------------------------------------------------
+
+    async def send_utility_key(self, key: int) -> bool:
+        """
+        Send a ``UK{nnn}\\r`` utility key command.
+
+        Utility keys (1-251) trigger actions programmed into the panel
+        (scene activations, output toggles, etc.).  The panel echoes
+        ``UK{nnn}&OK`` on success or ``UK{nnn}&fail`` if the key is not
+        programmed.
+
+        :param key: Utility key number, 1-251.
+        :returns:   True if the panel accepted the command, False otherwise.
+        :raises ValueError: if *key* is out of range (from encoder).
+        """
+        cmd = encoder.encode_utility_key(key)
+        expected_echo = f"UK{key:03d}"
+        msg = await self._prt3_send_wait(
+            cmd,
+            lambda m, ec=expected_echo: (
+                isinstance(m, PRT3CommandEcho) and m.cmd == ec
+            ),
+            retries=1,  # no retry — utility keys are not idempotent (gate toggles)
+        )
+        if msg is None:
+            logger.warning("PRT3: timeout on utility key %d", key)
+            return False
+        if not msg.ok:
+            logger.warning("PRT3: utility key %d rejected by panel (&fail)", key)
+            return False
+        logger.info("PRT3: utility key %d accepted", key)
         return True
