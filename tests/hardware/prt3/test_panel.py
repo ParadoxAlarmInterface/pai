@@ -507,14 +507,18 @@ async def test_send_utility_key_timeout_returns_false(core, panel):
     assert await panel.send_utility_key(1) is False
 
 
-async def test_send_utility_key_retries_on_timeout(core, panel):
-    """Utility key retries once on timeout; succeeds on second attempt."""
+async def test_send_utility_key_no_retry_on_timeout(core, panel):
+    """Utility key must NOT retry on timeout — commands are not idempotent.
+
+    A gate or latch toggles on each pulse; a retry would cause a double-trigger.
+    On timeout the command returns False immediately without a second write.
+    """
     core.connection.wait_for_message = AsyncMock(
         side_effect=[asyncio.TimeoutError, PRT3CommandEcho(cmd="UK001", ok=True)]
     )
     result = await panel.send_utility_key(1)
-    assert result is True
-    assert core.connection.write.call_count == 2
+    assert result is False
+    assert core.connection.write.call_count == 1
 
 
 async def test_send_utility_key_invalid_number_raises(core, panel):
