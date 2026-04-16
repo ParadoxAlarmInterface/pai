@@ -126,6 +126,22 @@ def test_echo_fail(line, expected_cmd):
     assert result.cmd == expected_cmd
 
 
+@pytest.mark.parametrize(
+    "line, expected_cmd",
+    [
+        ("AA001&ok", "AA001"),   # arm — lowercase firmware variant
+        ("UK001&ok", "UK001"),   # utility key — observed on live Paradox panel
+        ("AD001&ok", "AD001"),   # disarm
+    ],
+)
+def test_echo_ok_lowercase(line, expected_cmd):
+    """Some panel firmware sends lowercase '&ok'; parser must accept both cases."""
+    result = parse_line(line)
+    assert isinstance(result, PRT3CommandEcho)
+    assert result.ok is True
+    assert result.cmd == expected_cmd
+
+
 def test_echo_cmd_is_exactly_5_chars():
     result = parse_line("AA001&OK")
     assert len(result.cmd) == 5
@@ -135,6 +151,7 @@ def test_echo_cmd_is_exactly_5_chars():
     fx.ECHO_ARM_OK, fx.ECHO_QUICK_ARM_OK, fx.ECHO_DISARM_OK,
     fx.ECHO_PANIC_EMERG_OK, fx.ECHO_PANIC_MED_OK, fx.ECHO_PANIC_FIRE_OK,
     fx.ECHO_UTILITY_KEY_OK,
+    fx.ECHO_ARM_OK_LOWER, fx.ECHO_UTILITY_KEY_OK_LOWER,
 ])
 def test_echo_ok_from_fixtures(line):
     result = parse_line(line)
