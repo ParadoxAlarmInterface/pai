@@ -179,6 +179,20 @@ class MQTTConnection:
 
         self.start()
 
+        # If MQTT was already connected before this registrar started (common
+        # when interfaces register slightly after the MQTT loop connects),
+        # fire on_connect immediately so control subscriptions and futures are
+        # set up correctly.
+        if self.connected:
+            try:
+                if hasattr(cls, "on_connect") and callable(getattr(cls, "on_connect")):
+                    cls.on_connect(self.client, None, None, None)
+            except Exception:
+                logger.exception(
+                    'Failed to call on_connect on late registrar "%s"',
+                    cls.__class__.__name__,
+                )
+
     def unregister(self, cls):
         self.registrars.remove(cls)
 
