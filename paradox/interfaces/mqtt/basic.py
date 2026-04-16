@@ -145,6 +145,16 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             self._mqtt_handle_send_panic,
         )
 
+        if cfg.CONNECTION_TYPE == "PRT3":
+            self.subscribe_callback(
+                "{}/{}/{}/+".format(
+                    cfg.MQTT_BASE_TOPIC,
+                    cfg.MQTT_CONTROL_TOPIC,
+                    cfg.MQTT_UTILITY_KEY_TOPIC,
+                ),
+                self._mqtt_handle_utility_key,
+            )
+
         if not self.connected_future.done():
             self.connected_future.set_result(True)
 
@@ -359,6 +369,31 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             message = "Door command accepted: {}={} user: {}".format(
                 element, command, user
             )
+
+        self._publish_command_status(message)
+
+    @mqtt_handle_decorator
+    async def _mqtt_handle_utility_key(self, prep: ParsedMessage):
+        """PRT3-only: trigger a utility key (UK{nnn}). Payload is ignored."""
+        topics = prep.topics
+        if len(topics) < 4:
+            logger.error("PRT3 utility key: malformed topic %r", topics)
+            return
+        try:
+            key = int(topics[3])
+        except (ValueError, TypeError):
+            logger.error("PRT3 utility key: invalid key number %r", topics[3])
+            return
+
+        message = f"Utility key command: key={key}"
+        logger.info(message)
+        self._publish_command_status(message)
+
+        if not await self.alarm.control_utility_key(key):
+            message = f"Utility key command refused: key={key}"
+            logger.warning(message)
+        else:
+            message = f"Utility key command accepted: key={key}"
 
         self._publish_command_status(message)
 
