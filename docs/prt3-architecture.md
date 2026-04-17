@@ -1,21 +1,5 @@
 # PRT3 Connection — Architecture Notes
 
-## Branch status
-
-**Scaffolding only — PRT3 is not yet functional.**
-
-The skeleton modules and config keys are in place (see layer layout below),
-but all protocol logic raises `NotImplementedError`.  Setting
-`CONNECTION_TYPE = "PRT3"` will open the serial port and then immediately
-return an error from `connect()`.
-
-Implementation phases:
-
-| Phase | What gets implemented |
-|---|---|
-| Phase 2 | `PRT3Protocol` framer, `PRT3Panel` init/labels/status, `PRT3Paradox.connect()` |
-| Phase 3 | Event map, arm/disarm/panic control, full async event pipeline |
-
 ## Why PRT3 is a separate connection type
 
 PRT3 is not a transport wrapper around the existing Paradox binary serial protocol.
@@ -55,6 +39,7 @@ paradox/hardware/prt3/
     panel.py            PRT3Panel(Panel)
                         - implements all Panel abstract methods
                         - routes parsed lines to state updates or events
+                        - reply routing via _prt3_send_wait() / wait_for_message()
     parser.py           parse_line(line: str) -> PRT3Message | None
                         - pure function, no side effects
                         - handles: COMM&ok/fail, echo &OK/&fail, RA/RZ replies,
@@ -64,21 +49,28 @@ paradox/hardware/prt3/
                           requests, status requests, utility key
     event.py            EVENT_MAP: dict[int, dict]
                         - maps G-group codes to PAI event descriptors
+    adapter.py          normalise_area_status() / normalise_zone_status()
+                        - converts PRT3 status dataclasses into PAI storage dicts
     property.py         PROPERTY_MAP
                         - maps state-change keys to PAI property descriptors
 ```
 
 ### Wiring into the existing runtime
 
-Two small additions to existing files:
+Minimal additions to existing files:
 
-**`paradox/config.py`** — add `"PRT3"` to the `CONNECTION_TYPE` allowed list and
-five new config keys (`PRT3_SERIAL_PORT`, `PRT3_SERIAL_BAUD`, `PRT3_MAX_AREAS`,
-`PRT3_MAX_ZONES`, `PRT3_MAX_USERS`).
+**`paradox/config.py`** — adds `"PRT3"` to the `CONNECTION_TYPE` allowed list and
+new `PRT3_*` config keys (`PRT3_SERIAL_PORT`, `PRT3_SERIAL_BAUD`, `PRT3_MAX_AREAS`,
+`PRT3_MAX_ZONES`, `PRT3_MAX_USERS`, `PRT3_USER_CODE`, `PRT3_COMM_TIMEOUT`,
+`PRT3_UTILITY_KEYS`).
 
 **`paradox/paradox.py`** — one `elif cfg.CONNECTION_TYPE == "PRT3":` branch in the
-`connection` property, and a guard in `connect()` that skips the binary panel
-detection path and directly instantiates `PRT3Panel`.
+`connection` property; a guard in `connect()` that skips the binary panel detection
+path and directly instantiates `PRT3Panel`; protocol-gap guards for `sync_time`,
+`_clean_session`, and `control_utility_key`.
+
+**`paradox/interfaces/mqtt/`** — utility key button discovery (`UtilityKeyButton`
+entity, HA discovery publish, MQTT subscription and command handler).
 
 Everything else is either inherited unchanged or lives in the new modules above.
 
