@@ -359,7 +359,7 @@ async def test_send_panic_accepted(core, panel, panic_type, prefix):
         return_value=PRT3CommandEcho(cmd=echo_cmd, ok=True)
     )
 
-    result = await panel.send_panic(1, panic_type, None)
+    result = await panel.send_panic([1], panic_type, None)
     assert result is True
     cmd = core.connection.write.call_args[0][0]
     assert cmd.startswith(prefix)
@@ -369,16 +369,16 @@ async def test_send_panic_rejected_by_panel(core, panel):
     core.connection.wait_for_message = AsyncMock(
         return_value=PRT3CommandEcho(cmd="PE001", ok=False)
     )
-    assert await panel.send_panic(1, "emergency", None) is False
+    assert await panel.send_panic([1], "emergency", None) is False
 
 
 async def test_send_panic_timeout(core, panel):
     core.connection.wait_for_message = AsyncMock(return_value=None)
-    assert await panel.send_panic(1, "fire", None) is False
+    assert await panel.send_panic([1], "fire", None) is False
 
 
 async def test_send_panic_unknown_type(panel):
-    assert await panel.send_panic(1, "unknown_panic_type", None) is False
+    assert await panel.send_panic([1], "unknown_panic_type", None) is False
 
 
 # ---------------------------------------------------------------------------

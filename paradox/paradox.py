@@ -561,7 +561,7 @@ class Paradox:
             return False
         except asyncio.CancelledError:
             logger.error("control_utility_key canceled")
-            return False
+            raise
 
     def _init_module_pgms(self):
         for addr, pgm_count in cfg.MODULE_PGM_ADDRESSES.items():

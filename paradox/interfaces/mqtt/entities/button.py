@@ -53,7 +53,7 @@ class UtilityKeyButton:
         )
 
     def serialize(self) -> dict:
-        prefix = cfg.MQTT_HOMEASSISTANT_ENTITY_PREFIX.format(
+        prefix = cfg.MQTT_HOMEASSISTANT_ENTITY_PREFIX.format_map(
             {
                 "serial_number": self.device.serial_number,
                 "model": self.device.model,

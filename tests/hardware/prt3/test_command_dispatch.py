@@ -158,11 +158,12 @@ async def test_control_utility_key_panel_not_implemented(monkeypatch):
 
 
 async def test_control_utility_key_cancelled(monkeypatch):
-    """CancelledError from panel is caught and returns False."""
+    """CancelledError from panel is re-raised so the task can be cancelled cleanly."""
     paradox, mock_panel = _make_paradox(monkeypatch, connection_type="PRT3")
     mock_panel.send_utility_key = AsyncMock(side_effect=asyncio.CancelledError)
 
-    assert await paradox.control_utility_key(5) is False
+    with pytest.raises(asyncio.CancelledError):
+        await paradox.control_utility_key(5)
 
 
 # ---------------------------------------------------------------------------

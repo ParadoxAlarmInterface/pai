@@ -45,6 +45,13 @@ class PRT3Protocol(ConnectionProtocol):
         """
         self.buffer += data
 
+        if len(self.buffer) > 512:  # PRT3 max line is ~21 bytes; 512 is generous
+            logger.warning(
+                "PRT3: buffer overflow (%d bytes), discarding", len(self.buffer)
+            )
+            self.buffer = b""
+            return
+
         while b"\r" in self.buffer:
             line, self.buffer = self.buffer.split(b"\r", 1)
             line_with_cr = line + b"\r"

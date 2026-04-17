@@ -66,6 +66,7 @@ _QUICK_ARM_MODES = {
     "arm_stay":    "S",
     "arm_force":   "F",
     "arm_instant": "I",
+    "arm_sleep":   "I",   # instant arm (no entry delay) — PRT3 closest to HA arm_night
 }
 
 # Panic type → encoder function
@@ -96,6 +97,17 @@ class PRT3Panel(Panel):
         # variable_message_length=False: PRT3Protocol.variable_message_length()
         # is a no-op; the Panel base class must not try to manage lengths.
         super().__init__(core, variable_message_length=False)
+        # Warn if the configured zone count means each poll cycle could exceed
+        # half of KEEP_ALIVE_INTERVAL (in the worst-case all-timeout scenario).
+        if cfg.PRT3_MAX_ZONES * cfg.IO_TIMEOUT > cfg.KEEP_ALIVE_INTERVAL / 2:
+            logger.warning(
+                "PRT3: polling %d zones at %.1f s timeout may take up to %.0f s per "
+                "cycle (KEEP_ALIVE_INTERVAL=%d s) — consider reducing PRT3_MAX_ZONES",
+                cfg.PRT3_MAX_ZONES,
+                cfg.IO_TIMEOUT,
+                cfg.PRT3_MAX_ZONES * cfg.IO_TIMEOUT,
+                cfg.KEEP_ALIVE_INTERVAL,
+            )
 
     # ------------------------------------------------------------------
     # Message parsing
@@ -462,11 +474,11 @@ class PRT3Panel(Panel):
     # Panic
     # ------------------------------------------------------------------
 
-    async def send_panic(self, partition: int, panic_type: str, _code) -> bool:
+    async def send_panic(self, partitions: list, panic_type: str, _code) -> bool:
         """
         Send a PE/PM/PF panic command.
 
-        :param partition:  1-based area number (1-8).
+        :param partitions: list of 1-based area numbers (1-8).
         :param panic_type: 'emergency', 'medical', or 'fire'.
         :param _code:      Not used by PRT3 (panic commands carry no code).
         """
@@ -475,26 +487,29 @@ class PRT3Panel(Panel):
             logger.error("PRT3: unknown panic type %r", panic_type)
             return False
 
-        cmd = encode_fn(partition)
-        expected_echo = f"{cmd[:2].decode('ascii')}{partition:03d}"
+        accepted = False
+        for partition in partitions:
+            cmd = encode_fn(partition)
+            expected_echo = f"{cmd[:2].decode('ascii')}{partition:03d}"
 
-        msg = await self._prt3_send_wait(
-            cmd,
-            lambda m, ec=expected_echo: (
-                isinstance(m, PRT3CommandEcho) and m.cmd == ec
-            ),
-            retries=2,
-        )
-        if msg is None:
-            logger.warning("PRT3: timeout on %s panic area %d", panic_type, partition)
-            return False
-        if not msg.ok:
-            logger.warning(
-                "PRT3: %s panic area %d rejected (&fail)", panic_type, partition
+            msg = await self._prt3_send_wait(
+                cmd,
+                lambda m, ec=expected_echo: (
+                    isinstance(m, PRT3CommandEcho) and m.cmd == ec
+                ),
+                retries=2,
             )
-            return False
-        logger.info("PRT3: %s panic area %d accepted", panic_type, partition)
-        return True
+            if msg is None:
+                logger.warning("PRT3: timeout on %s panic area %d", panic_type, partition)
+                continue
+            if not msg.ok:
+                logger.warning(
+                    "PRT3: %s panic area %d rejected (&fail)", panic_type, partition
+                )
+                continue
+            logger.info("PRT3: %s panic area %d accepted", panic_type, partition)
+            accepted = True
+        return accepted
 
     # ------------------------------------------------------------------
     # Utility key
