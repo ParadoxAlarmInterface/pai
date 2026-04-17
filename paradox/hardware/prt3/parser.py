@@ -258,18 +258,11 @@ def parse_line(line: str) -> Optional[PRT3Message]:
     if m:
         return PRT3PgmEvent(pgm=int(m.group(1)), on=False)
 
-    # 5–7. Structured info replies keyed by 2-char prefix + 3-digit index.
-    # Pre-check digit index once; each branch tests the exact expected length
-    # so short echoes (e.g. RA001&fail) fall through to the echo check below.
-    has_digit_index = len(line) >= 5 and line[2:5].isdigit()
-    if has_digit_index:
-        prefix2 = line[:2]
-        if prefix2 == "RA" and len(line) == _AREA_STATUS_LEN:
-            return _parse_area_status(line)
-        if prefix2 == "RZ" and len(line) == _ZONE_STATUS_LEN:
-            return _parse_zone_status(line)
-        if prefix2 in _LABEL_PREFIXES and len(line) == _LABEL_LEN:
-            return _parse_label(line)
+    # 5–7. Structured info replies (RA/RZ/ZL/AL/UL).
+    # Short echoes like RA001&fail fall through when _parse_info_reply returns None.
+    msg = _parse_info_reply(line)
+    if msg is not None:
+        return msg
 
     # 8. Command echoes: {5 chars}&OK (8) or {5 chars}&fail (10)
     # Note: some panel firmware sends lowercase "&ok"; accept both.
@@ -285,6 +278,24 @@ def parse_line(line: str) -> Optional[PRT3Message]:
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
+
+
+def _parse_info_reply(line: str) -> Optional[PRT3Message]:
+    """Dispatch structured info replies: RA/RZ/ZL/AL/UL{nnn}{data}.
+
+    Returns None for lines that don't match (e.g. short &fail echoes),
+    allowing parse_line to fall through to the echo check.
+    """
+    if not (len(line) >= 5 and line[2:5].isdigit()):
+        return None
+    prefix2 = line[:2]
+    if prefix2 == "RA" and len(line) == _AREA_STATUS_LEN:
+        return _parse_area_status(line)
+    if prefix2 == "RZ" and len(line) == _ZONE_STATUS_LEN:
+        return _parse_zone_status(line)
+    if prefix2 in _LABEL_PREFIXES and len(line) == _LABEL_LEN:
+        return _parse_label(line)
+    return None
 
 
 def _parse_area_status(line: str) -> Optional[PRT3AreaStatus]:

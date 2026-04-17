@@ -138,7 +138,6 @@ class PRT3Panel(Panel):
         self,
         command_bytes: bytes,
         predicate,
-        timeout: Optional[float] = None,
         retries: int = 1,
     ):
         """
@@ -151,20 +150,18 @@ class PRT3Panel(Panel):
         :param command_bytes: Encoded command bytes (\\r-terminated).
         :param predicate:     callable(PRT3Message) → bool.  The first
                               message for which this returns True is returned.
-        :param timeout:       Override the default IO_TIMEOUT.
         :param retries:       Total attempts (1 = no retry, 2 = one retry…).
                               Retries are only performed on timeout; a received
                               reply (ok or &fail) is returned immediately.
         :returns:             Matching PRT3Message, or None if all attempts
                               timed out.
         """
-        _timeout = timeout if timeout is not None else cfg.IO_TIMEOUT
         async with self.core.request_lock:
             for attempt in range(1, retries + 1):
                 self.core.connection.write(command_bytes)
                 try:
                     return await self.core.connection.wait_for_message(
-                        predicate, timeout=_timeout
+                        predicate, timeout=cfg.IO_TIMEOUT
                     )
                 except asyncio.TimeoutError:
                     if attempt < retries:
