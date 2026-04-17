@@ -133,6 +133,37 @@ class Paradox:
                 PersistentHandler(self.handle_prt3_event_message)
             )
 
+    async def _prt3_connect(self) -> bool:
+        """PRT3-specific panel connection sequence (called from connect())."""
+        from paradox.hardware.prt3.panel import PRT3Panel
+
+        self.panel = PRT3Panel(self)
+        try:
+            if not await self.panel.initialize_communication(None):
+                raise ConnectionError("PRT3 panel did not respond with COMM&ok")
+            # PRT3 has no binary identification exchange; synthesise a
+            # DetectedPanel from the configured port so HA discovery has a
+            # stable device identity to anchor entity unique_ids to.
+            port_id = sanitize_key(cfg.PRT3_SERIAL_PORT) or "prt3"
+            ps.sendMessage(
+                "panel_detected",
+                panel=DetectedPanel(
+                    product_id=None,
+                    model="PRT3",
+                    firmware_version="N/A",
+                    serial_number=f"prt3_{port_id}",
+                ),
+            )
+            self.run_state = RunState.CONNECTED
+            logger.info("PRT3 connection OK")
+            return True
+        except asyncio.TimeoutError:
+            logger.error("Timeout waiting for PRT3 COMM&ok")
+        except ConnectionError as e:
+            logger.error("PRT3 connect failed: %s", e)
+        self.run_state = RunState.ERROR
+        return False
+
     async def connect(self) -> bool:
         if self.work_loop is None:
             self.work_loop = asyncio.get_running_loop()
@@ -153,34 +184,7 @@ class Paradox:
 
         # PRT3 uses ASCII framing — binary panel detection does not apply.
         if cfg.CONNECTION_TYPE == "PRT3":
-            from paradox.hardware.prt3.panel import PRT3Panel
-
-            self.panel = PRT3Panel(self)
-            try:
-                if not await self.panel.initialize_communication(None):
-                    raise ConnectionError("PRT3 panel did not respond with COMM&ok")
-                # PRT3 has no binary identification exchange; synthesise a
-                # DetectedPanel from the configured port so HA discovery has a
-                # stable device identity to anchor entity unique_ids to.
-                port_id = sanitize_key(cfg.PRT3_SERIAL_PORT) or "prt3"
-                ps.sendMessage(
-                    "panel_detected",
-                    panel=DetectedPanel(
-                        product_id=None,
-                        model="PRT3",
-                        firmware_version="N/A",
-                        serial_number=f"prt3_{port_id}",
-                    ),
-                )
-                self.run_state = RunState.CONNECTED
-                logger.info("PRT3 connection OK")
-                return True
-            except asyncio.TimeoutError:
-                logger.error("Timeout waiting for PRT3 COMM&ok")
-            except ConnectionError as e:
-                logger.error("PRT3 connect failed: %s", e)
-            self.run_state = RunState.ERROR
-            return False
+            return await self._prt3_connect()
 
         if not self.panel:
             self.panel = create_panel(self)

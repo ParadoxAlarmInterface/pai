@@ -169,7 +169,7 @@ class PRT3SystemEvent:
 class PRT3PgmEvent:
     """Virtual PGM activation/deactivation event (v1 scope: parsed, not acted on)."""
     pgm: int   # 1-30
-    on: bool   # True = activated (PGMxxON), False = deactivated (PGMxxOFF)
+    on: bool   # True if PGMxxON (activated), False if PGMxxOFF (deactivated)
 
 
 # Union type exported for type annotations in callers
@@ -258,33 +258,17 @@ def parse_line(line: str) -> Optional[PRT3Message]:
     if m:
         return PRT3PgmEvent(pgm=int(m.group(1)), on=False)
 
-    # 5. Area status reply: RA{nnn}{7-char flags} = 12 chars
-    if (
-        line.startswith("RA")
-        and len(line) > 4
-        and line[2:5].isdigit()
-    ):
-        if len(line) == _AREA_STATUS_LEN:
+    # 5–7. Structured info replies keyed by 2-char prefix + 3-digit index.
+    # Pre-check digit index once; each branch tests the exact expected length
+    # so short echoes (e.g. RA001&fail) fall through to the echo check below.
+    has_digit_index = len(line) >= 5 and line[2:5].isdigit()
+    if has_digit_index:
+        prefix2 = line[:2]
+        if prefix2 == "RA" and len(line) == _AREA_STATUS_LEN:
             return _parse_area_status(line)
-        # Shorter (e.g. RA001&fail) falls through to the echo check below
-
-    # 6. Zone status reply: RZ{nnn}{5-char flags} = 10 chars
-    if (
-        line.startswith("RZ")
-        and len(line) > 4
-        and line[2:5].isdigit()
-    ):
-        if len(line) == _ZONE_STATUS_LEN:
+        if prefix2 == "RZ" and len(line) == _ZONE_STATUS_LEN:
             return _parse_zone_status(line)
-
-    # 7. Label replies: ZL/AL/UL{nnn}{16-char label} = 21 chars
-    prefix2 = line[:2]
-    if (
-        prefix2 in _LABEL_PREFIXES
-        and len(line) > 4
-        and line[2:5].isdigit()
-    ):
-        if len(line) == _LABEL_LEN:
+        if prefix2 in _LABEL_PREFIXES and len(line) == _LABEL_LEN:
             return _parse_label(line)
 
     # 8. Command echoes: {5 chars}&OK (8) or {5 chars}&fail (10)

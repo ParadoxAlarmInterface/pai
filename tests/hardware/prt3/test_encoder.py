@@ -246,7 +246,7 @@ class TestEncodeArm:
 
     def test_code_type_error_raises(self):
         with pytest.raises((ValueError, TypeError)):
-            encode_arm(1, ARM_MODE_AWAY, 1234)  # type: ignore[arg-type]
+            encode_arm(1, ARM_MODE_AWAY, 1234)  # type: ignore[arg-type]  # NOSONAR
 
 
 # ---------------------------------------------------------------------------

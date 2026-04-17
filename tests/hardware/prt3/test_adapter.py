@@ -282,19 +282,19 @@ class TestZoneStatusFromZone:
 class TestLabelEntryFromReply:
 
     def test_zone_stays_zone(self):
-        container, idx, entry = label_entry_from_reply(
+        container, _, _ = label_entry_from_reply(
             _label(element_type="zone", index=1, label="Front Door  ")
         )
         assert container == "zone"
 
     def test_area_maps_to_partition(self):
-        container, idx, entry = label_entry_from_reply(
+        container, _, _ = label_entry_from_reply(
             _label(element_type="area", index=1, label="Home        ")
         )
         assert container == "partition"
 
     def test_user_stays_user(self):
-        container, idx, entry = label_entry_from_reply(
+        container, _, _ = label_entry_from_reply(
             _label(element_type="user", index=1, label="Master      ")
         )
         assert container == "user"
@@ -344,7 +344,7 @@ class TestLabelEntryFromReply:
         assert entry["id"] == 192
 
     def test_max_user_999(self):
-        container, idx, entry = label_entry_from_reply(
+        _, idx, _ = label_entry_from_reply(
             PRT3LabelReply(element_type="user", index=999, label="User 999        ")
         )
         assert idx == 999

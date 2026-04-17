@@ -59,11 +59,11 @@ class UtilityKeyButton:
                 "model": self.device.model,
             }
         )
-        return dict(
-            availability_topic=self.availability_topic,
-            device=self.device,
-            name=prefix + self.label,
-            unique_id=f"paradox_{self.device.serial_number}_{self.entity_id}",
-            command_topic=self.command_topic,
-            payload_press="trigger",
-        )
+        return {
+            "availability_topic": self.availability_topic,
+            "device": self.device,
+            "name": prefix + self.label,
+            "unique_id": f"paradox_{self.device.serial_number}_{self.entity_id}",
+            "command_topic": self.command_topic,
+            "payload_press": "trigger",
+        }

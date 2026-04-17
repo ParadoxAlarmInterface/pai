@@ -54,9 +54,11 @@ class _Handler:
         self.messages.append(raw)
 
     def on_connection(self):
+        # Required by ConnectionHandler interface; no-op in test stub.
         pass
 
     def on_connection_loss(self):
+        # Required by ConnectionHandler interface; no-op in test stub.
         pass
 
 
@@ -106,7 +108,7 @@ def test_partial_line_not_emitted_until_cr():
 
 
 def test_buffer_drained_after_complete_line():
-    proto, handler = _make_proto()
+    proto, _ = _make_proto()
     proto.data_received(b"COMM&ok\r")
     assert proto.buffer == b""
 

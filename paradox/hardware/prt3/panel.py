@@ -254,6 +254,29 @@ class PRT3Panel(Panel):
     # Label loading
     # ------------------------------------------------------------------
 
+    async def _load_label_range(
+        self, element_type: str, max_count: int, cmd_fn, prefix: str
+    ) -> list:
+        """Fetch labels for one element type (area/zone/user) via ASCII commands."""
+        replies = []
+        for i in range(1, max_count + 1):
+            cmd = cmd_fn(i)
+            expected_cmd = f"{prefix}{i:03d}"
+            msg = await self._prt3_send_wait(
+                cmd,
+                lambda m, ec=expected_cmd, et=element_type, idx=i: (
+                    (isinstance(m, PRT3LabelReply) and m.element_type == et and m.index == idx)
+                    or (isinstance(m, PRT3CommandEcho) and m.cmd == ec)
+                ),
+            )
+            if isinstance(msg, PRT3LabelReply):
+                replies.append(msg)
+            elif isinstance(msg, PRT3CommandEcho) and not msg.ok:
+                logger.debug("PRT3: %s %d label not found", element_type, i)
+            elif msg is None:
+                logger.warning("PRT3: timeout loading %s %d label", element_type, i)
+        return replies
+
     async def load_labels(self) -> dict:
         """
         Request area, zone, and user labels via AL/ZL/UL ASCII commands.
@@ -265,62 +288,11 @@ class PRT3Panel(Panel):
         Returns a labels dict compatible with Paradox._on_labels_load().
         """
         logger.info("PRT3: loading labels")
-        replies = []
-
-        # Area labels — AL001..AL{max}
-        for area in range(1, cfg.PRT3_MAX_AREAS + 1):
-            cmd = encoder.encode_area_label_request(area)
-            expected_cmd = f"AL{area:03d}"
-            msg = await self._prt3_send_wait(
-                cmd,
-                lambda m, ec=expected_cmd, a=area: (
-                    (isinstance(m, PRT3LabelReply) and m.element_type == "area" and m.index == a)
-                    or (isinstance(m, PRT3CommandEcho) and m.cmd == ec)
-                ),
-            )
-            if isinstance(msg, PRT3LabelReply):
-                replies.append(msg)
-            elif isinstance(msg, PRT3CommandEcho) and not msg.ok:
-                logger.debug("PRT3: area %d label not found (panel returned &fail)", area)
-            elif msg is None:
-                logger.warning("PRT3: timeout loading area %d label", area)
-
-        # Zone labels — ZL001..ZL{max}
-        for zone in range(1, cfg.PRT3_MAX_ZONES + 1):
-            cmd = encoder.encode_zone_label_request(zone)
-            expected_cmd = f"ZL{zone:03d}"
-            msg = await self._prt3_send_wait(
-                cmd,
-                lambda m, ec=expected_cmd, z=zone: (
-                    (isinstance(m, PRT3LabelReply) and m.element_type == "zone" and m.index == z)
-                    or (isinstance(m, PRT3CommandEcho) and m.cmd == ec)
-                ),
-            )
-            if isinstance(msg, PRT3LabelReply):
-                replies.append(msg)
-            elif isinstance(msg, PRT3CommandEcho) and not msg.ok:
-                logger.debug("PRT3: zone %d label not found", zone)
-            elif msg is None:
-                logger.warning("PRT3: timeout loading zone %d label", zone)
-
-        # User labels — UL001..UL{max}
-        for user in range(1, cfg.PRT3_MAX_USERS + 1):
-            cmd = encoder.encode_user_label_request(user)
-            expected_cmd = f"UL{user:03d}"
-            msg = await self._prt3_send_wait(
-                cmd,
-                lambda m, ec=expected_cmd, u=user: (
-                    (isinstance(m, PRT3LabelReply) and m.element_type == "user" and m.index == u)
-                    or (isinstance(m, PRT3CommandEcho) and m.cmd == ec)
-                ),
-            )
-            if isinstance(msg, PRT3LabelReply):
-                replies.append(msg)
-            elif isinstance(msg, PRT3CommandEcho) and not msg.ok:
-                logger.debug("PRT3: user %d label not found", user)
-            elif msg is None:
-                logger.warning("PRT3: timeout loading user %d label", user)
-
+        replies = (
+            await self._load_label_range("area", cfg.PRT3_MAX_AREAS, encoder.encode_area_label_request, "AL")
+            + await self._load_label_range("zone", cfg.PRT3_MAX_ZONES, encoder.encode_zone_label_request, "ZL")
+            + await self._load_label_range("user", cfg.PRT3_MAX_USERS, encoder.encode_user_label_request, "UL")
+        )
         labels = adapter.labels_dict_from_replies(replies)
         logger.info(
             "PRT3: labels loaded — %d zones, %d partitions, %d users",
@@ -333,6 +305,48 @@ class PRT3Panel(Panel):
     # ------------------------------------------------------------------
     # Status polling
     # ------------------------------------------------------------------
+
+    async def _poll_area_statuses(self) -> list:
+        """Poll RA{nnn} for all configured areas; return PRT3AreaStatus list."""
+        msgs = []
+        for area in range(1, cfg.PRT3_MAX_AREAS + 1):
+            cmd = encoder.encode_area_status_request(area)
+            expected_cmd = f"RA{area:03d}"
+            msg = await self._prt3_send_wait(
+                cmd,
+                lambda m, ec=expected_cmd, a=area: (
+                    (isinstance(m, PRT3AreaStatus) and m.area == a)
+                    or (isinstance(m, PRT3CommandEcho) and m.cmd == ec)
+                ),
+            )
+            if isinstance(msg, PRT3AreaStatus):
+                msgs.append(msg)
+            elif isinstance(msg, PRT3CommandEcho) and not msg.ok:
+                logger.debug("PRT3: area %d status not found", area)
+            elif msg is None:
+                logger.warning("PRT3: timeout polling area %d status", area)
+        return msgs
+
+    async def _poll_zone_statuses(self) -> list:
+        """Poll RZ{nnn} for all configured zones; return PRT3ZoneStatus list."""
+        msgs = []
+        for zone in range(1, cfg.PRT3_MAX_ZONES + 1):
+            cmd = encoder.encode_zone_status_request(zone)
+            expected_cmd = f"RZ{zone:03d}"
+            msg = await self._prt3_send_wait(
+                cmd,
+                lambda m, ec=expected_cmd, z=zone: (
+                    (isinstance(m, PRT3ZoneStatus) and m.zone == z)
+                    or (isinstance(m, PRT3CommandEcho) and m.cmd == ec)
+                ),
+            )
+            if isinstance(msg, PRT3ZoneStatus):
+                msgs.append(msg)
+            elif isinstance(msg, PRT3CommandEcho) and not msg.ok:
+                logger.debug("PRT3: zone %d status not found", zone)
+            elif msg is None:
+                logger.warning("PRT3: timeout polling zone %d status", zone)
+        return msgs
 
     async def request_status(self, nr: int) -> dict:
         """
@@ -354,48 +368,37 @@ class PRT3Panel(Panel):
         Timeouts per-element are logged as warnings; the poll loop tolerates
         missing replies via the deep_merge / StatusRequestException path.
         """
-        area_msgs = []
-        zone_msgs = []
-
-        for area in range(1, cfg.PRT3_MAX_AREAS + 1):
-            cmd = encoder.encode_area_status_request(area)
-            expected_cmd = f"RA{area:03d}"
-            msg = await self._prt3_send_wait(
-                cmd,
-                lambda m, ec=expected_cmd, a=area: (
-                    (isinstance(m, PRT3AreaStatus) and m.area == a)
-                    or (isinstance(m, PRT3CommandEcho) and m.cmd == ec)
-                ),
-            )
-            if isinstance(msg, PRT3AreaStatus):
-                area_msgs.append(msg)
-            elif isinstance(msg, PRT3CommandEcho) and not msg.ok:
-                logger.debug("PRT3: area %d status not found", area)
-            elif msg is None:
-                logger.warning("PRT3: timeout polling area %d status", area)
-
-        for zone in range(1, cfg.PRT3_MAX_ZONES + 1):
-            cmd = encoder.encode_zone_status_request(zone)
-            expected_cmd = f"RZ{zone:03d}"
-            msg = await self._prt3_send_wait(
-                cmd,
-                lambda m, ec=expected_cmd, z=zone: (
-                    (isinstance(m, PRT3ZoneStatus) and m.zone == z)
-                    or (isinstance(m, PRT3CommandEcho) and m.cmd == ec)
-                ),
-            )
-            if isinstance(msg, PRT3ZoneStatus):
-                zone_msgs.append(msg)
-            elif isinstance(msg, PRT3CommandEcho) and not msg.ok:
-                logger.debug("PRT3: zone %d status not found", zone)
-            elif msg is None:
-                logger.warning("PRT3: timeout polling zone %d status", zone)
-
+        area_msgs = await self._poll_area_statuses()
+        zone_msgs = await self._poll_zone_statuses()
         return adapter.build_flat_status(area_msgs, zone_msgs)
 
     # ------------------------------------------------------------------
     # Control — partitions
     # ------------------------------------------------------------------
+
+    def _build_partition_cmd(
+        self, partition: int, command: str, user_code: str
+    ) -> Optional[tuple]:
+        """
+        Build (cmd_bytes, expected_echo) for one partition command.
+
+        Returns None and logs an error when the command cannot be sent
+        (unknown command, or disarm without a user code).
+        """
+        if command == "disarm":
+            if not user_code:
+                logger.error("PRT3: disarm requires PRT3_USER_CODE to be configured")
+                return None
+            return encoder.encode_disarm(partition, user_code), f"AD{partition:03d}"
+
+        if command in _QUICK_ARM_MODES:
+            mode = _QUICK_ARM_MODES[command]
+            if user_code:
+                return encoder.encode_arm(partition, mode, user_code), f"AA{partition:03d}"
+            return encoder.encode_quick_arm(partition, mode), f"AQ{partition:03d}"
+
+        logger.error("PRT3: unknown partition command %r", command)
+        return None
 
     async def control_partitions(self, partitions: list, command: str) -> bool:
         """
@@ -411,28 +414,10 @@ class PRT3Panel(Panel):
         accepted = False
 
         for partition in partitions:
-            if command == "disarm":
-                if not user_code:
-                    logger.error(
-                        "PRT3: disarm requires PRT3_USER_CODE to be configured"
-                    )
-                    continue
-                cmd = encoder.encode_disarm(partition, user_code)
-                expected_echo = f"AD{partition:03d}"
-
-            elif command in _QUICK_ARM_MODES:
-                mode = _QUICK_ARM_MODES[command]
-                if user_code:
-                    cmd = encoder.encode_arm(partition, mode, user_code)
-                    expected_echo = f"AA{partition:03d}"
-                else:
-                    cmd = encoder.encode_quick_arm(partition, mode)
-                    expected_echo = f"AQ{partition:03d}"
-
-            else:
-                logger.error("PRT3: unknown partition command %r", command)
+            built = self._build_partition_cmd(partition, command, user_code)
+            if built is None:
                 continue
-
+            cmd, expected_echo = built
             msg = await self._prt3_send_wait(
                 cmd,
                 lambda m, ec=expected_echo: (
