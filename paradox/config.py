@@ -33,8 +33,8 @@ class Config:
         "PRT3_SERIAL_PORT": "/dev/ttyUSB0",  # Serial port for PRT3 module
         "PRT3_SERIAL_BAUD": (9600, int, (2400, 115200)),  # Baud rate; 9600 or 19200 typical
         "PRT3_MAX_AREAS": (8, int, (1, 8)),  # Number of areas on the panel
-        "PRT3_MAX_ZONES": (96, int, (1, 192)),  # Number of zones on the panel
-        "PRT3_MAX_USERS": (32, int, (1, 999)),   # Number of user codes on the panel
+        "PRT3_MAX_ZONES": (96, int, (0, 192)),  # Number of zones; 0 disables zone polling
+        "PRT3_MAX_USERS": (32, int, (0, 999)),  # Number of users; 0 disables user label polling
         "PRT3_USER_CODE": "",  # User code for arm/disarm (1-6 digits); empty = quick-arm only.
         # SECURITY: this is a live disarm code. Ensure pai.conf is chmod 600
         # and root-owned. This value is never written to logs.

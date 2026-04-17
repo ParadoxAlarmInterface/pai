@@ -87,7 +87,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             self._publish_module_pgm_configs(module_pgms)
         if "system" in status:
             self._publish_system_property_configs(status["system"])
-        if cfg.PRT3_UTILITY_KEYS:
+        if cfg.CONNECTION_TYPE == "PRT3" and cfg.PRT3_UTILITY_KEYS:
             self._publish_utility_key_configs(cfg.PRT3_UTILITY_KEYS)
 
     def _publish_config(self, entity: AbstractEntity):
@@ -195,6 +195,12 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 key_num = int(key_num)
             except (ValueError, TypeError):
                 logger.warning("PRT3_UTILITY_KEYS: invalid key number %r, skipping", key_num)
+                continue
+            if not 1 <= key_num <= 251:
+                logger.warning(
+                    "PRT3_UTILITY_KEYS: key number %d out of range (expected 1..251), skipping",
+                    key_num,
+                )
                 continue
             button = self.entity_factory.make_utility_key_button(key_num, str(label))
             self._publish_config(button)

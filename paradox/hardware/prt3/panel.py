@@ -169,8 +169,8 @@ class PRT3Panel(Panel):
                 except asyncio.TimeoutError:
                     if attempt < retries:
                         logger.warning(
-                            "PRT3: timeout on attempt %d/%d, retrying: %r",
-                            attempt, retries, command_bytes,
+                            "PRT3: timeout on attempt %d/%d, retrying: %s",
+                            attempt, retries, command_bytes[:5],
                         )
             return None
 

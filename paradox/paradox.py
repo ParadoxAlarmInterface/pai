@@ -140,7 +140,7 @@ class Paradox:
         self.panel = PRT3Panel(self)
         try:
             if not await self.panel.initialize_communication(None):
-                raise ConnectionError("PRT3 panel did not respond with COMM&ok")
+                raise ConnectionError("PRT3 serial link unresponsive — no messages received")
             # PRT3 has no binary identification exchange; synthesise a
             # DetectedPanel from the configured port so HA discovery has a
             # stable device identity to anchor entity unique_ids to.
@@ -562,6 +562,9 @@ class Paradox:
             return await self.panel.send_utility_key(key)
         except NotImplementedError:
             logger.error("send_utility_key not implemented for this panel type")
+            return False
+        except (ValueError, TypeError) as e:
+            logger.error("control_utility_key: invalid key %r — %s", key, e)
             return False
         except asyncio.CancelledError:
             logger.error("control_utility_key canceled")
