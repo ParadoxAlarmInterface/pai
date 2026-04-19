@@ -129,7 +129,7 @@ class Event:
 class LiveEvent(Event):
     def __init__(self, event: Container, event_map: dict, label_provider=None):
         raw = event.fields.value
-        if raw.po.command != 0xE:
+        if raw.po.command != 0xE and hasattr(raw, "event"):
             raise AssertionError("Message is not an event")
 
         # parse event map
