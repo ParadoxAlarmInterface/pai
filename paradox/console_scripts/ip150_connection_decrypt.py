@@ -165,10 +165,63 @@ def old_yaml_format_traverser(data):
         }
 
 
-def decrypt_file(file, password, max_packets: int = None):
-    try:
-        data = ordered_load(file, yaml.loader.SafeLoader)
-        parser = PayloadParser()
+class IPFileDecryptor:
+    def __init__(self, password):
+        self.password = password
+        self.parser = PayloadParser()
+
+    def _parse_packet(self, value):
+        """Parse raw packet bytes into an IP message. Returns (parsed, is_request) or None."""
+        if value[0] != 0xAA:
+            print(f"{Colors.RED}Not an IP packet: {value}{Colors.ENDC}")
+            return None
+        header = value[0:16]
+        payload = value[16:]
+
+        is_request = header[3] in [3, 4]
+        print(
+            f"{Colors.BLUE}PC->IP: " if is_request else f"{Colors.GREEN}IP->PC:\n",
+            f"\theader: {binascii.hexlify(header)}\n",
+            f"\tencrypted_payload: {binascii.hexlify(payload)}",
+        )
+
+        if is_request:
+            parsed = IPMessageRequest.parse(value, password=self.password)
+        else:
+            parsed = IPMessageResponse.parse(value, password=self.password)
+        return parsed, is_request
+
+    def _handle_connect_request(self, parsed):
+        if parsed.header.sub_command == 0:
+            assert self.password == parsed.payload, "Wrong decryption password"
+
+    def _handle_connect_response(self, parsed):
+        if parsed.header.sub_command == 0:
+            self.password = parsed.payload[1:17]
+            assert len(self.password) == 16, "Wrong password length"
+            print(f"{Colors.RED}Session password: {self.password}{Colors.ENDC}")
+        elif parsed.header.sub_command == 3:
+            self._print_connection_result(parsed.payload[0] & 240)
+
+    def _print_connection_result(self, result_byte):
+        messages = {16: "Successfully connected", 112: "Connection failed"}
+        msg = messages.get(result_byte, "Connected to unknown")
+        print(f"{Colors.RED}{msg}{Colors.ENDC}")
+
+    def _handle_connect(self, parsed):
+        if parsed.header.command != IPMessageCommand.connect:
+            return
+        if parsed.header.message_type == IPMessageType.ip_request:
+            self._handle_connect_request(parsed)
+        elif parsed.header.message_type == IPMessageType.ip_response:
+            self._handle_connect_response(parsed)
+
+    def decrypt(self, file, max_packets: int = None):
+        try:
+            data = ordered_load(file, yaml.loader.SafeLoader)
+        except yaml.YAMLError as exc:
+            print(f"{Colors.RED}{exc}{Colors.ENDC}")
+            return
 
         if "peers" in data and "packets" in data:
             iterator = data["packets"]
@@ -177,49 +230,12 @@ def decrypt_file(file, password, max_packets: int = None):
 
         n = 0
         for packet in iterator:
-            value = packet["data"]
-            key = packet["index"]
-            if not value[0] == 0xAA:
-                print(f"{Colors.RED}Not an IP packet: {value}{Colors.ENDC}")
+            result = self._parse_packet(packet["data"])
+            if result is None:
                 continue
-            header = value[0:16]
-            payload = value[16:]
+            parsed, is_request = result
 
-            is_request = header[3] in [3, 4]
-            print(
-                f"{Colors.BLUE}PC->IP: " if is_request else f"{Colors.GREEN}IP->PC:\n",
-                f"\theader: {binascii.hexlify(header)}\n",
-                f"\tencrypted_payload: {binascii.hexlify(payload)}",
-            )
-
-            if is_request:
-                parsed = IPMessageRequest.parse(value, password=password)
-            else:
-                parsed = IPMessageResponse.parse(value, password=password)
-
-            if (
-                parsed.header.command == IPMessageCommand.connect
-                and parsed.header.message_type == IPMessageType.ip_request
-            ):
-                if parsed.header.sub_command == 0:
-                    assert password == parsed.payload, "Wrong decryption password"
-
-            if (
-                parsed.header.command == IPMessageCommand.connect
-                and parsed.header.message_type == IPMessageType.ip_response
-            ):
-                if parsed.header.sub_command == 0:
-                    password = parsed.payload[1:17]
-                    assert len(password) == 16, "Wrong password length"
-                    print(f"{Colors.RED}Session password: {password}{Colors.ENDC}")
-                elif parsed.header.sub_command == 3:
-                    connection_result = parsed.payload[0] & 240
-                    if connection_result == 16:
-                        print(f"{Colors.RED}Successfully connected{Colors.ENDC}")
-                    elif connection_result == 112:
-                        print(f"{Colors.RED}Connection failed{Colors.ENDC}")
-                    else:
-                        print(f"{Colors.RED}Connected to unknown{Colors.ENDC}")
+            self._handle_connect(parsed)
 
             print(
                 f"\tpayload: {binascii.hexlify(parsed.payload)}\n",
@@ -228,105 +244,129 @@ def decrypt_file(file, password, max_packets: int = None):
 
             print(parsed)
             print(Colors.ENDC)
-            parser.parse(parsed)
+            self.parser.parse(parsed)
 
             if not is_request:
                 print(
                     "----end %s-------------------------------------------------------------"
-                    % key
+                    % packet["index"]
                 )
             n += 1
 
-            if max_packets is not None and n > max_packets:
+            if max_packets is not None and n >= max_packets:
                 print(f"Force stopped on {max_packets} packets")
                 return
 
-    except yaml.YAMLError as exc:
-        print(f"{Colors.RED}{exc}{Colors.ENDC}")
 
+class SerialFileDecryptor:
+    _LINE_RE = re.compile(r"^(TX|RX) \[(\d+)\]: ([0-9A-Fa-f ]+)$")
 
-def decrypt_serial_file(file, pc_password=None, max_packets: int = None):
-    import re
+    def __init__(self, pc_password=None):
+        self.panel = create_panel(None)
+        self.key_bytes = make_serial_key(pc_password) if pc_password else None
 
-    line_re = re.compile(r"^(TX|RX) \[(\d+)\]: ([0-9A-Fa-f ]+)$")
-    panel = create_panel(None)
-    key_bytes = make_serial_key(pc_password) if pc_password else None
-    n = 0
-    for line in file:
-        line = line.strip()
-        if not line:
-            continue
-        m = line_re.match(line)
+    def _direction_str(self, direction):
+        return "topanel" if direction == "TX" else "frompanel"
+
+    def _try_update_panel(self, parsed):
+        if parsed and parsed.fields.value.po.command == 0:
+            self.panel = create_panel(None, parsed)
+
+    def _parse_line(self, line):
+        """Parse a serial log line. Returns (direction, message) or None."""
+        m = self._LINE_RE.match(line)
         if not m:
             print(f"{Colors.RED}Unrecognised line: {line}{Colors.ENDC}")
-            continue
+            return None
         direction, length, hex_data = m.group(1), int(m.group(2)), m.group(3)
         message = bytes.fromhex(hex_data.replace(" ", ""))
         if len(message) != length:
             print(
                 f"{Colors.RED}Length mismatch: declared {length}, got {len(message)}{Colors.ENDC}"
             )
-            continue
+            return None
+        return direction, message
 
-        color = Colors.BLUE if direction == "TX" else Colors.GREEN
+    def _handle_encrypted_frame(self, direction, message):
+        """Handle E0 FE encrypted frames. Returns True if AES-decrypted (skip fallback)."""
+        if self.key_bytes:
+            plaintext = decrypt_serial_message(message, self.key_bytes)
+            if plaintext:
+                self._print_aes_decrypted(direction, message, plaintext)
+                return True
+
+        self._print_encrypted_fallback(message)
+        return False
+
+    def _print_aes_decrypted(self, direction, message, plaintext):
         print(
-            f"{color}{direction} [{length}]: {binascii.hexlify(message).decode()}{Colors.ENDC}"
+            f"{Colors.ON_WHITE}  AES-256 decrypted ({len(message)}b → {len(plaintext)}b): "
+            f"{binascii.hexlify(plaintext).decode()}{Colors.ENDC}"
         )
+        try:
+            inner = self.panel.parse_message(plaintext, self._direction_str(direction))
+            if inner:
+                print(f"{Colors.ON_WHITE}  Parsed: {inner}{Colors.ENDC}")
+                self._try_update_panel(inner)
+        except Exception:
+            pass
 
-        if len(message) >= 2 and message[0] >> 4 == 0xE and message[1] == 0xFE:
-            # Try full-AES decryption first (ESP32-style frames)
-            if key_bytes:
-                plaintext = decrypt_serial_message(message, key_bytes)
-                if plaintext:
-                    print(
-                        f"{Colors.ON_WHITE}  AES-256 decrypted ({len(message)}b → {len(plaintext)}b): "
-                        f"{binascii.hexlify(plaintext).decode()}{Colors.ENDC}"
-                    )
-                    try:
-                        inner = panel.parse_message(
-                            plaintext,
-                            "topanel" if direction == "TX" else "frompanel",
-                        )
-                        if inner:
-                            print(f"{Colors.ON_WHITE}  Parsed: {inner}{Colors.ENDC}")
-                            if inner.fields.value.po.command == 0:
-                                panel = create_panel(None, inner)
-                    except Exception:
-                        pass
+    def _print_encrypted_fallback(self, message):
+        try:
+            parsed = Encrypted.parse(message)
+            print(
+                f"{Colors.ON_WHITE}  Encrypted frame (compact): request_nr={parsed.fields.value.request_nr}"
+                f" data({len(parsed.fields.value.data)}b)={binascii.hexlify(parsed.fields.value.data).decode()}{Colors.ENDC}"
+            )
+        except Exception:
+            print(
+                f"{Colors.ON_WHITE}  E0 FE frame ({len(message)}b, no key provided or unknown format){Colors.ENDC}"
+            )
+
+    def _handle_plain_frame(self, direction, message):
+        try:
+            parsed = self.panel.parse_message(message, self._direction_str(direction))
+            if parsed:
+                print(f"{Colors.ON_WHITE}  {parsed}{Colors.ENDC}")
+                self._try_update_panel(parsed)
+            else:
+                print(
+                    f"{Colors.RED}  No parser for message: {binascii.hexlify(message).decode()}{Colors.ENDC}"
+                )
+        except Exception:
+            print(f"{Colors.RED}  Parse error{Colors.ENDC}")
+            traceback.print_exc()
+
+    def _is_encrypted_frame(self, message):
+        return len(message) >= 2 and message[0] >> 4 == 0xE and message[1] == 0xFE
+
+    def decrypt(self, file, max_packets: int = None):
+        n = 0
+        for line in file:
+            line = line.strip()
+            if not line:
+                continue
+
+            result = self._parse_line(line)
+            if result is None:
+                continue
+            direction, message = result
+
+            color = Colors.BLUE if direction == "TX" else Colors.GREEN
+            print(
+                f"{color}{direction} [{len(message)}]: {binascii.hexlify(message).decode()}{Colors.ENDC}"
+            )
+
+            if self._is_encrypted_frame(message):
+                if self._handle_encrypted_frame(direction, message):
                     continue
+            else:
+                self._handle_plain_frame(direction, message)
 
-            # Fallback: BabyWare compact E0 FE (algorithm unknown, display structure only)
-            try:
-                parsed = Encrypted.parse(message)
-                print(
-                    f"{Colors.ON_WHITE}  Encrypted frame (compact): request_nr={parsed.fields.value.request_nr}"
-                    f" data({len(parsed.fields.value.data)}b)={binascii.hexlify(parsed.fields.value.data).decode()}{Colors.ENDC}"
-                )
-            except Exception:
-                print(
-                    f"{Colors.ON_WHITE}  E0 FE frame ({len(message)}b, no key provided or unknown format){Colors.ENDC}"
-                )
-        else:
-            try:
-                parsed = panel.parse_message(
-                    message, "topanel" if direction == "TX" else "frompanel"
-                )
-                if parsed:
-                    print(f"{Colors.ON_WHITE}  {parsed}{Colors.ENDC}")
-                    if parsed.fields.value.po.command == 0:
-                        panel = create_panel(None, parsed)
-                else:
-                    print(
-                        f"{Colors.RED}  No parser for message: {binascii.hexlify(message).decode()}{Colors.ENDC}"
-                    )
-            except Exception:
-                print(f"{Colors.RED}  Parse error{Colors.ENDC}")
-                traceback.print_exc()
-
-        n += 1
-        if max_packets is not None and n >= max_packets:
-            print(f"Force stopped on {max_packets} packets")
-            return
+            n += 1
+            if max_packets is not None and n >= max_packets:
+                print(f"Force stopped on {max_packets} packets")
+                return
 
 
 def main():
@@ -366,9 +406,9 @@ def main():
     args = parser.parse_args()
 
     if args.serial:
-        decrypt_serial_file(args.file, args.pc_password, args.packets)
+        SerialFileDecryptor(args.pc_password).decrypt(args.file, args.packets)
     else:
-        decrypt_file(args.file, args.password.encode("utf8"), args.packets)
+        IPFileDecryptor(args.password.encode("utf8")).decrypt(args.file, args.packets)
 
 
 if __name__ == "__main__":

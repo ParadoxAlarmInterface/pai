@@ -33,7 +33,7 @@ class Panel:
         self.variable_message_length = variable_message_length
 
     def parse_message(self, message, direction="topanel") -> typing.Optional[Container]:
-        if message is None or len(message) == 0:
+        if message is None or len(message) < 2:
             return None
 
         if message[0] >> 4 == 0xE and message[1] == 0xFE:

@@ -27,6 +27,8 @@ def make_serial_key(password) -> bytes:
     """Derive the 32-byte serial encryption key from the panel PC password."""
     if isinstance(password, bytes):
         raw = password
+    elif isinstance(password, int):
+        raw = str(password).zfill(4).encode("utf-8")
     else:
         raw = str(password).encode("utf-8")
     if len(raw) < 32:
