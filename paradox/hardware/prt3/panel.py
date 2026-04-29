@@ -44,6 +44,7 @@ from paradox.hardware.prt3 import adapter, encoder
 from paradox.hardware.prt3.event import EVENT_MAP, PRT3Event
 from paradox.hardware.prt3.parser import (
     PRT3AreaStatus,
+    PRT3BufferFull,
     PRT3CommandEcho,
     PRT3CommStatus,
     PRT3LabelReply,
@@ -151,23 +152,33 @@ class PRT3Panel(Panel):
         :param predicate:     callable(PRT3Message) → bool.  The first
                               message for which this returns True is returned.
         :param retries:       Total attempts (1 = no retry, 2 = one retry…).
-                              Retries are only performed on timeout; a received
-                              reply (ok or &fail) is returned immediately.
+                              Retries are performed on timeout or on
+                              PRT3BufferFull (``!``) — the panel dropped the
+                              command; a definitive reply (&ok or &fail) is
+                              returned immediately without retrying.
         :returns:             Matching PRT3Message, or None if all attempts
-                              timed out.
+                              timed out or hit buffer-full.
         """
         async with self.core.request_lock:
+            buffer_full_or_match = lambda m: predicate(m) or isinstance(m, PRT3BufferFull)
             for attempt in range(1, retries + 1):
                 self.core.connection.write(command_bytes)
                 try:
-                    return await self.core.connection.wait_for_message(
-                        predicate, timeout=cfg.IO_TIMEOUT
+                    result = await self.core.connection.wait_for_message(
+                        buffer_full_or_match, timeout=cfg.IO_TIMEOUT
                     )
+                    if isinstance(result, PRT3BufferFull):
+                        logger.warning(
+                            "PRT3: buffer full on attempt %d/%d, retrying: %s",
+                            attempt, retries, command_bytes[:5],  # [:5] excludes user code
+                        )
+                        continue
+                    return result
                 except asyncio.TimeoutError:
                     if attempt < retries:
                         logger.warning(
                             "PRT3: timeout on attempt %d/%d, retrying: %s",
-                            attempt, retries, command_bytes[:5],
+                            attempt, retries, command_bytes[:5],  # [:5] excludes user code
                         )
             return None
 
@@ -386,12 +397,20 @@ class PRT3Panel(Panel):
             if not user_code:
                 logger.error("PRT3: disarm requires PRT3_USER_CODE to be configured")
                 return None
-            return encoder.encode_disarm(partition, user_code), f"AD{partition:03d}"
+            try:
+                return encoder.encode_disarm(partition, user_code), f"AD{partition:03d}"
+            except ValueError as exc:
+                logger.error("PRT3: invalid PRT3_USER_CODE for disarm: %s", exc)
+                return None
 
         if command in _QUICK_ARM_MODES:
             mode = _QUICK_ARM_MODES[command]
             if user_code:
-                return encoder.encode_arm(partition, mode, user_code), f"AA{partition:03d}"
+                try:
+                    return encoder.encode_arm(partition, mode, user_code), f"AA{partition:03d}"
+                except ValueError as exc:
+                    logger.error("PRT3: invalid PRT3_USER_CODE for arm: %s", exc)
+                    return None
             return encoder.encode_quick_arm(partition, mode), f"AQ{partition:03d}"
 
         logger.error("PRT3: unknown partition command %r", command)

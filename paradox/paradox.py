@@ -821,6 +821,10 @@ class Paradox:
         )
         try:
             evt = PRT3Event.from_prt3(message, label_provider=self.get_label)
+        except (KeyError, AttributeError, ValueError) as exc:
+            logger.warning("handle_prt3_event_message: failed to parse event: %s", exc)
+            return
+        try:
             if evt.change:
                 if evt.type == "partition" and evt.id in (0, 255):
                     # Global partition event (area=0 = all enabled areas per spec
@@ -837,6 +841,8 @@ class Paradox:
             ps.sendEvent(evt)
             if evt.type == "partition":
                 self._update_partition_states()
+        except (KeyError, AttributeError) as exc:
+            logger.warning("handle_prt3_event_message: storage dispatch error: %s", exc)
         except Exception:
             logger.exception("handle_prt3_event_message")
 

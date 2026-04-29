@@ -31,13 +31,16 @@ class Config:
         "SERIAL_BAUD": 9600,  # Baud rate of the Serial Port. Use 38400(default setting) or 57600 for EVO
         # PRT3 Connection Details (Paradox PRT3 Printer Module — ASCII serial protocol)
         "PRT3_SERIAL_PORT": "/dev/ttyUSB0",  # Serial port for PRT3 module
-        "PRT3_SERIAL_BAUD": (9600, int, (2400, 115200)),  # Baud rate; 9600 or 19200 typical
+        "PRT3_SERIAL_BAUD": (9600, int, [9600, 19200]),  # Hardware DIP-switch baud: 9600 or 19200
         "PRT3_MAX_AREAS": (8, int, (1, 8)),  # Number of areas on the panel
         "PRT3_MAX_ZONES": (96, int, (0, 192)),  # Number of zones; 0 disables zone polling
         "PRT3_MAX_USERS": (32, int, (0, 999)),  # Number of users; 0 disables user label polling
         "PRT3_USER_CODE": "",  # User code for arm/disarm (1-6 digits); empty = quick-arm only.
         # SECURITY: this is a live disarm code. Ensure pai.conf is chmod 600
-        # and root-owned. This value is never written to logs.
+        # and root-owned.  PAI never writes user codes to logs at default log
+        # levels.  If LOGGING_DUMP_MESSAGES or byte-level serial tracing is
+        # enabled in development, raw arm/disarm command bytes that include the
+        # code may appear in those debug streams; disable both before sharing logs.
         "PRT3_COMM_TIMEOUT": (10, int, (1, 60)),  # Seconds to wait for COMM&ok on connect
         "PRT3_UTILITY_KEYS": {},  # Keys to expose as HA buttons: {key_num: "Label", …}
         # IP Connection Details
@@ -351,7 +354,10 @@ class Config:
                     valid = False
 
                     if isinstance(v, int):
-                        if expected_value[0] <= v <= expected_value[1]:
+                        if isinstance(expected_value, list):
+                            if v in expected_value:
+                                valid = True
+                        elif expected_value[0] <= v <= expected_value[1]:
                             valid = True
                     elif isinstance(v, str):
                         if v in expected_value:
@@ -367,6 +373,15 @@ class Config:
                         )
                         sys.stderr.write(err + "\n")
                         raise (Exception(err))
+
+        user_code = getattr(self, "PRT3_USER_CODE", "")
+        if user_code and not re.fullmatch(r"\d{1,6}", user_code):
+            err = (
+                "Error parsing configuration: PRT3_USER_CODE must be empty or "
+                "1-6 decimal digits (got {!r})".format(user_code)
+            )
+            sys.stderr.write(err + "\n")
+            raise Exception(err)
 
         self.CONFIG_LOADED = True
 

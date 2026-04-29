@@ -22,6 +22,7 @@ from paradox.hardware.prt3.parser import (
     ARM_DISARMED,
     ARM_STAY,
     PRT3AreaStatus,
+    PRT3BufferFull,
     PRT3CommandEcho,
     PRT3CommStatus,
     PRT3LabelReply,
@@ -476,6 +477,44 @@ async def test_send_wait_does_not_retry_on_fail_echo(core, panel):
     assert isinstance(result, PRT3CommandEcho)
     assert result.ok is False
     assert core.connection.write.call_count == 1  # no second attempt
+
+
+async def test_send_wait_buffer_full_returns_none(core, panel):
+    """PRT3BufferFull on every attempt returns None without waiting full timeout."""
+    core.connection.wait_for_message = AsyncMock(return_value=PRT3BufferFull())
+    result = await panel._prt3_send_wait(
+        b"AQ001A\r",
+        lambda m: isinstance(m, PRT3CommandEcho),
+        retries=1,
+    )
+    assert result is None
+    assert core.connection.write.call_count == 1
+
+
+async def test_send_wait_buffer_full_retries_then_succeeds(core, panel):
+    """PRT3BufferFull on first attempt triggers a retry; second attempt succeeds."""
+    ok_echo = PRT3CommandEcho(cmd="AQ001", ok=True)
+    core.connection.wait_for_message = AsyncMock(
+        side_effect=[PRT3BufferFull(), ok_echo]
+    )
+    result = await panel._prt3_send_wait(
+        b"AQ001A\r",
+        lambda m: isinstance(m, PRT3CommandEcho),
+        retries=2,
+    )
+    assert result is ok_echo
+    assert core.connection.write.call_count == 2
+
+
+async def test_control_partitions_malformed_code_returns_false(core, panel, monkeypatch):
+    """Malformed PRT3_USER_CODE returns False without propagating ValueError."""
+    from paradox.config import config as cfg
+
+    monkeypatch.setattr(cfg, "PRT3_USER_CODE", "abc")
+
+    result = await panel.control_partitions([1], "disarm")
+    assert result is False
+    core.connection.write.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

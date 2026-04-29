@@ -221,11 +221,25 @@ EVENT_MAP: dict = {
          "tags": ["status"],
          "message": "Partition {label} Status-1 event (N{number})"},
     # G065: Status 2 — N001=exit_delay, N002=entry_delay, N003=trouble, N004=alarm_in_memory
-    # Per-N overrides are applied in from_prt3() below; this is the fallback.
+    # Per-N overrides are in "number_overrides"; this top-level entry is the fallback.
     65: {"type": "partition", "subtype": "status_update",      "level": EventLevel.DEBUG,
          "change": {},
          "tags": ["status"],
-         "message": "Partition {label} Status-2 event (N{number})"},
+         "message": "Partition {label} Status-2 event (N{number})",
+         "number_overrides": {
+             # N=000 = Ready (no zones open) — informational; does NOT mean "exit delay cleared".
+             # exit_delay is cleared by arm/disarm events (G009-G020), not by Ready snapshots.
+             # N=001: exit delay started → show HA "arming" state
+             1: {"subtype": "exit_delay",  "level": EventLevel.INFO,
+                 "change": {"exit_delay": True},
+                 "tags": ["status", "exit_delay"],
+                 "message": "Partition {label} exit delay started"},
+             # N=002: entry delay started
+             2: {"subtype": "entry_delay", "level": EventLevel.INFO,
+                 "change": {"entry_delay": True},
+                 "tags": ["status", "entry_delay"],
+                 "message": "Partition {label} entry delay started"},
+         }},
     66: {"type": "system",    "subtype": "status_tamper",      "level": EventLevel.CRITICAL,
          "change": {},
          "tags": ["trouble", "tamper", "status"],
@@ -260,30 +274,12 @@ class PRT3Event(Event):
         """
         descriptor = EVENT_MAP.get(prt3_event.group)
 
-        # G065 Status-2 per-N overrides
-        # Per spec: N=000 Ready, N=001 Exit Delay, N=002 Entry Delay,
-        # N=003 Trouble, N=004 Alarm in Memory, N=005 Bypassed, N=006 Programming,
-        # N=007 Keypad Lockout.  Only N=001/N=002 carry state changes we map;
-        # N=000 (Ready) is informational and does NOT mean "exit delay cleared".
-        # exit_delay is cleared by arm/disarm events, not by Ready snapshots.
-        if prt3_event.group == 65:
-            n = prt3_event.number
-            if n == 1:   # exit delay started → show HA "arming" state
-                descriptor = {
-                    "type": "partition", "subtype": "exit_delay",
-                    "level": EventLevel.INFO,
-                    "change": {"exit_delay": True},
-                    "tags": ["status", "exit_delay"],
-                    "message": "Partition {label} exit delay started",
-                }
-            elif n == 2:  # entry delay started
-                descriptor = {
-                    "type": "partition", "subtype": "entry_delay",
-                    "level": EventLevel.INFO,
-                    "change": {"entry_delay": True},
-                    "tags": ["status", "entry_delay"],
-                    "message": "Partition {label} entry delay started",
-                }
+        # Apply per-N overrides declared in EVENT_MAP[group]["number_overrides"].
+        # This keeps EVENT_MAP as the single source of truth for all per-N rules.
+        if descriptor is not None:
+            overrides = descriptor.get("number_overrides")
+            if overrides and prt3_event.number in overrides:
+                descriptor = {**descriptor, **overrides[prt3_event.number]}
 
         if descriptor is None:
             logger.debug(

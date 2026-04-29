@@ -184,11 +184,10 @@ class MQTTConnection:
         # when interfaces register slightly after the MQTT loop connects),
         # fire on_connect immediately so control subscriptions and futures are
         # set up correctly.
-        if self.connected:
+        if self.connected and self._last_connect_args is not None:
             try:
                 if hasattr(cls, "on_connect") and callable(getattr(cls, "on_connect")):
-                    args = self._last_connect_args or (self.client, None, None, None, None)
-                    cls.on_connect(*args)
+                    cls.on_connect(*self._last_connect_args)
             except Exception:
                 logger.exception(
                     'Failed to call on_connect on late registrar "%s"',
