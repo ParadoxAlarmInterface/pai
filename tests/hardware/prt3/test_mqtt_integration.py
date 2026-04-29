@@ -355,7 +355,13 @@ def test_g065_n2_sets_entry_delay():
 
 
 def test_g065_other_n_is_noop():
-    """G065 with N values other than 1/2 produce no state change (fallback no-op)."""
+    """G065 N=000 (Ready) and N>=3 produce no state change (informational only).
+
+    Per spec, G065 N=000 is the 'Ready' status flag (no zones open), NOT an
+    'exit-delay cleared' signal — the panel can fire it while exit delay is
+    active.  exit_delay is cleared by arm/disarm events or by the optimistic
+    update on disarm command acceptance, not by Ready snapshots.
+    """
     from paradox.hardware.prt3.parser import PRT3SystemEvent
     from paradox.hardware.prt3.event import PRT3Event
 
@@ -365,11 +371,11 @@ def test_g065_other_n_is_noop():
 
 
 def test_arm_event_clears_exit_delay():
-    """G010 (arm by user) must set arm=True AND exit_delay=False."""
+    """Per PRT3 spec page 18: G009=Master, G010=User, G011=Keyswitch, G012=Special arm."""
     from paradox.hardware.prt3.parser import PRT3SystemEvent
     from paradox.hardware.prt3.event import PRT3Event
 
-    for group in (10, 11, 12, 13):
+    for group in (9, 10, 11, 12):
         evt = PRT3Event.from_prt3(PRT3SystemEvent(group=group, number=1, area=1))
         assert evt.change.get("arm") is True, f"G{group:03d} must set arm=True"
         assert evt.change.get("exit_delay") is False, \
@@ -377,11 +383,17 @@ def test_arm_event_clears_exit_delay():
 
 
 def test_disarm_event_clears_exit_delay():
-    """G014-G017 and G020 (disarm) must clear exit_delay so a cancelled arm resets HA state."""
+    """Per PRT3 spec page 18: G013=Master, G014=User, G015=Keyswitch, G016/17 after alarm.
+
+    G013 is the critical regression: previously mismapped as 'auto-armed' which
+    caused arm=True to be set when the panel reported a master-code disarm,
+    producing a transient 'armed_away' flash in HA before the next RA poll
+    corrected the state.
+    """
     from paradox.hardware.prt3.parser import PRT3SystemEvent
     from paradox.hardware.prt3.event import PRT3Event
 
-    for group in (14, 15, 16, 17, 20):
+    for group in (13, 14, 15, 16, 17, 20):
         evt = PRT3Event.from_prt3(PRT3SystemEvent(group=group, number=1, area=1))
         assert evt.change.get("arm") is False, f"G{group:03d} must set arm=False"
         assert evt.change.get("exit_delay") is False, \

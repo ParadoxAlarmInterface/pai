@@ -50,6 +50,12 @@ class Paradox:
         self.busy = asyncio.Lock()
         self.loop_wait_event = asyncio.Event()
 
+        # partition_id -> monotonic deadline; while time.monotonic() < deadline,
+        # arm-related properties from RA polling are ignored for that partition.
+        # Set after a disarm command is accepted so a stale RA reply doesn't
+        # briefly re-assert arm=True before the panel internally settles.
+        self._partition_arm_freeze_until: dict = {}
+
         ps.subscribe(self._on_labels_load, "labels_loaded")
         ps.subscribe(self._on_definitions_load, "definitons_loaded")
         ps.subscribe(self._on_status_update, "status_update")
@@ -517,7 +523,7 @@ class Paradox:
 
     async def control_partition(self, partition: str, command: str) -> bool:
         command = command.lower()
-        logger.debug(f"Control Partition: {partition} - {command}")
+        logger.info("Control Partition: %s - %s", partition, command)
 
         partitions_selected = self.storage.get_container("partition").select(partition)
 
@@ -536,6 +542,28 @@ class Paradox:
             logger.error("control_partition canceled")
         except asyncio.TimeoutError:
             logger.error("control_partition timeout")
+
+        # Reflect command outcome immediately so HA state matches reality
+        # without waiting for RA polling (which lags 4–7 s on a busy panel)
+        # or for G-events that the panel may not emit for ASCII-initiated
+        # disarms during exit delay.  The panel's &OK echo is authoritative.
+        # The 3 s freeze prevents a stale RA reply (panel hasn't internally
+        # settled yet) from briefly re-asserting arm=True after the disarm.
+        if accepted and cfg.CONNECTION_TYPE == "PRT3" and command == "disarm":
+            change = {
+                "arm": False,
+                "arm_stay": False,
+                "arm_away": False,
+                "arm_force": False,
+                "exit_delay": False,
+                "entry_delay": False,
+            }
+            freeze_deadline = time.monotonic() + 3.0
+            for pid in partitions_selected:
+                if self.storage.get_container_object("partition", pid):
+                    self.storage.update_container_object("partition", pid, change)
+                    self._partition_arm_freeze_until[pid] = freeze_deadline
+            self._update_partition_states()
 
         # Refresh status
         self.request_status_refresh()  # Trigger status update
@@ -787,11 +815,25 @@ class Paradox:
 
         if not isinstance(message, PRT3SystemEvent):
             return
+        logger.info(
+            "PRT3 system event: G%03dN%03dA%03d",
+            message.group, message.number, message.area,
+        )
         try:
             evt = PRT3Event.from_prt3(message, label_provider=self.get_label)
-            element = self.storage.get_container_object(evt.type, evt.id)
-            if evt.change and element:
-                self.storage.update_container_object(evt.type, evt.id, evt.change)
+            if evt.change:
+                if evt.type == "partition" and evt.id in (0, 255):
+                    # Global partition event (area=0 = all enabled areas per spec
+                    # Note 1, area=255 = at least one enabled area).  Apply the
+                    # change to every known partition so a global disarm clears
+                    # state on each instead of being silently dropped via
+                    # get_container_object("partition", 0) returning None.
+                    for pid in list(self.storage.get_container("partition").keys()):
+                        self.storage.update_container_object("partition", pid, evt.change)
+                else:
+                    element = self.storage.get_container_object(evt.type, evt.id)
+                    if element:
+                        self.storage.update_container_object(evt.type, evt.id, evt.change)
             ps.sendEvent(evt)
             if evt.type == "partition":
                 self._update_partition_states()
@@ -855,6 +897,7 @@ class Paradox:
         if "troubles" in status:
             self._process_trouble_statuses(status["troubles"])
 
+        now = time.monotonic()
         for element_type, element_items in status.items():
             if element_type in ["troubles"]:  # troubles was already parsed
                 continue
@@ -866,6 +909,21 @@ class Paradox:
                         list,
                     ),
                 ):
+                    if (
+                        element_type == "partition"
+                        and isinstance(element_item_status, dict)
+                        and now < self._partition_arm_freeze_until.get(element_item_key, 0)
+                    ):
+                        # Within the post-disarm freeze window: a stale RA reply
+                        # may still report the partition as armed.  Drop arm-
+                        # related keys so the optimistic disarm state stands.
+                        # Other keys (trouble, ready_status, alarms_in_memory)
+                        # still flow through.
+                        _ARM_KEYS = {"arm", "arm_stay", "arm_away", "arm_force"}
+                        element_item_status = {
+                            k: v for k, v in element_item_status.items()
+                            if k not in _ARM_KEYS
+                        }
                     self.storage.update_container_object(
                         element_type, element_item_key, element_item_status
                     )

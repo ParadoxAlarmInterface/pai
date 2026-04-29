@@ -55,43 +55,53 @@ EVENT_MAP: dict = {
          "tags": ["zone", "trouble", "fire"],
          "message": "Zone {label} fire loop trouble"},
 
-    # Arm events (number = user ID, area = affected partition)
+    # Arm events (PRT3 spec page 18: G009=Master, G010=User, G011=Keyswitch, G012=Special)
+    # number = user/keyswitch ID, area = affected partition.
     # exit_delay cleared because the panel is now fully armed (delay is over)
+    9:  {"type": "partition", "subtype": "arm",                "level": EventLevel.INFO,
+         "change": {"arm": True, "exit_delay": False},
+         "tags": ["arm", "master"],
+         "message": "Partition {label} armed by master"},
     10: {"type": "partition", "subtype": "arm",                "level": EventLevel.INFO,
          "change": {"arm": True, "exit_delay": False},
          "tags": ["arm", "user"],
          "message": "Partition {label} armed by user"},
     11: {"type": "partition", "subtype": "arm",                "level": EventLevel.INFO,
          "change": {"arm": True, "exit_delay": False},
-         "tags": ["arm", "master"],
-         "message": "Partition {label} armed by master"},
-    12: {"type": "partition", "subtype": "arm",                "level": EventLevel.INFO,
-         "change": {"arm": True, "exit_delay": False},
          "tags": ["arm", "keyswitch"],
          "message": "Partition {label} armed via keyswitch"},
-    13: {"type": "partition", "subtype": "arm",                "level": EventLevel.INFO,
+    12: {"type": "partition", "subtype": "arm",                "level": EventLevel.INFO,
          "change": {"arm": True, "exit_delay": False},
-         "tags": ["arm", "auto"],
-         "message": "Partition {label} auto-armed"},
+         "tags": ["arm", "special"],
+         "message": "Partition {label} special arm"},
 
-    # Disarm events (number = user ID, area = affected partition)
-    # exit_delay cleared because arming was cancelled
+    # Disarm events (PRT3 spec page 18: G013=Master, G014=User, G015=Keyswitch).
+    # number = user/keyswitch ID, area = affected partition.
+    # exit_delay cleared because arming was cancelled (or disarm after full arm).
+    13: {"type": "partition", "subtype": "disarm",             "level": EventLevel.INFO,
+         "change": {"arm": False, "exit_delay": False},
+         "tags": ["disarm", "master"],
+         "message": "Partition {label} disarmed by master"},
     14: {"type": "partition", "subtype": "disarm",             "level": EventLevel.INFO,
          "change": {"arm": False, "exit_delay": False},
          "tags": ["disarm", "user"],
          "message": "Partition {label} disarmed by user"},
     15: {"type": "partition", "subtype": "disarm",             "level": EventLevel.INFO,
          "change": {"arm": False, "exit_delay": False},
-         "tags": ["disarm", "master"],
-         "message": "Partition {label} disarmed by master"},
-    16: {"type": "partition", "subtype": "disarm",             "level": EventLevel.INFO,
-         "change": {"arm": False, "exit_delay": False},
          "tags": ["disarm", "keyswitch"],
          "message": "Partition {label} disarmed via keyswitch"},
+    # G016/G017 = Disarm after alarm (per spec G016=Master, G017=User, G018=Keyswitch).
+    # G017 also clears audible_alarm; G016/G018 mappings are kept change-equivalent
+    # to PAI's pre-spec-realignment behaviour to avoid behaviour drift for events
+    # we haven't observed from the user's panel — G013 was the critical fix.
+    16: {"type": "partition", "subtype": "disarm",             "level": EventLevel.INFO,
+         "change": {"arm": False, "exit_delay": False},
+         "tags": ["disarm", "master", "alarm_cancel"],
+         "message": "Partition {label} disarmed after alarm by master"},
     17: {"type": "partition", "subtype": "disarm",             "level": EventLevel.INFO,
          "change": {"arm": False, "exit_delay": False, "audible_alarm": False},
-         "tags": ["disarm", "alarm_cancel"],
-         "message": "Partition {label} disarmed after alarm"},
+         "tags": ["disarm", "user", "alarm_cancel"],
+         "message": "Partition {label} disarmed after alarm by user"},
     18: {"type": "partition", "subtype": "alarm_cancelled",    "level": EventLevel.INFO,
          "change": {"audible_alarm": False},
          "tags": ["alarm", "cancel"],
@@ -251,7 +261,11 @@ class PRT3Event(Event):
         descriptor = EVENT_MAP.get(prt3_event.group)
 
         # G065 Status-2 per-N overrides
-        # The base descriptor is a no-op; specific N values carry state changes.
+        # Per spec: N=000 Ready, N=001 Exit Delay, N=002 Entry Delay,
+        # N=003 Trouble, N=004 Alarm in Memory, N=005 Bypassed, N=006 Programming,
+        # N=007 Keypad Lockout.  Only N=001/N=002 carry state changes we map;
+        # N=000 (Ready) is informational and does NOT mean "exit delay cleared".
+        # exit_delay is cleared by arm/disarm events, not by Ready snapshots.
         if prt3_event.group == 65:
             n = prt3_event.number
             if n == 1:   # exit delay started → show HA "arming" state
