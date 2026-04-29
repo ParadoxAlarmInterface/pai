@@ -124,7 +124,7 @@ def test_prt3_user_code_invalid_alpha_rejected(monkeypatch):
     c = Config()
     monkeypatch.setattr(c, "_find_config", lambda loc=None: None)
     monkeypatch.setattr(c, "_read_config", lambda: {"PRT3_USER_CODE": "abc"})
-    with pytest.raises(Exception, match="PRT3_USER_CODE"):
+    with pytest.raises(ValueError, match="PRT3_USER_CODE"):
         c.load()
 
 
@@ -134,7 +134,7 @@ def test_prt3_user_code_too_long_rejected(monkeypatch):
     c = Config()
     monkeypatch.setattr(c, "_find_config", lambda loc=None: None)
     monkeypatch.setattr(c, "_read_config", lambda: {"PRT3_USER_CODE": "1234567"})
-    with pytest.raises(Exception, match="PRT3_USER_CODE"):
+    with pytest.raises(ValueError, match="PRT3_USER_CODE"):
         c.load()
 
 

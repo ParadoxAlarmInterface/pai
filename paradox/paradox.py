@@ -825,19 +825,7 @@ class Paradox:
             logger.warning("handle_prt3_event_message: failed to parse event: %s", exc)
             return
         try:
-            if evt.change:
-                if evt.type == "partition" and evt.id in (0, 255):
-                    # Global partition event (area=0 = all enabled areas per spec
-                    # Note 1, area=255 = at least one enabled area).  Apply the
-                    # change to every known partition so a global disarm clears
-                    # state on each instead of being silently dropped via
-                    # get_container_object("partition", 0) returning None.
-                    for pid in list(self.storage.get_container("partition").keys()):
-                        self.storage.update_container_object("partition", pid, evt.change)
-                else:
-                    element = self.storage.get_container_object(evt.type, evt.id)
-                    if element:
-                        self.storage.update_container_object(evt.type, evt.id, evt.change)
+            self._apply_prt3_event_change(evt)
             ps.sendEvent(evt)
             if evt.type == "partition":
                 self._update_partition_states()
@@ -845,6 +833,19 @@ class Paradox:
             logger.warning("handle_prt3_event_message: storage dispatch error: %s", exc)
         except Exception:
             logger.exception("handle_prt3_event_message")
+
+    def _apply_prt3_event_change(self, evt):
+        """Apply a PRT3Event's change dict to the relevant storage object(s)."""
+        if not evt.change:
+            return
+        if evt.type == "partition" and evt.id in (0, 255):
+            # Global event: broadcast to every known partition (area=0/255 per spec).
+            for pid in self.storage.get_container("partition").keys():
+                self.storage.update_container_object("partition", pid, evt.change)
+        else:
+            element = self.storage.get_container_object(evt.type, evt.id)
+            if element:
+                self.storage.update_container_object(evt.type, evt.id, evt.change)
 
     async def disconnect(self):
         logger.info("Disconnecting from the Alarm Panel")
@@ -915,21 +916,9 @@ class Paradox:
                         list,
                     ),
                 ):
-                    if (
-                        element_type == "partition"
-                        and isinstance(element_item_status, dict)
-                        and now < self._partition_arm_freeze_until.get(element_item_key, 0)
-                    ):
-                        # Within the post-disarm freeze window: a stale RA reply
-                        # may still report the partition as armed.  Drop arm-
-                        # related keys so the optimistic disarm state stands.
-                        # Other keys (trouble, ready_status, alarms_in_memory)
-                        # still flow through.
-                        _ARM_KEYS = {"arm", "arm_stay", "arm_away", "arm_force"}
-                        element_item_status = {
-                            k: v for k, v in element_item_status.items()
-                            if k not in _ARM_KEYS
-                        }
+                    element_item_status = self._filter_arm_freeze(
+                        element_type, element_item_key, element_item_status, now
+                    )
                     self.storage.update_container_object(
                         element_type, element_item_key, element_item_status
                     )
@@ -945,6 +934,18 @@ class Paradox:
 
         if cfg.SYNC_TIME:
             asyncio.create_task(self.sync_time())
+
+    _ARM_FREEZE_KEYS = frozenset({"arm", "arm_stay", "arm_away", "arm_force"})
+
+    def _filter_arm_freeze(self, element_type, element_key, status, now):
+        """Drop arm-related keys from a partition status dict within the post-disarm freeze window."""
+        if (
+            element_type == "partition"
+            and isinstance(status, dict)
+            and now < self._partition_arm_freeze_until.get(element_key, 0)
+        ):
+            return {k: v for k, v in status.items() if k not in self._ARM_FREEZE_KEYS}
+        return status
 
     def _process_trouble_statuses(self, trouble_statuses):
         global_trouble = False

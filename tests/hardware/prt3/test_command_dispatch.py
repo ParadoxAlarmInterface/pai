@@ -203,7 +203,7 @@ async def test_utility_key_panel_rejection_is_false(monkeypatch):
 
 def _make_paradox_with_partitions(monkeypatch):
     """Paradox instance pre-populated with two partitions in storage."""
-    paradox, mock_panel = _make_paradox(monkeypatch)
+    paradox, _ = _make_paradox(monkeypatch)
     paradox.storage.get_container("partition")[1] = {
         "id": 1, "key": "home", "label": "Home", "arm": True, "exit_delay": True,
     }
@@ -213,7 +213,7 @@ def _make_paradox_with_partitions(monkeypatch):
     return paradox
 
 
-async def test_global_disarm_event_clears_exit_delay_on_all_partitions(monkeypatch):
+def test_global_disarm_event_clears_exit_delay_on_all_partitions(monkeypatch):
     """G014 with area=0 (global disarm) must clear exit_delay on every partition.
 
     Regression test for: disarming during exit delay from the panel keypad sends
@@ -238,7 +238,7 @@ async def test_global_disarm_event_clears_exit_delay_on_all_partitions(monkeypat
     assert p2["arm"] is False, "partition 2 arm must be cleared by global disarm"
 
 
-async def test_global_disarm_area255_clears_exit_delay_on_all_partitions(monkeypatch):
+def test_global_disarm_area255_clears_exit_delay_on_all_partitions(monkeypatch):
     """G014 with area=255 (any area) is also treated as global and clears all partitions."""
     from paradox.hardware.prt3.parser import PRT3SystemEvent
 
@@ -254,7 +254,7 @@ async def test_global_disarm_area255_clears_exit_delay_on_all_partitions(monkeyp
     assert p2["exit_delay"] is False
 
 
-async def test_specific_area_disarm_only_updates_that_partition(monkeypatch):
+def test_specific_area_disarm_only_updates_that_partition(monkeypatch):
     """G014 with a specific area (e.g. area=2) only updates partition 2, not partition 1."""
     from paradox.hardware.prt3.parser import PRT3SystemEvent
 
@@ -285,7 +285,7 @@ async def test_disarm_optimistically_clears_arm_and_exit_delay(monkeypatch):
     exit delay don't always emit G014, only G065N000 (Ready) which per spec
     isn't an exit_delay-cleared signal.
     """
-    paradox, mock_panel = _make_paradox(monkeypatch, connection_type="PRT3")
+    paradox, _ = _make_paradox(monkeypatch, connection_type="PRT3")
     paradox.storage.get_container("partition")[2] = {
         "id": 2, "key": "downstairs", "label": "Downstairs",
         "arm": True, "arm_stay": True, "arm_away": False, "arm_force": False,
@@ -312,7 +312,7 @@ async def test_disarm_freezes_arm_against_stale_ra_poll(monkeypatch):
     arm=True and HA flashes 'armed_home' before the next poll corrects it.
     The freeze window drops arm-related keys from RA updates for a few seconds.
     """
-    paradox, mock_panel = _make_paradox(monkeypatch, connection_type="PRT3")
+    paradox, _ = _make_paradox(monkeypatch, connection_type="PRT3")
     paradox.storage.get_container("partition")[2] = {
         "id": 2, "key": "downstairs", "label": "Downstairs",
         "arm": True, "arm_stay": True, "exit_delay": True,
@@ -339,7 +339,7 @@ async def test_disarm_freezes_arm_against_stale_ra_poll(monkeypatch):
 
 async def test_arm_does_not_optimistically_change_state(monkeypatch):
     """control_partition('arm_stay') leaves storage alone — G065N001 + RA set state."""
-    paradox, mock_panel = _make_paradox(monkeypatch, connection_type="PRT3")
+    paradox, _ = _make_paradox(monkeypatch, connection_type="PRT3")
     paradox.storage.get_container("partition")[2] = {
         "id": 2, "key": "downstairs", "label": "Downstairs",
         "arm": False, "arm_stay": False, "exit_delay": False,

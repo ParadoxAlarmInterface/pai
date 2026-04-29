@@ -381,7 +381,7 @@ class Config:
                 "1-6 decimal digits (got {!r})".format(user_code)
             )
             sys.stderr.write(err + "\n")
-            raise Exception(err)
+            raise ValueError(err)
 
         self.CONFIG_LOADED = True
 
