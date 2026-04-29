@@ -39,11 +39,16 @@ Set `CONNECTION_TYPE = 'PRT3'` and configure the PRT3 section in `pai.conf`:
 CONNECTION_TYPE = 'PRT3'
 
 PRT3_SERIAL_PORT = '/dev/ttyUSB0'   # Port the PRT3 module is attached to
-PRT3_SERIAL_BAUD = 9600             # Match your PRT3 module's DIP switch setting
+PRT3_SERIAL_BAUD = 9600             # Must be 9600 or 19200 — matches PRT3 DIP switch setting
 
-# User code for arm/disarm commands.  Leave empty to use quick-arm
-# (requires One-Touch Arming enabled on the panel).
-# Disarm always requires a valid user code.
+# User code for arm/disarm commands.  Must be 1–6 digits, or leave empty
+# to use quick-arm (requires One-Touch Arming enabled on the panel).
+# Disarm always requires a valid user code.  An invalid format is rejected
+# at startup so a misconfigured code fails fast rather than silently at
+# first disarm attempt.
+# SECURITY: store pai.conf chmod 600 root-owned.  The code does not appear
+# in PAI logs at default log levels; disable LOGGING_DUMP_MESSAGES and any
+# byte-level serial tracing before sharing debug logs.
 PRT3_USER_CODE = '1234'
 
 PRT3_MAX_AREAS = 2    # Number of areas (partitions) to poll (1–8)

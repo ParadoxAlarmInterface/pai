@@ -40,6 +40,10 @@ paradox/hardware/prt3/
                         - implements all Panel abstract methods
                         - routes parsed lines to state updates or events
                         - reply routing via _prt3_send_wait() / wait_for_message()
+                        - _prt3_send_wait uses a composite predicate matching both
+                          the caller's expected reply AND PRT3BufferFull ('!');
+                          a buffer-full response triggers a fast retry rather than
+                          waiting the full IO_TIMEOUT
     parser.py           parse_line(line: str) -> PRT3Message | None
                         - pure function, no side effects
                         - handles: COMM&ok/fail, echo &OK/&fail, RA/RZ replies,
@@ -49,6 +53,10 @@ paradox/hardware/prt3/
                           requests, status requests, utility key
     event.py            EVENT_MAP: dict[int, dict]
                         - maps G-group codes to PAI event descriptors
+                        - entries may include a "number_overrides" sub-dict keyed
+                          by N value for groups where the N field changes the event
+                          meaning (e.g. G065 N=001 exit_delay, N=002 entry_delay);
+                          from_prt3() applies overrides generically
     adapter.py          normalise_area_status() / normalise_zone_status()
                         - converts PRT3 status dataclasses into PAI storage dicts
     property.py         PROPERTY_MAP
