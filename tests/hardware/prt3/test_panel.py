@@ -20,17 +20,15 @@ from paradox.hardware.prt3.panel import PRT3Panel
 from paradox.hardware.prt3.parser import (
     ARM_AWAY,
     ARM_DISARMED,
-    ARM_STAY,
+    ZONE_CLOSED,
+    ZONE_OPEN,
     PRT3AreaStatus,
     PRT3BufferFull,
     PRT3CommandEcho,
     PRT3CommStatus,
     PRT3LabelReply,
     PRT3ZoneStatus,
-    ZONE_CLOSED,
-    ZONE_OPEN,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -88,31 +86,23 @@ def test_parse_message_strips_cr(panel):
 
 
 async def test_initialize_communication_ok(core, panel):
-    core.connection.wait_for_message = AsyncMock(
-        return_value=PRT3CommStatus(ok=True)
-    )
+    core.connection.wait_for_message = AsyncMock(return_value=PRT3CommStatus(ok=True))
     assert await panel.initialize_communication(None) is True
 
 
 async def test_initialize_communication_fail(core, panel):
-    core.connection.wait_for_message = AsyncMock(
-        return_value=PRT3CommStatus(ok=False)
-    )
+    core.connection.wait_for_message = AsyncMock(return_value=PRT3CommStatus(ok=False))
     assert await panel.initialize_communication(None) is False
 
 
 async def test_initialize_communication_timeout(core, panel):
-    core.connection.wait_for_message = AsyncMock(
-        side_effect=asyncio.TimeoutError
-    )
+    core.connection.wait_for_message = AsyncMock(side_effect=asyncio.TimeoutError)
     assert await panel.initialize_communication(None) is False
 
 
 async def test_initialize_communication_ignores_password_arg(core, panel):
     """PRT3 has no password; argument must be accepted but ignored."""
-    core.connection.wait_for_message = AsyncMock(
-        return_value=PRT3CommStatus(ok=True)
-    )
+    core.connection.wait_for_message = AsyncMock(return_value=PRT3CommStatus(ok=True))
     assert await panel.initialize_communication("secret") is True
 
 
@@ -265,7 +255,9 @@ async def test_control_partitions_arm_stay(core, panel, monkeypatch):
     assert cmd[5:6] == b"S"
 
 
-async def test_control_partitions_disarm_no_code_returns_false(core, panel, monkeypatch):
+async def test_control_partitions_disarm_no_code_returns_false(
+    core, panel, monkeypatch
+):
     """Disarm without PRT3_USER_CODE configured must return False."""
     from paradox.config import config as cfg
 
@@ -349,11 +341,14 @@ async def test_control_outputs_raises_not_implemented(panel):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("panic_type,prefix", [
-    ("emergency", b"PE"),
-    ("medical",   b"PM"),
-    ("fire",      b"PF"),
-])
+@pytest.mark.parametrize(
+    "panic_type,prefix",
+    [
+        ("emergency", b"PE"),
+        ("medical", b"PM"),
+        ("fire", b"PF"),
+    ],
+)
 async def test_send_panic_accepted(core, panel, panic_type, prefix):
     echo_cmd = f"{prefix.decode('ascii')}001"
     core.connection.wait_for_message = AsyncMock(
@@ -380,6 +375,37 @@ async def test_send_panic_timeout(core, panel):
 
 async def test_send_panic_unknown_type(panel):
     assert await panel.send_panic([1], "unknown_panic_type", None) is False
+
+
+async def test_send_panic_no_retry_on_timeout(core, panel):
+    """Panic must NOT retry on timeout — commands are not idempotent.
+
+    A retry after a lost echo would re-trigger the panic; this would be
+    audibly loud and could escalate to monitoring station.
+    """
+    core.connection.wait_for_message = AsyncMock(
+        side_effect=[asyncio.TimeoutError, PRT3CommandEcho(cmd="PE001", ok=True)]
+    )
+    result = await panel.send_panic([1], "emergency", None)
+    assert result is False
+    assert core.connection.write.call_count == 1
+
+
+async def test_control_partitions_no_retry_on_timeout(core, panel, monkeypatch):
+    """Arm/disarm must NOT retry on timeout — commands are not idempotent.
+
+    A retry after a lost echo would double-fire AA/AQ/AD and could move the
+    partition through arm states a second time.
+    """
+    from paradox.config import config as cfg
+
+    monkeypatch.setattr(cfg, "PRT3_USER_CODE", "")
+    core.connection.wait_for_message = AsyncMock(
+        side_effect=[asyncio.TimeoutError, PRT3CommandEcho(cmd="AQ001", ok=True)]
+    )
+    result = await panel.control_partitions([1], "arm")
+    assert result is False
+    assert core.connection.write.call_count == 1
 
 
 # ---------------------------------------------------------------------------
@@ -436,9 +462,7 @@ async def test_load_labels_skips_fail_echo(core, panel, monkeypatch):
 
 async def test_send_wait_succeeds_on_first_attempt(core, panel):
     """No retry needed when the first attempt returns a reply."""
-    core.connection.wait_for_message = AsyncMock(
-        return_value=PRT3CommStatus(ok=True)
-    )
+    core.connection.wait_for_message = AsyncMock(return_value=PRT3CommStatus(ok=True))
     result = await panel._prt3_send_wait(b"COMM\r", lambda m: True, retries=2)
     assert result is not None
     assert core.connection.write.call_count == 1
@@ -456,9 +480,7 @@ async def test_send_wait_retries_on_timeout(core, panel):
 
 async def test_send_wait_returns_none_when_all_retries_exhausted(core, panel):
     """Returns None only when every attempt times out."""
-    core.connection.wait_for_message = AsyncMock(
-        side_effect=asyncio.TimeoutError
-    )
+    core.connection.wait_for_message = AsyncMock(side_effect=asyncio.TimeoutError)
     result = await panel._prt3_send_wait(b"COMM\r", lambda m: True, retries=3)
     assert result is None
     assert core.connection.write.call_count == 3
@@ -506,7 +528,9 @@ async def test_send_wait_buffer_full_retries_then_succeeds(core, panel):
     assert core.connection.write.call_count == 2
 
 
-async def test_control_partitions_malformed_code_returns_false(core, panel, monkeypatch):
+async def test_control_partitions_malformed_code_returns_false(
+    core, panel, monkeypatch
+):
     """Malformed PRT3_USER_CODE returns False without propagating ValueError."""
     from paradox.config import config as cfg
 
@@ -540,9 +564,7 @@ async def test_send_utility_key_rejected_by_panel(core, panel):
 
 
 async def test_send_utility_key_timeout_returns_false(core, panel):
-    core.connection.wait_for_message = AsyncMock(
-        side_effect=asyncio.TimeoutError
-    )
+    core.connection.wait_for_message = AsyncMock(side_effect=asyncio.TimeoutError)
     assert await panel.send_utility_key(1) is False
 
 

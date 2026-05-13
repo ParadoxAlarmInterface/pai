@@ -57,7 +57,7 @@ class Paradox:
         self._partition_arm_freeze_until: dict = {}
 
         ps.subscribe(self._on_labels_load, "labels_loaded")
-        ps.subscribe(self._on_definitions_load, "definitons_loaded")
+        ps.subscribe(self._on_definitions_load, "definitions_loaded")
         ps.subscribe(self._on_status_update, "status_update")
         ps.subscribe(self._on_event, "events")
         ps.subscribe(self._on_property_change, "changes")
@@ -146,7 +146,9 @@ class Paradox:
         self.panel = PRT3Panel(self)
         try:
             if not await self.panel.initialize_communication(None):
-                raise ConnectionError("PRT3 serial link unresponsive — no messages received")
+                raise ConnectionError(
+                    "PRT3 serial link unresponsive — no messages received"
+                )
             # PRT3 has no binary identification exchange; synthesise a
             # DetectedPanel from the configured port so HA discovery has a
             # stable device identity to anchor entity unique_ids to.
@@ -810,14 +812,16 @@ class Paradox:
 
     def handle_prt3_event_message(self, message):
         """Dispatch an async PRT3 system event into PAI's event pipeline."""
-        from paradox.hardware.prt3.parser import PRT3SystemEvent
         from paradox.hardware.prt3.event import PRT3Event
+        from paradox.hardware.prt3.parser import PRT3SystemEvent
 
         if not isinstance(message, PRT3SystemEvent):
             return
         logger.info(
             "PRT3 system event: G%03dN%03dA%03d",
-            message.group, message.number, message.area,
+            message.group,
+            message.number,
+            message.area,
         )
         try:
             evt = PRT3Event.from_prt3(message, label_provider=self.get_label)
@@ -843,9 +847,10 @@ class Paradox:
             for pid in self.storage.get_container("partition").keys():
                 self.storage.update_container_object("partition", pid, evt.change)
         else:
-            element = self.storage.get_container_object(evt.type, evt.id)
-            if element:
-                self.storage.update_container_object(evt.type, evt.id, evt.change)
+            # MemoryStorage.update_container_object auto-creates the element if
+            # missing — do not guard with get_container_object, or fire-alarm
+            # events for unlabeled zones beyond PRT3_MAX_ZONES are dropped.
+            self.storage.update_container_object(evt.type, evt.id, evt.change)
 
     async def disconnect(self):
         logger.info("Disconnecting from the Alarm Panel")

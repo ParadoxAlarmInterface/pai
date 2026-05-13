@@ -59,7 +59,7 @@ class PRT3Protocol(ConnectionProtocol):
             if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug("PRT3 <- %s", binascii.hexlify(line_with_cr))
 
-            if line.strip():   # skip empty / whitespace-only lines
+            if line.strip():  # skip empty / whitespace-only lines
                 self.handler.on_message(line_with_cr)
 
     def send_message(self, message: bytes):
@@ -72,6 +72,11 @@ class PRT3Protocol(ConnectionProtocol):
         self.check_active()
 
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("PRT3 -> %s", binascii.hexlify(message))
+            # AA (arm with code) and AD (disarm) embed the user code in the
+            # payload; show only the command prefix to keep it out of logs.
+            if message[:2] in (b"AA", b"AD"):
+                logger.debug("PRT3 -> %s<redacted>", binascii.hexlify(message[:5]))
+            else:
+                logger.debug("PRT3 -> %s", binascii.hexlify(message))
 
         self.transport.write(message)

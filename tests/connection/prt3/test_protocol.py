@@ -188,3 +188,59 @@ def test_send_message_delegates_to_transport():
         transport.write.assert_called_once_with(b"AQ001A\r")
     finally:
         loop.close()
+
+
+@pytest.mark.parametrize(
+    "cmd_bytes",
+    [
+        b"AA0011234\r",  # arm partition 1 with user code 1234
+        b"AD0011234\r",  # disarm partition 1 with user code 1234
+    ],
+)
+def test_send_message_redacts_user_code_in_dump(monkeypatch, caplog, cmd_bytes):
+    """AA/AD payloads contain the user code; the dump must not log it."""
+    from paradox.config import config as cfg
+
+    monkeypatch.setattr(cfg, "LOGGING_DUMP_PACKETS", True)
+
+    proto, _ = _make_proto()
+    transport = MagicMock()
+    proto.transport = transport
+    import asyncio
+
+    loop = asyncio.new_event_loop()
+    try:
+        proto._closed = loop.create_future()
+        with caplog.at_level("DEBUG", logger="PAI.paradox.connections.prt3.protocol"):
+            proto.send_message(cmd_bytes)
+
+        joined = " ".join(r.getMessage() for r in caplog.records)
+        assert "1234" not in joined
+        assert "31323334" not in joined  # hex(b"1234")
+        assert "<redacted>" in joined
+        transport.write.assert_called_once_with(cmd_bytes)
+    finally:
+        loop.close()
+
+
+def test_send_message_does_not_redact_non_code_commands(monkeypatch, caplog):
+    """Commands without user codes (AQ/PE/RA/...) dump in full as before."""
+    from paradox.config import config as cfg
+
+    monkeypatch.setattr(cfg, "LOGGING_DUMP_PACKETS", True)
+
+    proto, _ = _make_proto()
+    transport = MagicMock()
+    proto.transport = transport
+    import asyncio
+
+    loop = asyncio.new_event_loop()
+    try:
+        proto._closed = loop.create_future()
+        with caplog.at_level("DEBUG", logger="PAI.paradox.connections.prt3.protocol"):
+            proto.send_message(b"AQ001A\r")
+
+        joined = " ".join(r.getMessage() for r in caplog.records)
+        assert "<redacted>" not in joined
+    finally:
+        loop.close()
