@@ -87,6 +87,8 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             self._publish_module_pgm_configs(module_pgms)
         if "system" in status:
             self._publish_system_property_configs(status["system"])
+        if cfg.CONNECTION_TYPE == "PRT3" and cfg.PRT3_UTILITY_KEYS:
+            self._publish_utility_key_configs(cfg.PRT3_UTILITY_KEYS)
 
     def _publish_config(self, entity: AbstractEntity):
         self.publish(
@@ -179,3 +181,26 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                     system_key, property_name
                 )
                 self._publish_config(system_property_config)
+
+    def _publish_utility_key_configs(self, utility_keys: dict):
+        """Publish HA button discovery configs for PRT3 utility keys.
+
+        ``utility_keys`` is ``{key_num: label}`` from ``PRT3_UTILITY_KEYS``.
+        Only keys explicitly listed in config are published; the full 1-251
+        range is not auto-discovered because utility key actions are
+        panel-programmed and have no introspectable meaning.
+        """
+        for key_num, label in utility_keys.items():
+            try:
+                key_num = int(key_num)
+            except (ValueError, TypeError):
+                logger.warning("PRT3_UTILITY_KEYS: invalid key number %r, skipping", key_num)
+                continue
+            if not 1 <= key_num <= 251:
+                logger.warning(
+                    "PRT3_UTILITY_KEYS: key number %d out of range (expected 1..251), skipping",
+                    key_num,
+                )
+                continue
+            button = self.entity_factory.make_utility_key_button(key_num, str(label))
+            self._publish_config(button)

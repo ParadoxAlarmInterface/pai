@@ -74,6 +74,7 @@ class MQTTConnection:
         self.client.on_connect = self._on_connect_cb
         self.client.on_disconnect = self._on_disconnect_cb
         self.state = ConnectionState.NEW
+        self._last_connect_args = None  # replayed to late registrars
         # self.client.enable_logger(logger)
 
         # self.client.on_subscribe = lambda client, userdata, mid, granted_qos: logger.debug("Subscribed: %s" %(mid))
@@ -179,6 +180,20 @@ class MQTTConnection:
 
         self.start()
 
+        # If MQTT was already connected before this registrar started (common
+        # when interfaces register slightly after the MQTT loop connects),
+        # fire on_connect immediately so control subscriptions and futures are
+        # set up correctly.
+        if self.connected and self._last_connect_args is not None:
+            try:
+                if hasattr(cls, "on_connect") and callable(getattr(cls, "on_connect")):
+                    cls.on_connect(*self._last_connect_args)
+            except Exception:
+                logger.exception(
+                    'Failed to call on_connect on late registrar "%s"',
+                    cls.__class__.__name__,
+                )
+
     def unregister(self, cls):
         self.registrars.remove(cls)
 
@@ -204,6 +219,7 @@ class MQTTConnection:
         if not reason_code.is_failure:
             logger.info("MQTT Broker Connected")
             self.state = ConnectionState.CONNECTED
+            self._last_connect_args = (client, userdata, connect_flags, reason_code, properties)
             self._report_pai_status(self._last_pai_status)
             self._call_registars("on_connect", client, userdata, connect_flags, reason_code, properties)
         else:

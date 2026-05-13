@@ -22,11 +22,28 @@ import logging
 # DEVELOPMENT_DUMP_MEMORY = False
 #
 ### Connection Type
-# CONNECTION_TYPE = 'Serial'  		# Serial or IP
+# CONNECTION_TYPE = 'Serial'  		# Serial or IP or PRT3
 #
 ### Serial Connection Details
 # SERIAL_PORT = '/dev/ttyS1' 		# Pathname of the Serial Port
 # SERIAL_BAUD = 9600              # 9600 for SP/MG. For EVO: Use 38400(default setting) or 57600. 115200 for + versions
+#
+### PRT3 ASCII Printer Module Connection
+# CONNECTION_TYPE = 'PRT3'
+# PRT3_SERIAL_PORT = '/dev/ttyUSB0'   # Serial port the PRT3 module is attached to
+# PRT3_SERIAL_BAUD = 9600             # PRT3 fixed baud rate (9600)
+# PRT3_USER_CODE = ''                 # User code for arm/disarm (e.g. '1234').
+#                                     # Leave empty to use quick-arm (requires
+#                                     # One-Touch Arming enabled on the panel).
+#                                     # Disarm always requires a user code.
+# PRT3_MAX_AREAS = 2                  # Number of areas (partitions) to poll (1-8)
+# PRT3_MAX_ZONES = 96                 # Number of zones to poll (1-96)
+# PRT3_MAX_USERS = 999                # Number of users to load labels for
+# PRT3_COMM_TIMEOUT = 10              # Seconds to wait for COMM&ok on connect
+# PRT3_UTILITY_KEYS = {              # Keys to expose as HA button entities
+#     1: 'Lock Front Door',          # key number → display label
+#     5: 'Activate Garden Lights',   # publish {} or omit to disable
+# }
 #
 ### IP Connection Details
 # IP_CONNECTION_HOST = '127.0.0.1'	# IP Module address when using direct IP Connection
@@ -105,6 +122,7 @@ import logging
 #
 # MQTT_NOTIFICATIONS_TOPIC = 'notifications'
 # MQTT_SEND_PANIC_TOPIC = 'panic'
+# MQTT_UTILITY_KEY_TOPIC = 'utility_key'    # PRT3 only: {base}/control/utility_key/{nnn}
 # MQTT_PUBLISH_RAW_EVENTS = True
 # MQTT_INTERFACE_TOPIC = 'interface'
 # MQTT_TOGGLE_CODES = {}
