@@ -16,7 +16,7 @@ class EventMessageHandler(PersistentHandler):
         if not isinstance(data, Container):
             return False
         values = data.fields.value
-        return values.po.command == 0xE and (not hasattr(values, "requested_event_nr"))
+        return values.po.command == 0xE and hasattr(values, "event")
 
 
 class ErrorMessageHandler(PersistentHandler):
