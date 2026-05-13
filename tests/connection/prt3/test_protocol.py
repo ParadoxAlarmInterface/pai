@@ -10,15 +10,15 @@ Coverage:
     no active transport
 """
 
+from typing import List, Tuple
 from unittest.mock import MagicMock
 
 import pytest
 
+from paradox.connections.protocols import ConnectionProtocol
 from paradox.connections.prt3.connection import PRT3SerialConnection
 from paradox.connections.prt3.protocol import PRT3Protocol
-from paradox.connections.protocols import ConnectionProtocol
 from paradox.connections.serial_connection import SerialCommunication
-
 
 # ---------------------------------------------------------------------------
 # Smoke / type hierarchy
@@ -48,7 +48,7 @@ class _Handler:
     """Minimal ConnectionHandler that records on_message() calls."""
 
     def __init__(self):
-        self.messages: list[bytes] = []
+        self.messages: List[bytes] = []
 
     def on_message(self, raw: bytes):
         self.messages.append(raw)
@@ -62,7 +62,7 @@ class _Handler:
         pass
 
 
-def _make_proto() -> tuple[PRT3Protocol, _Handler]:
+def _make_proto() -> Tuple[PRT3Protocol, _Handler]:
     handler = _Handler()
     proto = PRT3Protocol(handler)
     return proto, handler
@@ -96,7 +96,7 @@ def test_two_lines_in_one_chunk():
 def test_line_split_across_two_chunks():
     proto, handler = _make_proto()
     proto.data_received(b"COMM&")
-    assert handler.messages == []   # incomplete — not yet emitted
+    assert handler.messages == []  # incomplete — not yet emitted
     proto.data_received(b"ok\r")
     assert handler.messages == [b"COMM&ok\r"]
 
@@ -157,9 +157,9 @@ def test_multiple_splits():
 
 def test_variable_message_length_noop():
     proto, _ = _make_proto()
-    proto.variable_message_length(True)   # should not raise
+    proto.variable_message_length(True)  # should not raise
     proto.variable_message_length(False)  # should not raise
-    proto.variable_message_length(42)     # arbitrary arg — should not raise
+    proto.variable_message_length(42)  # arbitrary arg — should not raise
 
 
 # ---------------------------------------------------------------------------
@@ -180,6 +180,7 @@ def test_send_message_delegates_to_transport():
     proto.transport = transport
     # Provide a mock _closed future so is_active() returns True
     import asyncio
+
     loop = asyncio.new_event_loop()
     try:
         proto._closed = loop.create_future()
