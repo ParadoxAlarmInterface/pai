@@ -150,9 +150,21 @@ def _make_device():
 
 def _get_expected_device_block():
     return {
-            'identifiers': ['Paradox_EVO_1234abcd'],
+            'identifiers': ['Paradox_1234abcd'],
             'manufacturer': 'Paradox',
             'model': 'EVO',
             'name': 'EVO',
             'sw_version': '6.10'
         }
+
+
+def test_device_model_is_sanitized_for_discovery_payload():
+    device = Device(DetectedPanel(1, "MG505+\x00\xaa", "1.30 build 2", "1234abcd"))
+
+    assert device.serialize() == {
+        'manufacturer': 'Paradox',
+        'model': 'MG505+',
+        'identifiers': ['Paradox_1234abcd'],
+        'name': 'MG505+',
+        'sw_version': '1.30 build 2'
+    }
