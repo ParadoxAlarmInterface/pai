@@ -847,9 +847,6 @@ class Paradox:
             for pid in self.storage.get_container("partition").keys():
                 self.storage.update_container_object("partition", pid, evt.change)
         else:
-            # MemoryStorage.update_container_object auto-creates the element if
-            # missing — do not guard with get_container_object, or fire-alarm
-            # events for unlabeled zones beyond PRT3_MAX_ZONES are dropped.
             self.storage.update_container_object(evt.type, evt.id, evt.change)
 
     async def disconnect(self):
