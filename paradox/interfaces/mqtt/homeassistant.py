@@ -76,17 +76,22 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         self.entity_factory.set_device(Device(panel))
 
         self._publish_pai_state_sensor_config()
+
         if "partition" in status:
             self._publish_partition_configs(status["partition"])
+
         if "zone" in status:
             self._publish_zone_configs(status["zone"])
+
         if "pgm" in status:
             self._publish_pgm_configs(status["pgm"])
+
         module_pgms = dict(self.alarm.storage.get_container("module_pgm"))
         if module_pgms:
             self._publish_module_pgm_configs(module_pgms)
-        if "system" in status:
-            self._publish_system_property_configs(status["system"])
+
+        self._publish_system_configs_from_status(status)
+
         if cfg.CONNECTION_TYPE == "PRT3" and cfg.PRT3_UTILITY_KEYS:
             self._publish_utility_key_configs(cfg.PRT3_UTILITY_KEYS)
 
@@ -123,6 +128,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             for property_name in partition_status:
                 if property_name not in cfg.HOMEASSISTANT_PUBLISH_PARTITION_PROPERTIES:
                     continue
+
                 partition_property_binary_sensor_config = (
                     self.entity_factory.make_partition_status_binary_sensor(
                         partition, property_name
@@ -141,6 +147,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             for property_name in zone_status:
                 if property_name not in cfg.HOMEASSISTANT_PUBLISH_ZONE_PROPERTIES:
                     continue
+
                 if property_name == "bypassed":
                     zone_status_sensor = self.entity_factory.make_zone_bypass_switch(
                         zone
@@ -157,6 +164,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                             zone, property_name
                         )
                     )
+
                 self._publish_config(zone_status_sensor)
 
     def _publish_pgm_configs(self, pgm_statuses):
@@ -171,8 +179,33 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
 
     def _publish_module_pgm_configs(self, module_pgms):
         for _, module_pgm in module_pgms.items():
-            module_pgm_switch_config = self.entity_factory.make_module_pgm_switch(module_pgm)
+            module_pgm_switch_config = self.entity_factory.make_module_pgm_switch(
+                module_pgm
+            )
             self._publish_config(module_pgm_switch_config)
+
+    def _publish_system_configs_from_status(self, status):
+        system_statuses = {}
+
+        if "system" in status:
+            system_statuses.update(status["system"])
+
+        # In the PAI status_update payload, troubles are exposed as a top-level
+        # branch, while the MQTT state publisher exposes them under:
+        #
+        #   paradox/states/system/troubles/...
+        #
+        # Re-wrap them here so Home Assistant discovery matches the existing
+        # MQTT state topic convention:
+        #
+        #   status["troubles"]["ac_failure_trouble"]
+        #   -> system_troubles_ac_failure_trouble
+        #   -> paradox/states/system/troubles/ac_failure_trouble
+        if "troubles" in status:
+            system_statuses["troubles"] = status["troubles"]
+
+        if system_statuses:
+            self._publish_system_property_configs(system_statuses)
 
     def _publish_system_property_configs(self, system_statuses):
         for system_key, system_status in system_statuses.items():
@@ -194,13 +227,17 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             try:
                 key_num = int(key_num)
             except (ValueError, TypeError):
-                logger.warning("PRT3_UTILITY_KEYS: invalid key number %r, skipping", key_num)
+                logger.warning(
+                    "PRT3_UTILITY_KEYS: invalid key number %r, skipping", key_num
+                )
                 continue
+
             if not 1 <= key_num <= 251:
                 logger.warning(
                     "PRT3_UTILITY_KEYS: key number %d out of range (expected 1..251), skipping",
                     key_num,
                 )
                 continue
+
             button = self.entity_factory.make_utility_key_button(key_num, str(label))
             self._publish_config(button)
