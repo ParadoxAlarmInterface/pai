@@ -46,9 +46,9 @@ Flag layout for RZ{nnn}XAFSL (positions 5-9):
   [9] L=low_battery       / O=no
 """
 
+from dataclasses import dataclass
 import logging
 import re
-from dataclasses import dataclass
 from typing import Optional, Union
 
 logger = logging.getLogger("PAI").getChild(__name__)
@@ -58,11 +58,11 @@ logger = logging.getLogger("PAI").getChild(__name__)
 # Arm-state constants  (value of PRT3AreaStatus.arm_state)
 # ---------------------------------------------------------------------------
 
-ARM_DISARMED      = "disarmed"
-ARM_AWAY          = "armed_away"
-ARM_FORCE         = "armed_force"
-ARM_STAY          = "armed_stay"
-ARM_INSTANT       = "armed_instant"
+ARM_DISARMED = "disarmed"
+ARM_AWAY = "armed_away"
+ARM_FORCE = "armed_force"
+ARM_STAY = "armed_stay"
+ARM_INSTANT = "armed_instant"
 
 _ARM_STATE_MAP: dict = {
     "D": ARM_DISARMED,
@@ -76,9 +76,9 @@ _ARM_STATE_MAP: dict = {
 # Zone open-state constants  (value of PRT3ZoneStatus.open_state)
 # ---------------------------------------------------------------------------
 
-ZONE_CLOSED            = "closed"
-ZONE_OPEN              = "open"
-ZONE_TAMPERED          = "tampered"
+ZONE_CLOSED = "closed"
+ZONE_OPEN = "open"
+ZONE_TAMPERED = "tampered"
 ZONE_FIRE_LOOP_TROUBLE = "fire_loop_trouble"
 
 _ZONE_OPEN_MAP: dict = {
@@ -96,6 +96,7 @@ _ZONE_OPEN_MAP: dict = {
 @dataclass
 class PRT3CommStatus:
     """``COMM&ok`` or ``COMM&fail`` — combus/module communication status."""
+
     ok: bool  # True = panel ready
 
 
@@ -112,7 +113,8 @@ class PRT3CommandEcho:
     reply.  For info commands that fail (e.g. unknown area), this is also
     returned.
     """
-    cmd: str   # exactly the first 5 ASCII chars of the command that was sent
+
+    cmd: str  # exactly the first 5 ASCII chars of the command that was sent
     ok: bool
 
 
@@ -124,11 +126,12 @@ class PRT3AreaStatus:
     ready to arm (open zone, active trouble, etc.).  The adapter layer should
     negate this to produce a ``ready`` property.
     """
+
     area: int
-    arm_state: str       # one of the ARM_* constants above
+    arm_state: str  # one of the ARM_* constants above
     in_programming: bool
     trouble: bool
-    not_ready: bool      # True → area is NOT ready
+    not_ready: bool  # True → area is NOT ready
     alarm: bool
     strobe: bool
     zone_in_memory: bool
@@ -137,8 +140,9 @@ class PRT3AreaStatus:
 @dataclass
 class PRT3ZoneStatus:
     """Reply to ``RZ{nnn}`` — zone status flags."""
+
     zone: int
-    open_state: str          # one of the ZONE_* constants above
+    open_state: str  # one of the ZONE_* constants above
     alarm: bool
     fire_alarm: bool
     supervision_trouble: bool
@@ -148,9 +152,10 @@ class PRT3ZoneStatus:
 @dataclass
 class PRT3LabelReply:
     """Reply to ``ZL/AL/UL{nnn}`` — 16-character ASCII label (spaces preserved)."""
+
     element_type: str  # "zone", "area", or "user"
     index: int
-    label: str         # exactly 16 chars; trailing spaces not stripped
+    label: str  # exactly 16 chars; trailing spaces not stripped
 
 
 @dataclass
@@ -160,16 +165,18 @@ class PRT3SystemEvent:
     ``area == 0`` means the event occurred in all enabled areas (global).
     ``area == 255`` means at least one enabled area (per spec Note 1).
     """
-    group: int    # 3-digit event-group code (000-066)
-    number: int   # event-specific identifier: zone, user, door, key, …
-    area: int     # 0 = global / all, 1-8 = specific area, 255 = any
+
+    group: int  # 3-digit event-group code (000-066)
+    number: int  # event-specific identifier: zone, user, door, key, …
+    area: int  # 0 = global / all, 1-8 = specific area, 255 = any
 
 
 @dataclass
 class PRT3PgmEvent:
     """Virtual PGM activation/deactivation event (v1 scope: parsed, not acted on)."""
-    pgm: int   # 1-30
-    on: bool   # True if PGMxxON (activated), False if PGMxxOFF (deactivated)
+
+    pgm: int  # 1-30
+    on: bool  # True if PGMxxON (activated), False if PGMxxOFF (deactivated)
 
 
 # Union type exported for type annotations in callers
@@ -189,19 +196,19 @@ PRT3Message = Union[
 # ---------------------------------------------------------------------------
 
 _RE_SYSTEM_EVENT = re.compile(r"^G(\d{3})N(\d{3})A(\d{3})$")
-_RE_PGM_ON       = re.compile(r"^PGM(\d{2})ON$")
-_RE_PGM_OFF      = re.compile(r"^PGM(\d{2})OFF$")
+_RE_PGM_ON = re.compile(r"^PGM(\d{2})ON$")
+_RE_PGM_OFF = re.compile(r"^PGM(\d{2})OFF$")
 
 # Lengths of fully-formed info replies (after \r stripped)
-_AREA_STATUS_LEN  = 12   # RA + 3-digit area + 7 flags
-_ZONE_STATUS_LEN  = 10   # RZ + 3-digit zone + 5 flags
-_LABEL_LEN        = 21   # 2-char type + 3-digit index + 16-char label
+_AREA_STATUS_LEN = 12  # RA + 3-digit area + 7 flags
+_ZONE_STATUS_LEN = 10  # RZ + 3-digit zone + 5 flags
+_LABEL_LEN = 21  # 2-char type + 3-digit index + 16-char label
 
 # Lengths of command echoes (after \r stripped)
-_ECHO_OK_LEN      = 8    # 5-char prefix + "&OK"
-_ECHO_FAIL_LEN    = 10   # 5-char prefix + "&fail"
+_ECHO_OK_LEN = 8  # 5-char prefix + "&OK"
+_ECHO_FAIL_LEN = 10  # 5-char prefix + "&fail"
 
-_LABEL_PREFIXES   = {"ZL": "zone", "AL": "area", "UL": "user"}
+_LABEL_PREFIXES = {"ZL": "zone", "AL": "area", "UL": "user"}
 
 
 # ---------------------------------------------------------------------------
@@ -268,7 +275,7 @@ def parse_line(line: str) -> Optional[PRT3Message]:
     # Note: some panel firmware sends lowercase "&ok"; accept both.
     if len(line) == _ECHO_OK_LEN and line.upper().endswith("&OK"):
         return PRT3CommandEcho(cmd=line[:5], ok=True)
-    if len(line) == _ECHO_FAIL_LEN and line.endswith("&fail"):
+    if len(line) == _ECHO_FAIL_LEN and line.upper().endswith("&FAIL"):
         return PRT3CommandEcho(cmd=line[:5], ok=False)
 
     logger.warning("PRT3 parser: unrecognised line %r", line)
@@ -300,13 +307,14 @@ def _parse_info_reply(line: str) -> Optional[PRT3Message]:
 
 def _parse_area_status(line: str) -> Optional[PRT3AreaStatus]:
     """Parse ``RA{nnn}{7 flags}`` → ``PRT3AreaStatus`` or ``None`` on bad flags."""
-    area      = int(line[2:5])
-    arm_char  = line[5]
+    area = int(line[2:5])
+    arm_char = line[5]
     arm_state = _ARM_STATE_MAP.get(arm_char)
     if arm_state is None:
         logger.warning(
             "PRT3 parser: unknown arm-state char %r in area-status line %r",
-            arm_char, line,
+            arm_char,
+            line,
         )
         return None
     return PRT3AreaStatus(
@@ -323,13 +331,14 @@ def _parse_area_status(line: str) -> Optional[PRT3AreaStatus]:
 
 def _parse_zone_status(line: str) -> Optional[PRT3ZoneStatus]:
     """Parse ``RZ{nnn}{5 flags}`` → ``PRT3ZoneStatus`` or ``None`` on bad flags."""
-    zone       = int(line[2:5])
-    open_char  = line[5]
+    zone = int(line[2:5])
+    open_char = line[5]
     open_state = _ZONE_OPEN_MAP.get(open_char)
     if open_state is None:
         logger.warning(
             "PRT3 parser: unknown zone-open char %r in zone-status line %r",
-            open_char, line,
+            open_char,
+            line,
         )
         return None
     return PRT3ZoneStatus(
@@ -345,6 +354,6 @@ def _parse_zone_status(line: str) -> Optional[PRT3ZoneStatus]:
 def _parse_label(line: str) -> PRT3LabelReply:
     """Parse ``ZL/AL/UL{nnn}{16-char label}`` → ``PRT3LabelReply``."""
     element_type = _LABEL_PREFIXES[line[:2]]
-    index        = int(line[2:5])
-    label        = line[5:]   # always 16 chars (spec-mandated, spaces padded)
+    index = int(line[2:5])
+    label = line[5:]  # always 16 chars (spec-mandated, spaces padded)
     return PRT3LabelReply(element_type=element_type, index=index, label=label)

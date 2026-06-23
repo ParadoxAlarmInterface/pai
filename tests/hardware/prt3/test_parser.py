@@ -22,6 +22,10 @@ from paradox.hardware.prt3.parser import (
     ARM_FORCE,
     ARM_INSTANT,
     ARM_STAY,
+    ZONE_CLOSED,
+    ZONE_FIRE_LOOP_TROUBLE,
+    ZONE_OPEN,
+    ZONE_TAMPERED,
     PRT3AreaStatus,
     PRT3BufferFull,
     PRT3CommandEcho,
@@ -30,14 +34,10 @@ from paradox.hardware.prt3.parser import (
     PRT3PgmEvent,
     PRT3SystemEvent,
     PRT3ZoneStatus,
-    ZONE_CLOSED,
-    ZONE_FIRE_LOOP_TROUBLE,
-    ZONE_OPEN,
-    ZONE_TAMPERED,
     parse_line,
 )
-from tests.hardware.prt3 import fixtures as fx
 
+from tests.hardware.prt3 import fixtures as fx
 
 # ===========================================================================
 # COMM status
@@ -90,15 +90,15 @@ def test_buffer_full_from_fixture():
 @pytest.mark.parametrize(
     "line, expected_cmd",
     [
-        ("AA001&OK", "AA001"),   # arm
-        ("AQ001&OK", "AQ001"),   # quick arm
-        ("AD001&OK", "AD001"),   # disarm
-        ("PE001&OK", "PE001"),   # emergency panic
-        ("PM001&OK", "PM001"),   # medical panic
-        ("PF001&OK", "PF001"),   # fire panic
-        ("UK001&OK", "UK001"),   # utility key 1
-        ("UK251&OK", "UK251"),   # utility key max
-        ("AA008&OK", "AA008"),   # arm area 8
+        ("AA001&OK", "AA001"),  # arm
+        ("AQ001&OK", "AQ001"),  # quick arm
+        ("AD001&OK", "AD001"),  # disarm
+        ("PE001&OK", "PE001"),  # emergency panic
+        ("PM001&OK", "PM001"),  # medical panic
+        ("PF001&OK", "PF001"),  # fire panic
+        ("UK001&OK", "UK001"),  # utility key 1
+        ("UK251&OK", "UK251"),  # utility key max
+        ("AA008&OK", "AA008"),  # arm area 8
     ],
 )
 def test_echo_ok(line, expected_cmd):
@@ -129,9 +129,9 @@ def test_echo_fail(line, expected_cmd):
 @pytest.mark.parametrize(
     "line, expected_cmd",
     [
-        ("AA001&ok", "AA001"),   # arm — lowercase firmware variant
-        ("UK001&ok", "UK001"),   # utility key — observed on live Paradox panel
-        ("AD001&ok", "AD001"),   # disarm
+        ("AA001&ok", "AA001"),  # arm — lowercase firmware variant
+        ("UK001&ok", "UK001"),  # utility key — observed on live Paradox panel
+        ("AD001&ok", "AD001"),  # disarm
     ],
 )
 def test_echo_ok_lowercase(line, expected_cmd):
@@ -142,26 +142,56 @@ def test_echo_ok_lowercase(line, expected_cmd):
     assert result.cmd == expected_cmd
 
 
+@pytest.mark.parametrize(
+    "line, expected_cmd",
+    [
+        ("AA001&FAIL", "AA001"),
+        ("AA001&Fail", "AA001"),
+        ("AD001&FAIL", "AD001"),
+    ],
+)
+def test_echo_fail_case_insensitive(line, expected_cmd):
+    """Accept &fail in any case for symmetry with &OK/&ok handling."""
+    result = parse_line(line)
+    assert isinstance(result, PRT3CommandEcho)
+    assert result.ok is False
+    assert result.cmd == expected_cmd
+
+
 def test_echo_cmd_is_exactly_5_chars():
     result = parse_line("AA001&OK")
     assert len(result.cmd) == 5
 
 
-@pytest.mark.parametrize("line", [
-    fx.ECHO_ARM_OK, fx.ECHO_QUICK_ARM_OK, fx.ECHO_DISARM_OK,
-    fx.ECHO_PANIC_EMERG_OK, fx.ECHO_PANIC_MED_OK, fx.ECHO_PANIC_FIRE_OK,
-    fx.ECHO_UTILITY_KEY_OK,
-    fx.ECHO_ARM_OK_LOWER, fx.ECHO_UTILITY_KEY_OK_LOWER,
-])
+@pytest.mark.parametrize(
+    "line",
+    [
+        fx.ECHO_ARM_OK,
+        fx.ECHO_QUICK_ARM_OK,
+        fx.ECHO_DISARM_OK,
+        fx.ECHO_PANIC_EMERG_OK,
+        fx.ECHO_PANIC_MED_OK,
+        fx.ECHO_PANIC_FIRE_OK,
+        fx.ECHO_UTILITY_KEY_OK,
+        fx.ECHO_ARM_OK_LOWER,
+        fx.ECHO_UTILITY_KEY_OK_LOWER,
+    ],
+)
 def test_echo_ok_from_fixtures(line):
     result = parse_line(line)
     assert isinstance(result, PRT3CommandEcho)
     assert result.ok is True
 
 
-@pytest.mark.parametrize("line", [
-    fx.ECHO_ARM_FAIL, fx.ECHO_DISARM_FAIL, fx.ECHO_STATUS_FAIL, fx.ECHO_LABEL_FAIL,
-])
+@pytest.mark.parametrize(
+    "line",
+    [
+        fx.ECHO_ARM_FAIL,
+        fx.ECHO_DISARM_FAIL,
+        fx.ECHO_STATUS_FAIL,
+        fx.ECHO_LABEL_FAIL,
+    ],
+)
 def test_echo_fail_from_fixtures(line):
     result = parse_line(line)
     assert isinstance(result, PRT3CommandEcho)
@@ -302,7 +332,7 @@ class TestAreaStatus:
         assert r.area == 8
 
     def test_area_number_max(self):
-        r = parse_line(fx.AREA_MAX_NUMBER)   # "RA008DOOOOOO"
+        r = parse_line(fx.AREA_MAX_NUMBER)  # "RA008DOOOOOO"
         assert r.area == 8
 
     @pytest.mark.parametrize("area_num", [1, 4, 8])
@@ -317,7 +347,7 @@ class TestAreaStatus:
         assert parse_line("RA001XOOOOOO") is None
 
     def test_wrong_length_short_returns_none(self):
-        assert parse_line("RA001DOOOOO") is None    # 11 chars
+        assert parse_line("RA001DOOOOO") is None  # 11 chars
 
     def test_wrong_length_long_returns_none(self):
         assert parse_line("RA001DOOOOOOO") is None  # 13 chars
@@ -332,7 +362,7 @@ class TestZoneStatus:
     """RZ{nnn}{5 flags} replies — 10 chars total."""
 
     def test_closed_all_clear(self):
-        r = parse_line(fx.ZONE_CLOSED_OK)   # "RZ001COOOO"
+        r = parse_line(fx.ZONE_CLOSED_OK)  # "RZ001COOOO"
         assert isinstance(r, PRT3ZoneStatus)
         assert r.zone == 1
         assert r.open_state == ZONE_CLOSED
@@ -356,7 +386,7 @@ class TestZoneStatus:
         assert r.open_state == expected_state
 
     def test_alarm_flag(self):
-        r = parse_line(fx.ZONE_ALARM)   # "RZ005OAOOO"
+        r = parse_line(fx.ZONE_ALARM)  # "RZ005OAOOO"
         assert r.alarm is True
         assert r.fire_alarm is False
 
@@ -376,7 +406,7 @@ class TestZoneStatus:
         assert r.supervision_trouble is False
 
     def test_all_flags_active(self):
-        r = parse_line(fx.ZONE_ALL_FLAGS)   # "RZ009OAFSL"
+        r = parse_line(fx.ZONE_ALL_FLAGS)  # "RZ009OAFSL"
         assert r.zone == 9
         assert r.open_state == ZONE_OPEN
         assert r.alarm is True
@@ -399,7 +429,7 @@ class TestZoneStatus:
         assert parse_line("RZ001XOOOO") is None
 
     def test_wrong_length_short_returns_none(self):
-        assert parse_line("RZ001COOO") is None   # 9 chars
+        assert parse_line("RZ001COOO") is None  # 9 chars
 
     def test_wrong_length_long_returns_none(self):
         assert parse_line("RZ001COOOOO") is None  # 11 chars
@@ -438,7 +468,7 @@ class TestLabelReply:
     def test_label_trailing_spaces_preserved(self):
         # The full 16-char label including trailing spaces must not be stripped
         r = parse_line(fx.AREA_LABEL_HOME)
-        assert r.label == "Home            "   # 4 chars + 12 spaces
+        assert r.label == "Home            "  # 4 chars + 12 spaces
 
     def test_zone_label_max_index(self):
         r = parse_line(fx.ZONE_LABEL_MAX_ZONE)
@@ -454,8 +484,10 @@ class TestLabelReply:
 
     def test_label_is_always_16_chars(self):
         for line in [
-            fx.ZONE_LABEL_FRONT_DOOR, fx.ZONE_LABEL_BACK_DOOR,
-            fx.AREA_LABEL_HOME, fx.USER_LABEL_MASTER,
+            fx.ZONE_LABEL_FRONT_DOOR,
+            fx.ZONE_LABEL_BACK_DOOR,
+            fx.AREA_LABEL_HOME,
+            fx.USER_LABEL_MASTER,
         ]:
             r = parse_line(line)
             assert len(r.label) == 16, f"label length for {line!r}: {len(r.label)}"
@@ -478,14 +510,14 @@ class TestSystemEvent:
     """G{ggg}N{nnn}A{aaa} events — 12 chars."""
 
     def test_zone_open_event(self):
-        r = parse_line(fx.EVENT_ZONE_OPEN)   # G001N005A006
+        r = parse_line(fx.EVENT_ZONE_OPEN)  # G001N005A006
         assert isinstance(r, PRT3SystemEvent)
         assert r.group == 1
         assert r.number == 5
         assert r.area == 6
 
     def test_zone_ok_event(self):
-        r = parse_line(fx.EVENT_ZONE_OK)     # G000N005A006
+        r = parse_line(fx.EVENT_ZONE_OK)  # G000N005A006
         assert r.group == 0
         assert r.number == 5
         assert r.area == 6
@@ -501,7 +533,7 @@ class TestSystemEvent:
         assert r.area == 255
 
     def test_all_zero_event(self):
-        r = parse_line(fx.EVENT_ALL_ZERO)    # G000N000A000
+        r = parse_line(fx.EVENT_ALL_ZERO)  # G000N000A000
         assert isinstance(r, PRT3SystemEvent)
         assert r.group == 0
         assert r.number == 0
@@ -513,16 +545,19 @@ class TestSystemEvent:
         assert r.number == 999
         assert r.area == 255
 
-    @pytest.mark.parametrize("line, group, number, area", [
-        ("G001N005A006",   1,   5,   6),
-        ("G010N001A001",  10,   1,   1),
-        ("G014N002A002",  14,   2,   2),
-        ("G024N003A001",  24,   3,   1),
-        ("G048N001A000",  48,   1,   0),
-        ("G064N000A001",  64,   0,   1),
-        ("G002N012A002",   2,  12,   2),
-        ("G025N007A001",  25,   7,   1),
-    ])
+    @pytest.mark.parametrize(
+        "line, group, number, area",
+        [
+            ("G001N005A006", 1, 5, 6),
+            ("G010N001A001", 10, 1, 1),
+            ("G014N002A002", 14, 2, 2),
+            ("G024N003A001", 24, 3, 1),
+            ("G048N001A000", 48, 1, 0),
+            ("G064N000A001", 64, 0, 1),
+            ("G002N012A002", 2, 12, 2),
+            ("G025N007A001", 25, 7, 1),
+        ],
+    )
     def test_event_fields_parametrized(self, line, group, number, area):
         r = parse_line(line)
         assert isinstance(r, PRT3SystemEvent)
@@ -531,13 +566,13 @@ class TestSystemEvent:
         assert r.area == area
 
     def test_wrong_format_too_short_group(self):
-        assert parse_line("G01N005A006") is None    # group only 2 digits
+        assert parse_line("G01N005A006") is None  # group only 2 digits
 
     def test_wrong_format_too_short_number(self):
-        assert parse_line("G001N5A006") is None     # number only 1 digit
+        assert parse_line("G001N5A006") is None  # number only 1 digit
 
     def test_wrong_format_too_short_area(self):
-        assert parse_line("G001N005A06") is None    # area only 2 digits
+        assert parse_line("G001N005A06") is None  # area only 2 digits
 
     def test_wrong_format_too_long_area(self):
         assert parse_line("G001N005A0060") is None  # area 4 digits
@@ -552,7 +587,7 @@ class TestPgmEvent:
     """PGM{nn}ON/OFF events — v1 scope: parsed but not acted on."""
 
     def test_pgm_on(self):
-        r = parse_line(fx.PGM_01_ON)   # "PGM01ON"
+        r = parse_line(fx.PGM_01_ON)  # "PGM01ON"
         assert isinstance(r, PRT3PgmEvent)
         assert r.pgm == 1
         assert r.on is True
@@ -564,7 +599,7 @@ class TestPgmEvent:
         assert r.on is False
 
     def test_pgm_max_on(self):
-        r = parse_line(fx.PGM_30_ON)   # "PGM30ON"
+        r = parse_line(fx.PGM_30_ON)  # "PGM30ON"
         assert r.pgm == 30
         assert r.on is True
 
@@ -575,11 +610,11 @@ class TestPgmEvent:
 
     @pytest.mark.parametrize("pgm_num", [1, 15, 30])
     def test_pgm_number_range(self, pgm_num):
-        on_line  = f"PGM{pgm_num:02d}ON"
+        on_line = f"PGM{pgm_num:02d}ON"
         off_line = f"PGM{pgm_num:02d}OFF"
-        r_on  = parse_line(on_line)
+        r_on = parse_line(on_line)
         r_off = parse_line(off_line)
-        assert isinstance(r_on,  PRT3PgmEvent) and r_on.pgm  == pgm_num
+        assert isinstance(r_on, PRT3PgmEvent) and r_on.pgm == pgm_num
         assert isinstance(r_off, PRT3PgmEvent) and r_off.pgm == pgm_num
 
     def test_pgm_single_digit_returns_none(self):
@@ -611,16 +646,16 @@ class TestMalformedInputs:
         assert parse_line("COMM&OK") is None
 
     def test_area_status_too_short(self):
-        assert parse_line("RA001DOOOOO") is None    # 11 chars
+        assert parse_line("RA001DOOOOO") is None  # 11 chars
 
     def test_area_status_too_long(self):
         assert parse_line("RA001DOOOOOOO") is None  # 13 chars
 
     def test_zone_status_too_short(self):
-        assert parse_line("RZ001COOO") is None      # 9 chars
+        assert parse_line("RZ001COOO") is None  # 9 chars
 
     def test_zone_status_too_long(self):
-        assert parse_line("RZ001COOOOO") is None    # 11 chars
+        assert parse_line("RZ001COOOOO") is None  # 11 chars
 
     def test_label_too_short(self):
         # 20 chars — one below the required 21
@@ -639,7 +674,7 @@ class TestMalformedInputs:
         assert parse_line("RZ001XOOOO") is None
 
     def test_echo_ok_wrong_length_short(self):
-        assert parse_line("AA01&OK") is None    # 7 chars (4-char prefix)
+        assert parse_line("AA01&OK") is None  # 7 chars (4-char prefix)
 
     def test_echo_ok_wrong_length_long(self):
         assert parse_line("AA001 &OK") is None  # 9 chars (extra space)

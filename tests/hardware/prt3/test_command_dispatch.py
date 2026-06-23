@@ -15,7 +15,6 @@ import pytest
 
 from paradox.data.enums import RunState
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -40,6 +39,7 @@ def _make_paradox(monkeypatch, connection_type="PRT3"):
     paradox._partition_arm_freeze_until = {}
 
     from paradox.data.memory_storage import MemoryStorage
+
     paradox.storage = MemoryStorage()
 
     mock_panel = MagicMock()
@@ -60,21 +60,17 @@ def _make_paradox(monkeypatch, connection_type="PRT3"):
 
 async def test_control_partition_calls_panel(monkeypatch):
     """control_partition resolves partition from storage and calls panel."""
-    from paradox.paradox import Paradox
-
     paradox, mock_panel = _make_paradox(monkeypatch)
 
     # Populate storage with a named partition
-    paradox.storage.get_container("partition")[1] = {
-        "id": 1, "key": 1, "label": "Home"
-    }
+    paradox.storage.get_container("partition")[1] = {"id": 1, "key": 1, "label": "Home"}
 
     result = await paradox.control_partition("1", "arm")
 
     assert result is True
     mock_panel.control_partitions.assert_awaited_once()
     call_args = mock_panel.control_partitions.call_args
-    assert call_args[0][1] == "arm"    # command arg
+    assert call_args[0][1] == "arm"  # command arg
     paradox.request_status_refresh.assert_called_once()
 
 
@@ -94,9 +90,7 @@ async def test_control_partition_panel_refuses(monkeypatch):
     paradox, mock_panel = _make_paradox(monkeypatch)
     mock_panel.control_partitions = AsyncMock(return_value=False)
 
-    paradox.storage.get_container("partition")[1] = {
-        "id": 1, "key": 1, "label": "Home"
-    }
+    paradox.storage.get_container("partition")[1] = {"id": 1, "key": 1, "label": "Home"}
 
     result = await paradox.control_partition("1", "disarm")
 
@@ -109,9 +103,7 @@ async def test_control_partition_not_implemented(monkeypatch):
     paradox, mock_panel = _make_paradox(monkeypatch)
     mock_panel.control_partitions = AsyncMock(side_effect=NotImplementedError)
 
-    paradox.storage.get_container("partition")[1] = {
-        "id": 1, "key": 1, "label": "Home"
-    }
+    paradox.storage.get_container("partition")[1] = {"id": 1, "key": 1, "label": "Home"}
 
     result = await paradox.control_partition("1", "arm")
     assert result is False
@@ -183,7 +175,9 @@ async def test_utility_key_transport_success_is_true(monkeypatch):
 async def test_utility_key_transport_timeout_is_false(monkeypatch):
     """Timeout (panel never echoed) → False (transport failure)."""
     paradox, mock_panel = _make_paradox(monkeypatch, connection_type="PRT3")
-    mock_panel.send_utility_key = AsyncMock(return_value=False)  # panel returns False on timeout
+    mock_panel.send_utility_key = AsyncMock(
+        return_value=False
+    )  # panel returns False on timeout
 
     assert await paradox.control_utility_key(1) is False
 
@@ -205,10 +199,18 @@ def _make_paradox_with_partitions(monkeypatch):
     """Paradox instance pre-populated with two partitions in storage."""
     paradox, _ = _make_paradox(monkeypatch)
     paradox.storage.get_container("partition")[1] = {
-        "id": 1, "key": "home", "label": "Home", "arm": True, "exit_delay": True,
+        "id": 1,
+        "key": "home",
+        "label": "Home",
+        "arm": True,
+        "exit_delay": True,
     }
     paradox.storage.get_container("partition")[2] = {
-        "id": 2, "key": "downstairs", "label": "Downstairs", "arm": True, "exit_delay": True,
+        "id": 2,
+        "key": "downstairs",
+        "label": "Downstairs",
+        "arm": True,
+        "exit_delay": True,
     }
     return paradox
 
@@ -232,8 +234,12 @@ def test_global_disarm_event_clears_exit_delay_on_all_partitions(monkeypatch):
 
     p1 = paradox.storage.get_container_object("partition", 1)
     p2 = paradox.storage.get_container_object("partition", 2)
-    assert p1["exit_delay"] is False, "partition 1 exit_delay must be cleared by global disarm"
-    assert p2["exit_delay"] is False, "partition 2 exit_delay must be cleared by global disarm"
+    assert (
+        p1["exit_delay"] is False
+    ), "partition 1 exit_delay must be cleared by global disarm"
+    assert (
+        p2["exit_delay"] is False
+    ), "partition 2 exit_delay must be cleared by global disarm"
     assert p1["arm"] is False, "partition 1 arm must be cleared by global disarm"
     assert p2["arm"] is False, "partition 2 arm must be cleared by global disarm"
 
@@ -266,8 +272,32 @@ def test_specific_area_disarm_only_updates_that_partition(monkeypatch):
 
     p1 = paradox.storage.get_container_object("partition", 1)
     p2 = paradox.storage.get_container_object("partition", 2)
-    assert p1["exit_delay"] is True,  "partition 1 must NOT be touched by area=2 event"
-    assert p2["exit_delay"] is False, "partition 2 exit_delay must be cleared by area=2 disarm"
+    assert p1["exit_delay"] is True, "partition 1 must NOT be touched by area=2 event"
+    assert (
+        p2["exit_delay"] is False
+    ), "partition 2 exit_delay must be cleared by area=2 disarm"
+
+
+def test_event_for_unmapped_zone_is_not_dropped(monkeypatch):
+    """A zone-alarm event for a zone beyond PRT3_MAX_ZONES must still apply.
+
+    Regression: a manual existence guard prior to update_container_object
+    silently dropped events (including fire alarms) for zones that had no
+    label loaded (e.g. zone 100 when PRT3_MAX_ZONES was 96).  MemoryStorage
+    auto-creates the element, so the guard defeated that protection.
+    """
+    from paradox.hardware.prt3.parser import PRT3SystemEvent
+
+    with patch("paradox.paradox.ps.sendChange"), patch("paradox.paradox.ps.sendEvent"):
+        paradox, _ = _make_paradox(monkeypatch)
+        # No zones pre-populated; storage container is empty.
+
+        # G024 = "Zone in alarm" per PRT3 spec; zone 100 is unlabeled.
+        msg = PRT3SystemEvent(group=24, number=100, area=1)
+        paradox.handle_prt3_event_message(msg)
+
+        zone = paradox.storage.get_container_object("zone", 100)
+        assert zone is not None, "zone 100 must be auto-created by the event"
 
 
 # ---------------------------------------------------------------------------
@@ -287,13 +317,22 @@ async def test_disarm_optimistically_clears_arm_and_exit_delay(monkeypatch):
     """
     paradox, _ = _make_paradox(monkeypatch, connection_type="PRT3")
     paradox.storage.get_container("partition")[2] = {
-        "id": 2, "key": "downstairs", "label": "Downstairs",
-        "arm": True, "arm_stay": True, "arm_away": False, "arm_force": False,
-        "exit_delay": True, "entry_delay": False,
+        "id": 2,
+        "key": "downstairs",
+        "label": "Downstairs",
+        "arm": True,
+        "arm_stay": True,
+        "arm_away": False,
+        "arm_force": False,
+        "exit_delay": True,
+        "entry_delay": False,
     }
 
-    with patch("paradox.paradox.ps.sendChange"), patch("paradox.paradox.ps.sendEvent"), \
-         patch("paradox.paradox.ps.sendMessage"), patch("paradox.paradox.ps.sendNotification"):
+    with patch("paradox.paradox.ps.sendChange"), patch(
+        "paradox.paradox.ps.sendEvent"
+    ), patch("paradox.paradox.ps.sendMessage"), patch(
+        "paradox.paradox.ps.sendNotification"
+    ):
         result = await paradox.control_partition("2", "disarm")
 
     assert result is True
@@ -314,12 +353,19 @@ async def test_disarm_freezes_arm_against_stale_ra_poll(monkeypatch):
     """
     paradox, _ = _make_paradox(monkeypatch, connection_type="PRT3")
     paradox.storage.get_container("partition")[2] = {
-        "id": 2, "key": "downstairs", "label": "Downstairs",
-        "arm": True, "arm_stay": True, "exit_delay": True,
+        "id": 2,
+        "key": "downstairs",
+        "label": "Downstairs",
+        "arm": True,
+        "arm_stay": True,
+        "exit_delay": True,
     }
 
-    with patch("paradox.paradox.ps.sendChange"), patch("paradox.paradox.ps.sendEvent"), \
-         patch("paradox.paradox.ps.sendMessage"), patch("paradox.paradox.ps.sendNotification"):
+    with patch("paradox.paradox.ps.sendChange"), patch(
+        "paradox.paradox.ps.sendEvent"
+    ), patch("paradox.paradox.ps.sendMessage"), patch(
+        "paradox.paradox.ps.sendNotification"
+    ):
         await paradox.control_partition("2", "disarm")
 
         # Simulate an RA poll arriving during the freeze window — should be a no-op
@@ -341,15 +387,24 @@ async def test_arm_does_not_optimistically_change_state(monkeypatch):
     """control_partition('arm_stay') leaves storage alone — G065N001 + RA set state."""
     paradox, _ = _make_paradox(monkeypatch, connection_type="PRT3")
     paradox.storage.get_container("partition")[2] = {
-        "id": 2, "key": "downstairs", "label": "Downstairs",
-        "arm": False, "arm_stay": False, "exit_delay": False,
+        "id": 2,
+        "key": "downstairs",
+        "label": "Downstairs",
+        "arm": False,
+        "arm_stay": False,
+        "exit_delay": False,
     }
 
-    with patch("paradox.paradox.ps.sendChange"), patch("paradox.paradox.ps.sendEvent"), \
-         patch("paradox.paradox.ps.sendMessage"), patch("paradox.paradox.ps.sendNotification"):
+    with patch("paradox.paradox.ps.sendChange"), patch(
+        "paradox.paradox.ps.sendEvent"
+    ), patch("paradox.paradox.ps.sendMessage"), patch(
+        "paradox.paradox.ps.sendNotification"
+    ):
         result = await paradox.control_partition("2", "arm_stay")
 
     assert result is True
     p2 = paradox.storage.get_container_object("partition", 2)
     assert p2["arm"] is False, "arm should be set by G065N001/RA, not optimistically"
-    assert p2["exit_delay"] is False, "exit_delay should be set by G065N001, not optimistically"
+    assert (
+        p2["exit_delay"] is False
+    ), "exit_delay should be set by G065N001, not optimistically"

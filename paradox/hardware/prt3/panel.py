@@ -41,7 +41,6 @@ from typing import Optional
 from paradox.config import config as cfg
 from paradox.hardware.panel import Panel
 from paradox.hardware.prt3 import adapter, encoder
-from paradox.hardware.prt3.event import EVENT_MAP, PRT3Event
 from paradox.hardware.prt3.parser import (
     PRT3AreaStatus,
     PRT3BufferFull,
@@ -62,19 +61,19 @@ logger = logging.getLogger("PAI").getChild(__name__)
 # Maps PAI command string → (encoder_fn, arm_mode_char)
 # All arm variants that don't require a user code use quick-arm.
 _QUICK_ARM_MODES = {
-    "arm":         "A",   # default arm → away
-    "arm_away":    "A",
-    "arm_stay":    "S",
-    "arm_force":   "F",
+    "arm": "A",  # default arm → away
+    "arm_away": "A",
+    "arm_stay": "S",
+    "arm_force": "F",
     "arm_instant": "I",
-    "arm_sleep":   "I",   # instant arm (no entry delay) — PRT3 closest to HA arm_night
+    "arm_sleep": "I",  # instant arm (no entry delay) — PRT3 closest to HA arm_night
 }
 
 # Panic type → encoder function
 _PANIC_ENCODERS = {
     "emergency": encoder.encode_panic_emergency,
-    "medical":   encoder.encode_panic_medical,
-    "fire":      encoder.encode_panic_fire,
+    "medical": encoder.encode_panic_medical,
+    "fire": encoder.encode_panic_fire,
 }
 
 
@@ -108,6 +107,24 @@ class PRT3Panel(Panel):
                 cfg.IO_TIMEOUT,
                 cfg.PRT3_MAX_ZONES * cfg.IO_TIMEOUT,
                 cfg.KEEP_ALIVE_INTERVAL,
+            )
+        # Labels are loaded serially at startup; with PRT3_MAX_USERS=999 and
+        # IO_TIMEOUT=0.5 the worst-case (all timeouts) is ~8 min just for users.
+        # Warn when the combined worst-case load time exceeds 2 min so it
+        # doesn't fire on the default 8+96+32 config.
+        label_load_seconds = (
+            cfg.PRT3_MAX_AREAS + cfg.PRT3_MAX_ZONES + cfg.PRT3_MAX_USERS
+        ) * cfg.IO_TIMEOUT
+        if label_load_seconds > 120:
+            logger.warning(
+                "PRT3: startup label load may take up to %.0f s "
+                "(%d areas + %d zones + %d users at %.1f s timeout) — "
+                "consider reducing PRT3_MAX_USERS / PRT3_MAX_ZONES",
+                label_load_seconds,
+                cfg.PRT3_MAX_AREAS,
+                cfg.PRT3_MAX_ZONES,
+                cfg.PRT3_MAX_USERS,
+                cfg.IO_TIMEOUT,
             )
 
     # ------------------------------------------------------------------
@@ -160,7 +177,10 @@ class PRT3Panel(Panel):
                               timed out or hit buffer-full.
         """
         async with self.core.request_lock:
-            buffer_full_or_match = lambda m: predicate(m) or isinstance(m, PRT3BufferFull)
+
+            def buffer_full_or_match(m):
+                return predicate(m) or isinstance(m, PRT3BufferFull)
+
             for attempt in range(1, retries + 1):
                 self.core.connection.write(command_bytes)
                 try:
@@ -170,7 +190,9 @@ class PRT3Panel(Panel):
                     if isinstance(result, PRT3BufferFull):
                         logger.warning(
                             "PRT3: buffer full on attempt %d/%d, retrying: %s",
-                            attempt, retries, command_bytes[:5],  # [:5] excludes user code
+                            attempt,
+                            retries,
+                            command_bytes[:5],  # [:5] excludes user code
                         )
                         continue
                     return result
@@ -178,7 +200,9 @@ class PRT3Panel(Panel):
                     if attempt < retries:
                         logger.warning(
                             "PRT3: timeout on attempt %d/%d, retrying: %s",
-                            attempt, retries, command_bytes[:5],  # [:5] excludes user code
+                            attempt,
+                            retries,
+                            command_bytes[:5],  # [:5] excludes user code
                         )
             return None
 
@@ -210,10 +234,18 @@ class PRT3Panel(Panel):
         """
         from paradox.hardware.prt3.parser import PRT3SystemEvent
 
-        _any_prt3_msg = lambda m: isinstance(
-            m, (PRT3CommStatus, PRT3AreaStatus, PRT3ZoneStatus, PRT3LabelReply,
-                PRT3CommandEcho, PRT3SystemEvent)
-        )
+        def _any_prt3_msg(m):
+            return isinstance(
+                m,
+                (
+                    PRT3CommStatus,
+                    PRT3AreaStatus,
+                    PRT3ZoneStatus,
+                    PRT3LabelReply,
+                    PRT3CommandEcho,
+                    PRT3SystemEvent,
+                ),
+            )
 
         logger.info("PRT3: checking serial link liveness")
 
@@ -242,11 +274,14 @@ class PRT3Panel(Panel):
             if isinstance(msg, PRT3CommStatus) and not msg.ok:
                 logger.error("PRT3: panel communication failure (COMM&fail)")
                 return False
-            logger.info("PRT3: serial link live (probe response: %s)", type(msg).__name__)
+            logger.info(
+                "PRT3: serial link live (probe response: %s)", type(msg).__name__
+            )
             return True
         except asyncio.TimeoutError:
             logger.error(
-                "PRT3: serial link unresponsive after %.0fs probe", cfg.PRT3_COMM_TIMEOUT
+                "PRT3: serial link unresponsive after %.0fs probe",
+                cfg.PRT3_COMM_TIMEOUT,
             )
             return False
 
@@ -273,7 +308,11 @@ class PRT3Panel(Panel):
             msg = await self._prt3_send_wait(
                 cmd,
                 lambda m, ec=expected_cmd, et=element_type, idx=i: (
-                    (isinstance(m, PRT3LabelReply) and m.element_type == et and m.index == idx)
+                    (
+                        isinstance(m, PRT3LabelReply)
+                        and m.element_type == et
+                        and m.index == idx
+                    )
                     or (isinstance(m, PRT3CommandEcho) and m.cmd == ec)
                 ),
             )
@@ -297,9 +336,15 @@ class PRT3Panel(Panel):
         """
         logger.info("PRT3: loading labels")
         replies = (
-            await self._load_label_range("area", cfg.PRT3_MAX_AREAS, encoder.encode_area_label_request, "AL")
-            + await self._load_label_range("zone", cfg.PRT3_MAX_ZONES, encoder.encode_zone_label_request, "ZL")
-            + await self._load_label_range("user", cfg.PRT3_MAX_USERS, encoder.encode_user_label_request, "UL")
+            await self._load_label_range(
+                "area", cfg.PRT3_MAX_AREAS, encoder.encode_area_label_request, "AL"
+            )
+            + await self._load_label_range(
+                "zone", cfg.PRT3_MAX_ZONES, encoder.encode_zone_label_request, "ZL"
+            )
+            + await self._load_label_range(
+                "user", cfg.PRT3_MAX_USERS, encoder.encode_user_label_request, "UL"
+            )
         )
         labels = adapter.labels_dict_from_replies(replies)
         logger.info(
@@ -407,7 +452,10 @@ class PRT3Panel(Panel):
             mode = _QUICK_ARM_MODES[command]
             if user_code:
                 try:
-                    return encoder.encode_arm(partition, mode, user_code), f"AA{partition:03d}"
+                    return (
+                        encoder.encode_arm(partition, mode, user_code),
+                        f"AA{partition:03d}",
+                    )
                 except ValueError as exc:
                     logger.error("PRT3: invalid PRT3_USER_CODE for arm: %s", exc)
                     return None
@@ -439,7 +487,7 @@ class PRT3Panel(Panel):
                 lambda m, ec=expected_echo: (
                     isinstance(m, PRT3CommandEcho) and m.cmd == ec
                 ),
-                retries=2,
+                retries=1,  # non-idempotent: retry can double-arm if echo was lost
             )
             if msg is None:
                 logger.warning("PRT3: timeout on %s partition %d", command, partition)
@@ -448,7 +496,9 @@ class PRT3Panel(Panel):
                 accepted = True
             else:
                 logger.warning(
-                    "PRT3: %s partition %d rejected by panel (&fail)", command, partition
+                    "PRT3: %s partition %d rejected by panel (&fail)",
+                    command,
+                    partition,
                 )
 
         return accepted
@@ -498,10 +548,12 @@ class PRT3Panel(Panel):
                 lambda m, ec=expected_echo: (
                     isinstance(m, PRT3CommandEcho) and m.cmd == ec
                 ),
-                retries=2,
+                retries=1,  # non-idempotent: retry can re-trigger panic if echo was lost
             )
             if msg is None:
-                logger.warning("PRT3: timeout on %s panic area %d", panic_type, partition)
+                logger.warning(
+                    "PRT3: timeout on %s panic area %d", panic_type, partition
+                )
                 continue
             if not msg.ok:
                 logger.warning(
