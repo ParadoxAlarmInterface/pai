@@ -89,7 +89,11 @@ class SerialFramer:
             if not self.use_variable_message_length:
                 if len(self.buffer) < FIXED_MESSAGE_LENGTH:
                     return None
-                return self._take_checked(FrameLength(FIXED_MESSAGE_LENGTH))
+                frame = self._take_checked(FrameLength(FIXED_MESSAGE_LENGTH))
+                if frame is not None:
+                    return frame
+                # Checksum failed and one byte was consumed; realign and retry.
+                continue
 
             if len(self.buffer) < MIN_MESSAGE_LENGTH:
                 return None

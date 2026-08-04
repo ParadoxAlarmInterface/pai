@@ -3,7 +3,7 @@ import logging
 from unittest.mock import MagicMock, call
 
 from paradox.config import config as cfg
-from paradox.connections.serial_connection import SerialConnectionProtocol
+from paradox.connections.serial.protocol import SerialConnectionProtocol
 
 
 def test_6byte_message():
@@ -294,7 +294,7 @@ def test_encrypted_mode_outgoing_wraps_in_e0fe(mocker):
     mocker.patch.object(cfg, "SERIAL_ENCRYPTED", True)
     mocker.patch.object(cfg, "PASSWORD", "1234")
     # Avoid asyncio.get_running_loop() in the base class connection_made
-    from paradox.connections.protocols import ConnectionProtocol
+    from paradox.connections.protocol_base import ConnectionProtocol
 
     mocker.patch.object(ConnectionProtocol, "connection_made")
 
@@ -305,7 +305,7 @@ def test_encrypted_mode_outgoing_wraps_in_e0fe(mocker):
 
     # Manually populate the fields that the base connection_made would have set,
     # so that check_active() passes.
-    from paradox.connections.serial_encryption import (
+    from paradox.connections.serial.encryption import (
         EncryptedSerialTransport,
         make_serial_key,
     )
@@ -329,7 +329,7 @@ def test_encrypted_mode_incoming_e0fe_is_decrypted(mocker):
 
     mocker.patch.object(cfg, "SERIAL_ENCRYPTED", True)
     mocker.patch.object(cfg, "PASSWORD", "1234")
-    from paradox.connections.protocols import ConnectionProtocol
+    from paradox.connections.protocol_base import ConnectionProtocol
 
     mocker.patch.object(ConnectionProtocol, "connection_made")
 
@@ -432,7 +432,7 @@ def test_long_aes_frame_is_not_clamped(mocker):
 
     mocker.patch.object(cfg, "SERIAL_ENCRYPTED", True)
     mocker.patch.object(cfg, "PASSWORD", "1234")
-    from paradox.connections.protocols import ConnectionProtocol
+    from paradox.connections.protocol_base import ConnectionProtocol
 
     mocker.patch.object(ConnectionProtocol, "connection_made")
 

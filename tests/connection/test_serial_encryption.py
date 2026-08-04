@@ -1,4 +1,4 @@
-from paradox.connections.serial_encryption import make_serial_key
+from paradox.connections.serial.encryption import make_serial_key
 from paradox.lib.crypto import decrypt_serial_message, encrypt_serial_message
 
 # PC password "1234" padded to 32 bytes with 0xEE

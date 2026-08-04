@@ -14,7 +14,7 @@ from paradox.connections.ip.parsers import (
     IPMessageType,
     IPPayloadConnectResponse,
 )
-from paradox.connections.serial_encryption import make_serial_key
+from paradox.connections.serial.encryption import make_serial_key
 from paradox.hardware import create_panel
 from paradox.hardware.parsers import Encrypted, InitiateCommunicationResponse
 from paradox.lib.crypto import decrypt_serial_message

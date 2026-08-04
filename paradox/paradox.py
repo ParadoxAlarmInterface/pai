@@ -78,7 +78,7 @@ class Paradox:
             if cfg.CONNECTION_TYPE == "Serial":
                 logger.info("Using Serial Connection")
 
-                from paradox.connections.serial_connection import SerialCommunication
+                from paradox.connections.serial.connection import SerialCommunication
 
                 self._connection = SerialCommunication(
                     port=cfg.SERIAL_PORT,
