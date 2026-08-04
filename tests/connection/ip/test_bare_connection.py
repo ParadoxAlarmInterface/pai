@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from paradox.connections.ip.connection import BareIPConnection
-from paradox.connections.protocols import ConnectionProtocol
+from paradox.connections.protocol_base import ConnectionProtocol
 
 
 @pytest.mark.asyncio

@@ -1,8 +1,8 @@
-import logging
 from abc import abstractmethod
+import logging
 
 from paradox.connections.handler import ConnectionHandler
-from paradox.connections.protocols import ConnectionProtocol
+from paradox.connections.protocol_base import ConnectionProtocol
 from paradox.lib.async_message_manager import AsyncMessageManager
 
 logger = logging.getLogger("PAI").getChild(__name__)

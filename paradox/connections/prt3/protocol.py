@@ -15,7 +15,7 @@ import binascii
 import logging
 
 from paradox.config import config as cfg
-from paradox.connections.protocols import ConnectionProtocol
+from paradox.connections.protocol_base import ConnectionProtocol
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
