@@ -16,6 +16,7 @@ import logging
 
 from paradox.config import config as cfg
 from paradox.connections.protocol_base import ConnectionProtocol
+from paradox.connections.prt3.framing import LineFramer
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -30,37 +31,30 @@ class PRT3Protocol(ConnectionProtocol):
     parse_message() strips it before calling parse_line().
     """
 
+    def __init__(self, handler):
+        super().__init__(handler)
+        self._framer = LineFramer()
+
     def variable_message_length(self, *args, **kwargs):
         # PRT3 lines are delimiter-framed, not length-prefixed.
         # This is a deliberate no-op so the Panel base class can call it
-        # without error; actual line assembly happens in data_received().
+        # without error; actual line assembly happens in the framer.
         pass
 
     def data_received(self, data: bytes):
-        """
-        Buffer incoming bytes and emit each complete \\r-terminated line.
-
-        Lines that contain no printable content after stripping whitespace
-        are silently discarded (e.g. a bare \\r with no preceding payload).
-        """
-        self.buffer += data
-
-        if len(self.buffer) > 512:  # PRT3 max line is ~21 bytes; 512 is generous
-            logger.warning(
-                "PRT3: buffer overflow (%d bytes), discarding", len(self.buffer)
-            )
-            self.buffer = b""
-            return
-
-        while b"\r" in self.buffer:
-            line, self.buffer = self.buffer.split(b"\r", 1)
-            line_with_cr = line + b"\r"
-
+        """Emit each complete \\r-terminated line to the handler."""
+        for frame in self._framer.feed(data):
             if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("PRT3 <- %s", binascii.hexlify(line_with_cr))
+                logger.debug("PRT3 <- %s", binascii.hexlify(frame.data))
+            self.handler.on_message(frame.data)
 
-            if line.strip():  # skip empty / whitespace-only lines
-                self.handler.on_message(line_with_cr)
+    def reset_framing(self) -> None:
+        self._framer.reset()
+
+    @property
+    def buffer(self) -> bytes:
+        """Unconsumed bytes. Retained for tests and diagnostics."""
+        return self._framer.buffer.pending
 
     def send_message(self, message: bytes):
         """

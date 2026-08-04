@@ -23,6 +23,7 @@ class SerialConnectionProtocol(ConnectionProtocol):
     def __init__(self, handler: ConnectionHandler):
         super().__init__(handler)
         self.last_message = b""
+        self.buffer = b""
 
     async def send_message(self, message):
         self.last_message = message
@@ -53,6 +54,9 @@ class SerialConnectionProtocol(ConnectionProtocol):
                 self.last_message = b""
             elif len(frame) > 0:
                 self.handler.on_message(frame)  # Callback
+
+    def reset_framing(self) -> None:
+        self.buffer = b""
 
     def connection_lost(self, exc):
         logger.error("The serial port was closed")
