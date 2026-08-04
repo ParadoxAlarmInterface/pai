@@ -237,6 +237,11 @@ class Paradox:
                     self, reply
                 )  # Now we know what panel it is. Let's
                 # recreate panel object.
+                # The framing mode is panel family specific and only known
+                # now: SP/Magellan use fixed length messages, EVO variable.
+                self.connection.variable_message_length(
+                    self.panel.variable_message_length
+                )
                 ps.sendMessage(
                     "panel_detected",
                     panel=DetectedPanel(

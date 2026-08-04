@@ -19,6 +19,12 @@ from paradox.lib.crypto import decrypt_serial_message
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
+# Shortest and longest plausible unencrypted serial frame. A length derived
+# outside this range means the buffer head is misaligned (e.g. after a lost
+# serial byte), not that a real frame is on its way.
+MIN_MESSAGE_LENGTH = 4
+MAX_MESSAGE_LENGTH = 71
+
 
 def checksum(data, min_message_length):
     """Calculates the 8bit checksum of Paradox messages"""
@@ -166,6 +172,15 @@ class SerialConnectionProtocol(ConnectionProtocol):
                             if len(self.buffer) < 3:
                                 break
                             potential_packet_length = self.buffer[2]
+                            if potential_packet_length < MIN_MESSAGE_LENGTH:
+                                # Misaligned data, not a frame. Framing a zero
+                                # length frame here would consume nothing and
+                                # spin this loop forever.
+                                self._discard_first_byte(
+                                    "implausible E0FE length %d"
+                                    % potential_packet_length
+                                )
+                                continue
                             is_encrypted_frame = True
                     elif self.buffer[1] < 37 or self.buffer[1] == 0xFF:
                         # MG/SP in 21st century and EVO Live Events. Probable values=0x13, 0x13, 0x00, 0xFF
@@ -177,6 +192,22 @@ class SerialConnectionProtocol(ConnectionProtocol):
 
             else:
                 potential_packet_length = 37
+
+            if not is_encrypted_frame and potential_packet_length > MAX_MESSAGE_LENGTH:
+                # Length synthesised from a misaligned payload byte, e.g. a
+                # battery voltage byte 0xC0-0xCF landing at the buffer head
+                # reads as a ~39000 byte length through the 0xC branch above.
+                # Breaking on it would block the framer for minutes without
+                # consuming a byte, so the resynchronising discard below would
+                # never be reached. AES frames are exempt: they legitimately
+                # exceed the protocol maximum.
+                logger.warning(
+                    "SER: implausible message length %d derived from %s, resyncing",
+                    potential_packet_length,
+                    binascii.hexlify(self.buffer[:3]).decode(),
+                )
+                self._discard_first_byte("implausible length")
+                continue
 
             if len(self.buffer) < potential_packet_length:
                 break
@@ -202,7 +233,17 @@ class SerialConnectionProtocol(ConnectionProtocol):
                 else:
                     self.handler.on_message(frame)
             else:
-                self.buffer = self.buffer[1:]
+                self._discard_first_byte("checksum mismatch")
+
+    def _discard_first_byte(self, reason):
+        """Drop one byte to resynchronise on the next possible frame start."""
+        if self.buffer:
+            logger.debug(
+                "SER: discarding byte %s (%s)",
+                binascii.hexlify(self.buffer[:1]).decode(),
+                reason,
+            )
+        self.buffer = self.buffer[1:]
 
 
 class IPConnectionProtocol(ConnectionProtocol):
