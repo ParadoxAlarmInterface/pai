@@ -1,7 +1,7 @@
 """Shared asyncio glue for all PAI connection protocols.
 
 Framing lives in the ``framing`` modules; this class owns only transport
-lifecycle. The split keeps each concern testable on its own.
+lifecycle.
 """
 
 from abc import ABC, abstractmethod

@@ -1,8 +1,6 @@
 """Transport-agnostic byte framing primitives.
 
-Nothing here imports asyncio or touches a transport. Framers turn a stream of
-bytes into discrete frames and do nothing else, which is what makes framing
-directly unit-testable with plain ``bytes`` and no mocks.
+Framers turn a stream of bytes into discrete frames and do nothing else.
 """
 
 import logging

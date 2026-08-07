@@ -1,7 +1,4 @@
-"""Framing for the IP150 / IP100 module wire protocol.
-
-Pure byte handling: no asyncio, no transport, no decryption.
-"""
+"""Framing for the IP150 / IP100 module wire protocol."""
 
 import binascii
 import logging
