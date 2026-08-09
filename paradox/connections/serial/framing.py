@@ -52,8 +52,7 @@ class SerialFramer:
     """Turns a serial byte stream into frames.
 
     Progress invariant: every pass of :meth:`feed` either emits a frame,
-    consumes at least one byte, or returns with a bounded buffer. Violating it
-    is what caused every stall defect this class replaces.
+    consumes at least one byte, or returns with a bounded buffer.
     """
 
     def __init__(self, use_variable_message_length: bool = True) -> None:

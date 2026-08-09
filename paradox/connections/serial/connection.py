@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import os
-import stat
 
 from serial import SerialException
 import serial_asyncio
@@ -48,21 +47,9 @@ class SerialCommunication(Connection, ConnectionHandler):
         logger.info(f"Connecting to serial port {self.port_path}")
 
         if not os.access(self.port_path, mode=os.R_OK | os.W_OK):
-            logger.info(f"{self.port_path} is not readable/writable. Trying to fix...")
-            try:
-                os.chmod(
-                    self.port_path,
-                    stat.S_IRUSR
-                    | stat.S_IWUSR
-                    | stat.S_IRGRP
-                    | stat.S_IWGRP
-                    | stat.S_IROTH
-                    | stat.S_IWOTH,
-                )
-                logger.info(f"File {self.port_path} permissions changed")
-            except OSError:
-                logger.error(f"Failed to update file {self.port_path} permissions")
-                return False
+            logger.error(f"{self.port_path} is not readable/writable.")
+
+            return False
 
         self.connected_future = asyncio.get_running_loop().create_future()
         open_timeout_handler = asyncio.get_running_loop().call_later(

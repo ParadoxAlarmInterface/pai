@@ -1,5 +1,3 @@
-"""asyncio glue for the serial link. Framing lives in :mod:`.framing`."""
-
 import binascii
 import logging
 
