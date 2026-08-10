@@ -46,9 +46,10 @@ class Paradox:
         self.storage = Storage()
 
         self._run_state = RunState.STOP
-        self.request_lock = asyncio.Lock()
-        self.busy = asyncio.Lock()
-        self.loop_wait_event = asyncio.Event()
+        # Created lazily: see the loop-affinity note on _loop_primitive().
+        self._request_lock: Optional[asyncio.Lock] = None
+        self._busy: Optional[asyncio.Lock] = None
+        self._loop_wait_event: Optional[asyncio.Event] = None
 
         # partition_id -> monotonic deadline; while time.monotonic() < deadline,
         # arm-related properties from RA polling are ignored for that partition.
@@ -61,6 +62,52 @@ class Paradox:
         ps.subscribe(self._on_status_update, "status_update")
         ps.subscribe(self._on_event, "events")
         ps.subscribe(self._on_property_change, "changes")
+
+    def _loop_primitive(self, attr: str, factory):
+        """Return a loop-bound asyncio primitive, creating it on first use.
+
+        Paradox is constructed before the event loop exists (``main`` does
+        ``asyncio.run(_run(Paradox()))``, ``pai_dump_memory`` does the same).
+        On Python 3.8/3.9 ``asyncio.Lock``/``Event`` capture
+        ``get_event_loop()`` in ``__init__``, so building them there binds them
+        to a loop that is never run. The mismatch stays invisible until the
+        first *contended* acquire -- the fast path never touches the bound loop
+        -- and then raises "got Future attached to a different loop", which
+        aborts every polling cycle and forces a reconnect.
+
+        Creating them on first access instead binds them to the loop that
+        actually runs them. On 3.10+ the primitives no longer bind at
+        construction and this is simply a lazy initialisation.
+        """
+        primitive = getattr(self, attr)
+        if primitive is None:
+            primitive = factory()
+            setattr(self, attr, primitive)
+        return primitive
+
+    @property
+    def request_lock(self) -> asyncio.Lock:
+        return self._loop_primitive("_request_lock", asyncio.Lock)
+
+    @request_lock.setter
+    def request_lock(self, value: asyncio.Lock):
+        self._request_lock = value
+
+    @property
+    def busy(self) -> asyncio.Lock:
+        return self._loop_primitive("_busy", asyncio.Lock)
+
+    @busy.setter
+    def busy(self, value: asyncio.Lock):
+        self._busy = value
+
+    @property
+    def loop_wait_event(self) -> asyncio.Event:
+        return self._loop_primitive("_loop_wait_event", asyncio.Event)
+
+    @loop_wait_event.setter
+    def loop_wait_event(self, value: asyncio.Event):
+        self._loop_wait_event = value
 
     @property
     def run_state(self) -> RunState:
@@ -994,6 +1041,13 @@ class Paradox:
         current_state is fully HomeAssistant compatible. Check HASS manual before making any changes.
         """
         for _, properties in self.storage.get_container("partition").items():
+            # Definitions are loaded for every partition slot the panel has,
+            # labels only for the ones actually in use, so unlabelled slots sit
+            # in the container without a "key". They cannot be addressed or
+            # published, and update_container_object() requires one.
+            if not isinstance(properties, dict) or "key" not in properties:
+                continue
+
             change = {}
             if any(
                 [

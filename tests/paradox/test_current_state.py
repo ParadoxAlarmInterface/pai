@@ -110,3 +110,31 @@ async def test_current_alarm(mocker):
         "partition", "Partition_1", {"current_state": "triggered"}
     )
     alarm.panel = None
+
+
+@pytest.mark.asyncio
+async def test_unlabelled_partitions_do_not_break_state_updates(alarm):
+    """Panel definitions cover every partition slot; labels only cover used ones.
+
+    ``load_definitions`` merges an entry for *every* parsed slot, so the
+    partition container legitimately holds objects that never received a
+    ``key`` (``ElementTypeContainer`` guards every key access with
+    ``if "key" in value`` for exactly this reason). ``_update_partition_states``
+    used to index ``properties["key"]`` unconditionally, so a single unlabelled
+    slot raised ``KeyError: 'key'`` and killed the ``events`` subscriber for
+    every live event.
+    """
+    send_initial_status(alarm)
+
+    # Partition 6 exists (definitions) but was never labelled.
+    alarm.storage.get_container("partition").deep_merge(
+        {6: dict(id=6, definition="disabled", arm=False)}
+    )
+
+    alarm._on_status_update(status=dict(partition={1: dict(arm=True)}))
+
+    alarm.storage.update_container_object.assert_any_call(
+        "partition",
+        "Partition_1",
+        {"current_state": "armed_away", "target_state": "armed_away"},
+    )
