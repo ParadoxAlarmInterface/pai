@@ -30,29 +30,25 @@ class SerialConnectionProtocol(ConnectionProtocol):
         self.transport.write(message + b"\r\n")
 
     def data_received(self, recv_data):
+        # Bytes arrive in arbitrary chunks, so partial lines are buffered until
+        # their CRLF terminator shows up in a later callback.
         self.buffer += recv_data
-        logger.debug(f"BUFFER: {self.buffer}")
-        while len(self.buffer) >= 0:
+        logger.debug("BUFFER: %s", self.buffer)
+        while True:
             r = self.buffer.find(b"\r\n")
-            # not found
-            if r < 0:
+            if r < 0:  # No complete frame yet
                 break
 
-            # In the beginning
-            if r == 0:
-                self.buffer = self.buffer[2:]
+            frame = self.buffer[:r]
+            self.buffer = self.buffer[r + 2 :]
+
+            if not frame:  # Empty line between frames
                 continue
 
-            # Buffer is empty
-            if len(self.buffer) == 0:
-                return
-
-            frame = self.buffer[:r]
-            self.buffer = self.buffer[r:]
             # Ignore echoed bytes
             if self.last_message == frame:
                 self.last_message = b""
-            elif len(frame) > 0:
+            else:
                 self.handler.on_message(frame)  # Callback
 
     def reset_framing(self) -> None:

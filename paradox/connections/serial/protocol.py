@@ -16,11 +16,21 @@ logger = logging.getLogger("PAI").getChild(__name__)
 class SerialConnectionProtocol(ConnectionProtocol):
     def __init__(self, handler):
         super().__init__(handler)
-        self._framer = SerialFramer()
+        # Decide once, here, so the framer and this protocol can never
+        # disagree about whether the link is encrypted. Encryption needs a
+        # password to derive the key; without one there is nothing to decrypt
+        # with, so stay in plain mode rather than raising on every frame.
+        self._encrypted_link = bool(cfg.SERIAL_ENCRYPTED and cfg.PASSWORD)
+        if cfg.SERIAL_ENCRYPTED and not cfg.PASSWORD:
+            logger.error(
+                "SERIAL_ENCRYPTED is set but PASSWORD is empty; "
+                "serial encryption disabled. Set PASSWORD to enable it."
+            )
+        self._framer = SerialFramer(encrypted_link=self._encrypted_link)
         self._serial_key = None
 
     def connection_made(self, transport):
-        if cfg.SERIAL_ENCRYPTED and cfg.PASSWORD:
+        if self._encrypted_link:
             self._serial_key = make_serial_key(cfg.PASSWORD)
             transport = EncryptedSerialTransport(transport, self._serial_key)
             logger.info("Serial encryption enabled (SERIAL_ENCRYPTED=True)")
@@ -40,7 +50,9 @@ class SerialConnectionProtocol(ConnectionProtocol):
             if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug(f"SER -> PAI {binascii.hexlify(frame.data)}")
 
-            if frame.encrypted and cfg.SERIAL_ENCRYPTED:
+            # The BabyWare compact E0FE frame is also flagged encrypted, so the
+            # link-level check stays: only AES-scanned frames are decryptable.
+            if frame.encrypted and self._encrypted_link:
                 self._deliver_encrypted(frame.data)
             else:
                 self.handler.on_message(frame.data)

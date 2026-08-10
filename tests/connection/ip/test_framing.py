@@ -3,11 +3,7 @@
 import pytest
 
 from paradox.connections.framing import NEED_MORE, RESYNC
-from paradox.connections.ip.framing import (
-    IP_HEADER_LENGTH,
-    MAX_IP_PAYLOAD,
-    IPFramer,
-)
+from paradox.connections.ip.framing import IP_HEADER_LENGTH, MAX_IP_PAYLOAD, IPFramer
 
 
 def header(length, encrypted=True):
@@ -20,9 +16,8 @@ def header(length, encrypted=True):
 
 def message(payload, encrypted=True):
     body = payload
-    if encrypted:
-        pad = (-len(payload)) % 16
-        body = payload + b"\xee" * pad
+    pad = (-len(payload)) % 16
+    body = payload + b"\xee" * pad
     return header(len(payload), encrypted) + body
 
 
@@ -58,9 +53,12 @@ class TestLengthDerivation:
     def test_encrypted_payload_is_padded_to_16(self, framer):
         assert framer.derive_length(header(6)).length == IP_HEADER_LENGTH + 16
 
-    def test_unencrypted_payload_is_not_padded(self, framer):
+    def test_unencrypted_payload_is_also_padded(self, framer):
+        # The wire pads regardless of the encrypt flag: the original
+        # implementation only ever processed 16-aligned totals. Taking just
+        # `length` bytes would strand the padding and drop the next message.
         assert framer.derive_length(header(6, encrypted=False)).length == (
-            IP_HEADER_LENGTH + 6
+            IP_HEADER_LENGTH + 16
         )
 
     def test_zero_length_payload_is_header_only(self, framer):
@@ -84,6 +82,14 @@ class TestFraming:
     def test_unencrypted_message_emits(self, framer):
         msg = message(b"\x01" * 6, encrypted=False)
         assert [f.data for f in frames(framer, msg)] == [msg]
+
+    def test_pipelined_unencrypted_messages_all_emit(self, framer):
+        # Regression: taking only `length` bytes for an unencrypted message
+        # left its padding in the buffer, which failed the SOF check and made
+        # _drop_buffer() discard every message queued behind it.
+        a = message(b"\x01" * 6, encrypted=False)
+        b = message(b"\x02" * 6, encrypted=False)
+        assert [f.data for f in frames(framer, a + b)] == [a, b]
 
     def test_pipelined_messages_all_emit(self, framer):
         # Regression: only the first message used to be processed and the rest

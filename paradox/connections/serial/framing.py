@@ -7,7 +7,7 @@ against real captures with plain ``bytes``.
 
 import binascii
 import logging
-from typing import Iterator
+from typing import Iterator, Optional
 
 from paradox.config import config as cfg
 from paradox.connections.framing import (
@@ -25,6 +25,12 @@ logger = logging.getLogger("PAI").getChild(__name__)
 #: Shortest and longest plausible unencrypted serial frame. A length derived
 #: outside this range means the buffer head is misaligned (e.g. after a lost
 #: serial byte), not that a real frame is on its way.
+#:
+#: 71 is the protocol maximum: EVO's largest reply is an EEPROM read of
+#: ``max_eeprom_response_data_length`` (64, see hardware/evo/panel.py) plus a
+#: 7 byte header. Without this clamp a misaligned battery-voltage byte
+#: (0xC0-0xCF) reads through the 0xC branch as a ~39,000 byte length and
+#: blocks the framer for minutes -- the amplifier described in issue #609.
 MIN_MESSAGE_LENGTH = 4
 MAX_MESSAGE_LENGTH = 71
 
@@ -51,16 +57,27 @@ MAX_AES_FRAME_LENGTH = 2 + MAX_AES_BLOCKS * 16 + 1
 class SerialFramer:
     """Turns a serial byte stream into frames.
 
-    Progress invariant: every pass of :meth:`feed` either emits a frame,
-    consumes at least one byte, or returns with a bounded buffer.
+    Progress invariant: no pass of :meth:`feed` can leave the buffer growing
+    without bound. A pass either emits a frame, consumes at least one byte, or
+    returns needing more data with the outstanding bytes bounded by
+    :data:`MAX_AES_FRAME_LENGTH` (encrypted) or
+    :data:`MAX_MESSAGE_LENGTH` (plain). Waiting is therefore always for a
+    bounded amount of further input, never indefinite.
     """
 
-    def __init__(self, use_variable_message_length: bool = True) -> None:
+    def __init__(
+        self,
+        use_variable_message_length: bool = True,
+        encrypted_link: Optional[bool] = None,
+    ) -> None:
         self.buffer = FrameBuffer()
         self.use_variable_message_length = use_variable_message_length
-        # Read once here rather than per byte; the connection is rebuilt when
-        # configuration changes.
-        self._encrypted_link = bool(cfg.SERIAL_ENCRYPTED)
+        # Supplied by the protocol so both agree on one value. Falls back to
+        # config for direct construction; read once rather than per byte, as
+        # the connection is rebuilt when configuration changes.
+        self._encrypted_link = (
+            bool(cfg.SERIAL_ENCRYPTED) if encrypted_link is None else encrypted_link
+        )
 
     def reset(self) -> None:
         self.buffer.clear()
@@ -68,11 +85,17 @@ class SerialFramer:
     def feed(self, data: bytes) -> Iterator[Frame]:
         """Append ``data`` and yield every complete frame it completes.
 
-        A generator rather than a list: if the consumer raises while handling
-        frame *n*, frames *n+1..* remain buffered and are re-parsed on the next
-        feed instead of being silently dropped.
+        The append is eager, so bytes are never lost if the caller drops the
+        iterator without consuming it. Only frame extraction is deferred.
+
+        Extraction yields lazily rather than returning a list: if the consumer
+        raises while handling frame *n*, frames *n+1..* remain buffered and are
+        re-parsed on the next feed instead of being silently dropped.
         """
         self.buffer.append(data)
+        return self._iter_frames()
+
+    def _iter_frames(self) -> Iterator[Frame]:
         try:
             while True:
                 frame = self._next_frame()

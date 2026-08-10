@@ -497,3 +497,37 @@ def test_discarded_byte_is_logged(caplog):
         cp.data_received(b"\x11\x22" + VALID_37BYTE_FRAME)
 
     assert any("discarding byte" in r.message for r in caplog.records)
+
+
+def test_encrypted_without_password_falls_back_to_plain(mocker):
+    """SERIAL_ENCRYPTED=True with no PASSWORD must not raise on every frame.
+
+    There is no key to decrypt with, so the framer must stay in plain mode.
+    Previously the framer still AES-scanned while the key was None, and
+    decrypt_serial_message(data, None) raised TypeError for each frame,
+    killing the link.
+    """
+    mocker.patch.object(cfg, "SERIAL_ENCRYPTED", True)
+    mocker.patch.object(cfg, "PASSWORD", None)
+
+    handler = MagicMock()
+    cp = SerialConnectionProtocol(handler)
+
+    assert cp._encrypted_link is False
+
+    body = b"\xe0\xfe" + bytes(16)
+    cp.data_received(body + bytes([sum(body) % 256]))  # must not raise
+
+
+def test_framer_and_protocol_agree_on_encryption(mocker):
+    """The framer must not read SERIAL_ENCRYPTED independently of the protocol."""
+    mocker.patch.object(cfg, "SERIAL_ENCRYPTED", True)
+    mocker.patch.object(cfg, "PASSWORD", "1234")
+
+    cp = SerialConnectionProtocol(MagicMock())
+    assert cp._encrypted_link is True
+    assert cp._framer._encrypted_link is True
+
+    # A later config flip must not desynchronise an already-built protocol.
+    mocker.patch.object(cfg, "SERIAL_ENCRYPTED", False)
+    assert cp._framer._encrypted_link is cp._encrypted_link

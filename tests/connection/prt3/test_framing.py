@@ -78,3 +78,21 @@ def test_emitted_value_is_a_frame(framer):
 def test_custom_terminator():
     framer = LineFramer(terminator=b"\n")
     assert [f.data for f in framer.feed(b"A\nB\n")] == [b"A\n", b"B\n"]
+
+
+def test_burst_of_complete_lines_over_the_cap_is_not_discarded(framer):
+    """The cap targets a lost terminator, not a backlog of good lines.
+
+    The overflow check used to run before extraction, so a burst larger than
+    MAX_LINE_LENGTH threw away every complete line it contained.
+    """
+    burst = b"".join(b"G001N%03d\r" % i for i in range(60))
+    assert len(burst) > MAX_LINE_LENGTH
+
+    assert len(list(framer.feed(burst))) == 60
+    assert framer.buffer.pending == b""
+
+
+def test_oversized_run_without_terminator_is_still_discarded(framer):
+    list(framer.feed(b"X" * (MAX_LINE_LENGTH + 1)))
+    assert framer.buffer.pending == b""

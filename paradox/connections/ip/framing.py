@@ -25,8 +25,12 @@ IP_HEADER_LENGTH = 16
 _LENGTH_OFFSET = 1
 _FLAGS_OFFSET = 4
 
-#: Bit 0 of the flags byte marks an encrypted, and therefore 16 byte aligned,
-#: payload. An unencrypted payload is exactly ``length`` bytes.
+#: Bit 0 of the flags byte marks an encrypted payload. Payloads are padded up
+#: to a 16 byte boundary on the wire regardless of this flag: the original
+#: implementation refused to process any message whose total length was not a
+#: multiple of 16, so every message PAI has ever handled in the field was
+#: aligned. Only the parser distinguishes the two, and it reads exactly
+#: ``header.length`` bytes, ignoring any padding.
 _ENCRYPT_FLAG = 0x01
 
 #: Any declared payload beyond this is a desynchronised stream, not a message.
@@ -50,8 +54,15 @@ class IPFramer:
         self.buffer.clear()
 
     def feed(self, data: bytes) -> Iterator[Frame]:
-        """Append ``data`` and yield every complete message it completes."""
+        """Append ``data`` and yield every complete message it completes.
+
+        The append is eager, so bytes are never lost if the caller drops the
+        iterator without consuming it. Only frame extraction is deferred.
+        """
         self.buffer.append(data)
+        return self._iter_frames()
+
+    def _iter_frames(self) -> Iterator[Frame]:
         try:
             while True:
                 frame = self._next_frame()
@@ -101,8 +112,11 @@ class IPFramer:
             return RESYNC
 
         encrypted = bool(head[_FLAGS_OFFSET] & _ENCRYPT_FLAG)
-        if encrypted:
-            # Only an encrypted payload is padded up to a 16 byte boundary.
-            payload_length += (-payload_length) % 16
+
+        # Padded whether or not the payload is encrypted. Taking only
+        # ``length`` bytes for an unencrypted message would leave the padding
+        # in the buffer, where it fails the SOF check and costs every
+        # pipelined message behind it.
+        payload_length += (-payload_length) % 16
 
         return FrameLength(IP_HEADER_LENGTH + payload_length, encrypted=encrypted)

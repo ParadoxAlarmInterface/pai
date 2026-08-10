@@ -62,6 +62,45 @@ async def test_serial_connection_protocol():
     handler.on_connection_loss.assert_called_once_with()
 
 
+@pytest.mark.asyncio
+async def test_serial_connection_protocol_reassembles_split_frames():
+    # Characterization test: pins the existing framing contract so the buffer
+    # can later be swapped for a shared framer. Not a regression test -- the
+    # pre-refactor loop passed this too.
+    handler = mock.MagicMock()
+    protocol = SerialConnectionProtocol(handler)
+    protocol.connection_made(mock.MagicMock())
+
+    protocol.data_received(b"par")
+    handler.on_message.assert_not_called()
+
+    protocol.data_received(b"tial\r\n\r\nOK\r\ntrail")
+
+    assert handler.on_message.call_args_list == [
+        mock.call(b"partial"),
+        mock.call(b"OK"),
+    ]
+    assert protocol.buffer == b"trail"
+
+    protocol.reset_framing()
+    assert protocol.buffer == b""
+
+
+@pytest.mark.asyncio
+async def test_serial_connection_protocol_drops_echoed_message():
+    # Characterization test: documents that echo suppression requires an exact
+    # match against the last sent message. See the follow-up issue on GSM
+    # framing for the `\r`-only echo and sticky `last_message` shortcomings.
+    handler = mock.MagicMock()
+    protocol = SerialConnectionProtocol(handler)
+    protocol.connection_made(mock.MagicMock())
+
+    await protocol.send_message(b"AT")
+    protocol.data_received(b"AT\r\nOK\r\n")
+
+    handler.on_message.assert_called_once_with(b"OK")
+
+
 # Test SerialCommunication class
 @pytest.mark.asyncio
 async def test_serial_communication(connected_serial_communication):

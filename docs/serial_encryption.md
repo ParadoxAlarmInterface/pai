@@ -60,7 +60,7 @@ encryption; only the key derivation differs.
 key = pc_password_bytes  +  b"\xee" * (32 - len(pc_password_bytes))
 ```
 
-- `make_serial_key(password)` in `paradox/connections/serial_encryption.py`
+- `make_serial_key(password)` in `paradox/connections/serial/encryption.py`
   handles `str`, `bytes`, and `int` password types.
 - The PC password is the 4-hex-digit code configured on the panel
   (e.g. `"0000"` → `b"0000" + b"\xee" * 28`).
@@ -155,12 +155,13 @@ pai-decrypt capture.serial --serial --pc-password 0000
 | File | Role |
 |---|---|
 | `paradox/lib/crypto.py` | `encrypt()`, `decrypt()`, `encrypt_serial_message()`, `decrypt_serial_message()` |
-| `paradox/connections/serial_encryption.py` | `EncryptedSerialTransport`, `make_serial_key()` |
-| `paradox/connections/protocols.py` | `SerialConnectionProtocol` — framing and dispatch |
+| `paradox/connections/serial/encryption.py` | `EncryptedSerialTransport`, `make_serial_key()` |
+| `paradox/connections/serial/framing.py` | `SerialFramer` — pure byte framing and AES block scan |
+| `paradox/connections/serial/protocol.py` | `SerialConnectionProtocol` — asyncio glue and dispatch |
 | `paradox/config.py` | `SERIAL_ENCRYPTED` flag |
 | `paradox/console_scripts/ip150_connection_decrypt.py` | Offline capture decryption tool |
 | `tests/lib/test_serial_crypto.py` | Unit tests for encrypt/decrypt roundtrips |
-| `tests/connection/test_serial_protocol.py` | Integration tests for framing and decryption |
+| `tests/connection/serial/test_protocol.py` | Integration tests for framing and decryption |
 
 ---
 

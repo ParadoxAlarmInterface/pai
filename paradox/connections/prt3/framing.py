@@ -32,21 +32,28 @@ class LineFramer:
 
         Lines with no printable content are dropped: a bare terminator carries
         no message.
+
+        The append is eager, so bytes are never lost if the caller drops the
+        iterator without consuming it. Only line extraction is deferred.
         """
         self.buffer.append(data)
+        return self._iter_frames()
 
-        if len(self.buffer) > self._max_line_length:
-            logger.warning(
-                "PRT3: buffer overflow (%d bytes), discarding", len(self.buffer)
-            )
-            self.buffer.clear()
-            return
-
+    def _iter_frames(self) -> Iterator[Frame]:
         try:
             while True:
                 pending = self.buffer.pending
                 index = pending.find(self._terminator)
                 if index < 0:
+                    # Only now, with no complete line left to rescue, is a
+                    # large buffer evidence of a lost terminator rather than
+                    # of a burst of good lines waiting to be extracted.
+                    if len(self.buffer) > self._max_line_length:
+                        logger.warning(
+                            "PRT3: buffer overflow (%d bytes), discarding",
+                            len(self.buffer),
+                        )
+                        self.buffer.clear()
                     return
 
                 line = self.buffer.take(index + len(self._terminator))

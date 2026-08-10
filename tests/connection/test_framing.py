@@ -144,3 +144,42 @@ def test_frame_length_defaults_to_unencrypted():
 def test_frame_defaults_to_unencrypted():
     assert Frame(b"abc").encrypted is False
     assert Frame(b"abc").data == b"abc"
+
+
+# feed() defers frame extraction but must not defer the append: a caller that
+# drops the iterator without consuming it would otherwise lose the bytes.
+
+
+@pytest.mark.parametrize(
+    "make_framer, data",
+    [
+        (lambda: _serial_framer(), b"\x12\x06"),
+        (lambda: _ip_framer(), b"\xaa\x05\x00" + b"\x00" * 13 + b"hello"),
+        (lambda: _line_framer(), b"AT\r"),
+    ],
+    ids=["serial", "ip", "prt3"],
+)
+def test_feed_buffers_data_even_if_iterator_is_never_consumed(make_framer, data):
+    framer = make_framer()
+
+    framer.feed(data)  # deliberately not iterated
+
+    assert framer.buffer.pending == data
+
+
+def _serial_framer():
+    from paradox.connections.serial.framing import SerialFramer
+
+    return SerialFramer()
+
+
+def _ip_framer():
+    from paradox.connections.ip.framing import IPFramer
+
+    return IPFramer()
+
+
+def _line_framer():
+    from paradox.connections.prt3.framing import LineFramer
+
+    return LineFramer()

@@ -9,7 +9,11 @@ import pytest
 
 from paradox.config import config as cfg
 from paradox.connections.framing import NEED_MORE, RESYNC
-from paradox.connections.serial.framing import MAX_AES_BLOCKS, SerialFramer
+from paradox.connections.serial.framing import (
+    MAX_AES_BLOCKS,
+    MAX_MESSAGE_LENGTH,
+    SerialFramer,
+)
 
 
 def frames(framer, data):
@@ -225,3 +229,26 @@ class TestReset:
         assert len(plain.buffer) == 3
         plain.reset()
         assert len(plain.buffer) == 0
+
+
+class TestPlausibleLengthClamp:
+    """The 71 byte maximum is what stops issue #609's minutes-long stall.
+
+    A misaligned battery-voltage byte reads as a ~39,000 byte length through
+    the 0xC branch; without the clamp the framer waits for data that will
+    never come instead of sliding one byte and recovering.
+    """
+
+    def test_direct_length_nibble_over_the_maximum_resyncs(self, plain):
+        for nibble in (0xA, 0xB, 0xD):
+            head = bytes([nibble << 4, MAX_MESSAGE_LENGTH + 1]) + b"\x00" * 6
+            assert plain.derive_length(head) is RESYNC, hex(nibble)
+
+    def test_big_endian_nibble_over_the_maximum_resyncs(self, plain):
+        # 0xC derives length from two bytes: this is the #609 trigger.
+        assert plain.derive_length(b"\xc0\x98\x40" + b"\x00" * 5) is RESYNC
+
+    def test_oversized_length_does_not_stall_the_link(self, plain):
+        # The clamp must cost one byte, not block until 39,000 bytes arrive.
+        list(plain.feed(b"\xc0\x98\x40" + b"\x00" * 5))
+        assert len(plain.buffer) < 8
