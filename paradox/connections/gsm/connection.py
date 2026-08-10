@@ -59,18 +59,23 @@ class GsmSerialConnection(Connection):
             self.connected_future.set_result(True)
 
     def on_message(self, message: bytes):
-        """Route a modem line to the waiting caller or to the push callback.
+        """Route a modem line to the push callback, or to the waiting caller.
 
         Overrides :class:`~paradox.connections.connection.Connection`, whose
         handler registry dispatches parsed panel messages. Modem lines are
-        plain bytes answering a specific command, so they queue instead.
+        plain bytes, so they queue instead.
+
+        The callback returns whether it consumed the line. Unsolicited results
+        (``+CMT``, ``+CUSD``) belong to it; anything it declines is a reply to
+        a command in flight and goes to the queue. Routing *everything* to the
+        callback would starve :meth:`send_command` for the life of the process.
         """
         logger.debug("M->I: %s", message)
 
-        if self.recv_callback is not None:
-            self.recv_callback(message)
-        else:
-            self.queue.put_nowait(message)
+        if self.recv_callback is not None and self.recv_callback(message):
+            return
+
+        self.queue.put_nowait(message)
 
     def set_recv_callback(self, callback: Optional[Callable[[bytes], bool]]):
         self.recv_callback = callback
@@ -86,11 +91,34 @@ class GsmSerialConnection(Connection):
     def make_protocol(self):
         return GsmSerialProtocol(self)
 
-    async def send_command(self, message: bytes, timeout=DEFAULT_COMMAND_TIMEOUT):
-        """Send an AT command and wait for the modem's next line."""
+    async def send_command(
+        self,
+        message: bytes,
+        timeout=DEFAULT_COMMAND_TIMEOUT,
+        expect_prompt: bool = False,
+    ):
+        """Send an AT command and wait for the modem's next line.
+
+        Set ``expect_prompt`` when the command is answered by an unterminated
+        ``"> "`` entry prompt rather than by a line, as ``AT+CMGS`` is.
+        """
         logger.debug("I->M: %s", message)
+
+        if expect_prompt:
+            if self._protocol is None:
+                raise ConnectionError("Not connected")
+            self._protocol.expect_prompt()
+
         self.write(message)
         return await asyncio.wait_for(self.queue.get(), timeout=timeout)
+
+    def write_raw(self, message: bytes) -> None:
+        """Write bytes with no line terminator, for an SMS body."""
+        if not self.connected or self._protocol is None:
+            raise ConnectionError("Not connected")
+
+        logger.debug("I->M: %s (raw)", message)
+        self._protocol.send_raw(message)
 
     async def read(self, timeout=DEFAULT_COMMAND_TIMEOUT):
         if self._protocol is None:

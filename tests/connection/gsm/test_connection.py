@@ -151,3 +151,63 @@ async def test_clear_replaces_the_queue(connected_gsm_connection):
     comm.clear()
 
     assert comm.queue.empty()
+
+
+@pytest.mark.asyncio
+async def test_a_declined_line_still_reaches_the_command_waiter(
+    connected_gsm_connection,
+):
+    """Routing every line to the callback used to starve send_command forever."""
+    comm = connected_gsm_connection
+    comm.set_recv_callback(lambda message: message.startswith(b"+CMT"))
+
+    comm.on_message(b"+CMT: unsolicited")
+    comm.on_message(b"OK")
+
+    assert await comm.read(timeout=0.1) == b"OK"
+    assert comm.queue.empty()
+
+
+@pytest.mark.asyncio
+async def test_a_consumed_line_is_not_queued(connected_gsm_connection):
+    comm = connected_gsm_connection
+    consumed = []
+
+    def callback(message):
+        consumed.append(message)
+        return True
+
+    comm.set_recv_callback(callback)
+    comm.on_message(b"+CUSD: 1")
+
+    assert consumed == [b"+CUSD: 1"]
+    assert comm.queue.empty()
+
+
+@pytest.mark.asyncio
+async def test_send_command_can_arm_the_sms_prompt(connected_gsm_connection):
+    comm = connected_gsm_connection
+
+    with mock.patch.object(comm._protocol, "expect_prompt") as expect_prompt:
+        asyncio.get_event_loop().call_soon(comm.on_message, b"> ")
+        assert await comm.send_command(b'AT+CMGS="+1"', expect_prompt=True) == b"> "
+
+    expect_prompt.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_write_raw_bypasses_the_line_terminator(connected_gsm_connection):
+    comm = connected_gsm_connection
+
+    with mock.patch.object(comm._protocol, "transport") as transport:
+        comm.write_raw(b"body\x1a")
+
+    transport.write.assert_called_once_with(b"body\x1a")
+
+
+@pytest.mark.asyncio
+async def test_write_raw_requires_a_connection():
+    comm = GsmSerialConnection("test_port", 9600, 5)
+
+    with pytest.raises(ConnectionError):
+        comm.write_raw(b"body\x1a")

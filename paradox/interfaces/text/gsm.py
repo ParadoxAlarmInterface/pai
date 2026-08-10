@@ -4,6 +4,7 @@ import logging
 
 from paradox.config import config as cfg
 from paradox.connections.gsm.connection import GsmSerialConnection
+from paradox.connections.gsm.protocol import PROMPT
 from paradox.event import EventLevel, Notification
 from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
 from paradox.lib import ps
@@ -12,6 +13,15 @@ from paradox.lib import ps
 # Only exposes critical status changes and accepts commands
 
 logger = logging.getLogger("PAI").getChild(__name__)
+
+#: Ends an SMS body and hands it to the modem for sending.
+CTRL_Z = b"\x1a"
+
+#: Abandons SMS entry mode without sending.
+ESC = b"\x1b"
+
+#: Delivery to the network can be slow on a weak signal.
+SMS_SEND_TIMEOUT = 60
 
 
 class GSMTextInterface(ConfiguredAbstractTextInterface):
@@ -105,6 +115,12 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
             await asyncio.sleep(5)
 
     def data_received(self, raw: bytes) -> bool:
+        """Handle an unsolicited modem line.
+
+        Returns whether the line was consumed. Anything declined here is a
+        reply to a command in flight and falls through to the connection's
+        queue, which is what lets :meth:`_send_sms` see its own responses.
+        """
         logger.debug(f"Data Received: {raw}")
 
         try:
@@ -116,7 +132,9 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
 
         if data.startswith("+CMT"):
             self.message_cmt = data
-        elif self.message_cmt is not None:
+            return True
+
+        if self.message_cmt is not None:
             # Clear before parsing: a header left in place after a failure
             # would capture every following line as its SMS body.
             header, self.message_cmt = self.message_cmt, None
@@ -124,13 +142,16 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
                 self.process_cmt(header, data)
             except (ValueError, IndexError):
                 logger.warning("Discarding malformed +CMT message: %r", header)
-        elif data.startswith("+CUSD:"):
+            return True
+
+        if data.startswith("+CUSD:"):
             try:
                 self.process_cusd(data)
             except (ValueError, IndexError):
                 logger.warning("Discarding malformed +CUSD message: %r", data)
+            return True
 
-        return True
+        return False
 
     async def handle_message(self, timestamp: str, source: str, message: str) -> None:
         """Handle GSM message. It should be a command"""
@@ -151,19 +172,72 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
             Notification(sender=self.name, message=m, level=EventLevel.INFO)
         )
 
-    async def send_message(self, message: str, level: EventLevel) -> None:
-        if self.port is None:
+    def send_message(self, message: str, level: EventLevel) -> None:
+        """Queue an SMS to every configured contact.
+
+        Synchronous to match :class:`AbstractTextInterface`, which is called
+        straight from the pubsub handlers. Declaring this ``async`` made every
+        notification build a coroutine that nobody ever awaited.
+        """
+        if self.port is None or not self.modem_connected:
             logger.warning("GSM not available when sending message")
             return
 
-        for dst in cfg.GSM_CONTACTS:
-            data = b'AT+CMGS="%b"\x0d%b\x1a' % (dst.encode(), message.encode())
+        self._loop.create_task(self._send_sms_to_contacts(message))
 
+    async def _send_sms_to_contacts(self, message: str) -> None:
+        for dst in cfg.GSM_CONTACTS:
             try:
-                result = await self.port.send_command(data)
-                logger.debug(f"SMS result: {result}")
+                await self._send_sms(dst, message)
             except Exception:
-                logger.exception("ERROR sending SMS")
+                logger.exception("ERROR sending SMS to %s", dst)
+
+    async def _send_sms(self, destination: str, message: str) -> None:
+        """Send one text-mode SMS.
+
+        The exchange is two-stage: ``AT+CMGS`` is answered by a ``"> "`` entry
+        prompt, and only then does the modem accept the body, terminated by
+        Ctrl-Z. Sending both at once -- as this did -- leaves the modem sitting
+        in entry mode and the message unsent.
+        """
+        prompt = await self.port.send_command(
+            b'AT+CMGS="%b"' % destination.encode(), expect_prompt=True
+        )
+
+        if prompt != PROMPT:
+            # The modem may still be in entry mode; ESC leaves it cleanly
+            # rather than letting the next command become SMS text.
+            self.port.write_raw(ESC)
+            raise ValueError(f"Modem did not ask for an SMS body: {prompt!r}")
+
+        self.port.write_raw(message.encode() + CTRL_Z)
+
+        result = await self._read_final_result(SMS_SEND_TIMEOUT)
+        logger.debug(f"SMS to {destination} result: {result}")
+
+    async def _read_final_result(self, timeout: float) -> bytes:
+        """Drain modem lines until a final result code.
+
+        Sending can take the best part of a minute on a weak network, and the
+        modem interleaves informational lines such as ``+CMGS: 42`` before the
+        closing ``OK``.
+        """
+        deadline = self._loop.time() + timeout
+
+        while True:
+            remaining = deadline - self._loop.time()
+            if remaining <= 0:
+                raise asyncio.TimeoutError("No final result code from modem")
+
+            line = await self.port.read(timeout=remaining)
+            if line is None:
+                raise ConnectionError("Modem disconnected while sending")
+
+            if line == b"OK":
+                return line
+
+            if line == b"ERROR" or line.startswith((b"+CME ERROR", b"+CMS ERROR")):
+                raise ValueError(f"Modem rejected the SMS: {line!r}")
 
     def process_cmt(self, header: str, text: str) -> None:
         idx = header.find(" ")

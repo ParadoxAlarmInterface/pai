@@ -19,6 +19,10 @@ MAX_LINE_LENGTH = 1024
 
 TERMINATOR = b"\r\n"
 
+#: What the modem sends to ask for an SMS body. It is *not* terminated, so the
+#: line framer can never surface it on its own.
+PROMPT = b"> "
+
 
 class GsmSerialProtocol(ConnectionProtocol):
     """CRLF line framing and modem echo suppression for an AT-command modem.
@@ -32,6 +36,7 @@ class GsmSerialProtocol(ConnectionProtocol):
     def __init__(self, handler: ConnectionHandler):
         super().__init__(handler)
         self.last_message = b""
+        self._prompt_expected = False
         self._framer = LineFramer(
             terminator=TERMINATOR,
             max_line_length=MAX_LINE_LENGTH,
@@ -43,6 +48,24 @@ class GsmSerialProtocol(ConnectionProtocol):
         self.last_message = message
         self.transport.write(message + TERMINATOR)
 
+    def send_raw(self, message: bytes) -> None:
+        """Write bytes verbatim, without the AT line terminator.
+
+        An SMS body is ended by Ctrl-Z rather than ``<CR><LF>``; appending a
+        terminator would put a stray blank line into the message.
+        """
+        self.check_active()
+        self.transport.write(message)
+
+    def expect_prompt(self) -> None:
+        """Arm one-shot detection of the SMS entry prompt.
+
+        Scoped to a single command because ``"> "`` is indistinguishable from a
+        line that has merely not finished arriving. Only a caller that just
+        sent ``AT+CMGS`` knows a prompt is due.
+        """
+        self._prompt_expected = True
+
     def data_received(self, recv_data):
         for frame in self._framer.feed(recv_data):
             message = frame.data
@@ -51,12 +74,27 @@ class GsmSerialProtocol(ConnectionProtocol):
             if self._is_echo(message):
                 continue
 
-            try:
-                self.handler.on_message(message)
-            except Exception:
-                # A single unparseable line must not strand the frames behind
-                # it: they would sit in the buffer until the next byte arrives.
-                logger.exception("Error handling modem message")
+            self._dispatch(message)
+
+        self._check_for_prompt()
+
+    def _dispatch(self, message: bytes) -> None:
+        try:
+            self.handler.on_message(message)
+        except Exception:
+            # A single unparseable line must not strand the frames behind
+            # it: they would sit in the buffer until the next byte arrives.
+            logger.exception("Error handling modem message")
+
+    def _check_for_prompt(self) -> None:
+        """Surface an armed, unterminated ``"> "`` left over after framing."""
+        if not self._prompt_expected or self._framer.buffer.pending != PROMPT:
+            return
+
+        logger.debug("M->P: %s (prompt)", PROMPT)
+        self._prompt_expected = False
+        self._framer.reset()
+        self._dispatch(PROMPT)
 
     def _is_echo(self, message: bytes) -> bool:
         """True when ``message`` is the modem echoing back the last command.
@@ -76,6 +114,7 @@ class GsmSerialProtocol(ConnectionProtocol):
     def reset_framing(self) -> None:
         self._framer.reset()
         self.last_message = b""
+        self._prompt_expected = False
 
     @property
     def buffer(self) -> bytes:

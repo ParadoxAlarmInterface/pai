@@ -4,7 +4,11 @@ from unittest import mock
 
 import pytest
 
-from paradox.connections.gsm.protocol import MAX_LINE_LENGTH, GsmSerialProtocol
+from paradox.connections.gsm.protocol import (
+    MAX_LINE_LENGTH,
+    PROMPT,
+    GsmSerialProtocol,
+)
 
 
 # Test GsmSerialProtocol class
@@ -147,3 +151,86 @@ async def test_gsm_serial_protocol_reset_framing_clears_echo_expectation():
     protocol.data_received(b"AT\r\n")
 
     handler.on_message.assert_called_once_with(b"AT")
+
+
+@pytest.fixture
+async def connected_protocol():
+    handler = mock.MagicMock()
+    protocol = GsmSerialProtocol(handler)
+    protocol.connection_made(mock.MagicMock())
+    handler.reset_mock()
+    return protocol
+
+
+@pytest.mark.asyncio
+async def test_the_sms_prompt_is_surfaced_when_expected(connected_protocol):
+    """ "> " carries no terminator, so the framer alone can never emit it."""
+    connected_protocol.expect_prompt()
+
+    connected_protocol.data_received(b"\r\n> ")
+
+    connected_protocol.handler.on_message.assert_called_once_with(PROMPT)
+    assert connected_protocol.buffer == b""
+
+
+@pytest.mark.asyncio
+async def test_the_sms_prompt_is_ignored_when_not_expected(connected_protocol):
+    """Unarmed, "> " is just a line that has not finished arriving."""
+    connected_protocol.data_received(b"\r\n> ")
+
+    connected_protocol.handler.on_message.assert_not_called()
+    assert connected_protocol.buffer == b"> "
+
+
+@pytest.mark.asyncio
+async def test_the_sms_prompt_expectation_is_one_shot(connected_protocol):
+    connected_protocol.expect_prompt()
+    connected_protocol.data_received(b"\r\n> ")
+    connected_protocol.handler.reset_mock()
+
+    connected_protocol.data_received(b"> ")
+
+    connected_protocol.handler.on_message.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_lines_are_still_delivered_while_a_prompt_is_expected(connected_protocol):
+    connected_protocol.expect_prompt()
+
+    connected_protocol.data_received(b"+CMTI: 1\r\n> ")
+
+    assert [
+        c.args[0] for c in connected_protocol.handler.on_message.call_args_list
+    ] == [
+        b"+CMTI: 1",
+        PROMPT,
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_partial_line_is_not_mistaken_for_a_prompt(connected_protocol):
+    connected_protocol.expect_prompt()
+
+    connected_protocol.data_received(b"+CMGS")
+    connected_protocol.handler.on_message.assert_not_called()
+
+    connected_protocol.data_received(b": 42\r\n")
+    connected_protocol.handler.on_message.assert_called_once_with(b"+CMGS: 42")
+
+
+@pytest.mark.asyncio
+async def test_send_raw_appends_no_terminator(connected_protocol):
+    """An SMS body ends with Ctrl-Z; a CRLF would add a blank line to it."""
+    connected_protocol.send_raw(b"body\x1a")
+
+    connected_protocol.transport.write.assert_called_once_with(b"body\x1a")
+
+
+@pytest.mark.asyncio
+async def test_reset_framing_disarms_the_prompt(connected_protocol):
+    connected_protocol.expect_prompt()
+    connected_protocol.reset_framing()
+
+    connected_protocol.data_received(b"\r\n> ")
+
+    connected_protocol.handler.on_message.assert_not_called()
