@@ -8,8 +8,9 @@ from paradox.config import config as cfg
 from paradox.connections.connection import Connection
 from paradox.connections.handler import IPConnectionHandler
 from paradox.connections.ip.commands import IPModuleConnectCommand
+from paradox.connections.ip.protocol import IPConnectionProtocol
 from paradox.connections.ip.stun_session import StunSession
-from paradox.connections.protocols import IPConnectionProtocol, SerialConnectionProtocol
+from paradox.connections.serial.protocol import SerialConnectionProtocol
 from paradox.exceptions import PAICriticalException
 from paradox.lib.handlers import FutureHandler, HandlerRegistry
 

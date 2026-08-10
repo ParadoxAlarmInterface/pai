@@ -1,8 +1,9 @@
 import binascii
+import logging
 from unittest.mock import MagicMock, call
 
 from paradox.config import config as cfg
-from paradox.connections.serial_connection import SerialConnectionProtocol
+from paradox.connections.serial.protocol import SerialConnectionProtocol
 
 
 def test_6byte_message():
@@ -293,7 +294,7 @@ def test_encrypted_mode_outgoing_wraps_in_e0fe(mocker):
     mocker.patch.object(cfg, "SERIAL_ENCRYPTED", True)
     mocker.patch.object(cfg, "PASSWORD", "1234")
     # Avoid asyncio.get_running_loop() in the base class connection_made
-    from paradox.connections.protocols import ConnectionProtocol
+    from paradox.connections.protocol_base import ConnectionProtocol
 
     mocker.patch.object(ConnectionProtocol, "connection_made")
 
@@ -304,7 +305,7 @@ def test_encrypted_mode_outgoing_wraps_in_e0fe(mocker):
 
     # Manually populate the fields that the base connection_made would have set,
     # so that check_active() passes.
-    from paradox.connections.serial_encryption import (
+    from paradox.connections.serial.encryption import (
         EncryptedSerialTransport,
         make_serial_key,
     )
@@ -328,7 +329,7 @@ def test_encrypted_mode_incoming_e0fe_is_decrypted(mocker):
 
     mocker.patch.object(cfg, "SERIAL_ENCRYPTED", True)
     mocker.patch.object(cfg, "PASSWORD", "1234")
-    from paradox.connections.protocols import ConnectionProtocol
+    from paradox.connections.protocol_base import ConnectionProtocol
 
     mocker.patch.object(ConnectionProtocol, "connection_made")
 
@@ -344,3 +345,189 @@ def test_encrypted_mode_incoming_e0fe_is_decrypted(mocker):
     cp.data_received(frame)
 
     handler.on_message.assert_called_once_with(payload)
+
+
+# ── Malformed / misaligned framing tests (issue #609) ───────────────────────
+
+VALID_37BYTE_FRAME = (
+    b"\xe2\xff\xad\x06\x14\x13\x01\x04\x0e\x10\x00\x01\x05\x00"
+    b"\x00\x00\x00\x00\x02Living room     \x00\xcc"
+)
+
+
+def _loop_guarded_handler(max_calls=200):
+    """Handler that raises instead of letting a non-terminating parser loop hang."""
+    handler = MagicMock()
+    calls = []
+
+    def guard(message):
+        calls.append(message)
+        if len(calls) > max_calls:
+            raise AssertionError(
+                "data_received did not terminate: on_message called %d times"
+                % len(calls)
+            )
+
+    handler.on_message.side_effect = guard
+    return handler
+
+
+def test_e0fe_zero_length_does_not_block_parser(mocker):
+    """E0 FE 00 (unencrypted) must not stall or spin the framer (issue #609).
+
+    The BabyWare compact branch reads the length from byte [2]. A zero there
+    yields a zero-length frame that consumes nothing, so the parser must treat
+    it as misaligned data and slide instead.
+    """
+    mocker.patch.object(cfg, "SERIAL_ENCRYPTED", False)
+    handler = _loop_guarded_handler()
+    cp = SerialConnectionProtocol(handler)
+
+    cp.data_received(b"\xe0\xfe\x00" + VALID_37BYTE_FRAME)
+
+    handler.on_message.assert_called_once_with(VALID_37BYTE_FRAME)
+
+
+def test_e0fe_short_length_does_not_dispatch_truncated_frame(mocker):
+    """A 2-byte E0 FE 'frame' is implausible and must not reach the handler."""
+    mocker.patch.object(cfg, "SERIAL_ENCRYPTED", False)
+    handler = _loop_guarded_handler()
+    cp = SerialConnectionProtocol(handler)
+
+    cp.data_received(b"\xe0\xfe\x02" + VALID_37BYTE_FRAME)
+
+    handler.on_message.assert_called_once_with(VALID_37BYTE_FRAME)
+
+
+def test_implausible_derived_length_does_not_block_parser():
+    """A misaligned 0xC head derives a ~39000 byte length (issue #609).
+
+    The framer must not wait for it: the length exceeds the 71 byte protocol
+    maximum, so the byte is discarded and the following genuine frame delivered.
+    """
+    handler = _loop_guarded_handler()
+    cp = SerialConnectionProtocol(handler)
+
+    cp.data_received(b"\xc5\x99\x99" + VALID_37BYTE_FRAME)
+
+    handler.on_message.assert_called_once_with(VALID_37BYTE_FRAME)
+
+
+def test_implausible_derived_length_recovers_across_chunks():
+    """The 0xC trap must not survive subsequent data_received callbacks."""
+    handler = _loop_guarded_handler()
+    cp = SerialConnectionProtocol(handler)
+
+    cp.data_received(b"\xc5\x99\x99")
+    for i in range(0, len(VALID_37BYTE_FRAME), 5):
+        cp.data_received(VALID_37BYTE_FRAME[i : i + 5])
+
+    handler.on_message.assert_called_once_with(VALID_37BYTE_FRAME)
+    assert cp.buffer == b""
+
+
+def test_long_aes_frame_is_not_clamped(mocker):
+    """AES E0 FE frames legitimately exceed 71 bytes and must still be framed."""
+    from paradox.lib.crypto import encrypt_serial_message
+
+    mocker.patch.object(cfg, "SERIAL_ENCRYPTED", True)
+    mocker.patch.object(cfg, "PASSWORD", "1234")
+    from paradox.connections.protocol_base import ConnectionProtocol
+
+    mocker.patch.object(ConnectionProtocol, "connection_made")
+
+    handler = MagicMock()
+    cp = SerialConnectionProtocol(handler)
+    cp.connection_made(MagicMock())
+
+    payload = bytes([0x72] + [0x00] * 78 + [0x72])  # 80 bytes -> 5 AES blocks
+    frame = encrypt_serial_message(payload, b"1234" + b"\xee" * 28)
+    assert len(frame) > 71
+
+    cp.data_received(frame)
+
+    handler.on_message.assert_called_once_with(payload)
+
+
+def _sp_frame(byte15):
+    """37 byte SP style status reply; byte 15 carries the battery voltage."""
+    frame = bytearray(b"\x52\x47\x80\x00" + bytes(32))
+    frame[15] = byte15
+    frame.append(sum(frame) % 256)
+    return bytes(frame)
+
+
+def test_lost_byte_resyncs_in_fixed_length_mode():
+    """A dropped serial byte must cost at most the frames until resync.
+
+    Byte 15 of an SP RAM status reply is the battery voltage, which reads as
+    0xC0-0xCF on a healthy panel. Misaligned, that byte used to derive a
+    ~39000 byte length and trap the framer (issue #609).
+    """
+    handler = _loop_guarded_handler()
+    cp = SerialConnectionProtocol(handler)
+    cp.variable_message_length(False)
+
+    good = _sp_frame(0xC5)
+    cp.data_received(good[1:])  # first byte lost on the wire
+    for _ in range(3):
+        cp.data_received(good)
+
+    assert handler.on_message.call_args_list[-1][0][0] == good
+    assert cp.buffer == b""
+
+
+def test_implausible_length_is_logged(caplog):
+    """The framer must report implausible lengths instead of stalling silently."""
+    handler = _loop_guarded_handler()
+    cp = SerialConnectionProtocol(handler)
+
+    with caplog.at_level(logging.WARNING, logger="PAI"):
+        cp.data_received(b"\xc5\x99\x99" + VALID_37BYTE_FRAME)
+
+    assert any("implausible message length" in r.message for r in caplog.records)
+
+
+def test_discarded_byte_is_logged(caplog):
+    """Resynchronising discards must be visible at debug level."""
+    handler = _loop_guarded_handler()
+    cp = SerialConnectionProtocol(handler)
+
+    with caplog.at_level(logging.DEBUG, logger="PAI"):
+        cp.data_received(b"\x11\x22" + VALID_37BYTE_FRAME)
+
+    assert any("discarding byte" in r.message for r in caplog.records)
+
+
+def test_encrypted_without_password_falls_back_to_plain(mocker):
+    """SERIAL_ENCRYPTED=True with no PASSWORD must not raise on every frame.
+
+    There is no key to decrypt with, so the framer must stay in plain mode.
+    Previously the framer still AES-scanned while the key was None, and
+    decrypt_serial_message(data, None) raised TypeError for each frame,
+    killing the link.
+    """
+    mocker.patch.object(cfg, "SERIAL_ENCRYPTED", True)
+    mocker.patch.object(cfg, "PASSWORD", None)
+
+    handler = MagicMock()
+    cp = SerialConnectionProtocol(handler)
+
+    assert cp._encrypted_link is False
+
+    body = b"\xe0\xfe" + bytes(16)
+    cp.data_received(body + bytes([sum(body) % 256]))  # must not raise
+
+
+def test_framer_and_protocol_agree_on_encryption(mocker):
+    """The framer must not read SERIAL_ENCRYPTED independently of the protocol."""
+    mocker.patch.object(cfg, "SERIAL_ENCRYPTED", True)
+    mocker.patch.object(cfg, "PASSWORD", "1234")
+
+    cp = SerialConnectionProtocol(MagicMock())
+    assert cp._encrypted_link is True
+    assert cp._framer._encrypted_link is True
+
+    # A later config flip must not desynchronise an already-built protocol.
+    mocker.patch.object(cfg, "SERIAL_ENCRYPTED", False)
+    assert cp._framer._encrypted_link is cp._encrypted_link

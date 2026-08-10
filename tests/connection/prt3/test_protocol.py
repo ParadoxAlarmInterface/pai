@@ -15,10 +15,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from paradox.connections.protocols import ConnectionProtocol
+from paradox.connections.protocol_base import ConnectionProtocol
 from paradox.connections.prt3.connection import PRT3SerialConnection
 from paradox.connections.prt3.protocol import PRT3Protocol
-from paradox.connections.serial_connection import SerialCommunication
+from paradox.connections.serial.connection import SerialCommunication
 
 # ---------------------------------------------------------------------------
 # Smoke / type hierarchy

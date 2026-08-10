@@ -9,8 +9,8 @@ SerialConnectionProtocol.
 
 import logging
 
-from paradox.connections.serial_connection import SerialCommunication
 from paradox.connections.prt3.protocol import PRT3Protocol
+from paradox.connections.serial.connection import SerialCommunication
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
