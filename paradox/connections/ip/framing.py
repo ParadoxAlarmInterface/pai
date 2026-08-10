@@ -2,15 +2,14 @@
 
 import binascii
 import logging
-from typing import Iterator
 
 from paradox.connections.framing import (
     NEED_MORE,
     RESYNC,
     Derivation,
     Frame,
-    FrameBuffer,
     FrameLength,
+    Framer,
 )
 
 logger = logging.getLogger("PAI").getChild(__name__)
@@ -38,7 +37,7 @@ _ENCRYPT_FLAG = 0x01
 MAX_IP_PAYLOAD = 2048
 
 
-class IPFramer:
+class IPFramer(Framer):
     """Turns an IP150 byte stream into framed messages.
 
     Unlike the serial framer this does not slide byte by byte on desync. The
@@ -46,31 +45,6 @@ class IPFramer:
     corrupt rather than merely offset; sliding through it would only
     manufacture plausible-looking garbage.
     """
-
-    def __init__(self) -> None:
-        self.buffer = FrameBuffer()
-
-    def reset(self) -> None:
-        self.buffer.clear()
-
-    def feed(self, data: bytes) -> Iterator[Frame]:
-        """Append ``data`` and yield every complete message it completes.
-
-        The append is eager, so bytes are never lost if the caller drops the
-        iterator without consuming it. Only frame extraction is deferred.
-        """
-        self.buffer.append(data)
-        return self._iter_frames()
-
-    def _iter_frames(self) -> Iterator[Frame]:
-        try:
-            while True:
-                frame = self._next_frame()
-                if frame is None:
-                    return
-                yield frame
-        finally:
-            self.buffer.compact()
 
     def _next_frame(self):
         if len(self.buffer) < IP_HEADER_LENGTH:

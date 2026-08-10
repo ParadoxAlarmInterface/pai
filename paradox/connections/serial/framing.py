@@ -7,7 +7,7 @@ against real captures with plain ``bytes``.
 
 import binascii
 import logging
-from typing import Iterator, Optional
+from typing import Optional
 
 from paradox.config import config as cfg
 from paradox.connections.framing import (
@@ -15,8 +15,8 @@ from paradox.connections.framing import (
     RESYNC,
     Derivation,
     Frame,
-    FrameBuffer,
     FrameLength,
+    Framer,
     checksum,
 )
 
@@ -54,7 +54,7 @@ MAX_AES_BLOCKS = 7
 MAX_AES_FRAME_LENGTH = 2 + MAX_AES_BLOCKS * 16 + 1
 
 
-class SerialFramer:
+class SerialFramer(Framer):
     """Turns a serial byte stream into frames.
 
     Progress invariant: no pass of :meth:`feed` can leave the buffer growing
@@ -70,7 +70,7 @@ class SerialFramer:
         use_variable_message_length: bool = True,
         encrypted_link: Optional[bool] = None,
     ) -> None:
-        self.buffer = FrameBuffer()
+        super().__init__()
         self.use_variable_message_length = use_variable_message_length
         # Supplied by the protocol so both agree on one value. Falls back to
         # config for direct construction; read once rather than per byte, as
@@ -78,32 +78,6 @@ class SerialFramer:
         self._encrypted_link = (
             bool(cfg.SERIAL_ENCRYPTED) if encrypted_link is None else encrypted_link
         )
-
-    def reset(self) -> None:
-        self.buffer.clear()
-
-    def feed(self, data: bytes) -> Iterator[Frame]:
-        """Append ``data`` and yield every complete frame it completes.
-
-        The append is eager, so bytes are never lost if the caller drops the
-        iterator without consuming it. Only frame extraction is deferred.
-
-        Extraction yields lazily rather than returning a list: if the consumer
-        raises while handling frame *n*, frames *n+1..* remain buffered and are
-        re-parsed on the next feed instead of being silently dropped.
-        """
-        self.buffer.append(data)
-        return self._iter_frames()
-
-    def _iter_frames(self) -> Iterator[Frame]:
-        try:
-            while True:
-                frame = self._next_frame()
-                if frame is None:
-                    return
-                yield frame
-        finally:
-            self.buffer.compact()
 
     def _next_frame(self):
         """Return the next :class:`Frame`, or ``None`` to wait for more data."""

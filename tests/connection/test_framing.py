@@ -9,6 +9,7 @@ from paradox.connections.framing import (
     Frame,
     FrameBuffer,
     FrameLength,
+    Framer,
     checksum,
 )
 
@@ -183,3 +184,32 @@ def _line_framer():
     from paradox.connections.prt3.framing import LineFramer
 
     return LineFramer()
+
+
+class TestFramerContract:
+    """All three transports share one feed/extract loop."""
+
+    def test_every_framer_implements_the_shared_contract(self):
+        for make in (_serial_framer, _ip_framer, _line_framer):
+            framer = make()
+            assert isinstance(framer, Framer)
+            assert framer.buffer.pending == b""
+
+    def test_next_frame_is_required(self):
+        class Incomplete(Framer):
+            pass
+
+        with pytest.raises(TypeError):
+            Incomplete()
+
+    def test_reset_drops_a_partial_frame(self):
+        for make, partial in (
+            (_serial_framer, b"\x12"),
+            (_ip_framer, b"\xaa\x05"),
+            (_line_framer, b"AT"),
+        ):
+            framer = make()
+            list(framer.feed(partial))
+            assert framer.buffer.pending == partial
+            framer.reset()
+            assert framer.buffer.pending == b""

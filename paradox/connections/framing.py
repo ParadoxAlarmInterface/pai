@@ -3,8 +3,9 @@
 Framers turn a stream of bytes into discrete frames and do nothing else.
 """
 
+from abc import ABC, abstractmethod
 import logging
-from typing import NamedTuple, Union
+from typing import Iterator, NamedTuple, Optional, Union
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -120,6 +121,50 @@ class FrameBuffer:
 
     def __repr__(self) -> str:
         return "FrameBuffer(%d pending)" % len(self)
+
+
+class Framer(ABC):
+    """Shared feed-and-extract loop for every transport's framer.
+
+    Subclasses implement :meth:`_next_frame` and nothing else: it returns the
+    next :class:`Frame`, or ``None`` when the buffer cannot yield one yet.
+    Consuming and resynchronising are the subclass's business; this class only
+    guarantees how the bytes get in and how frames come out.
+    """
+
+    def __init__(self) -> None:
+        self.buffer = FrameBuffer()
+
+    def reset(self) -> None:
+        """Drop any partially received frame."""
+        self.buffer.clear()
+
+    def feed(self, data: bytes) -> Iterator[Frame]:
+        """Append ``data`` and yield every frame it completes.
+
+        The append is eager, so bytes are never lost if the caller drops the
+        iterator without consuming it. Only extraction is deferred: yielding
+        lazily means that if the consumer raises while handling frame *n*,
+        frames *n+1..* stay buffered and are re-parsed on the next feed
+        instead of being silently dropped.
+        """
+        self.buffer.append(data)
+        return self._iter_frames()
+
+    def _iter_frames(self) -> Iterator[Frame]:
+        try:
+            while True:
+                frame = self._next_frame()
+                if frame is None:
+                    return
+                yield frame
+        finally:
+            self.buffer.compact()
+
+    @abstractmethod
+    def _next_frame(self) -> Optional[Frame]:
+        """Return the next frame, or ``None`` to wait for more data."""
+        raise NotImplementedError
 
 
 def checksum(data: bytes) -> bool:
