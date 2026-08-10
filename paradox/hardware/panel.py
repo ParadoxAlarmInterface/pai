@@ -100,7 +100,13 @@ class Panel:
         elif error_code == 0x1C:
             message = "Invalid label number"
         else:
-            message = error_str
+            # Include the hex form so unknown codes can be looked up easily
+            # in Paradox docs / issues (e.g. "29 (0x1D)" reported by panels
+            # in response to PGM and panic commands on some EVO firmwares).
+            if isinstance(error_code, int):
+                message = f"{error_str} (0x{error_code:02X})"
+            else:
+                message = error_str
 
         return message
 

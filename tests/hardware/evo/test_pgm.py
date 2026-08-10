@@ -68,6 +68,19 @@ def test_pgm4_deactivate_and_monitor():
     assert a == expected_out
 
 
+def test_pgm5_activate_and_monitor():
+    # PGM 5 maps to bit 4 of the bitmap (byte offset 6 = 0x10).
+    # Onboard PGM 5 is the only dry relay on the EVO192 mainboard; see
+    # https://github.com/ParadoxAlarmInterface/pai/issues/580
+    expected_out = unhexlify("4013060000001000000000000000030000006c")
+
+    pgms = [5]
+
+    a = PerformPGMAction.build({"fields": {"value": {"pgms": pgms, "command": "on"}}})
+
+    assert a == expected_out
+
+
 def test_pgm_flags_1():
     parser = PGMFlags(1)
     assert parser.sizeof() == 4
