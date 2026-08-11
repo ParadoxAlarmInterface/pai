@@ -14,6 +14,9 @@ logger = logging.getLogger("PAI").getChild(__name__)
 # wasted memory per connection at 1 KB.
 COMPACT_THRESHOLD = 1024
 
+#: Default upper bound for a delimiter-framed line without a terminator.
+MAX_LINE_LENGTH = 512
+
 
 class _Signal:
     """A named singleton used as a non-frame framing outcome."""
@@ -165,6 +168,37 @@ class Framer(ABC):
     def _next_frame(self) -> Optional[Frame]:
         """Return the next frame, or ``None`` to wait for more data."""
         raise NotImplementedError
+
+
+class LineFramer(Framer):
+    """Split a byte stream on a terminator, keeping the terminator."""
+
+    def __init__(
+        self, terminator: bytes = b"\r", max_line_length: int = MAX_LINE_LENGTH
+    ) -> None:
+        super().__init__()
+        self._terminator = terminator
+        self._max_line_length = max_line_length
+
+    def _next_frame(self) -> Optional[Frame]:
+        """Return the next non-empty line, or ``None`` to wait for more data."""
+        while True:
+            index = self.buffer.pending.find(self._terminator)
+            if index < 0:
+                # Only now, with no complete line left to rescue, is a large
+                # buffer evidence of a lost terminator rather than of a burst
+                # of good lines still waiting to be extracted.
+                if len(self.buffer) > self._max_line_length:
+                    logger.warning(
+                        "Line framer buffer overflow (%d bytes), discarding",
+                        len(self.buffer),
+                    )
+                    self.buffer.clear()
+                return None
+
+            line = self.buffer.take(index + len(self._terminator))
+            if line[: -len(self._terminator)].strip():
+                return Frame(line)
 
 
 def checksum(data: bytes) -> bool:

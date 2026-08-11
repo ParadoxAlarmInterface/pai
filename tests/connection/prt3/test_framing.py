@@ -2,8 +2,7 @@
 
 import pytest
 
-from paradox.connections.framing import Frame
-from paradox.connections.prt3.framing import MAX_LINE_LENGTH, LineFramer
+from paradox.connections.framing import MAX_LINE_LENGTH, Frame, LineFramer
 
 
 @pytest.fixture

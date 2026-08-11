@@ -181,7 +181,7 @@ def _ip_framer():
 
 
 def _line_framer():
-    from paradox.connections.prt3.framing import LineFramer
+    from paradox.connections.framing import LineFramer
 
     return LineFramer()
 

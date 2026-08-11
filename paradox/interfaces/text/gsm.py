@@ -8,6 +8,7 @@ import serial_asyncio
 
 from paradox.config import config as cfg
 from paradox.connections.connection import ConnectionProtocol
+from paradox.connections.framing import LineFramer
 from paradox.connections.handler import ConnectionHandler
 from paradox.event import EventLevel, Notification
 from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
@@ -19,40 +20,39 @@ from paradox.lib import ps
 logger = logging.getLogger("PAI").getChild(__name__)
 
 
-class SerialConnectionProtocol(ConnectionProtocol):
+class GsmSerialProtocol(ConnectionProtocol):
     def __init__(self, handler: ConnectionHandler):
         super().__init__(handler)
         self.last_message = b""
-        self.buffer = b""
+        self._framer = LineFramer(terminator=b"\r\n")
 
     async def send_message(self, message):
         self.last_message = message
         self.transport.write(message + b"\r\n")
 
     def data_received(self, recv_data):
-        # Bytes arrive in arbitrary chunks, so partial lines are buffered until
-        # their CRLF terminator shows up in a later callback.
-        self.buffer += recv_data
-        logger.debug("BUFFER: %s", self.buffer)
-        while True:
-            r = self.buffer.find(b"\r\n")
-            if r < 0:  # No complete frame yet
-                break
+        for frame in self._framer.feed(recv_data):
+            message = frame.data[: -len(b"\r\n")]
+            logger.debug("GSM <- %s", message)
 
-            frame = self.buffer[:r]
-            self.buffer = self.buffer[r + 2 :]
-
-            if not frame:  # Empty line between frames
+            # A modem echo, when enabled, is the first non-empty line after a
+            # write. Clear the expectation even when that line is a response.
+            last_message, self.last_message = self.last_message, b""
+            if last_message and message.rstrip(b"\r") == last_message.rstrip(b"\r"):
                 continue
 
-            # Ignore echoed bytes
-            if self.last_message == frame:
-                self.last_message = b""
-            else:
-                self.handler.on_message(frame)  # Callback
+            try:
+                self.handler.on_message(message)
+            except Exception:
+                logger.exception("GSM message callback raised an exception")
 
     def reset_framing(self) -> None:
-        self.buffer = b""
+        self._framer.reset()
+        self.last_message = b""
+
+    @property
+    def buffer(self) -> bytes:
+        return self._framer.buffer.pending
 
     def connection_lost(self, exc):
         logger.error("The serial port was closed")
@@ -103,7 +103,7 @@ class SerialCommunication(ConnectionHandler):
         self.connected = False
 
     def make_protocol(self):
-        return SerialConnectionProtocol(self)
+        return GsmSerialProtocol(self)
 
     async def write(self, message, timeout=15):
         logger.debug(f"I->M: {message}")

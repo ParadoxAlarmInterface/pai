@@ -15,8 +15,8 @@ import binascii
 import logging
 
 from paradox.config import config as cfg
+from paradox.connections.framing import LineFramer
 from paradox.connections.protocol_base import ConnectionProtocol
-from paradox.connections.prt3.framing import LineFramer
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
