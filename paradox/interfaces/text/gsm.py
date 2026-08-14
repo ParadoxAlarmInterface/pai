@@ -8,6 +8,7 @@ import serial_asyncio
 
 from paradox.config import config as cfg
 from paradox.connections.connection import ConnectionProtocol
+from paradox.connections.framing import LineFramer
 from paradox.connections.handler import ConnectionHandler
 from paradox.event import EventLevel, Notification
 from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
@@ -18,41 +19,74 @@ from paradox.lib import ps
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
+#: AT responses are short, but a text-mode ``+CMT`` line carries a whole SMS:
+#: 140 octets of UCS2 hex-encoded payload plus the header. 1 KiB leaves room
+#: for that and for verbose ``AT+CMEE=2`` error strings.
+MAX_LINE_LENGTH = 1024
 
-class SerialConnectionProtocol(ConnectionProtocol):
+TERMINATOR = b"\r\n"
+
+
+class GsmSerialProtocol(ConnectionProtocol):
+    """CRLF line framing and modem echo suppression for an AT-command modem.
+
+    Named apart from
+    :class:`paradox.connections.serial.protocol.SerialConnectionProtocol`
+    because the two are not substitutable: that one's ``send_message`` is
+    synchronous, this one's is a coroutine.
+    """
+
     def __init__(self, handler: ConnectionHandler):
         super().__init__(handler)
         self.last_message = b""
-        self.buffer = b""
+        self._framer = LineFramer(
+            terminator=TERMINATOR,
+            max_line_length=MAX_LINE_LENGTH,
+            strip_terminator=True,
+        )
 
     async def send_message(self, message):
         self.last_message = message
-        self.transport.write(message + b"\r\n")
+        self.transport.write(message + TERMINATOR)
 
     def data_received(self, recv_data):
-        # Bytes arrive in arbitrary chunks, so partial lines are buffered until
-        # their CRLF terminator shows up in a later callback.
-        self.buffer += recv_data
-        logger.debug("BUFFER: %s", self.buffer)
-        while True:
-            r = self.buffer.find(b"\r\n")
-            if r < 0:  # No complete frame yet
-                break
+        for frame in self._framer.feed(recv_data):
+            message = frame.data
+            logger.debug("M->P: %s", message)
 
-            frame = self.buffer[:r]
-            self.buffer = self.buffer[r + 2 :]
-
-            if not frame:  # Empty line between frames
+            if self._is_echo(message):
                 continue
 
-            # Ignore echoed bytes
-            if self.last_message == frame:
-                self.last_message = b""
-            else:
-                self.handler.on_message(frame)  # Callback
+            try:
+                self.handler.on_message(message)
+            except Exception:
+                # A single unparseable line must not strand the frames behind
+                # it: they would sit in the buffer until the next byte arrives.
+                logger.exception("Error handling modem message")
+
+    def _is_echo(self, message: bytes) -> bool:
+        """True when ``message`` is the modem echoing back the last command.
+
+        Echo suppression is scoped to the first line after a write. Echo is
+        normally off (``connect()`` issues ``ATE0``), so an expectation that
+        outlived its response would eventually swallow an unrelated line that
+        happened to match the last command.
+
+        The comparison tolerates a trailing ``\\r`` because many V.25ter modems
+        echo the command terminated by a bare ``<CR>`` and only then send
+        ``<CR><LF>OK<CR><LF>``.
+        """
+        expected, self.last_message = self.last_message, b""
+        return bool(expected) and message.rstrip(b"\r") == expected.rstrip(b"\r")
 
     def reset_framing(self) -> None:
-        self.buffer = b""
+        self._framer.reset()
+        self.last_message = b""
+
+    @property
+    def buffer(self) -> bytes:
+        """Unconsumed bytes. Retained for tests and diagnostics."""
+        return self._framer.buffer.pending
 
     def connection_lost(self, exc):
         logger.error("The serial port was closed")
@@ -103,7 +137,7 @@ class SerialCommunication(ConnectionHandler):
         self.connected = False
 
     def make_protocol(self):
-        return SerialConnectionProtocol(self)
+        return GsmSerialProtocol(self)
 
     async def write(self, message, timeout=15):
         logger.debug(f"I->M: {message}")
@@ -220,18 +254,31 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
 
             await asyncio.sleep(5)
 
-    def data_received(self, data: str) -> bool:
-        logger.debug(f"Data Received: {data}")
+    def data_received(self, raw: bytes) -> bool:
+        logger.debug(f"Data Received: {raw}")
 
-        data = data.decode()
+        try:
+            data = raw.decode()
+        except UnicodeDecodeError:
+            logger.warning("Discarding undecodable modem line: %r", raw)
+            self.message_cmt = None
+            return True
 
         if data.startswith("+CMT"):
             self.message_cmt = data
         elif self.message_cmt is not None:
-            self.process_cmt(self.message_cmt, data)
-            self.message_cmt = None
+            # Clear before parsing: a header left in place after a failure
+            # would capture every following line as its SMS body.
+            header, self.message_cmt = self.message_cmt, None
+            try:
+                self.process_cmt(header, data)
+            except (ValueError, IndexError):
+                logger.warning("Discarding malformed +CMT message: %r", header)
         elif data.startswith("+CUSD:"):
-            self.process_cusd(data)
+            try:
+                self.process_cusd(data)
+            except (ValueError, IndexError):
+                logger.warning("Discarding malformed +CUSD message: %r", data)
 
         return True
 

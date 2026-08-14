@@ -1,14 +1,18 @@
-"""Tests for the PRT3 line framer."""
+"""Tests for the shared line framer."""
 
 import pytest
 
-from paradox.connections.framing import Frame
-from paradox.connections.prt3.framing import MAX_LINE_LENGTH, LineFramer
+from paradox.connections.framing import DEFAULT_MAX_LINE_LENGTH, Frame, LineFramer
+
+MAX_LINE_LENGTH = DEFAULT_MAX_LINE_LENGTH
 
 
 @pytest.fixture
 def framer():
-    return LineFramer()
+    """A framer configured the way PRT3 uses it."""
+    return LineFramer(
+        terminator=b"\r", max_line_length=MAX_LINE_LENGTH, drop_blank_lines=True
+    )
 
 
 def lines(framer, data):
@@ -78,6 +82,37 @@ def test_emitted_value_is_a_frame(framer):
 def test_custom_terminator():
     framer = LineFramer(terminator=b"\n")
     assert [f.data for f in framer.feed(b"A\nB\n")] == [b"A\n", b"B\n"]
+
+
+def test_empty_terminator_is_rejected():
+    with pytest.raises(ValueError):
+        LineFramer(terminator=b"")
+
+
+def test_multi_byte_terminator():
+    framer = LineFramer(terminator=b"\r\n")
+    assert [f.data for f in framer.feed(b"A\r\nB\r\n")] == [b"A\r\n", b"B\r\n"]
+
+
+def test_strip_terminator_drops_the_delimiter():
+    framer = LineFramer(terminator=b"\r\n", strip_terminator=True)
+    assert [f.data for f in framer.feed(b"A\r\nB\r\n")] == [b"A", b"B"]
+
+
+def test_whitespace_only_line_survives_by_default():
+    """Only a genuinely empty payload is skipped when blanks are kept.
+
+    A whitespace-only line may still be data -- an SMS body of a single
+    space, for instance -- so dropping it is opt-in.
+    """
+    framer = LineFramer(terminator=b"\r\n", strip_terminator=True)
+    assert [f.data for f in framer.feed(b"\r\n \r\n")] == [b" "]
+
+
+def test_max_line_length_is_per_caller():
+    framer = LineFramer(terminator=b"\r", max_line_length=8)
+    assert [f.data for f in framer.feed(b"x" * 9)] == []
+    assert framer.buffer.pending == b""
 
 
 def test_burst_of_complete_lines_over_the_cap_is_not_discarded(framer):
