@@ -25,13 +25,30 @@ async def connected_gsm_connection():
         new_callable=mock.AsyncMock,
         side_effect=mocked_create_serial_connection,
     ):
-        asyncio.get_event_loop().call_soon(comm.on_connection)
         result = await comm.connect()
         assert result
 
     assert comm.connected
 
     return comm
+
+
+@pytest.mark.asyncio
+async def test_connect_gives_up_when_the_port_open_hangs():
+    """A hung create_serial_connection must not block connect() forever."""
+    comm = GsmSerialConnection("test_port", 9600, 0.01)
+
+    async def never_opens(*args, **kwargs):
+        await asyncio.sleep(10)
+
+    with mock.patch("os.access", return_value=True), mock.patch(
+        "serial_asyncio.create_serial_connection",
+        new_callable=mock.AsyncMock,
+        side_effect=never_opens,
+    ):
+        assert await comm.connect() is False
+
+    assert not comm.connected
 
 
 @pytest.mark.asyncio
@@ -81,10 +98,14 @@ async def test_send_command_honours_its_timeout(connected_gsm_connection):
 
 
 @pytest.mark.asyncio
-async def test_write_is_rejected(connected_gsm_connection):
-    """Connection.write() would leave send_message's coroutine un-awaited."""
-    with pytest.raises(NotImplementedError):
-        connected_gsm_connection.write(b"AT")
+async def test_write_reaches_the_transport(connected_gsm_connection):
+    """Connection.write() is inherited now that send_message is synchronous."""
+    comm = connected_gsm_connection
+
+    with mock.patch.object(comm._protocol, "transport") as transport:
+        comm.write(b"AT")
+
+    transport.write.assert_called_once_with(b"AT\r\n")
 
 
 @pytest.mark.asyncio

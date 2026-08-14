@@ -23,10 +23,10 @@ TERMINATOR = b"\r\n"
 class GsmSerialProtocol(ConnectionProtocol):
     """CRLF line framing and modem echo suppression for an AT-command modem.
 
-    Named apart from
+    Kept distinct from
     :class:`paradox.connections.serial.protocol.SerialConnectionProtocol`
-    because the two are not substitutable: that one's ``send_message`` is
-    synchronous, this one's is a coroutine.
+    because the two framings have nothing in common: that one is a binary
+    nibble-pattern framer, this one is CRLF lines plus echo suppression.
     """
 
     def __init__(self, handler: ConnectionHandler):
@@ -38,7 +38,8 @@ class GsmSerialProtocol(ConnectionProtocol):
             strip_terminator=True,
         )
 
-    async def send_message(self, message):
+    def send_message(self, message):
+        self.check_active()
         self.last_message = message
         self.transport.write(message + TERMINATOR)
 

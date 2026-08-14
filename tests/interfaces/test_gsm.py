@@ -22,7 +22,6 @@ async def connected_gsm_connection():
         new_callable=mock.AsyncMock,
         side_effect=mocked_create_serial_connection,
     ):
-        asyncio.get_event_loop().call_soon(comm.on_connection)
         assert await comm.connect()
 
     return comm

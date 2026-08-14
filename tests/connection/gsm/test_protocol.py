@@ -18,7 +18,7 @@ async def test_gsm_serial_protocol():
     handler.on_connection.assert_called_once()
 
     message = b"test_message"
-    await protocol.send_message(message)
+    protocol.send_message(message)
     transport.write.assert_called_once_with(message + b"\r\n")
 
     recv_data = b"test_data\r\n"
@@ -57,7 +57,7 @@ async def test_gsm_serial_protocol_drops_echoed_message():
     protocol = GsmSerialProtocol(handler)
     protocol.connection_made(mock.MagicMock())
 
-    await protocol.send_message(b"AT")
+    protocol.send_message(b"AT")
     protocol.data_received(b"AT\r\nOK\r\n")
 
     handler.on_message.assert_called_once_with(b"OK")
@@ -70,7 +70,7 @@ async def test_gsm_serial_protocol_drops_cr_terminated_echo():
     protocol = GsmSerialProtocol(handler)
     protocol.connection_made(mock.MagicMock())
 
-    await protocol.send_message(b"AT")
+    protocol.send_message(b"AT")
     protocol.data_received(b"AT\r\r\nOK\r\n")
 
     handler.on_message.assert_called_once_with(b"OK")
@@ -83,7 +83,7 @@ async def test_gsm_serial_protocol_echo_expectation_is_not_sticky():
     protocol = GsmSerialProtocol(handler)
     protocol.connection_made(mock.MagicMock())
 
-    await protocol.send_message(b"AT+CUSD=1")
+    protocol.send_message(b"AT+CUSD=1")
     protocol.data_received(b"OK\r\n")
     protocol.data_received(b"AT+CUSD=1\r\n")
 
@@ -99,7 +99,7 @@ async def test_gsm_serial_protocol_only_checks_the_first_frame_for_echo():
     protocol = GsmSerialProtocol(handler)
     protocol.connection_made(mock.MagicMock())
 
-    await protocol.send_message(b"AT")
+    protocol.send_message(b"AT")
     protocol.data_received(b"OK\r\nAT\r\n")
 
     assert handler.on_message.call_args_list == [mock.call(b"OK"), mock.call(b"AT")]
@@ -142,7 +142,7 @@ async def test_gsm_serial_protocol_reset_framing_clears_echo_expectation():
     protocol = GsmSerialProtocol(handler)
     protocol.connection_made(mock.MagicMock())
 
-    await protocol.send_message(b"AT")
+    protocol.send_message(b"AT")
     protocol.reset_framing()
     protocol.data_received(b"AT\r\n")
 

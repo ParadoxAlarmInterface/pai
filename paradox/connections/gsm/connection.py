@@ -86,21 +86,10 @@ class GsmSerialConnection(Connection):
     def make_protocol(self):
         return GsmSerialProtocol(self)
 
-    def write(self, data: bytes):
-        """Unsupported: the modem channel is request/response.
-
-        ``Connection.write`` is a synchronous fire-and-forget that would leave
-        :meth:`GsmSerialProtocol.send_message`'s coroutine un-awaited.
-        """
-        raise NotImplementedError("Use send_command() for the modem channel")
-
     async def send_command(self, message: bytes, timeout=DEFAULT_COMMAND_TIMEOUT):
         """Send an AT command and wait for the modem's next line."""
-        if self._protocol is None:
-            return None
-
         logger.debug("I->M: %s", message)
-        await self._protocol.send_message(message)
+        self.write(message)
         return await asyncio.wait_for(self.queue.get(), timeout=timeout)
 
     async def read(self, timeout=DEFAULT_COMMAND_TIMEOUT):
@@ -122,14 +111,22 @@ class GsmSerialConnection(Connection):
         )
 
         try:
-            _, self._protocol = await serial_asyncio.create_serial_connection(
-                asyncio.get_running_loop(),
-                self.make_protocol,
-                self.port_path,
-                self.baud,
+            # The open itself is bounded too: open_timeout() only resolves the
+            # future, which does no good if create_serial_connection is what
+            # hangs -- connect() would not yet be awaiting it.
+            _, self._protocol = await asyncio.wait_for(
+                serial_asyncio.create_serial_connection(
+                    asyncio.get_running_loop(),
+                    self.make_protocol,
+                    self.port_path,
+                    self.baud,
+                ),
+                timeout=self.open_timeout_seconds,
             )
 
             return await self.connected_future
+        except asyncio.TimeoutError:
+            logger.error("Serial Port Timeout")
         except Exception:
             logger.exception("Unable to connect to GSM modem")
         finally:

@@ -39,7 +39,7 @@ class PRT3Protocol(ConnectionProtocol):
         self._framer = LineFramer(
             terminator=b"\r",
             max_line_length=MAX_LINE_LENGTH,
-            drop_blank_lines=True,
+            drop_whitespace_lines=True,
         )
 
     def variable_message_length(self, *args, **kwargs):

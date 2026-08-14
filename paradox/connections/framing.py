@@ -190,15 +190,19 @@ class LineFramer(Framer):
     ``strip_terminator``
         Drop the terminator from the emitted frame. Off by default, so the
         consumer can verify framing.
-    ``drop_blank_lines``
-        Skip lines whose payload has no printable content. Off by default,
-        which skips only genuinely empty payloads: a bare terminator carries
-        no message, but a whitespace-only line may still be data.
+    ``drop_whitespace_lines``
+        Also skip lines whose payload is only whitespace. Empty payloads are
+        always skipped -- a bare terminator carries no message -- but a
+        whitespace-only line may still be data, so discarding it is opt-in.
 
     ``max_line_length``
         Discard the buffer once it exceeds this without a terminator. The
         default is a fallback only: a bound that suits one transport's line
         lengths silently truncates another's, so pass your own.
+
+    A discarded overrun is followed by a resynchronisation: bytes are dropped
+    up to and including the next terminator, so the tail of the line that
+    overran is not emitted as if it were a whole line of its own.
     """
 
     def __init__(
@@ -206,7 +210,7 @@ class LineFramer(Framer):
         terminator: bytes = b"\r",
         max_line_length: int = DEFAULT_MAX_LINE_LENGTH,
         strip_terminator: bool = False,
-        drop_blank_lines: bool = False,
+        drop_whitespace_lines: bool = False,
     ) -> None:
         super().__init__()
         if not terminator:
@@ -214,7 +218,12 @@ class LineFramer(Framer):
         self._terminator = terminator
         self._max_line_length = max_line_length
         self._strip_terminator = strip_terminator
-        self._drop_blank_lines = drop_blank_lines
+        self._drop_whitespace_lines = drop_whitespace_lines
+        self._resyncing = False
+
+    def reset(self) -> None:
+        super().reset()
+        self._resyncing = False
 
     def _next_frame(self) -> Optional[Frame]:
         """Return the next line, or ``None`` to wait for more data."""
@@ -231,14 +240,20 @@ class LineFramer(Framer):
                         self._max_line_length,
                     )
                     self.buffer.clear()
+                    self._resyncing = True
                 return None
 
             line = self.buffer.take(index + len(self._terminator))
+
+            if self._resyncing:
+                # The tail of the overrun line, not a line in its own right.
+                self._resyncing = False
+                continue
+
             payload = line[: -len(self._terminator)]
-            if self._drop_blank_lines:
-                if not payload.strip():
-                    continue
-            elif not payload:
+            if not payload:
+                continue
+            if self._drop_whitespace_lines and not payload.strip():
                 continue
 
             return Frame(payload if self._strip_terminator else line)
