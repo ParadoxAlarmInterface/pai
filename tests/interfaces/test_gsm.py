@@ -374,3 +374,38 @@ async def test_stop_cancels_in_flight_sends(gsm_interface):
         await settle()
 
     assert task.cancelled()
+
+
+@pytest.mark.asyncio
+async def test_a_stale_ok_does_not_satisfy_the_next_command(gsm_interface):
+    """The late answer to a timed-out command used to be handed to the next."""
+    comm = gsm_interface.port
+    comm.set_recv_callback(None)
+
+    with mock.patch.object(comm._protocol, "transport"):
+        with pytest.raises(asyncio.TimeoutError):
+            await gsm_interface._at_command(b"AT+A", timeout=0.01)
+
+        modem_says(comm, b"OK\r\n")  # A's answer, arriving too late
+
+        task = asyncio.ensure_future(gsm_interface._at_command(b"AT+B"))
+        await settle()
+        assert not task.done(), "the stale OK was taken as B's reply"
+
+        modem_says(comm, b"OK\r\n")
+        assert await task == b"OK"
+
+
+@pytest.mark.asyncio
+async def test_a_stale_line_is_not_mistaken_for_the_sms_prompt(gsm_interface):
+    comm = gsm_interface.port
+    comm.on_message(b"stale")  # left behind by an earlier timeout
+
+    with mock.patch.object(comm._protocol, "transport"):
+        task = asyncio.ensure_future(gsm_interface._send_sms("+1", "hi"))
+        await settle()
+        modem_says(comm, b"\r\n> ")
+        await settle()
+        modem_says(comm, b"OK\r\n")
+
+        await task

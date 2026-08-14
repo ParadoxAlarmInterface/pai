@@ -1,9 +1,9 @@
 """GsmSerialConnection — serial transport for an AT-command GSM modem.
 
 Unlike the panel transports, this one is a request/response command channel:
-``send_command()`` writes a line and waits for the modem's reply. Unsolicited
-lines (``+CMT``, ``+CUSD``) arrive at any time, so the consumer switches
-between draining the queue during init and a push callback afterwards.
+a caller writes a line and waits for the modem's reply. Unsolicited lines
+(``+CMT``, ``+CUSD``) arrive at any time, so the consumer switches between
+draining the queue during init and a push callback afterwards.
 """
 
 import asyncio
@@ -74,7 +74,8 @@ class GsmSerialConnection(Connection):
         The callback returns whether it consumed the line. Unsolicited results
         (``+CMT``, ``+CUSD``) belong to it; anything it declines is a reply to
         a command in flight and goes to the queue. Routing *everything* to the
-        callback would starve :meth:`send_command` for the life of the process.
+        callback would starve any caller waiting on a reply for the life of
+        the process.
         """
         logger.debug("M->I: %s", message)
 
@@ -97,54 +98,36 @@ class GsmSerialConnection(Connection):
     def make_protocol(self):
         return GsmSerialProtocol(self)
 
-    async def send_command(
-        self,
-        message: bytes,
-        timeout=DEFAULT_COMMAND_TIMEOUT,
-        expect_prompt: bool = False,
-    ):
-        """Send an AT command and wait for the modem's next line.
-
-        Set ``expect_prompt`` when the command is answered by an unterminated
-        ``"> "`` entry prompt rather than by a line, as ``AT+CMGS`` is.
-
-        Callers must serialise their own exchanges: the modem answers one
-        command at a time, and the reply queue cannot tell two callers apart.
-        """
-        if self._protocol is None:
-            raise ConnectionError("Not connected")
-
-        # Anything already queued predates this command, so it cannot be its
-        # reply. Most often it is the late answer to one that timed out.
-        self.clear()
-
-        logger.debug("I->M: %s", message)
-
-        if expect_prompt:
-            self._protocol.expect_prompt()
-
-        try:
-            self.write(message)
-            return await asyncio.wait_for(self.queue.get(), timeout=timeout)
-        finally:
-            if expect_prompt and self._protocol is not None:
-                # An expectation that outlived its command would prime the
-                # next unterminated line to be read as a prompt.
-                self._protocol.disarm_prompt()
-
     def write_raw(self, message: bytes) -> None:
         """Write bytes with no line terminator, for an SMS body."""
-        if not self.connected or self._protocol is None:
+        if self._protocol is None:
             raise ConnectionError("Not connected")
 
         logger.debug("I->M: %s (raw)", message)
         self._protocol.send_raw(message)
 
-    async def read(self, timeout=DEFAULT_COMMAND_TIMEOUT):
+    async def read(self, timeout=DEFAULT_COMMAND_TIMEOUT, expect_prompt: bool = False):
+        """Wait for the modem's next line.
+
+        Set ``expect_prompt`` when the reply is the unterminated ``"> "`` SMS
+        entry prompt rather than a line, as it is after ``AT+CMGS``. The
+        expectation is dropped again on the way out: one that outlived its
+        command would prime the next unterminated line to be read as a prompt.
+
+        Callers must serialise their own exchanges -- the modem answers one
+        command at a time, and the reply queue cannot tell two callers apart.
+        """
         if self._protocol is None:
             return None
 
-        return await asyncio.wait_for(self.queue.get(), timeout=timeout)
+        if expect_prompt:
+            self._protocol.expect_prompt()
+
+        try:
+            return await asyncio.wait_for(self.queue.get(), timeout=timeout)
+        finally:
+            if expect_prompt and self._protocol is not None:
+                self._protocol.disarm_prompt()
 
     async def connect(self) -> bool:
         logger.info(f"Connecting to serial port {self.port_path}")

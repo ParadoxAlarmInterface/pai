@@ -59,7 +59,7 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
         """Stops the GSM Interface"""
         super().stop()
 
-        for task in list(self._send_tasks):
+        for task in self._send_tasks:
             task.cancel()
 
         if self.port is not None:
@@ -247,9 +247,10 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
         # and the Ctrl-Z the modem treats everything written as message text,
         # so a second sender would end up inside this SMS.
         async with self._command_lock:
-            prompt = await self.port.send_command(
-                b'AT+CMGS="%b"' % destination.encode(), expect_prompt=True
-            )
+            logger.debug("I->M: %s", destination)
+            self.port.clear()
+            self.port.write(b'AT+CMGS="%b"' % destination.encode())
+            prompt = await self.port.read(expect_prompt=True)
 
             if prompt != PROMPT:
                 # The modem may still be in entry mode; ESC leaves it cleanly
