@@ -1,8 +1,4 @@
-"""Framing and echo suppression for an AT-command GSM modem.
-
-Pure asyncio glue over :class:`~paradox.connections.framing.LineFramer`: no
-AT-command knowledge lives here beyond the echo of the last write.
-"""
+"""Framing and echo suppression for an AT-command GSM modem."""
 
 import logging
 
@@ -27,10 +23,9 @@ PROMPT = b"> "
 class GsmSerialProtocol(ConnectionProtocol):
     """CRLF line framing and modem echo suppression for an AT-command modem.
 
-    Kept distinct from
-    :class:`paradox.connections.serial.protocol.SerialConnectionProtocol`
-    because the two framings have nothing in common: that one is a binary
-    nibble-pattern framer, this one is CRLF lines plus echo suppression.
+    Distinct from
+    :class:`paradox.connections.serial.protocol.SerialConnectionProtocol`,
+    which frames the panel's binary nibble patterns.
     """
 
     def __init__(self, handler: ConnectionHandler):

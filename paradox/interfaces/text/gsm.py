@@ -26,7 +26,6 @@ ESC = b"\x1b"
 #: Delivery to the network can be slow on a weak signal.
 SMS_SEND_TIMEOUT = 60
 
-#: How often to notice that the modem has gone away, and to retry a failed open.
 MODEM_POLL_INTERVAL = 5
 
 #: Error result codes. Everything else the modem emits before OK is informational.
@@ -98,7 +97,7 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
             # Held across the whole sequence: a half-initialised modem must not
             # see an SMS interleaved between these commands.
             async with self._command_lock:
-                await self._at_command(b"AT")  # Init
+                await self._at_command(b"AT")
                 await self._at_command(b"ATE0")  # Disable Echo
                 await self._at_command(b"AT+CMEE=2")  # Increase verbosity
                 await self._at_command(b"AT+CMGF=1")  # SMS Text mode
@@ -116,9 +115,7 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
             logger.exception("Modem connect error")
             return False
 
-        self.port.set_recv_callback(
-            self.data_received
-        )  # Set recv callback to handle future messages
+        self.port.set_recv_callback(self.data_received)
 
         logger.debug("Modem connected")
         self.modem_connected = True
@@ -214,7 +211,7 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
 
         Synchronous to match :class:`AbstractTextInterface`, which is called
         straight from the pubsub handlers. Declaring this ``async`` made every
-        notification build a coroutine that nobody ever awaited.
+        notification build a coroutine that nobody awaited.
         """
         if self.port is None or not self.modem_connected:
             logger.warning("GSM not available when sending message")
@@ -240,8 +237,8 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
 
         The exchange is two-stage: ``AT+CMGS`` is answered by a ``"> "`` entry
         prompt, and only then does the modem accept the body, terminated by
-        Ctrl-Z. Sending both at once -- as this did -- leaves the modem sitting
-        in entry mode and the message unsent.
+        Ctrl-Z. Sending both at once leaves the modem sitting in entry mode and
+        the message unsent.
         """
         # Held for the whole exchange, not just the command: between the prompt
         # and the Ctrl-Z the modem treats everything written as message text,

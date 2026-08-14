@@ -18,10 +18,7 @@ from paradox.connections.gsm.protocol import GsmSerialProtocol
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
-#: Seconds to wait for the serial port to open before giving up.
 DEFAULT_OPEN_TIMEOUT = 5
-
-#: Seconds to wait for the modem to answer a command.
 DEFAULT_COMMAND_TIMEOUT = 5
 
 
@@ -29,8 +26,7 @@ class GsmSerialConnection(Connection):
     """Serial transport for a GSM modem speaking AT commands.
 
     Named apart from :class:`paradox.connections.serial.connection.SerialCommunication`,
-    which is the panel's binary serial transport: the two share a medium and
-    nothing else.
+    which is the panel's binary serial transport.
     """
 
     def __init__(self, port, baud=9600, timeout=DEFAULT_OPEN_TIMEOUT):
@@ -66,10 +62,6 @@ class GsmSerialConnection(Connection):
 
     def on_message(self, message: bytes):
         """Route a modem line to the push callback, or to the waiting caller.
-
-        Overrides :class:`~paradox.connections.connection.Connection`, whose
-        handler registry dispatches parsed panel messages. Modem lines are
-        plain bytes, so they queue instead.
 
         The callback returns whether it consumed the line. Unsolicited results
         (``+CMT``, ``+CUSD``) belong to it; anything it declines is a reply to
