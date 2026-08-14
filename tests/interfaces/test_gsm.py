@@ -4,9 +4,10 @@ from unittest import mock
 import pytest
 
 from paradox.interfaces.text.gsm import (
+    MAX_LINE_LENGTH,
+    GsmSerialProtocol,
     GSMTextInterface,
     SerialCommunication,
-    SerialConnectionProtocol,
 )
 
 
@@ -39,11 +40,11 @@ async def connected_serial_communication():
     return comm
 
 
-# Test SerialConnectionProtocol class
+# Test GsmSerialProtocol class
 @pytest.mark.asyncio
-async def test_serial_connection_protocol():
+async def test_gsm_serial_protocol():
     handler = mock.MagicMock()
-    protocol = SerialConnectionProtocol(handler)
+    protocol = GsmSerialProtocol(handler)
 
     transport = mock.MagicMock()
     protocol.connection_made(transport)
@@ -63,12 +64,9 @@ async def test_serial_connection_protocol():
 
 
 @pytest.mark.asyncio
-async def test_serial_connection_protocol_reassembles_split_frames():
-    # Characterization test: pins the existing framing contract so the buffer
-    # can later be swapped for a shared framer. Not a regression test -- the
-    # pre-refactor loop passed this too.
+async def test_gsm_serial_protocol_reassembles_split_frames():
     handler = mock.MagicMock()
-    protocol = SerialConnectionProtocol(handler)
+    protocol = GsmSerialProtocol(handler)
     protocol.connection_made(mock.MagicMock())
 
     protocol.data_received(b"par")
@@ -87,18 +85,101 @@ async def test_serial_connection_protocol_reassembles_split_frames():
 
 
 @pytest.mark.asyncio
-async def test_serial_connection_protocol_drops_echoed_message():
-    # Characterization test: documents that echo suppression requires an exact
-    # match against the last sent message. See the follow-up issue on GSM
-    # framing for the `\r`-only echo and sticky `last_message` shortcomings.
+async def test_gsm_serial_protocol_drops_echoed_message():
     handler = mock.MagicMock()
-    protocol = SerialConnectionProtocol(handler)
+    protocol = GsmSerialProtocol(handler)
     protocol.connection_made(mock.MagicMock())
 
     await protocol.send_message(b"AT")
     protocol.data_received(b"AT\r\nOK\r\n")
 
     handler.on_message.assert_called_once_with(b"OK")
+
+
+@pytest.mark.asyncio
+async def test_gsm_serial_protocol_drops_cr_terminated_echo():
+    """Many V.25ter modems echo the command terminated by a bare CR."""
+    handler = mock.MagicMock()
+    protocol = GsmSerialProtocol(handler)
+    protocol.connection_made(mock.MagicMock())
+
+    await protocol.send_message(b"AT")
+    protocol.data_received(b"AT\r\r\nOK\r\n")
+
+    handler.on_message.assert_called_once_with(b"OK")
+
+
+@pytest.mark.asyncio
+async def test_gsm_serial_protocol_echo_expectation_is_not_sticky():
+    """Echo is off after ATE0, so the expectation must die with the response."""
+    handler = mock.MagicMock()
+    protocol = GsmSerialProtocol(handler)
+    protocol.connection_made(mock.MagicMock())
+
+    await protocol.send_message(b"AT+CUSD=1")
+    protocol.data_received(b"OK\r\n")
+    protocol.data_received(b"AT+CUSD=1\r\n")
+
+    assert handler.on_message.call_args_list == [
+        mock.call(b"OK"),
+        mock.call(b"AT+CUSD=1"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_gsm_serial_protocol_only_checks_the_first_frame_for_echo():
+    handler = mock.MagicMock()
+    protocol = GsmSerialProtocol(handler)
+    protocol.connection_made(mock.MagicMock())
+
+    await protocol.send_message(b"AT")
+    protocol.data_received(b"OK\r\nAT\r\n")
+
+    assert handler.on_message.call_args_list == [mock.call(b"OK"), mock.call(b"AT")]
+
+
+def test_gsm_serial_protocol_keeps_draining_after_a_callback_raises():
+    handler = mock.MagicMock()
+    handler.on_message.side_effect = [ValueError("bad line"), None]
+    protocol = GsmSerialProtocol(handler)
+
+    protocol.data_received(b"\xff\r\nOK\r\n")
+
+    assert handler.on_message.call_args_list == [mock.call(b"\xff"), mock.call(b"OK")]
+    assert protocol.buffer == b""
+
+
+def test_gsm_serial_protocol_discards_an_oversized_partial_frame():
+    handler = mock.MagicMock()
+    protocol = GsmSerialProtocol(handler)
+
+    protocol.data_received(b"x" * (MAX_LINE_LENGTH + 1))
+
+    handler.on_message.assert_not_called()
+    assert protocol.buffer == b""
+
+
+def test_gsm_serial_protocol_keeps_a_whitespace_only_line():
+    """An SMS body of a single space is data, not framing noise."""
+    handler = mock.MagicMock()
+    protocol = GsmSerialProtocol(handler)
+
+    protocol.data_received(b" \r\n")
+
+    handler.on_message.assert_called_once_with(b" ")
+
+
+@pytest.mark.asyncio
+async def test_gsm_serial_protocol_reset_framing_clears_echo_expectation():
+    handler = mock.MagicMock()
+    protocol = GsmSerialProtocol(handler)
+    protocol.connection_made(mock.MagicMock())
+
+    await protocol.send_message(b"AT")
+    protocol.reset_framing()
+    protocol.data_received(b"AT\r\n")
+
+    handler.on_message.assert_called_once_with(b"AT")
 
 
 # Test SerialCommunication class
@@ -154,3 +235,30 @@ async def test_gsm_text_interface(connected_serial_communication):
     alarm.control_partition.side_effect = control_partition
     interface.process_cmt(header, text)
     await asyncio.wait_for(event.wait(), timeout=0.1)
+
+
+@pytest.mark.asyncio
+async def test_gsm_text_interface_discards_undecodable_line():
+    interface = GSMTextInterface(mock.MagicMock())
+
+    assert interface.data_received(b"\xff\xfe")
+    assert interface.message_cmt is None
+
+
+@pytest.mark.asyncio
+async def test_gsm_text_interface_does_not_keep_a_malformed_cmt_header():
+    """A header left in place would eat every following line as its body."""
+    interface = GSMTextInterface(mock.MagicMock())
+
+    interface.data_received(b"+CMT: not-json")
+    assert interface.message_cmt == "+CMT: not-json"
+
+    assert interface.data_received(b"body")
+    assert interface.message_cmt is None
+
+
+@pytest.mark.asyncio
+async def test_gsm_text_interface_survives_a_malformed_cusd():
+    interface = GSMTextInterface(mock.MagicMock())
+
+    assert interface.data_received(b"+CUSD: not-json")

@@ -41,6 +41,34 @@ def test_take_more_than_available_returns_what_there_is():
     assert len(buf) == 0
 
 
+def test_find_returns_index_relative_to_the_pending_bytes():
+    buf = FrameBuffer(b"abcXdefX")
+    buf.take(4)
+    assert buf.find(b"X") == 3
+
+
+def test_find_returns_minus_one_when_absent():
+    buf = FrameBuffer(b"abc")
+    assert buf.find(b"X") == -1
+
+
+def test_find_ignores_consumed_bytes():
+    buf = FrameBuffer(b"X abc")
+    buf.take(1)
+    assert buf.find(b"X") == -1
+
+
+def test_find_honours_the_start_offset():
+    buf = FrameBuffer(b"aXbX")
+    assert buf.find(b"X", 2) == 3
+
+
+def test_find_does_not_consume():
+    buf = FrameBuffer(b"abX")
+    buf.find(b"X")
+    assert buf.pending == b"abX"
+
+
 def test_discard_defaults_to_one_byte_and_returns_it():
     buf = FrameBuffer(b"abc")
     assert buf.discard() == b"a"
@@ -181,7 +209,7 @@ def _ip_framer():
 
 
 def _line_framer():
-    from paradox.connections.prt3.framing import LineFramer
+    from paradox.connections.framing import LineFramer
 
     return LineFramer()
 

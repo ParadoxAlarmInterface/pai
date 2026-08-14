@@ -15,10 +15,13 @@ import binascii
 import logging
 
 from paradox.config import config as cfg
+from paradox.connections.framing import LineFramer
 from paradox.connections.protocol_base import ConnectionProtocol
-from paradox.connections.prt3.framing import LineFramer
 
 logger = logging.getLogger("PAI").getChild(__name__)
+
+#: PRT3 lines are ~21 bytes; anything much larger means the delimiter was lost.
+MAX_LINE_LENGTH = 512
 
 
 class PRT3Protocol(ConnectionProtocol):
@@ -33,7 +36,11 @@ class PRT3Protocol(ConnectionProtocol):
 
     def __init__(self, handler):
         super().__init__(handler)
-        self._framer = LineFramer()
+        self._framer = LineFramer(
+            terminator=b"\r",
+            max_line_length=MAX_LINE_LENGTH,
+            drop_blank_lines=True,
+        )
 
     def variable_message_length(self, *args, **kwargs):
         # PRT3 lines are delimiter-framed, not length-prefixed.
