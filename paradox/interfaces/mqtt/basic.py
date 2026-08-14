@@ -26,7 +26,7 @@ def mqtt_handle_decorator(
     func: typing.Callable[
         ["BasicMQTTInterface", ParsedMessage],
         typing.Coroutine[None, "BasicMQTTInterface", ParsedMessage],
-    ]
+    ],
 ):
     async def try_func(*args, **kwargs):
         try:
@@ -65,7 +65,7 @@ def mqtt_handle_decorator(
             topics = topic.split("/")
 
             if len(topics) < 3:
-                logger.error(f"Invalid topic in mqtt message: {message.topic}")
+                logger.warning(f"Invalid topic in mqtt message: {message.topic}")
                 return
 
             content = message.payload.decode("utf-8").strip()
@@ -377,12 +377,12 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         """PRT3-only: trigger a utility key (UK{nnn}). Payload is ignored."""
         topics = prep.topics
         if len(topics) < 4:
-            logger.error("PRT3 utility key: malformed topic %r", topics)
+            logger.warning("PRT3 utility key: malformed topic %r", topics)
             return
         try:
             key = int(topics[3])
         except (ValueError, TypeError):
-            logger.error("PRT3 utility key: invalid key number %r", topics[3])
+            logger.warning("PRT3 utility key: invalid key number %r", topics[3])
             return
 
         message = f"Utility key command: key={key}"

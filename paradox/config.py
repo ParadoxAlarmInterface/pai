@@ -7,7 +7,7 @@ import sys
 class Config:
     DEFAULTS = {
         "LOGGING_LEVEL_CONSOLE": logging.INFO,  # See documentation of Logging package
-        "LOGGING_LEVEL_FILE": logging.ERROR,
+        "LOGGING_LEVEL_FILE": logging.WARNING,
         "LOGGING_FILE": (
             None,
             [type(None), str],

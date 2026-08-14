@@ -125,4 +125,4 @@ class HandlerRegistry:
                 cmd = data.fields.value.po.command
             except AttributeError:
                 cmd = repr(data)
-            logger.error("No handler for message %s\nDetail: %s", cmd, data)
+            logger.warning("No handler for message %s\nDetail: %s", cmd, data)
