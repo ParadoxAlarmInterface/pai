@@ -30,7 +30,6 @@ async def connected_gsm_connection():
     return comm
 
 
-# Test GSMTextInterface class
 @pytest.mark.asyncio
 async def test_gsm_text_interface(connected_gsm_connection):
     alarm = mock.MagicMock()
@@ -50,9 +49,6 @@ async def test_gsm_text_interface(connected_gsm_connection):
     data = b"+CMT: test_data"
     interface.data_received(data)
     assert interface.message_cmt == data.decode()
-
-    # level = EventLevel.INFO
-    # await interface.send_message("bla", level)
 
     header = '+CMT: "+1234567890","","24/09/17,10:30:00+32"'
     text = "partition outside arm"

@@ -149,7 +149,7 @@ async def test_clear_replaces_the_queue(connected_gsm_connection):
 async def test_a_declined_line_still_reaches_the_command_waiter(
     connected_gsm_connection,
 ):
-    """Routing every line to the callback used to starve send_command forever."""
+    """Routing every line to the callback used to starve command waiters."""
     comm = connected_gsm_connection
     comm.set_recv_callback(lambda message: message.startswith(b"+CMT"))
 

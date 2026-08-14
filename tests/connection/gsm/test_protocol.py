@@ -11,7 +11,6 @@ from paradox.connections.gsm.protocol import (
 )
 
 
-# Test GsmSerialProtocol class
 @pytest.mark.asyncio
 async def test_gsm_serial_protocol():
     handler = mock.MagicMock()
