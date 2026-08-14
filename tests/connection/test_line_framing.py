@@ -11,7 +11,7 @@ MAX_LINE_LENGTH = DEFAULT_MAX_LINE_LENGTH
 def framer():
     """A framer configured the way PRT3 uses it."""
     return LineFramer(
-        terminator=b"\r", max_line_length=MAX_LINE_LENGTH, drop_whitespace_lines=True
+        terminator=b"\r", max_line_length=MAX_LINE_LENGTH, drop_blank_lines=True
     )
 
 

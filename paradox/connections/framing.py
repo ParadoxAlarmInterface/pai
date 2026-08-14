@@ -190,7 +190,7 @@ class LineFramer(Framer):
     ``strip_terminator``
         Drop the terminator from the emitted frame. Off by default, so the
         consumer can verify framing.
-    ``drop_whitespace_lines``
+    ``drop_blank_lines``
         Also skip lines whose payload is only whitespace. Empty payloads are
         always skipped -- a bare terminator carries no message -- but a
         whitespace-only line may still be data, so discarding it is opt-in.
@@ -210,7 +210,7 @@ class LineFramer(Framer):
         terminator: bytes = b"\r",
         max_line_length: int = DEFAULT_MAX_LINE_LENGTH,
         strip_terminator: bool = False,
-        drop_whitespace_lines: bool = False,
+        drop_blank_lines: bool = False,
     ) -> None:
         super().__init__()
         if not terminator:
@@ -218,7 +218,7 @@ class LineFramer(Framer):
         self._terminator = terminator
         self._max_line_length = max_line_length
         self._strip_terminator = strip_terminator
-        self._drop_whitespace_lines = drop_whitespace_lines
+        self._drop_blank_lines = drop_blank_lines
         self._resyncing = False
 
     def reset(self) -> None:
@@ -253,7 +253,7 @@ class LineFramer(Framer):
             payload = line[: -len(self._terminator)]
             if not payload:
                 continue
-            if self._drop_whitespace_lines and not payload.strip():
+            if self._drop_blank_lines and not payload.strip():
                 continue
 
             return Frame(payload if self._strip_terminator else line)
