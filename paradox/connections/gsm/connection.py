@@ -43,7 +43,13 @@ class GsmSerialConnection(Connection):
         self.queue = asyncio.Queue()
 
     def clear(self):
-        self.queue = asyncio.Queue()
+        """Drop any unread modem output.
+
+        Drains in place rather than replacing the queue: a coroutine already
+        blocked in :meth:`read` would otherwise wait on the old object forever.
+        """
+        while not self.queue.empty():
+            self.queue.get_nowait()
 
     def on_connection_loss(self):
         logger.error("Connection was lost")
@@ -101,16 +107,30 @@ class GsmSerialConnection(Connection):
 
         Set ``expect_prompt`` when the command is answered by an unterminated
         ``"> "`` entry prompt rather than by a line, as ``AT+CMGS`` is.
+
+        Callers must serialise their own exchanges: the modem answers one
+        command at a time, and the reply queue cannot tell two callers apart.
         """
+        if self._protocol is None:
+            raise ConnectionError("Not connected")
+
+        # Anything already queued predates this command, so it cannot be its
+        # reply. Most often it is the late answer to one that timed out.
+        self.clear()
+
         logger.debug("I->M: %s", message)
 
         if expect_prompt:
-            if self._protocol is None:
-                raise ConnectionError("Not connected")
             self._protocol.expect_prompt()
 
-        self.write(message)
-        return await asyncio.wait_for(self.queue.get(), timeout=timeout)
+        try:
+            self.write(message)
+            return await asyncio.wait_for(self.queue.get(), timeout=timeout)
+        finally:
+            if expect_prompt and self._protocol is not None:
+                # An expectation that outlived its command would prime the
+                # next unterminated line to be read as a prompt.
+                self._protocol.disarm_prompt()
 
     def write_raw(self, message: bytes) -> None:
         """Write bytes with no line terminator, for an SMS body."""

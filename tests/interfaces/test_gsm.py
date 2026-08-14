@@ -6,6 +6,7 @@ import pytest
 from paradox.config import config as cfg
 from paradox.connections.gsm.connection import GsmSerialConnection
 from paradox.event import EventLevel
+from paradox.interfaces.text import gsm
 from paradox.interfaces.text.gsm import GSMTextInterface
 
 
@@ -256,3 +257,120 @@ async def test_unsolicited_lines_do_not_satisfy_a_pending_command(gsm_interface)
 
         modem_says(comm, b"OK\r\n")
         await task
+
+
+@pytest.mark.asyncio
+async def test_concurrent_sends_are_serialised(gsm_interface):
+    """Two AT commands in flight at once make the second the first SMS's body."""
+    comm = gsm_interface.port
+
+    with mock.patch.object(comm._protocol, "transport") as transport:
+        first = asyncio.ensure_future(gsm_interface._send_sms("+1", "one"))
+        second = asyncio.ensure_future(gsm_interface._send_sms("+2", "two"))
+        await settle()
+
+        # Only the first exchange has reached the modem.
+        assert [c.args[0] for c in transport.write.call_args_list] == [
+            b'AT+CMGS="+1"\r\n'
+        ]
+
+        modem_says(comm, b"\r\n> ")
+        await settle()
+        modem_says(comm, b"OK\r\n")
+        await first
+
+        # The second waits its turn rather than interleaving.
+        await settle()
+        assert transport.write.call_args_list[-1].args[0] == b'AT+CMGS="+2"\r\n'
+
+        modem_says(comm, b"\r\n> ")
+        await settle()
+        modem_says(comm, b"OK\r\n")
+        await second
+
+
+@pytest.mark.asyncio
+async def test_at_command_reports_a_rejection_immediately(gsm_interface):
+    """An ERROR used to be swallowed and cost a full command timeout."""
+    comm = gsm_interface.port
+    comm.set_recv_callback(None)
+
+    with mock.patch.object(comm._protocol, "transport"):
+        task = asyncio.ensure_future(gsm_interface._at_command(b"AT+CUSD=1"))
+        await settle()
+        modem_says(comm, b"+CME ERROR: operation not supported\r\n")
+
+        with pytest.raises(ValueError, match="rejected"):
+            await task
+
+
+@pytest.mark.asyncio
+async def test_at_command_skips_informational_lines(gsm_interface):
+    comm = gsm_interface.port
+    comm.set_recv_callback(None)
+
+    with mock.patch.object(comm._protocol, "transport"):
+        task = asyncio.ensure_future(gsm_interface._at_command(b"AT+CSQ"))
+        await settle()
+        modem_says(comm, b"+CSQ: 19,99\r\nOK\r\n")
+
+        assert await task == b"OK"
+
+
+@pytest.mark.asyncio
+async def test_run_reconnects_after_the_modem_drops(gsm_interface):
+    """on_connection_loss clears only the transport's flag; run() must notice."""
+    connects = []
+
+    async def fake_connect():
+        connects.append(True)
+        gsm_interface.modem_connected = True
+        gsm_interface.port.connected = True
+        return True
+
+    with mock.patch.object(gsm, "MODEM_POLL_INTERVAL", 0), mock.patch.object(
+        gsm_interface, "connect", side_effect=fake_connect
+    ):
+        task = asyncio.ensure_future(gsm_interface.run())
+        await settle()
+        assert connects == []  # already connected, nothing to do
+
+        gsm_interface.port.connected = False  # modem unplugged
+        await settle()
+
+        task.cancel()
+
+    assert connects, "run() never reconnected after the port dropped"
+
+
+@pytest.mark.asyncio
+async def test_connect_closes_the_previous_port(gsm_interface):
+    """A failed retry used to leak the previous connection object."""
+    old = gsm_interface.port
+
+    with mock.patch.object(
+        old, "close", new_callable=mock.AsyncMock
+    ) as close, mock.patch.object(
+        gsm.GsmSerialConnection, "connect", new_callable=mock.AsyncMock
+    ) as connect:
+        connect.return_value = False
+        assert await gsm_interface.connect() is False
+
+    close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_stop_cancels_in_flight_sends(gsm_interface):
+    comm = gsm_interface.port
+
+    with mock.patch.object(comm._protocol, "transport"), mock.patch.object(
+        cfg, "GSM_CONTACTS", ["+1"]
+    ):
+        gsm_interface.send_message("Alarm!", EventLevel.INFO)
+        await settle()
+        task = next(iter(gsm_interface._send_tasks))
+
+        gsm_interface.stop()
+        await settle()
+
+    assert task.cancelled()

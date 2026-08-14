@@ -23,6 +23,16 @@ ESC = b"\x1b"
 #: Delivery to the network can be slow on a weak signal.
 SMS_SEND_TIMEOUT = 60
 
+#: Plain AT commands answer promptly or not at all.
+AT_COMMAND_TIMEOUT = 5
+
+#: How often to notice that the modem has gone away, and to retry a failed open.
+MODEM_POLL_INTERVAL = 5
+
+#: Final result codes. Everything else the modem emits is informational.
+_OK = b"OK"
+_ERRORS = (b"+CME ERROR", b"+CMS ERROR")
+
 
 class GSMTextInterface(ConfiguredAbstractTextInterface):
     """Interface Class using GSM"""
@@ -40,9 +50,18 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
         self.modem_connected = False
         self.message_cmt = None
 
+        # The modem answers one command at a time and the reply queue cannot
+        # tell two callers apart, so every exchange is serialised here rather
+        # than in the transport -- an SMS spans several transport calls.
+        self._command_lock = asyncio.Lock()
+        self._send_tasks = set()
+
     def stop(self):
         """Stops the GSM Interface"""
         super().stop()
+
+        for task in list(self._send_tasks):
+            task.cancel()
 
         if self.port is not None:
             # stop() is synchronous, so the close can only be scheduled. The
@@ -54,21 +73,15 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
 
         logger.debug("GSM Stopped")
 
-    async def write(self, message: str, expected: str = None) -> None:
-        r = b""
-        while r != expected:
-            r = await self.port.send_command(message)
-            data = b""
-
-            if r == b"ERROR":
-                raise Exception(f"Got error from modem: {r}")
-
-            while r != expected:
-                r = await self.port.read()
-                data += r + b"\n"
+    async def _at_command(self, command: bytes, timeout=AT_COMMAND_TIMEOUT) -> bytes:
+        """Send one AT command and wait for its final result code."""
+        first = await self.port.send_command(command, timeout=timeout)
+        return await self._read_final_result(timeout, first_line=first)
 
     async def connect(self):
         logger.info(f"Using {cfg.GSM_MODEM_PORT} at {cfg.GSM_MODEM_BAUDRATE} baud")
+
+        await self._close_port()
         self.port = GsmSerialConnection(cfg.GSM_MODEM_PORT, cfg.GSM_MODEM_BAUDRATE, 5)
 
         self.port.set_recv_callback(None)
@@ -79,15 +92,18 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
             return False
 
         try:
-            await self.write(b"AT", b"OK")  # Init
-            await self.write(b"ATE0", b"OK")  # Disable Echo
-            await self.write(b"AT+CMEE=2", b"OK")  # Increase verbosity
-            await self.write(b"AT+CMGF=1", b"OK")  # SMS Text mode
-            await self.write(b"AT+CFUN=1", b"OK")  # Enable modem
-            await self.write(
-                b"AT+CNMI=1,2,0,0,0", b"OK"
-            )  # SMS received only when modem enabled, Use +CMT with SMS, No Status Report,
-            await self.write(b"AT+CUSD=1", b"OK")  # Enable result code presentation
+            # Held across the whole sequence: a half-initialised modem must not
+            # see an SMS interleaved between these commands.
+            async with self._command_lock:
+                await self._at_command(b"AT")  # Init
+                await self._at_command(b"ATE0")  # Disable Echo
+                await self._at_command(b"AT+CMEE=2")  # Increase verbosity
+                await self._at_command(b"AT+CMGF=1")  # SMS Text mode
+                await self._at_command(b"AT+CFUN=1")  # Enable modem
+                # SMS delivered only while the modem is enabled, body carried
+                # in +CMT, no status report.
+                await self._at_command(b"AT+CNMI=1,2,0,0,0")
+                await self._at_command(b"AT+CUSD=1")  # Result code presentation
 
         except asyncio.TimeoutError:
             logger.error("No reply from modem")
@@ -105,14 +121,36 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
         self.modem_connected = True
         return True
 
+    async def _close_port(self) -> None:
+        """Drop the previous port, so a retry does not leak the last attempt."""
+        if self.port is None:
+            return
+
+        port, self.port = self.port, None
+        self.modem_connected = False
+        try:
+            await port.close()
+        except Exception:
+            logger.exception("Error closing GSM modem port")
+
     async def run(self):
         await super().run()
 
-        while not self.modem_connected:
-            if not await self.connect():
+        while True:
+            if (
+                self.modem_connected
+                and self.port is not None
+                and not self.port.connected
+            ):
+                # on_connection_loss only clears the transport's own flag, so
+                # the interface has to notice the drop and rebuild the port.
+                logger.warning("Modem connection lost")
+                self.modem_connected = False
+
+            if not self.modem_connected and not await self.connect():
                 logger.warning("Could not connect to modem")
 
-            await asyncio.sleep(5)
+            await asyncio.sleep(MODEM_POLL_INTERVAL)
 
     def data_received(self, raw: bytes) -> bool:
         """Handle an unsolicited modem line.
@@ -183,12 +221,18 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
             logger.warning("GSM not available when sending message")
             return
 
-        self._loop.create_task(self._send_sms_to_contacts(message))
+        task = self._loop.create_task(self._send_sms_to_contacts(message))
+        # Tracked so stop() can cancel them, and so the loop keeps a strong
+        # reference: asyncio only holds a weak one.
+        self._send_tasks.add(task)
+        task.add_done_callback(self._send_tasks.discard)
 
     async def _send_sms_to_contacts(self, message: str) -> None:
         for dst in cfg.GSM_CONTACTS:
             try:
                 await self._send_sms(dst, message)
+            except asyncio.CancelledError:
+                raise
             except Exception:
                 logger.exception("ERROR sending SMS to %s", dst)
 
@@ -200,44 +244,54 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
         Ctrl-Z. Sending both at once -- as this did -- leaves the modem sitting
         in entry mode and the message unsent.
         """
-        prompt = await self.port.send_command(
-            b'AT+CMGS="%b"' % destination.encode(), expect_prompt=True
-        )
+        # Held for the whole exchange, not just the command: between the prompt
+        # and the Ctrl-Z the modem treats everything written as message text,
+        # so a second sender would end up inside this SMS.
+        async with self._command_lock:
+            prompt = await self.port.send_command(
+                b'AT+CMGS="%b"' % destination.encode(), expect_prompt=True
+            )
 
-        if prompt != PROMPT:
-            # The modem may still be in entry mode; ESC leaves it cleanly
-            # rather than letting the next command become SMS text.
-            self.port.write_raw(ESC)
-            raise ValueError(f"Modem did not ask for an SMS body: {prompt!r}")
+            if prompt != PROMPT:
+                # The modem may still be in entry mode; ESC leaves it cleanly
+                # rather than letting the next command become SMS text.
+                self.port.write_raw(ESC)
+                raise ValueError(f"Modem did not ask for an SMS body: {prompt!r}")
 
-        self.port.write_raw(message.encode() + CTRL_Z)
+            try:
+                self.port.write_raw(message.encode() + CTRL_Z)
+                result = await self._read_final_result(SMS_SEND_TIMEOUT)
+            except asyncio.TimeoutError:
+                self.port.write_raw(ESC)
+                raise
 
-        result = await self._read_final_result(SMS_SEND_TIMEOUT)
         logger.debug(f"SMS to {destination} result: {result}")
 
-    async def _read_final_result(self, timeout: float) -> bytes:
-        """Drain modem lines until a final result code.
+    async def _read_final_result(self, timeout: float, first_line: bytes = None):
+        """Read modem lines until a final result code.
 
         Sending can take the best part of a minute on a weak network, and the
         modem interleaves informational lines such as ``+CMGS: 42`` before the
-        closing ``OK``.
+        closing ``OK``. ``first_line`` lets a caller hand over a line it has
+        already taken off the queue.
         """
         deadline = self._loop.time() + timeout
+        line = first_line
 
         while True:
+            if line is not None:
+                if line == _OK:
+                    return line
+                if line == b"ERROR" or line.startswith(_ERRORS):
+                    raise ValueError(f"Modem rejected the command: {line!r}")
+
             remaining = deadline - self._loop.time()
             if remaining <= 0:
                 raise asyncio.TimeoutError("No final result code from modem")
 
             line = await self.port.read(timeout=remaining)
             if line is None:
-                raise ConnectionError("Modem disconnected while sending")
-
-            if line == b"OK":
-                return line
-
-            if line == b"ERROR" or line.startswith((b"+CME ERROR", b"+CMS ERROR")):
-                raise ValueError(f"Modem rejected the SMS: {line!r}")
+                raise ConnectionError("Modem disconnected")
 
     def process_cmt(self, header: str, text: str) -> None:
         idx = header.find(" ")

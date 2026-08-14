@@ -211,3 +211,54 @@ async def test_write_raw_requires_a_connection():
 
     with pytest.raises(ConnectionError):
         comm.write_raw(b"body\x1a")
+
+
+@pytest.mark.asyncio
+async def test_a_stale_reply_does_not_satisfy_the_next_command(
+    connected_gsm_connection,
+):
+    """The late answer to a timed-out command used to be handed to the next."""
+    comm = connected_gsm_connection
+
+    with mock.patch.object(comm._protocol, "transport"):
+        with pytest.raises(asyncio.TimeoutError):
+            await comm.send_command(b"AT+A", timeout=0.01)
+
+        comm.on_message(b"late-reply-to-A")
+
+        asyncio.get_event_loop().call_soon(comm.on_message, b"reply-to-B")
+        assert await comm.send_command(b"AT+B", timeout=0.5) == b"reply-to-B"
+
+
+@pytest.mark.asyncio
+async def test_a_timed_out_command_disarms_the_prompt(connected_gsm_connection):
+    """A stuck expectation would read the next unterminated line as a prompt."""
+    comm = connected_gsm_connection
+
+    with mock.patch.object(comm._protocol, "transport"):
+        with pytest.raises(asyncio.TimeoutError):
+            await comm.send_command(b'AT+CMGS="+1"', timeout=0.01, expect_prompt=True)
+
+    assert comm._protocol._prompt_expected is False
+
+
+@pytest.mark.asyncio
+async def test_send_command_requires_a_connection():
+    comm = GsmSerialConnection("test_port", 9600, 5)
+
+    with pytest.raises(ConnectionError):
+        await comm.send_command(b"AT")
+
+
+@pytest.mark.asyncio
+async def test_clear_keeps_a_waiter_attached(connected_gsm_connection):
+    """Replacing the queue object stranded anyone already blocked in read()."""
+    comm = connected_gsm_connection
+
+    reader = asyncio.ensure_future(comm.read(timeout=0.5))
+    await asyncio.sleep(0)
+
+    comm.clear()
+    comm.on_message(b"OK")
+
+    assert await reader == b"OK"

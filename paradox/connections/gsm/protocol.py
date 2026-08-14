@@ -66,6 +66,10 @@ class GsmSerialProtocol(ConnectionProtocol):
         """
         self._prompt_expected = True
 
+    def disarm_prompt(self) -> None:
+        """Drop an expectation whose command did not survive to use it."""
+        self._prompt_expected = False
+
     def data_received(self, recv_data):
         for frame in self._framer.feed(recv_data):
             message = frame.data
