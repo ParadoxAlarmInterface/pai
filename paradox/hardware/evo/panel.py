@@ -248,7 +248,7 @@ class Panel_EVOBase(PanelBase):
                 parsers.PerformPartitionAction, args, reply_expected=0x4
             )
         except MappingError:
-            logger.error('Partition command: "%s" is not supported' % command)
+            logger.warning('Partition command: "%s" is not supported' % command)
             return False
 
         if reply:
@@ -275,7 +275,7 @@ class Panel_EVOBase(PanelBase):
                 parsers.PerformZoneAction, args, reply_expected=0xD
             )
         except MappingError:
-            logger.error('Zone command: "%s" is not supported' % command)
+            logger.warning('Zone command: "%s" is not supported' % command)
             return False
 
         if reply:
@@ -299,7 +299,7 @@ class Panel_EVOBase(PanelBase):
                 parsers.PerformPGMAction, args, reply_expected=0x4
             )
         except MappingError:
-            logger.error('PGM command: "%s" is not supported' % command)
+            logger.warning('PGM command: "%s" is not supported' % command)
             return False
 
         if reply:
@@ -308,7 +308,9 @@ class Panel_EVOBase(PanelBase):
             logger.info('PGM command: "%s" failed' % command)
         return reply is not None
 
-    async def control_module_pgm_outputs(self, module_address: int, pgm_index: int, command: str) -> bool:
+    async def control_module_pgm_outputs(
+        self, module_address: int, pgm_index: int, command: str
+    ) -> bool:
         """
         Control PGM module outputs
         :param int module_address: bus address of the PGM module
@@ -316,7 +318,9 @@ class Panel_EVOBase(PanelBase):
         :param str command: textual command
         :return: True if accepted
         """
-        assert 1 <= pgm_index <= parsers.MODULE_PGM_PACKET_SLOTS, "pgm_index must be between 1 and %d" % parsers.MODULE_PGM_PACKET_SLOTS
+        assert 1 <= pgm_index <= parsers.MODULE_PGM_PACKET_SLOTS, (
+            "pgm_index must be between 1 and %d" % parsers.MODULE_PGM_PACKET_SLOTS
+        )
         pgm_commands = ["release"] * parsers.MODULE_PGM_PACKET_SLOTS
         pgm_commands[pgm_index - 1] = command
 
@@ -326,7 +330,7 @@ class Panel_EVOBase(PanelBase):
                 parsers.PerformModulePGMAction, args, reply_expected=0xA
             )
         except MappingError:
-            logger.error('Module PGM command: "%s" is not supported' % command)
+            logger.warning('Module PGM command: "%s" is not supported' % command)
             return False
 
         if reply:
@@ -350,7 +354,7 @@ class Panel_EVOBase(PanelBase):
                 parsers.PerformDoorAction, args, reply_expected=0x4
             )
         except MappingError:
-            logger.error('Door command: "%s" is not supported' % command)
+            logger.warning('Door command: "%s" is not supported' % command)
             return False
 
         if reply:

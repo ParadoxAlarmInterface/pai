@@ -112,7 +112,7 @@ async def test_unknown_message_type_is_logged(protocol, handler, caplog):
     protocol.data_received(build(b"\x01", IPMessageType.ip_request))
     handler.on_message.assert_not_called()
     handler.on_ip_message.assert_not_called()
-    assert [r for r in caplog.records if r.levelname == "ERROR"]
+    assert [r for r in caplog.records if r.levelname == "WARNING"]
 
 
 async def test_raw_dump_logging_does_not_raise(protocol, mocker):

@@ -26,7 +26,7 @@ from paradox.hardware.evo.parsers import MODULE_PGM_PACKET_SLOTS
 from paradox.lib import ps
 from paradox.lib.async_message_manager import ErrorMessageHandler, EventMessageHandler
 from paradox.lib.handlers import PersistentHandler
-from paradox.lib.utils import deep_merge, sanitize_key
+from paradox.lib.utils import deep_merge, describe_connection, sanitize_key
 from paradox.parsers.status import convert_raw_status
 
 logger = logging.getLogger("PAI").getChild(__name__)
@@ -210,7 +210,10 @@ class Paradox:
                 ),
             )
             self.run_state = RunState.CONNECTED
-            logger.info("PRT3 connection OK")
+            logger.info(
+                "Connected via %s to PRT3 (no panel identification)",
+                describe_connection(),
+            )
             return True
         except asyncio.TimeoutError:
             logger.error("Timeout waiting for PRT3 COMM&ok")
@@ -232,7 +235,7 @@ class Paradox:
         logger.info("Connecting to interface")
         if not await self.connection.connect():
             self.run_state = RunState.ERROR
-            logger.error("Failed to connect to interface")
+            logger.error("Failed to connect to interface %s", describe_connection())
             return False
 
         logger.info("Connecting to Panel")
@@ -265,7 +268,12 @@ class Paradox:
                     initiate_reply.fields.value.serial_number
                 ).decode()
 
-                logger.info(f"Panel Identified {model} version {firmware_version}")
+                logger.info(
+                    "Connected via %s to %s version %s",
+                    describe_connection(),
+                    model,
+                    firmware_version,
+                )
             else:
                 raise ConnectionError("Panel did not replied to InitiateCommunication")
 
@@ -556,7 +564,7 @@ class Paradox:
 
         # Not Found
         if len(zones_selected) == 0:
-            logger.error("No zones selected")
+            logger.warning("No zones selected")
             return False
 
         # Apply state changes
@@ -564,9 +572,9 @@ class Paradox:
         try:
             accepted = await self.panel.control_zones(zones_selected, command)
         except NotImplementedError:
-            logger.error("control_zone is not implemented for this alarm type")
+            logger.warning("control_zone is not implemented for this alarm type")
         except asyncio.CancelledError:
-            logger.error("control_zone canceled")
+            logger.debug("control_zone canceled")
         except asyncio.TimeoutError:
             logger.error("control_zone timeout")
 
@@ -583,7 +591,7 @@ class Paradox:
 
         # Not Found
         if len(partitions_selected) == 0:
-            logger.error("No partitions selected")
+            logger.warning("No partitions selected")
             return False
 
         # Apply state changes
@@ -591,9 +599,9 @@ class Paradox:
         try:
             accepted = await self.panel.control_partitions(partitions_selected, command)
         except NotImplementedError:
-            logger.error("control_partition is not implemented for this alarm type")
+            logger.warning("control_partition is not implemented for this alarm type")
         except asyncio.CancelledError:
-            logger.error("control_partition canceled")
+            logger.debug("control_partition canceled")
         except asyncio.TimeoutError:
             logger.error("control_partition timeout")
 
@@ -636,20 +644,20 @@ class Paradox:
         :returns:   True if the panel accepted the command, False otherwise.
         """
         if cfg.CONNECTION_TYPE != "PRT3":
-            logger.error(
+            logger.warning(
                 "control_utility_key is only supported with CONNECTION_TYPE = 'PRT3'"
             )
             return False
         try:
             return await self.panel.send_utility_key(key)
         except NotImplementedError:
-            logger.error("send_utility_key not implemented for this panel type")
+            logger.warning("send_utility_key not implemented for this panel type")
             return False
         except (ValueError, TypeError) as e:
-            logger.error("control_utility_key: invalid key %r — %s", key, e)
+            logger.warning("control_utility_key: invalid key %r — %s", key, e)
             return False
         except asyncio.CancelledError:
-            logger.error("control_utility_key canceled")
+            logger.debug("control_utility_key canceled")
             raise
 
     def _init_module_pgms(self):
@@ -691,9 +699,9 @@ class Paradox:
             try:
                 accepted = await self.panel.control_outputs(outputs_selected, command)
             except NotImplementedError:
-                logger.error("control_output is not implemented for this alarm type")
+                logger.warning("control_output is not implemented for this alarm type")
             except asyncio.CancelledError:
-                logger.error("control_output canceled")
+                logger.debug("control_output canceled")
                 raise
             except asyncio.TimeoutError:
                 logger.error("control_output timeout")
@@ -711,11 +719,11 @@ class Paradox:
                         out["module_address"], out["pgm_index"], command
                     )
                 except NotImplementedError:
-                    logger.error(
+                    logger.warning(
                         "control_module_pgm_outputs is not implemented for this alarm type"
                     )
                 except asyncio.CancelledError:
-                    logger.error("control_module_pgm_output canceled")
+                    logger.debug("control_module_pgm_output canceled")
                     raise
                 except asyncio.TimeoutError:
                     logger.error("control_output timeout")
@@ -726,7 +734,7 @@ class Paradox:
                     )
             return accepted
 
-        logger.error("No outputs selected")
+        logger.warning("No outputs selected")
         return False
 
     async def send_panic(self, partition_id, panic_type, user_id) -> bool:
@@ -740,16 +748,16 @@ class Paradox:
         user = self.storage.get_container_object("user", user_id)
 
         if partition is None or user is None:
-            logger.error("Send panic: user or partition is not found")
+            logger.warning("Send panic: user or partition is not found")
 
         try:
             return await self.panel.send_panic(
                 [partition["id"]], panic_type, user["id"]
             )
         except NotImplementedError:
-            logger.error("send_panic is not implemented for this alarm type")
+            logger.warning("send_panic is not implemented for this alarm type")
         except asyncio.CancelledError:
-            logger.error("send_panic canceled")
+            logger.debug("send_panic canceled")
         except asyncio.TimeoutError:
             logger.error("send_panic timeout")
 
@@ -763,7 +771,7 @@ class Paradox:
 
         # Not Found
         if len(doors_selected) == 0:
-            logger.error("No doors selected")
+            logger.warning("No doors selected")
             return False
 
         # Apply state changes
@@ -771,9 +779,9 @@ class Paradox:
         try:
             accepted = await self.panel.control_doors(doors_selected, command)
         except NotImplementedError:
-            logger.error("control_door is not implemented for this alarm type")
+            logger.warning("control_door is not implemented for this alarm type")
         except asyncio.CancelledError:
-            logger.error("control_door canceled")
+            logger.debug("control_door canceled")
         except asyncio.TimeoutError:
             logger.error("control_door timeout")
         # Apply state changes

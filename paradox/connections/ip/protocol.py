@@ -68,7 +68,7 @@ class IPConnectionProtocol(ConnectionProtocol):
         elif message.header.message_type == IPMessageType.ip_response:
             self.handler.on_ip_message(message)
         else:
-            logger.error(f"Wrong message detected: {message}")
+            logger.warning(f"Wrong message detected: {message}")
 
     def data_received(self, recv_data):
         for frame in self._framer.feed(recv_data):

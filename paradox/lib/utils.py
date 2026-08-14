@@ -1,4 +1,5 @@
 import asyncio
+import binascii
 from collections.abc import Hashable
 from copy import deepcopy
 import functools
@@ -140,3 +141,92 @@ class memoized:
     def __get__(self, obj, objtype):
         """Support instance methods."""
         return functools.partial(self.__call__, obj)
+
+
+def mask_secret(value: typing.Any, keep: int = 4) -> str:
+    """Mask a sensitive identifier, keeping only the last ``keep`` characters."""
+    if value is None:
+        return "****"
+
+    if isinstance(value, (bytes, bytearray)):
+        value = binascii.hexlify(bytes(value)).decode("utf-8")
+    else:
+        value = str(value)
+
+    if keep <= 0 or len(value) <= keep:
+        return "****"
+
+    return "****" + value[-keep:]
+
+
+def mask_email(value: typing.Any) -> str:
+    """Render an email address as ``j****@e****.com``."""
+    if not value:
+        return "****"
+
+    local, sep, domain = str(value).partition("@")
+    if not sep or not local or "." not in domain:
+        return "****"
+
+    name, _, tld = domain.rpartition(".")
+    if not name:
+        return "****"
+
+    return f"{local[0]}****@{name[0]}****.{tld}"
+
+
+def format_duration(seconds: typing.Optional[float]) -> str:
+    """Render a duration coarsely, using at most the two largest units."""
+    if seconds is None:
+        return "unknown"
+
+    total = int(max(0, seconds))
+    days, rem = divmod(total, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, secs = divmod(rem, 60)
+
+    if days:
+        parts = [("d", days), ("h", hours)]
+    elif hours:
+        parts = [("h", hours), ("m", minutes)]
+    elif minutes:
+        parts = [("m", minutes), ("s", secs)]
+    else:
+        return f"{secs}s"
+
+    return " ".join(f"{v}{u}" for u, v in parts if v)
+
+
+def describe_connection(config=None) -> str:
+    """Render the configured connection as a short, redacted descriptor.
+
+    Reads configuration only, so it is safe to call before connecting and
+    after a connection has dropped.
+    """
+    if config is None:
+        from paradox.config import config as cfg
+
+        config = cfg
+
+    connection_type = config.CONNECTION_TYPE
+
+    if connection_type == "Serial":
+        return f"Serial({config.SERIAL_PORT}@{config.SERIAL_BAUD})"
+
+    if connection_type == "PRT3":
+        return f"PRT3({config.PRT3_SERIAL_PORT}@{config.PRT3_SERIAL_BAUD})"
+
+    if connection_type == "IP":
+        if config.IP_CONNECTION_BARE:
+            return "IP-bare({}:{})".format(
+                config.IP_CONNECTION_HOST, config.IP_CONNECTION_PORT
+            )
+        if config.IP_CONNECTION_SITEID and config.IP_CONNECTION_EMAIL:
+            return "SITE({} / {}, serial {})".format(
+                config.IP_CONNECTION_SITEID,
+                mask_email(config.IP_CONNECTION_EMAIL),
+                mask_secret(config.IP_CONNECTION_PANEL_SERIAL),
+            )
+        return f"IP({config.IP_CONNECTION_HOST}:{config.IP_CONNECTION_PORT})"
+
+    return f"Unknown({connection_type})"

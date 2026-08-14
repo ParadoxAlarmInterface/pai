@@ -440,12 +440,12 @@ class PRT3Panel(Panel):
         """
         if command == "disarm":
             if not user_code:
-                logger.error("PRT3: disarm requires PRT3_USER_CODE to be configured")
+                logger.warning("PRT3: disarm requires PRT3_USER_CODE to be configured")
                 return None
             try:
                 return encoder.encode_disarm(partition, user_code), f"AD{partition:03d}"
             except ValueError as exc:
-                logger.error("PRT3: invalid PRT3_USER_CODE for disarm: %s", exc)
+                logger.warning("PRT3: invalid PRT3_USER_CODE for disarm: %s", exc)
                 return None
 
         if command in _QUICK_ARM_MODES:
@@ -457,11 +457,11 @@ class PRT3Panel(Panel):
                         f"AA{partition:03d}",
                     )
                 except ValueError as exc:
-                    logger.error("PRT3: invalid PRT3_USER_CODE for arm: %s", exc)
+                    logger.warning("PRT3: invalid PRT3_USER_CODE for arm: %s", exc)
                     return None
             return encoder.encode_quick_arm(partition, mode), f"AQ{partition:03d}"
 
-        logger.error("PRT3: unknown partition command %r", command)
+        logger.warning("PRT3: unknown partition command %r", command)
         return None
 
     async def control_partitions(self, partitions: list, command: str) -> bool:
@@ -535,7 +535,7 @@ class PRT3Panel(Panel):
         """
         encode_fn = _PANIC_ENCODERS.get(panic_type)
         if encode_fn is None:
-            logger.error("PRT3: unknown panic type %r", panic_type)
+            logger.warning("PRT3: unknown panic type %r", panic_type)
             return False
 
         accepted = False

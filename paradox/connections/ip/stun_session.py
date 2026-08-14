@@ -8,6 +8,7 @@ import requests
 
 from paradox.exceptions import ConnectToSiteFailed, StunSessionRefreshFailed
 from paradox.lib import stun
+from paradox.lib.utils import mask_secret
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -102,7 +103,8 @@ class StunSession:
                     continue
 
                 logger.debug(
-                    "Found module with panel serial: %s", module["panelSerial"]
+                    "Found module with panel serial: %s",
+                    mask_secret(module["panelSerial"]),
                 )
 
                 if not self.panel_serial:  # Pick first available

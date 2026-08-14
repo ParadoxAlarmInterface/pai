@@ -338,7 +338,7 @@ class Panel:
         mvars = message.fields.value
 
         if mvars.address not in parser_map:
-            logger.error(
+            logger.warning(
                 "Parser for memory address ({}) is not implemented. "
                 "Skipping.".format(mvars.address)
             )

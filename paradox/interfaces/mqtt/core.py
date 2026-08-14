@@ -10,7 +10,6 @@ import typing
 
 from paho.mqtt.client import (
     LOGGING_LEVEL,
-    MQTT_ERR_SUCCESS,
     CallbackAPIVersion,
     Client,
     MQTTv5,
@@ -186,7 +185,7 @@ class MQTTConnection:
         # set up correctly.
         if self.connected and self._last_connect_args is not None:
             try:
-                if hasattr(cls, "on_connect") and callable(getattr(cls, "on_connect")):
+                if hasattr(cls, "on_connect") and callable(cls.on_connect):
                     cls.on_connect(*self._last_connect_args)
             except Exception:
                 logger.exception(
@@ -214,28 +213,49 @@ class MQTTConnection:
             retain=True,
         )
 
-    def _on_connect_cb(self, client, userdata, connect_flags, reason_code, properties=None):
+    def _on_connect_cb(
+        self, client, userdata, connect_flags, reason_code, properties=None
+    ):
         # called on Thread-6
         if not reason_code.is_failure:
             logger.info("MQTT Broker Connected")
             self.state = ConnectionState.CONNECTED
-            self._last_connect_args = (client, userdata, connect_flags, reason_code, properties)
+            self._last_connect_args = (
+                client,
+                userdata,
+                connect_flags,
+                reason_code,
+                properties,
+            )
             self._report_pai_status(self._last_pai_status)
-            self._call_registars("on_connect", client, userdata, connect_flags, reason_code, properties)
+            self._call_registars(
+                "on_connect", client, userdata, connect_flags, reason_code, properties
+            )
         else:
             logger.error(
                 f"Failed to connect to MQTT: {connack_string(reason_code)} ({reason_code})"
             )
 
-    def _on_disconnect_cb(self, client, userdata, disconnect_flags, reason_code, properties=None):
+    def _on_disconnect_cb(
+        self, client, userdata, disconnect_flags, reason_code, properties=None
+    ):
         # called on Thread-6
         if not reason_code.is_failure:
             logger.info("MQTT Broker Disconnected")
         else:
-            logger.error(f"MQTT Broker unexpectedly disconnected. Code: {reason_code}")
+            logger.warning(
+                f"MQTT Broker unexpectedly disconnected. Code: {reason_code}"
+            )
 
         self.state = ConnectionState.NEW
-        self._call_registars("on_disconnect", self.client, userdata, disconnect_flags, reason_code, properties)
+        self._call_registars(
+            "on_disconnect",
+            self.client,
+            userdata,
+            disconnect_flags,
+            reason_code,
+            properties,
+        )
 
     def disconnect(self, reasoncode=None, properties=None):
         self.state = ConnectionState.DISCONNECTING
@@ -320,7 +340,9 @@ class AbstractMQTTInterface(ThreadQueueInterface):
         self.mqtt.message_callback_add(sub, callback)
         self.mqtt.subscribe(sub)
 
-    def on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties=None):
+    def on_disconnect(
+        self, client, userdata, disconnect_flags, reason_code, properties=None
+    ):
         """Called from MQTT connection"""
         pass
 
