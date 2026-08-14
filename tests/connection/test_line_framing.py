@@ -65,7 +65,24 @@ def test_overflow_discards_the_buffer(framer):
 
 
 def test_recovers_after_overflow(framer):
+    """The first terminator after an overrun ends the discarded line."""
     lines(framer, b"x" * (MAX_LINE_LENGTH + 1))
+
+    # b"tail\r" is the remainder of the line that overran, not a line.
+    assert lines(framer, b"tail\rA\r") == [b"A\r"]
+
+
+def test_overflow_suffix_is_not_emitted_as_a_line(framer):
+    """Without a resync the corrupt tail looked like a whole line."""
+    lines(framer, b"G001N" + b"x" * MAX_LINE_LENGTH)
+
+    assert lines(framer, b"001\r") == []
+
+
+def test_reset_clears_the_resync_state(framer):
+    lines(framer, b"x" * (MAX_LINE_LENGTH + 1))
+    framer.reset()
+
     assert lines(framer, b"A\r") == [b"A\r"]
 
 
