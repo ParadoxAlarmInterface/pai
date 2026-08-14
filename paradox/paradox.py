@@ -748,7 +748,8 @@ class Paradox:
         user = self.storage.get_container_object("user", user_id)
 
         if partition is None or user is None:
-            logger.warning("Send panic: user or partition is not found")
+            logger.error("Send panic: user or partition is not found")
+            return False
 
         try:
             return await self.panel.send_panic(

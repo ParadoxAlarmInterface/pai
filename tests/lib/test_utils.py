@@ -194,3 +194,13 @@ def test_describe_connection_unknown():
         describe_connection(_Cfg(CONNECTION_TYPE="Carrier Pigeon"))
         == "Unknown(Carrier Pigeon)"
     )
+
+
+def test_describe_connection_site_requires_both_id_and_email():
+    """Only one of SITEID/EMAIL set must fall back to the local IP rendering."""
+    assert describe_connection(_Cfg(IP_CONNECTION_SITEID="MySite")) == (
+        "IP(192.168.1.10:10000)"
+    )
+    assert describe_connection(_Cfg(IP_CONNECTION_EMAIL="john@example.com")) == (
+        "IP(192.168.1.10:10000)"
+    )

@@ -99,7 +99,7 @@ async def _run(alarm: Paradox):
     def mark_connected():
         nonlocal connected_since, disconnected_at
         if disconnected_at is not None:
-            logger.info(
+            logger.warning(
                 "Connection recovered after %s down",
                 format_duration(time.monotonic() - disconnected_at),
             )
@@ -108,14 +108,16 @@ async def _run(alarm: Paradox):
 
     def mark_disconnected():
         nonlocal connected_since, disconnected_at
-        if connected_since is not None:
-            logger.warning(
-                "Panel connection ended after %s up",
-                format_duration(time.monotonic() - connected_since),
-            )
-            connected_since = None
-        if disconnected_at is None:
-            disconnected_at = time.monotonic()
+        if connected_since is None:
+            # Never reached a healthy session, so there is no uptime to report
+            # and nothing to "recover" from on the next successful attempt.
+            return
+        logger.warning(
+            "Panel connection ended after %s up",
+            format_duration(time.monotonic() - connected_since),
+        )
+        connected_since = None
+        disconnected_at = time.monotonic()
 
     while alarm is not None:
         logger.info("Starting...")
@@ -146,9 +148,11 @@ async def _run(alarm: Paradox):
             logger.exception("Restarting")
             await asyncio.sleep(retry_time_wait)
         except PAICriticalException:
+            mark_disconnected()
             logger.exception("PAI Critical exception. Stopping PAI")
             break
         except (KeyboardInterrupt, SystemExit):
+            mark_disconnected()
             break  # break exits the retry loop
         except Exception:
             mark_disconnected()

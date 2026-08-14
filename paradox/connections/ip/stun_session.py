@@ -8,9 +8,30 @@ import requests
 
 from paradox.exceptions import ConnectToSiteFailed, StunSessionRefreshFailed
 from paradox.lib import stun
-from paradox.lib.utils import mask_secret
+from paradox.lib.utils import mask_email, mask_secret
 
 logger = logging.getLogger("PAI").getChild(__name__)
+
+SENSITIVE_SITE_INFO_KEYS = {
+    "panelSerial": mask_secret,
+    "email": mask_email,
+}
+
+
+def redact_site_info(value):
+    """Recursively mask serials and emails in the SWAN site listing."""
+    if isinstance(value, dict):
+        return {
+            k: (
+                SENSITIVE_SITE_INFO_KEYS[k](v)
+                if k in SENSITIVE_SITE_INFO_KEYS
+                else redact_site_info(v)
+            )
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [redact_site_info(v) for v in value]
+    return value
 
 
 class StunSession:
@@ -37,7 +58,9 @@ class StunSession:
         if self.site_info is None:
             raise ConnectToSiteFailed("Unable to get site info")
 
-        logger.debug("Site Info: %s", json.dumps(self.site_info, indent=4))
+        logger.debug(
+            "Site Info: %s", json.dumps(redact_site_info(self.site_info), indent=4)
+        )
         self.module = self._select_module()
 
         if self.module is None:
