@@ -3,7 +3,10 @@ import json
 import logging
 
 from paradox.config import config as cfg
-from paradox.connections.gsm.connection import GsmSerialConnection
+from paradox.connections.gsm.connection import (
+    DEFAULT_COMMAND_TIMEOUT,
+    GsmSerialConnection,
+)
 from paradox.connections.gsm.protocol import PROMPT
 from paradox.event import EventLevel, Notification
 from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
@@ -23,15 +26,11 @@ ESC = b"\x1b"
 #: Delivery to the network can be slow on a weak signal.
 SMS_SEND_TIMEOUT = 60
 
-#: Plain AT commands answer promptly or not at all.
-AT_COMMAND_TIMEOUT = 5
-
 #: How often to notice that the modem has gone away, and to retry a failed open.
 MODEM_POLL_INTERVAL = 5
 
-#: Final result codes. Everything else the modem emits is informational.
-_OK = b"OK"
-_ERRORS = (b"+CME ERROR", b"+CMS ERROR")
+#: Error result codes. Everything else the modem emits before OK is informational.
+ERRORS = (b"ERROR", b"+CME ERROR", b"+CMS ERROR")
 
 
 class GSMTextInterface(ConfiguredAbstractTextInterface):
@@ -73,10 +72,14 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
 
         logger.debug("GSM Stopped")
 
-    async def _at_command(self, command: bytes, timeout=AT_COMMAND_TIMEOUT) -> bytes:
+    async def _at_command(
+        self, command: bytes, timeout=DEFAULT_COMMAND_TIMEOUT
+    ) -> bytes:
         """Send one AT command and wait for its final result code."""
-        first = await self.port.send_command(command, timeout=timeout)
-        return await self._read_final_result(timeout, first_line=first)
+        logger.debug("I->M: %s", command)
+        self.port.clear()
+        self.port.write(command)
+        return await self._read_final_result(timeout)
 
     async def connect(self):
         logger.info(f"Using {cfg.GSM_MODEM_PORT} at {cfg.GSM_MODEM_BAUDRATE} baud")
@@ -137,11 +140,7 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
         await super().run()
 
         while True:
-            if (
-                self.modem_connected
-                and self.port is not None
-                and not self.port.connected
-            ):
+            if self.modem_connected and not self.port.connected:
                 # on_connection_loss only clears the transport's own flag, so
                 # the interface has to notice the drop and rebuild the port.
                 logger.warning("Modem connection lost")
@@ -267,31 +266,25 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
 
         logger.debug(f"SMS to {destination} result: {result}")
 
-    async def _read_final_result(self, timeout: float, first_line: bytes = None):
+    async def _read_final_result(self, timeout: float) -> bytes:
         """Read modem lines until a final result code.
 
         Sending can take the best part of a minute on a weak network, and the
         modem interleaves informational lines such as ``+CMGS: 42`` before the
-        closing ``OK``. ``first_line`` lets a caller hand over a line it has
-        already taken off the queue.
+        closing ``OK``.
         """
-        deadline = self._loop.time() + timeout
-        line = first_line
 
-        while True:
-            if line is not None:
-                if line == _OK:
+        async def until_final():
+            while True:
+                line = await self.port.read(timeout=None)
+                if line is None:
+                    raise ConnectionError("Modem disconnected")
+                if line == b"OK":
                     return line
-                if line == b"ERROR" or line.startswith(_ERRORS):
+                if line.startswith(ERRORS):
                     raise ValueError(f"Modem rejected the command: {line!r}")
 
-            remaining = deadline - self._loop.time()
-            if remaining <= 0:
-                raise asyncio.TimeoutError("No final result code from modem")
-
-            line = await self.port.read(timeout=remaining)
-            if line is None:
-                raise ConnectionError("Modem disconnected")
+        return await asyncio.wait_for(until_final(), timeout)
 
     def process_cmt(self, header: str, text: str) -> None:
         idx = header.find(" ")
