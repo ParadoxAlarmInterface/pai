@@ -1,0 +1,132 @@
+"""Tests for the GSM modem serial transport."""
+
+import asyncio
+from unittest import mock
+
+import pytest
+
+from paradox.connections.gsm.connection import GsmSerialConnection
+
+
+@pytest.fixture
+async def connected_gsm_connection():
+    comm = GsmSerialConnection("test_port", 9600, 5)
+
+    assert comm.queue.empty()
+
+    async def mocked_create_serial_connection(loop, protocol_factory, *args, **kwargs):
+        transport = mock.Mock()
+        protocol = comm.make_protocol()
+        asyncio.get_event_loop().call_soon(protocol.connection_made, transport)
+        return (transport, protocol)
+
+    with mock.patch("os.access", return_value=True), mock.patch(
+        "serial_asyncio.create_serial_connection",
+        new_callable=mock.AsyncMock,
+        side_effect=mocked_create_serial_connection,
+    ):
+        asyncio.get_event_loop().call_soon(comm.on_connection)
+        result = await comm.connect()
+        assert result
+
+    assert comm.connected
+
+    return comm
+
+
+@pytest.mark.asyncio
+async def test_send_command_returns_the_next_modem_line(connected_gsm_connection):
+    comm = connected_gsm_connection
+
+    asyncio.get_event_loop().call_soon(comm.on_message, b"OK")
+    assert await comm.send_command(b"AT") == b"OK"
+
+
+@pytest.mark.asyncio
+async def test_read_drains_the_queue(connected_gsm_connection):
+    comm = connected_gsm_connection
+
+    asyncio.get_event_loop().call_soon(comm.on_message, b"read_message")
+    assert await comm.read() == b"read_message"
+    assert comm.queue.empty()
+
+
+@pytest.mark.asyncio
+async def test_recv_callback_takes_precedence_over_the_queue(connected_gsm_connection):
+    comm = connected_gsm_connection
+
+    callback = mock.MagicMock()
+    comm.set_recv_callback(callback)
+    comm.on_message(b"+CMT: unsolicited")
+
+    callback.assert_called_once_with(b"+CMT: unsolicited")
+    assert comm.queue.empty()
+
+
+@pytest.mark.asyncio
+async def test_send_command_honours_its_timeout(connected_gsm_connection):
+    """The timeout argument used to be accepted and then ignored.
+
+    The old code hardcoded ``wait_for(..., timeout=5)``, so this raised too,
+    just five seconds later. The elapsed check is what pins the fix.
+    """
+    comm = connected_gsm_connection
+
+    loop = asyncio.get_event_loop()
+    started = loop.time()
+    with pytest.raises(asyncio.TimeoutError):
+        await comm.send_command(b"AT", timeout=0.01)
+
+    assert loop.time() - started < 1
+
+
+@pytest.mark.asyncio
+async def test_write_is_rejected(connected_gsm_connection):
+    """Connection.write() would leave send_message's coroutine un-awaited."""
+    with pytest.raises(NotImplementedError):
+        connected_gsm_connection.write(b"AT")
+
+
+@pytest.mark.asyncio
+async def test_connection_loss_after_connect_does_not_raise(connected_gsm_connection):
+    """The connected_future is already resolved by then."""
+    comm = connected_gsm_connection
+
+    comm.on_connection_loss()
+
+    assert not comm.connected
+
+
+@pytest.mark.asyncio
+async def test_connect_fails_when_the_port_is_not_accessible():
+    comm = GsmSerialConnection("test_port", 9600, 5)
+
+    with mock.patch("os.access", return_value=False):
+        assert await comm.connect() is False
+
+
+@pytest.mark.asyncio
+async def test_connect_gives_up_after_the_open_timeout():
+    comm = GsmSerialConnection("test_port", 9600, 0.01)
+
+    async def never_connects(loop, protocol_factory, *args, **kwargs):
+        return (mock.Mock(), comm.make_protocol())
+
+    with mock.patch("os.access", return_value=True), mock.patch(
+        "serial_asyncio.create_serial_connection",
+        new_callable=mock.AsyncMock,
+        side_effect=never_connects,
+    ):
+        assert await comm.connect() is False
+
+    assert not comm.connected
+
+
+@pytest.mark.asyncio
+async def test_clear_replaces_the_queue(connected_gsm_connection):
+    comm = connected_gsm_connection
+
+    comm.on_message(b"stale")
+    comm.clear()
+
+    assert comm.queue.empty()

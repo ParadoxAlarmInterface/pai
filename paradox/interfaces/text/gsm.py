@@ -1,15 +1,9 @@
 import asyncio
 import json
 import logging
-import os
-from typing import Callable, Optional
-
-import serial_asyncio
 
 from paradox.config import config as cfg
-from paradox.connections.connection import ConnectionProtocol
-from paradox.connections.framing import LineFramer
-from paradox.connections.handler import ConnectionHandler
+from paradox.connections.gsm.connection import GsmSerialConnection
 from paradox.event import EventLevel, Notification
 from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
 from paradox.lib import ps
@@ -18,148 +12,6 @@ from paradox.lib import ps
 # Only exposes critical status changes and accepts commands
 
 logger = logging.getLogger("PAI").getChild(__name__)
-
-#: AT responses are short, but a text-mode ``+CMT`` line carries a whole SMS:
-#: 140 octets of UCS2 hex-encoded payload plus the header. 1 KiB leaves room
-#: for that and for verbose ``AT+CMEE=2`` error strings.
-MAX_LINE_LENGTH = 1024
-
-TERMINATOR = b"\r\n"
-
-
-class GsmSerialProtocol(ConnectionProtocol):
-    """CRLF line framing and modem echo suppression for an AT-command modem.
-
-    Named apart from
-    :class:`paradox.connections.serial.protocol.SerialConnectionProtocol`
-    because the two are not substitutable: that one's ``send_message`` is
-    synchronous, this one's is a coroutine.
-    """
-
-    def __init__(self, handler: ConnectionHandler):
-        super().__init__(handler)
-        self.last_message = b""
-        self._framer = LineFramer(
-            terminator=TERMINATOR,
-            max_line_length=MAX_LINE_LENGTH,
-            strip_terminator=True,
-        )
-
-    async def send_message(self, message):
-        self.last_message = message
-        self.transport.write(message + TERMINATOR)
-
-    def data_received(self, recv_data):
-        for frame in self._framer.feed(recv_data):
-            message = frame.data
-            logger.debug("M->P: %s", message)
-
-            if self._is_echo(message):
-                continue
-
-            try:
-                self.handler.on_message(message)
-            except Exception:
-                # A single unparseable line must not strand the frames behind
-                # it: they would sit in the buffer until the next byte arrives.
-                logger.exception("Error handling modem message")
-
-    def _is_echo(self, message: bytes) -> bool:
-        """True when ``message`` is the modem echoing back the last command.
-
-        Echo suppression is scoped to the first line after a write. Echo is
-        normally off (``connect()`` issues ``ATE0``), so an expectation that
-        outlived its response would eventually swallow an unrelated line that
-        happened to match the last command.
-
-        The comparison tolerates a trailing ``\\r`` because many V.25ter modems
-        echo the command terminated by a bare ``<CR>`` and only then send
-        ``<CR><LF>OK<CR><LF>``.
-        """
-        expected, self.last_message = self.last_message, b""
-        return bool(expected) and message.rstrip(b"\r") == expected.rstrip(b"\r")
-
-    def reset_framing(self) -> None:
-        self._framer.reset()
-        self.last_message = b""
-
-    @property
-    def buffer(self) -> bytes:
-        """Unconsumed bytes. Retained for tests and diagnostics."""
-        return self._framer.buffer.pending
-
-    def connection_lost(self, exc):
-        logger.error("The serial port was closed")
-        self.last_message = b""
-        super().connection_lost(exc)
-
-
-class SerialCommunication(ConnectionHandler):
-    def __init__(self, port, baud=9600, timeout=5):
-        self.port_path = port
-        self.baud = baud
-        self.connected_future = None
-        self.recv_callback = None
-        self.connected = False
-        self.connection = None
-        self.queue = asyncio.Queue()
-
-    def clear(self):
-        self.queue = asyncio.Queue()
-
-    def on_connection_loss(self):
-        logger.error("Connection was lost")
-        self.connected_future.set_result(False)
-        self.connected = False
-
-    def on_connection(self):
-        logger.info("Serial port open")
-        self.connected_future.set_result(True)
-        self.connected = True
-
-    def on_message(self, message: bytes):
-        logger.debug(f"M->I: {message}")
-
-        if self.recv_callback is not None:
-            self.recv_callback(message)  # Callback
-        else:
-            self.queue.put_nowait(message)
-
-    def set_recv_callback(self, callback: Optional[Callable[[str], bool]]):
-        self.recv_callback = callback
-
-    def open_timeout(self):
-        if self.connected_future.done():
-            return
-
-        logger.error("Serial Port Timeout")
-        self.connected_future.set_result(False)
-        self.connected = False
-
-    def make_protocol(self):
-        return GsmSerialProtocol(self)
-
-    async def write(self, message, timeout=15):
-        logger.debug(f"I->M: {message}")
-        if self.connection is not None:
-            await self.connection.send_message(message)
-            return await asyncio.wait_for(self.queue.get(), timeout=5)
-
-    async def read(self, timeout=5):
-        if self.connection is not None:
-            return await asyncio.wait_for(self.queue.get(), timeout=timeout)
-
-    async def connect(self):
-        logger.info(f"Connecting to serial port {self.port_path}")
-
-        self.connected_future = asyncio.get_running_loop().create_future()
-        asyncio.get_running_loop().call_later(5, self.open_timeout)
-
-        _, self.connection = await serial_asyncio.create_serial_connection(
-            asyncio.get_running_loop(), self.make_protocol, self.port_path, self.baud
-        )
-
-        return await self.connected_future
 
 
 class GSMTextInterface(ConfiguredAbstractTextInterface):
@@ -181,12 +33,21 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
     def stop(self):
         """Stops the GSM Interface"""
         super().stop()
-        logger.debug("GSM Stopped. TODO: Implement a proper stop")
+
+        if self.port is not None:
+            # stop() is synchronous, so the close can only be scheduled. The
+            # port is dropped either way: a half-closed port is still better
+            # than one held open for the life of the process.
+            port, self.port = self.port, None
+            self.modem_connected = False
+            self._loop.create_task(port.close())
+
+        logger.debug("GSM Stopped")
 
     async def write(self, message: str, expected: str = None) -> None:
         r = b""
         while r != expected:
-            r = await self.port.write(message)
+            r = await self.port.send_command(message)
             data = b""
 
             if r == b"ERROR":
@@ -198,24 +59,13 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
 
     async def connect(self):
         logger.info(f"Using {cfg.GSM_MODEM_PORT} at {cfg.GSM_MODEM_BAUDRATE} baud")
-        try:
-            if not os.path.exists(cfg.GSM_MODEM_PORT):
-                logger.error(f"Modem port ({cfg.GSM_MODEM_PORT}) not found")
-                return False
-
-            self.port = SerialCommunication(
-                cfg.GSM_MODEM_PORT, cfg.GSM_MODEM_BAUDRATE, 5
-            )
-
-        except Exception:
-            logger.exception(f"Could not open port {cfg.GSM_MODEM_PORT} for GSM modem")
-            return False
+        self.port = GsmSerialConnection(cfg.GSM_MODEM_PORT, cfg.GSM_MODEM_BAUDRATE, 5)
 
         self.port.set_recv_callback(None)
         result = await self.port.connect()
 
         if not result:
-            logger.exception("Could not connect to GSM modem")
+            logger.error("Could not connect to GSM modem")
             return False
 
         try:
@@ -310,7 +160,7 @@ class GSMTextInterface(ConfiguredAbstractTextInterface):
             data = b'AT+CMGS="%b"\x0d%b\x1a' % (dst.encode(), message.encode())
 
             try:
-                result = await self.port.write(data)
+                result = await self.port.send_command(data)
                 logger.debug(f"SMS result: {result}")
             except Exception:
                 logger.exception("ERROR sending SMS")
