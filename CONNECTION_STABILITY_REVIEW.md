@@ -1,5 +1,10 @@
 # PAI connection-stability evaluation
 
+**Status:** all 13 findings below are fixed on this branch. The analysis is kept
+as the rationale for each change; see `git log` for the commits. Verified with
+the full suite (1721 tests) plus 21 new regression tests, each confirmed to fail
+against the original code.
+
 **Scope:** defects in the PAI codebase that could cause or worsen repeated loss of
 connection to a Paradox panel, and slow/failed recovery afterwards.
 **Base:** `ParadoxAlarmInterface/pai` @ `be1e46e` (branch `dev`).
@@ -244,13 +249,25 @@ validity (`raise AssertionError(f"Invalid connection type: ...")` at `paradox.py
 
 ---
 
-## Suggested order of work
+## Behaviour changes worth knowing about
 
-1. Finding 1 (`IO_TIMEOUT`) — one-line-per-site fix, immediately gives users a working knob.
-2. Finding 3 (`2 ^ retry`) — one-line fix, stops PAI hammering the module after a drop.
-3. Finding 4 (socket leak) — stops PAI competing with itself for the module's session slot.
-4. Finding 2 (poll cycle bound) — the structural fix; needs a little design.
-5. Findings 5-7 if the deployment uses STUN/paradoxmyhome.
+- **Reconnect backoff is now 2, 4, 8, 16, 30, 30 s** (was 3, 0, 1, 6, 7, ...).
+  Recovery from a brief blip is marginally slower; recovery from a real outage
+  is much more reliable, because PAI stops hammering the module.
+- **IP connect attempts are now 5 s apart** (`CONNECT_RETRY_DELAY`), so a failing
+  `connect()` takes ~10 s longer before giving up and handing back to the main
+  retry loop.
+- **Raising `IO_TIMEOUT` now actually takes effect.** Anyone who had raised it to
+  work around finding 1 should re-check the value: it was being ignored, so the
+  configured number has never been exercised.
+- **A failed IP attempt now closes its STUN session**, so the next attempt
+  re-fetches the SWAN site info instead of reusing a possibly stale `xoraddr`.
+  That costs one extra HTTPS round trip per retry.
+- **The poll cycle is bounded** by `Panel.status_cycle_budget`. A cycle that
+  exceeds it is cancelled and counted as a missing reply, so a wedged cycle now
+  surfaces as "Replies missing" and a reconnect instead of silence. PRT3
+  overrides the budget because its single virtual address expands into one
+  request per area and zone.
 
 ## Diagnostics worth collecting first
 
