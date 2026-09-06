@@ -4,7 +4,6 @@ from typing import Callable, Optional
 
 from construct import Container
 
-from paradox.config import config as cfg
 from paradox.lib.handlers import FutureHandler, HandlerRegistry, PersistentHandler
 
 logger = logging.getLogger("PAI").getChild(__name__)
@@ -39,8 +38,10 @@ class AsyncMessageManager:
     async def wait_for_message(
         self,
         check_fn: Optional[Callable[[Container], bool]] = None,
-        timeout=cfg.IO_TIMEOUT,
+        timeout=None,
     ) -> Container:
+        # ``None`` defers to cfg.IO_TIMEOUT inside wait_until_complete, which
+        # reads it at call time. See the note there.
         return await self.handler_registry.wait_until_complete(
             FutureHandler(check_fn), timeout
         )

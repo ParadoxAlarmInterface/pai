@@ -12,6 +12,13 @@ from paradox.lib.utils import mask_email, mask_secret
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
+#: TURN allocations are handed out with a 600 s lifetime; renew with headroom.
+SESSION_REFRESH_INTERVAL = 500
+
+#: Bound on the SWAN site lookup. Without one a stalled HTTP call hangs the
+#: connect path forever.
+SITE_INFO_HTTP_TIMEOUT = 20
+
 SENSITIVE_SITE_INFO_KEYS = {
     "panelSerial": mask_secret,
     "email": mask_email,
@@ -138,22 +145,35 @@ class StunSession:
     def get_socket(self):
         return self.stun_tunnel.sock
 
-    def refresh_session_if_required(self) -> None:
+    def refresh_required(self) -> bool:
+        """Whether the TURN allocation is close enough to expiry to renew."""
         if self.site_info is None or self.connection_timestamp == 0:
-            return
+            return False
 
-        # Refresh session if required
-        if time.time() - self.connection_timestamp >= 500:
-            logger.info("STUN Session Refresh")
-            self.stun_control.send_refresh_request()
-            stun_r = self.stun_control.receive_response()
-            if stun.is_error(stun_r):
-                self.connected = False
-                raise StunSessionRefreshFailed(
-                    f"STUN Session Refresh failed: {stun.get_error(stun_r)}"
-                )
+        return time.time() - self.connection_timestamp >= SESSION_REFRESH_INTERVAL
 
-            self.connection_timestamp = time.time()
+    def refresh_session(self) -> None:
+        """Renew the TURN allocation.
+
+        Blocking: this talks to the control socket synchronously. Call it from
+        an executor, never from the event loop -- it used to run inline in
+        ``write()``, where a slow or half-dead TURN server stalled every
+        interface PAI was running until the socket gave up.
+        """
+        logger.info("STUN Session Refresh")
+        self.stun_control.send_refresh_request()
+        stun_r = self.stun_control.receive_response()
+        if stun.is_error(stun_r):
+            raise StunSessionRefreshFailed(
+                f"STUN Session Refresh failed: {stun.get_error(stun_r)}"
+            )
+
+        self.connection_timestamp = time.time()
+
+    def refresh_session_if_required(self) -> None:
+        """Blocking refresh-if-due. Retained for callers outside the event loop."""
+        if self.refresh_required():
+            self.refresh_session()
 
     def close(self):
         self.site_info = None
@@ -185,7 +205,10 @@ class StunSession:
             req = await loop.run_in_executor(
                 None,
                 lambda: requests.get(
-                    URL, headers=headers, params={"email": email, "name": siteid}
+                    URL,
+                    headers=headers,
+                    params={"email": email, "name": siteid},
+                    timeout=SITE_INFO_HTTP_TIMEOUT,
                 ),
             )
             if req.status_code == 200:
@@ -193,7 +216,9 @@ class StunSession:
 
             logger.warning("Unable to get site info. Retrying...")
             tries -= 1
-            time.sleep(5)
+            # await, not time.sleep: this is a coroutine, and blocking here
+            # stalled the whole event loop for up to 25 s.
+            await asyncio.sleep(5)
 
         return None
 

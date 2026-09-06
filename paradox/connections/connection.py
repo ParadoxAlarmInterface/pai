@@ -49,10 +49,18 @@ class Connection(AsyncMessageManager, ConnectionHandler):
             raise ConnectionError("Not connected")
 
     async def close(self):
-        if self._protocol:
-            await self._protocol.close()
+        protocol = self._protocol
+        try:
+            if protocol is not None:
+                await protocol.close()
+        finally:
+            # ConnectionProtocol.close() re-raises whatever killed the
+            # transport -- the normal case when closing after a fault -- and
+            # can also time out waiting for it to settle. Either way the
+            # protocol is spent, so the reset has to happen regardless or the
+            # next connect attempt inherits a dead one.
             self._protocol = None
-        self.connected = False
+            self.connected = False
 
     def variable_message_length(self, mode):
         if self._protocol is not None:

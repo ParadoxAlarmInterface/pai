@@ -31,6 +31,10 @@ from paradox.parsers.status import convert_raw_status
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
+#: Smallest gap between two status poll cycles. Only reached when a cycle
+#: overruns KEEP_ALIVE_INTERVAL; an explicit refresh still bypasses it.
+MIN_LOOP_IDLE_TIME = 1.0
+
 
 class Paradox:
     def __init__(self, retries=3):
@@ -409,9 +413,14 @@ class Paradox:
             tstart = time.time()
             if self.run_state == RunState.RUN:
                 try:
-                    await self.busy.acquire()
-                    result = await asyncio.gather(*self.panel.get_status_requests())
-                    merged = deep_merge(*result, extend_lists=True, initializer={})
+                    # ``async with``, not acquire()/release() in a finally: a
+                    # cancelled acquire() left the finally releasing a lock it
+                    # never held, and the RuntimeError turned a clean shutdown
+                    # into an exception-driven restart.
+                    async with self.busy:
+                        merged = await asyncio.wait_for(
+                            self._poll_status(), self._status_cycle_budget()
+                        )
                     asyncio.get_running_loop().call_soon(self._process_status, merged)
                     replies_missing = max(0, replies_missing - 1)
                 except ConnectionError:
@@ -424,15 +433,19 @@ class Paradox:
                         return
                 except Exception:
                     logger.exception("Loop")
-                finally:
-                    self.busy.release()
 
                 if replies_missing > 0:
                     logger.debug(f"Loop: Replies missing: {replies_missing}")
 
             # cfg.Listen for events
 
-            max_wait_time = max((tstart + cfg.KEEP_ALIVE_INTERVAL) - time.time(), 0)
+            # Floor the idle gap. A cycle that overran KEEP_ALIVE_INTERVAL used
+            # to leave zero wait here, so PAI re-polled a struggling panel back
+            # to back. request_status_refresh() still gets its immediate cycle:
+            # a set event short-circuits the wait whatever the timeout is.
+            max_wait_time = max(
+                (tstart + cfg.KEEP_ALIVE_INTERVAL) - time.time(), MIN_LOOP_IDLE_TIME
+            )
             try:
                 await asyncio.wait_for(self.loop_wait_event.wait(), max_wait_time)
             except asyncio.TimeoutError:
@@ -440,6 +453,50 @@ class Paradox:
                 pass
             finally:
                 self.loop_wait_event.clear()
+
+    def _status_cycle_budget(self) -> float:
+        """How long one status poll may run before it is abandoned.
+
+        Status requests are serialised behind ``request_lock`` and ``send_wait``
+        retries five times, so an unbounded EVO poll (14 RAM addresses) can run
+        for minutes against a ``KEEP_ALIVE_INTERVAL`` of 10 s -- with no
+        missing reply counted and no status published the whole time. The panel
+        owns the number, because only it knows how many requests an address
+        expands into.
+        """
+        return self.panel.status_cycle_budget
+
+    async def _poll_status(self) -> dict:
+        """Run one status poll cycle, as an all-or-nothing batch.
+
+        ``asyncio.gather`` propagates the first exception but leaves its
+        siblings running. Those stragglers stay queued on ``request_lock`` and
+        collide with the next cycle's requests, so one slow address compounds
+        into cross-cycle contention instead of staying in its own cycle.
+        """
+        tasks = [
+            asyncio.ensure_future(request)
+            for request in self.panel.get_status_requests()
+        ]
+        try:
+            results = await asyncio.gather(*tasks)
+        except BaseException:
+            for task in tasks:
+                task.cancel()
+            raise
+
+        # handle_status() returns None for a block it cannot parse. Passing
+        # that to deep_merge raises, which the caller logs as a generic loop
+        # error and drops the whole cycle -- including the blocks that did
+        # parse -- without counting a missing reply.
+        parsed = [result for result in results if result is not None]
+        if len(parsed) != len(results):
+            logger.warning(
+                "Discarded %d unparsable status block(s) this cycle",
+                len(results) - len(parsed),
+            )
+
+        return deep_merge(*parsed, extend_lists=True, initializer={})
 
     @staticmethod
     def _process_status(raw_status: Container) -> None:
@@ -494,9 +551,15 @@ class Paradox:
         args=None,
         message=None,
         retries=5,
-        timeout=cfg.IO_TIMEOUT,
+        timeout=None,
         reply_expected=None,
     ) -> Optional[Container]:
+        # Read at call time, not as a default argument value: this module is
+        # imported before main() runs cfg.load(), so a default would freeze the
+        # built-in IO_TIMEOUT and ignore the configured one.
+        if timeout is None:
+            timeout = cfg.IO_TIMEOUT
+
         # Connection closed
         if not self.connection.connected:
             raise ConnectionError("Not connected")
@@ -914,9 +977,16 @@ class Paradox:
         logger.info("Disconnecting from the Alarm Panel")
         self.run_state = RunState.STOP
 
+        # Via _connection, not the connection property: the property builds a
+        # Connection on first access, so shutting down before a first connect
+        # would construct one -- and raise on an invalid CONNECTION_TYPE --
+        # just to ask whether anything was open.
+        if self._connection is None:
+            return
+
         self._clean_session()
-        if self.connection.connected:
-            await self.connection.close()
+        if self._connection.connected:
+            await self._connection.close()
             logger.info("Disconnected from the Alarm Panel")
 
     async def pause(self):
