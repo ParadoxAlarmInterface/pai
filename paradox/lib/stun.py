@@ -9,6 +9,14 @@ import struct
 
 STUN_PORT = 3478
 
+#: Every STUN message starts with a fixed 20 byte header.
+STUN_HEADER_LENGTH = 20
+
+#: Bound on every blocking STUN socket operation. Without one, a TURN server
+#: that stops answering hangs the caller indefinitely -- and the session
+#: refresh used to run on the event loop, so that hung all of PAI.
+STUN_SOCKET_TIMEOUT = 10.0
+
 FAMILY_IPv4 = b"\x01"
 FAMILY_IPv6 = b"\x02"
 
@@ -306,6 +314,9 @@ class StunClient(object):
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # asyncio clears this when the tunnel socket is handed to
+        # create_connection(sock=...), so it only bounds the blocking phase.
+        self.sock.settimeout(STUN_SOCKET_TIMEOUT)
         self.sock.bind(("0.0.0.0", 0))
         self.host = host
         self.port = port
@@ -337,14 +348,32 @@ class StunClient(object):
         self.sock.send(self.req)
 
     def receive_response(self):
-        buf = self.sock.recv(2048)
-        validate_response(buf, self.transaction_id)
+        header = self._recv_exactly(STUN_HEADER_LENGTH)
+        validate_response(header, self.transaction_id)
 
-        body_length = int(binascii.b2a_hex(buf[2:4]), 16)
-        attributes = buf[20:]
-        assert len(attributes) == body_length
+        body_length = int(binascii.b2a_hex(header[2:4]), 16)
+        attributes = self._recv_exactly(body_length)
 
         return read_attributes(attributes, body_length)
+
+    def _recv_exactly(self, length):
+        """Read exactly ``length`` bytes from the control socket.
+
+        TCP does not preserve message boundaries, so one recv() can return a
+        short read. The previous code asserted the whole response arrived in a
+        single recv(), which turned ordinary segmentation into an unexplained
+        connection failure.
+        """
+        chunks = []
+        remaining = length
+        while remaining > 0:
+            chunk = self.sock.recv(remaining)
+            if not chunk:
+                raise Exception("Connection closed while reading STUN response")
+            chunks.append(chunk)
+            remaining -= len(chunk)
+
+        return b"".join(chunks)
 
     def send_refresh_request(self):
         self.req = build_connection_refresh_request(self.transaction_id)

@@ -25,14 +25,15 @@ class FakeAlarm:
         pass
 
 
-async def _nosleep(*args, **kwargs):
-    return None
-
-
-async def run_scripted(script, caplog):
+async def run_scripted(script, caplog, sleeps=None):
     alarm = FakeAlarm(script)
     interface_manager = MagicMock()
     interface_manager.interfaces = []
+
+    async def _record_sleep(delay=None, *args, **kwargs):
+        if sleeps is not None:
+            sleeps.append(delay)
+        return None
 
     clock = [1000.0]
 
@@ -40,10 +41,10 @@ async def run_scripted(script, caplog):
         clock[0] += 100
         return clock[0]
 
-    with patch.object(
-        pai_main, "InterfaceManager", return_value=interface_manager
-    ), patch.object(pai_main.asyncio, "sleep", new=_nosleep), patch.object(
-        pai_main.time, "monotonic", monotonic
+    with (
+        patch.object(pai_main, "InterfaceManager", return_value=interface_manager),
+        patch.object(pai_main.asyncio, "sleep", new=_record_sleep),
+        patch.object(pai_main.time, "monotonic", monotonic),
     ):
         with caplog.at_level(logging.DEBUG, logger="PAI"):
             await pai_main._run(alarm)
@@ -78,3 +79,17 @@ async def test_banner_reports_version_and_connection(caplog):
 
     assert any("PAI " in m for m in messages)
     assert any("Connection:" in m for m in messages)
+
+
+async def test_reconnect_backoff_grows_and_caps(caplog):
+    """``2 ^ retry`` is XOR, not exponentiation.
+
+    The old expression backed off 3, 0, 1, 6, 7, 4, 5 ... seconds: the second
+    attempt reconnected instantly, the sequence never grew, and it never
+    reached the 30 s cap. The IP module serves one session at a time and needs
+    a moment to release the previous one before it will accept a new one.
+    """
+    sleeps = []
+    await run_scripted(["fail"] * 6 + ["stop"], caplog, sleeps=sleeps)
+
+    assert sleeps == [2, 4, 8, 16, 30, 30]

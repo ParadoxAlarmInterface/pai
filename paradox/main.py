@@ -121,8 +121,11 @@ async def _run(alarm: Paradox):
 
     while alarm is not None:
         logger.info("Starting...")
-        retry_time_wait = 2 ^ retry
-        retry_time_wait = 30 if retry_time_wait > 30 else retry_time_wait
+        # ``^`` is XOR, not exponentiation. The original expression backed off
+        # 3, 0, 1, 6, 7, 4, 5 ... seconds, so the second attempt reconnected
+        # instantly and the sequence never grew. The IP module serves one
+        # session at a time and needs a moment to release the previous one.
+        retry_time_wait = min(2**retry, 30)
 
         try:
             if await alarm.full_connect():

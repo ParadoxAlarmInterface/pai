@@ -94,7 +94,14 @@ class HandlerRegistry:
         for handler in to_remove:
             self.remove(handler)
 
-    async def wait_until_complete(self, handler: Handler, timeout=cfg.IO_TIMEOUT):
+    async def wait_until_complete(self, handler: Handler, timeout=None):
+        # Resolved per call, never as a default argument value: PAI imports
+        # this module before ``main()`` runs ``cfg.load()``, so a default
+        # argument would freeze the built-in IO_TIMEOUT and silently ignore
+        # whatever the user configured.
+        if timeout is None:
+            timeout = cfg.IO_TIMEOUT
+
         self.append(handler)
         try:
             return await asyncio.wait_for(handler, timeout=timeout)
