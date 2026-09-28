@@ -55,7 +55,7 @@ def test_zone_binary_sensor_serialize(mqtt_entity_factory):
         'name': 'Zone Zone 1 Open',
         'availability_topic': 'paradox/interface/availability',
         'state_topic': 'paradox/states/zones/Zone_1/open',
-        'device': _get_expected_device_block(),
+        'device': _get_expected_zone_device_block(),
         'payload_on': 'True',
         'payload_off': 'False',
         'device_class': 'motion'
@@ -129,7 +129,7 @@ def test_zone_bypass_switch_serialize(mqtt_entity_factory):
         'availability_topic': 'paradox/interface/availability',
         'state_topic': 'paradox/states/zones/Zone_1/bypassed',
         'command_topic': 'paradox/control/zones/Zone_1',
-        'device': _get_expected_device_block(),
+        'device': _get_expected_zone_device_block(),
         'state_on': 'True',
         'state_off': 'False',
         'payload_on': 'bypass',
@@ -155,6 +155,16 @@ def _get_expected_device_block():
             'model': 'EVO',
             'name': 'EVO',
             'sw_version': '6.10'
+        }
+
+
+def _get_expected_zone_device_block():
+    return {
+            'identifiers': ['Paradox_1234abcd_zone_Zone_1'],
+            'manufacturer': 'Paradox',
+            'model': 'Zone',
+            'name': 'Zone 1',
+            'via_device': 'Paradox_1234abcd'
         }
 
 

@@ -45,11 +45,15 @@ async def test_hass(mocker):
         sendMessage(
             "labels_loaded",
             data=dict(
-                partition={1: dict(id=1, label="Partition 1", key="Partition_1")}
+                partition={1: dict(id=1, label="Partition 1", key="Partition_1")},
+                zone={1: dict(id=1, label="Front Door", key="Front_Door")},
             ),
         )
 
-        sendMessage("status_update", status=dict(partition={1: dict(arm=False)}))
+        sendMessage(
+            "status_update",
+            status=dict(partition={1: dict(arm=False)}, zone={1: dict(open=False)}),
+        )
 
         await asyncio.sleep(0.1)
 
@@ -95,6 +99,31 @@ async def test_hass(mocker):
                 "code_arm_required": False,
                 "code_disarm_required": False,
                 "code_trigger_required": False,
+            },
+            0,
+            True,
+        )
+
+        # A zone is published as its own device, nested under the panel via
+        # via_device, rather than being attached to the panel device directly.
+        assert_any_call_with_json(
+            interface.mqtt.publish,
+            "homeassistant/binary_sensor/aabbccdd/zone_front_door_open/config",
+            {
+                "name": "Zone Front Door Open",
+                "unique_id": "paradox_aabbccdd_zone_front_door_open",
+                "state_topic": "paradox/states/zones/Front_Door/open",
+                "availability_topic": "paradox/interface/availability",
+                "device": {
+                    "manufacturer": "Paradox",
+                    "model": "Zone",
+                    "identifiers": ["Paradox_aabbccdd_zone_Front_Door"],
+                    "name": "Front Door",
+                    "via_device": "Paradox_aabbccdd",
+                },
+                "device_class": "motion",
+                "payload_on": "True",
+                "payload_off": "False",
             },
             0,
             True,

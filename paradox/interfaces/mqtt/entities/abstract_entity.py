@@ -44,6 +44,29 @@ class AbstractEntity:
             ]
         )
 
+    def _hass_device(self):
+        """Device block for the discovery payload.
+
+        Zones get their own device, linked to the panel with ``via_device`` so
+        Home Assistant nests them underneath it. Without this every zone sensor,
+        binary sensor and bypass switch lands on the panel device, which on a
+        large system is a flat list of hundreds of entities.
+
+        ``unique_id`` is deliberately untouched, so on an existing install the
+        entities are re-parented in place: entity ids, customisations and
+        history are all preserved.
+        """
+        if self.pai_entity_type != "zone":
+            return self.device
+
+        return dict(
+            identifiers=[f"Paradox_{self.device.serial_number}_zone_{self.key}"],
+            name=self.label or to_label(self.key),
+            manufacturer="Paradox",
+            model="Zone",
+            via_device=self.device.serialize()["identifiers"][0],
+        )
+
     def serialize(self):
         prefix = cfg.MQTT_HOMEASSISTANT_ENTITY_PREFIX.format_map(
             {
@@ -53,7 +76,7 @@ class AbstractEntity:
         )
         return dict(
             availability_topic=self.availability_topic,
-            device=self.device,
+            device=self._hass_device(),
             name=prefix + f"{self.entity_name}",
             unique_id=f"paradox_{self.device.serial_number}_{self.entity_id}",
             state_topic=self.state_topic,
