@@ -38,9 +38,10 @@ async def test_wait_until_complete_uses_the_configured_timeout(monkeypatch):
     monkeypatch.setattr(cfg, "IO_TIMEOUT", 0.01)
 
     registry = HandlerRegistry()
+    handler = FutureHandler()
 
     with pytest.raises(asyncio.TimeoutError):
-        await registry.wait_until_complete(FutureHandler())
+        await registry.wait_until_complete(handler)
 
     # The handler is removed even when the wait times out.
     assert len(registry) == 0

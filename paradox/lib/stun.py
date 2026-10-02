@@ -369,7 +369,7 @@ class StunClient(object):
         while remaining > 0:
             chunk = self.sock.recv(remaining)
             if not chunk:
-                raise Exception("Connection closed while reading STUN response")
+                raise ConnectionError("Connection closed while reading STUN response")
             chunks.append(chunk)
             remaining -= len(chunk)
 

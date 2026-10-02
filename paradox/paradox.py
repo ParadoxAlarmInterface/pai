@@ -551,7 +551,7 @@ class Paradox:
         args=None,
         message=None,
         retries=5,
-        timeout=None,
+        timeout=None,  # NOSONAR: existing timeout API; asyncio.timeout() needs Python 3.11+ (PAI supports 3.8)
         reply_expected=None,
     ) -> Optional[Container]:
         # Read at call time, not as a default argument value: this module is

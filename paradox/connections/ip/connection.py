@@ -127,7 +127,10 @@ class IPConnectionWithEncryption(MultiAttemptConnection, IPConnectionHandler, AB
             self.ip_handler_registry.handle(container)
         )
 
-    async def wait_for_ip_message(self, timeout=None) -> Container:
+    async def wait_for_ip_message(
+        self,
+        timeout=None,  # NOSONAR: existing timeout API; asyncio.timeout() needs Python 3.11+ (PAI supports 3.8)
+    ) -> Container:
         # ``None`` defers to cfg.IO_TIMEOUT inside wait_until_complete, which
         # reads it at call time rather than at import time.
         future = FutureHandler()
@@ -219,9 +222,7 @@ class StunIPConnection(IPConnectionWithEncryption):
             # The allocation is gone or the control socket is dead. Drop the
             # link so the main loop reconnects, rather than writing into a
             # tunnel that has already stopped forwarding.
-            logger.error(
-                "STUN session refresh failed, dropping connection", exc_info=True
-            )
+            logger.exception("STUN session refresh failed, dropping connection")
             await self.close()
 
     async def _try_connect(self) -> None:

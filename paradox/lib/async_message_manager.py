@@ -38,7 +38,7 @@ class AsyncMessageManager:
     async def wait_for_message(
         self,
         check_fn: Optional[Callable[[Container], bool]] = None,
-        timeout=None,
+        timeout=None,  # NOSONAR: existing timeout API; asyncio.timeout() needs Python 3.11+ (PAI supports 3.8)
     ) -> Container:
         # ``None`` defers to cfg.IO_TIMEOUT inside wait_until_complete, which
         # reads it at call time. See the note there.
