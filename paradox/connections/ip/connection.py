@@ -129,7 +129,8 @@ class IPConnectionWithEncryption(MultiAttemptConnection, IPConnectionHandler, AB
 
     async def wait_for_ip_message(
         self,
-        timeout=None,  # NOSONAR: existing timeout API; asyncio.timeout() needs Python 3.11+ (PAI supports 3.8)
+        # Existing timeout API: the asyncio.timeout() Sonar suggests needs Python 3.11+, PAI supports 3.8.
+        timeout=None,  # NOSONAR(S7483)
     ) -> Container:
         # ``None`` defers to cfg.IO_TIMEOUT inside wait_until_complete, which
         # reads it at call time rather than at import time.

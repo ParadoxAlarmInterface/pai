@@ -551,7 +551,8 @@ class Paradox:
         args=None,
         message=None,
         retries=5,
-        timeout=None,  # NOSONAR: existing timeout API; asyncio.timeout() needs Python 3.11+ (PAI supports 3.8)
+        # Existing timeout API: the asyncio.timeout() Sonar suggests needs Python 3.11+, PAI supports 3.8.
+        timeout=None,  # NOSONAR(S7483)
         reply_expected=None,
     ) -> Optional[Container]:
         # Read at call time, not as a default argument value: this module is
