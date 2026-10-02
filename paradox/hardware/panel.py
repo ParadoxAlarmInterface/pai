@@ -328,6 +328,26 @@ class Panel:
     def get_status_requests(self) -> typing.Iterable[typing.Awaitable]:
         return (self.request_status(i) for i in self.status_request_addresses)
 
+    @property
+    def status_cycle_budget(self) -> float:
+        """Wall-clock bound for one full status poll, in seconds.
+
+        The poll loop abandons a cycle that exceeds this, so it has to allow
+        for what a healthy-but-slow panel legitimately needs: the requests run
+        one at a time behind ``request_lock``, each waiting up to
+        ``IO_TIMEOUT * 2`` for its reply, with room for one retry. It is a
+        backstop against a wedged cycle, not a latency target -- which is why
+        it is generous rather than tight.
+
+        Panels whose virtual addresses expand into several requests each must
+        override this; see PRT3Panel.
+        """
+        per_request = cfg.IO_TIMEOUT * 2 * 2  # reply window, plus one retry
+        return max(
+            cfg.KEEP_ALIVE_INTERVAL,
+            per_request * len(list(self.status_request_addresses)),
+        )
+
     @abstractmethod
     async def request_status(self, nr) -> typing.Optional[Container]:
         raise NotImplementedError("override request_status in a subclass")

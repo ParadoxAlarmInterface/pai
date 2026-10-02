@@ -93,6 +93,17 @@ class PRT3Panel(Panel):
     # all configured areas and zones internally.
     status_request_addresses = [0]
 
+    @property
+    def status_cycle_budget(self) -> float:
+        """One request per area and per zone, not one per status address.
+
+        The base implementation would size the budget from
+        ``status_request_addresses``, which is a single virtual address here,
+        and cut every cycle short on a panel with many zones.
+        """
+        elements = cfg.PRT3_MAX_AREAS + cfg.PRT3_MAX_ZONES
+        return max(cfg.KEEP_ALIVE_INTERVAL, cfg.IO_TIMEOUT * elements * 2)
+
     def __init__(self, core):
         # variable_message_length=False: PRT3Protocol.variable_message_length()
         # is a no-op; the Panel base class must not try to manage lengths.
