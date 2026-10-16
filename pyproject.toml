@@ -37,6 +37,7 @@ dependencies = [
     "paho_mqtt>=2.1.0,<3",
     "requests>=2.20.0",
     "pyserial-asyncio>=0.4",
+    "pycryptodome",
 ]
 
 [project.urls]

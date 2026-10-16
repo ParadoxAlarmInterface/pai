@@ -50,9 +50,8 @@ frame size : 2 (header) + 48 (AES) + 1 (checksum) = 51 bytes
 
 ## Encryption algorithm
 
-Paradox uses a **custom pure-Python AES-256-ECB** implementation
-(`paradox/lib/crypto.py`).  The same algorithm is used for IP150 TCP
-encryption; only the key derivation differs.
+Paradox uses **AES-256-ECB** (`paradox/lib/crypto.py`) for encryption with data order column wise in the AES state.
+The same algorithm is used for IP150 TCP encryption, only the key derivation differs.
 
 ### Key derivation for serial
 
