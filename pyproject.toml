@@ -59,7 +59,6 @@ Pushbullet = [
 Signal = [
     "pygobject>=3.20.0",
     "pydbus>=0.6.0",
-    "gi>=1.2",
 ]
 
 [tool.setuptools]

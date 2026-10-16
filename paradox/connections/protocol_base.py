@@ -65,6 +65,10 @@ class ConnectionProtocol(asyncio.Protocol, ABC):
     def variable_message_length(self, mode: bool) -> None:
         """Toggle variable-length framing. Overridden where framing exists."""
 
+    def set_framer(self, framer) -> None:
+        """Replace the framer. Overridden where swapping framers is supported."""
+        raise NotImplementedError(f"{type(self).__name__} cannot swap framers")
+
     @property
     def use_variable_message_length(self) -> bool:
         return True

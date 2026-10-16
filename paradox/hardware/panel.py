@@ -52,6 +52,10 @@ class Panel:
 
         return None
 
+    def make_framer(self):
+        """A framer to replace the connection's default one, or None to keep it."""
+        return None
+
     def get_message(self, name) -> Construct:
         clsmembers = dict(inspect.getmembers(parsers))
         if name in clsmembers:

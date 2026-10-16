@@ -68,6 +68,17 @@ class SerialConnectionProtocol(ConnectionProtocol):
     def reset_framing(self) -> None:
         self._framer.reset()
 
+    def set_framer(self, framer) -> None:
+        """Replace the framer at runtime, e.g. after the panel is detected.
+
+        Any bytes already buffered but not yet framed are carried over, so a
+        reply that arrived in the same read as the trigger is not lost.
+        """
+        pending = self._framer.buffer.pending
+        self._framer = framer
+        if pending:
+            self._framer.buffer.append(pending)
+
     def variable_message_length(self, mode: bool) -> None:
         self._framer.use_variable_message_length = mode
 
