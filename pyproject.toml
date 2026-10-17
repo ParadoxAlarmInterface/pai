@@ -31,6 +31,7 @@ classifiers = [
 requires-python = ">=3.8"
 dependencies = [
     "construct~=2.10.70",
+    "cryptography>=43.0.0",
     "argparse>=1.4.0",
     "python-slugify>=4.0.1",
     "pytz>=2021.3",

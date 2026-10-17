@@ -50,9 +50,16 @@ frame size : 2 (header) + 48 (AES) + 1 (checksum) = 51 bytes
 
 ## Encryption algorithm
 
-Paradox uses a **custom pure-Python AES-256-ECB** implementation
-(`paradox/lib/crypto.py`).  The same algorithm is used for IP150 TCP
+PAI uses **AES-256-ECB from `cryptography`** (`paradox/lib/crypto.py`).
+Each 16-byte block is transposed between Paradox's row-major state layout
+and standard AES column-major order before and after encryption or decryption.
+The AES key bytes are not transposed. This preserves the wire format of the
+original pure-Python implementation. The same algorithm is used for IP150 TCP
 encryption; only the key derivation differs.
+
+The low-level `encrypt()` and `decrypt()` functions pad nonempty keys shorter
+than 32 bytes with `0xEE` and use only the first 32 bytes of longer keys.
+Empty keys are rejected, as in the original implementation.
 
 ### Key derivation for serial
 
@@ -70,7 +77,10 @@ key = pc_password_bytes  +  b"\xee" * (32 - len(pc_password_bytes))
 ### Padding
 
 Plaintext is padded with `0xEE` bytes to the next 16-byte boundary before
-encryption.  After decryption, trailing `0xEE` bytes are stripped.
+encryption. Aligned plaintext gets no extra block; empty input produces empty
+output. Low-level `decrypt()` processes only complete 16-byte ciphertext blocks
+(ignoring any partial tail) and retains padding. The serial wrapper strips
+trailing `0xEE` bytes after decryption, while IP150 uses the header payload length.
 
 ---
 
