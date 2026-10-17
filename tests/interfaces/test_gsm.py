@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from unittest import mock
 
 import pytest
@@ -8,6 +9,7 @@ from paradox.connections.gsm.connection import GsmSerialConnection
 from paradox.event import EventLevel
 from paradox.interfaces.text import gsm
 from paradox.interfaces.text.gsm import GSMTextInterface
+from paradox.lib import ps
 
 
 @pytest.fixture
@@ -145,7 +147,7 @@ async def test_data_received_consumes_unsolicited_results():
 @pytest.mark.asyncio
 async def test_send_message_is_synchronous(gsm_interface):
     """An async override left every notification as a dropped coroutine."""
-    assert not asyncio.iscoroutinefunction(gsm_interface.send_message)
+    assert not inspect.iscoroutinefunction(gsm_interface.send_message)
 
 
 @pytest.mark.asyncio
@@ -328,13 +330,19 @@ async def test_run_reconnects_after_the_modem_drops(gsm_interface):
         gsm_interface, "connect", side_effect=fake_connect
     ):
         task = asyncio.ensure_future(gsm_interface.run())
-        await settle()
-        assert connects == []  # already connected, nothing to do
+        try:
+            await settle()
+            assert connects == []  # already connected, nothing to do
 
-        gsm_interface.port.connected = False  # modem unplugged
-        await settle()
-
-        task.cancel()
+            gsm_interface.port.connected = False  # modem unplugged
+            await settle()
+        finally:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+            ps.pub.unsubscribe(gsm_interface.handle_panel_event, ps.PREFIX + "events")
+            ps.pub.unsubscribe(
+                gsm_interface.handle_notify, ps.PREFIX + "notifications"
+            )
 
     assert connects, "run() never reconnected after the port dropped"
 

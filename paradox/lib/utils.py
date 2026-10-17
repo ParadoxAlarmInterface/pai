@@ -33,6 +33,26 @@ def call_soon_in_main_loop(fn: typing.Union[typing.Callable, typing.Coroutine]) 
             main_thread_loop.call_soon_threadsafe(fn)
 
 
+def set_future_result_threadsafe(
+    future: asyncio.Future, result: typing.Any
+) -> None:
+    loop = future.get_loop()
+    try:
+        current_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        current_loop = None
+
+    if current_loop is loop:
+        _set_future_result(future, result)
+    else:
+        loop.call_soon_threadsafe(_set_future_result, future, result)
+
+
+def _set_future_result(future: asyncio.Future, result: typing.Any) -> None:
+    if not future.done():
+        future.set_result(result)
+
+
 class JSONByteEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, bytes):

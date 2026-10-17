@@ -12,7 +12,12 @@ from paho.mqtt.client import Client, MQTTMessage
 from paradox.config import config as cfg
 from paradox.event import Change, Event, EventLevel, Notification
 from paradox.lib import ps
-from paradox.lib.utils import JSONByteEncoder, call_soon_in_main_loop, sanitize_key
+from paradox.lib.utils import (
+    JSONByteEncoder,
+    call_soon_in_main_loop,
+    sanitize_key,
+    set_future_result_threadsafe,
+)
 
 from .core import AbstractMQTTInterface
 from .helpers import ELEMENT_TOPIC_MAP, get_control_topic_prefix
@@ -155,8 +160,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                 self._mqtt_handle_utility_key,
             )
 
-        if not self.connected_future.done():
-            self.connected_future.set_result(True)
+        set_future_result_threadsafe(self.connected_future, True)
 
     @mqtt_handle_decorator
     async def _mqtt_handle_notifications(self, prep: ParsedMessage):
