@@ -4,7 +4,6 @@ import datetime
 from enum import Enum
 import logging
 import time
-import typing
 
 from construct import Container
 
@@ -108,7 +107,7 @@ class Event:
                 continue
 
             value = getattr(self, key)
-            if not key.startswith("_") and not isinstance(value, typing.Callable):
+            if not key.startswith("_") and not callable(value):
                 if isinstance(value, datetime.datetime):
                     dp[key] = str(value.isoformat())
                 elif isinstance(value, Enum):
@@ -118,7 +117,7 @@ class Event:
         return dp
 
     def call_hook(self, *args, **kwargs):
-        if isinstance(self.hook_fn, typing.Callable):
+        if callable(self.hook_fn):
             kwargs["event"] = self
             try:
                 self.hook_fn(*args, **kwargs)
@@ -175,7 +174,7 @@ class LiveEvent(Event):
                         event_map[k] = (
                             f"{event_map[k]}: {sub[k]}" if k in event_map else sub[k]
                         )
-                    elif isinstance(sub[k], typing.List):  # for tags or other lists
+                    elif isinstance(sub[k], list):  # for tags or other lists
                         event_map[k] = event_map.get(k, []) + sub[k]
                     else:
                         event_map[k] = sub[k]
@@ -184,11 +183,7 @@ class LiveEvent(Event):
         else:
             self.id = self.minor
 
-        callables = (
-            k
-            for k in event_map
-            if isinstance(event_map[k], typing.Callable) and k != "hook_fn"
-        )
+        callables = (k for k in event_map if callable(event_map[k]) and k != "hook_fn")
         for k in callables:
             event_map[k] = event_map[k](self, self.label_provider)
 
@@ -249,9 +244,7 @@ class ChangeEvent(Event):
         self.change = {self.property: self.value}
 
         property_map = copy(property_map[self.property])  # for inplace modifications
-        callables = (
-            k for k in property_map if isinstance(property_map[k], typing.Callable)
-        )
+        callables = (k for k in property_map if callable(property_map[k]))
         for k in callables:
             property_map[k] = property_map[k](self, self.label_provider)
 
