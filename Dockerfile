@@ -1,9 +1,5 @@
 FROM python:3.15-slim-trixie AS base
 
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends tzdata libffi8 libgcc-s1 libssl3t64 \
-  && rm -rf /var/lib/apt/lists
-
 FROM base AS builder
 
 # CFFI may need a C compiler on ARMv7; cryptography must use a prebuilt wheel.
@@ -20,7 +16,8 @@ RUN pip install --no-cache-dir --only-binary=cryptography -r requirements.txt
 
 COPY pyproject.toml README.md LICENSE MANIFEST.in ./
 COPY paradox ./paradox
-RUN pip install --no-cache-dir --only-binary=cryptography .
+RUN pip install --no-cache-dir --no-deps . \
+  && pip check
 
 FROM base AS runtime
 
