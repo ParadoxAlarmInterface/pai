@@ -69,7 +69,7 @@ class Paradox:
 
         Paradox is constructed before the event loop exists (``main`` does
         ``asyncio.run(_run(Paradox()))``, ``pai_dump_memory`` does the same).
-        On Python 3.8/3.9 ``asyncio.Lock``/``Event`` capture
+        On Python 3.9 ``asyncio.Lock``/``Event`` capture
         ``get_event_loop()`` in ``__init__``, so building them there binds them
         to a loop that is never run. The mismatch stays invisible until the
         first *contended* acquire -- the fast path never touches the bound loop

@@ -1,4 +1,6 @@
+import asyncio
 import json
+import threading
 
 from construct import Container, ListContainer
 import pytest
@@ -12,6 +14,7 @@ from paradox.lib.utils import (
     mask_email,
     mask_secret,
     sanitize_key,
+    set_future_result_threadsafe,
 )
 
 
@@ -73,6 +76,52 @@ def test_sanitize_key():
     assert sanitize_key("Living room") == "Living_room"
 
     assert sanitize_key(1) == "1"
+
+
+@pytest.mark.asyncio
+async def test_set_future_result_threadsafe_from_worker_thread():
+    loop = asyncio.get_running_loop()
+    future = loop.create_future()
+    previous_debug = loop.get_debug()
+    loop.set_debug(True)
+    errors = []
+
+    def complete():
+        try:
+            set_future_result_threadsafe(future, "ready")
+            set_future_result_threadsafe(future, "duplicate")
+        except Exception as error:
+            errors.append(error)
+
+    try:
+        thread = threading.Thread(target=complete)
+        thread.start()
+        thread.join()
+
+        assert errors == []
+        assert await asyncio.wait_for(future, timeout=1) == "ready"
+    finally:
+        loop.set_debug(previous_debug)
+
+
+@pytest.mark.asyncio
+async def test_set_future_result_threadsafe_on_owner_loop_is_immediate():
+    future = asyncio.get_running_loop().create_future()
+
+    set_future_result_threadsafe(future, "ready")
+
+    assert future.done()
+    assert future.result() == "ready"
+
+
+@pytest.mark.asyncio
+async def test_set_future_result_threadsafe_reports_closed_loop():
+    loop = asyncio.new_event_loop()
+    future = loop.create_future()
+    loop.close()
+
+    with pytest.raises(RuntimeError, match="Event loop is closed"):
+        set_future_result_threadsafe(future, "ready")
 
 
 def test_construct_free():

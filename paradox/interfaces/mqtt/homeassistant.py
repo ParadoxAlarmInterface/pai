@@ -6,7 +6,10 @@ import logging
 from paradox.config import config as cfg
 from paradox.data.model import DetectedPanel
 from paradox.lib import ps
-from paradox.lib.utils import SerializableToJSONEncoder
+from paradox.lib.utils import (
+    SerializableToJSONEncoder,
+    set_future_result_threadsafe,
+)
 
 from .core import AbstractMQTTInterface
 from .entities.abstract_entity import AbstractEntity
@@ -58,8 +61,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
 
     def on_connect(self, client, userdata, connect_flags, reason_code, properties=None):
         # TODO: do not create connected_future, use some other
-        if not self.connected_future.done():
-            self.connected_future.set_result(True)
+        set_future_result_threadsafe(self.connected_future, True)
 
     def _handle_labels_loaded(self, data):
         partitions = data.get("partition", {})
