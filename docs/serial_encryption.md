@@ -51,24 +51,16 @@ frame size : 2 (header) + 48 (AES) + 1 (checksum) = 51 bytes
 ## Encryption algorithm
 
 PAI uses **AES-256-ECB from `cryptography`** (`paradox/lib/crypto.py`).
-Each 16-byte block is transposed between Paradox's row-major state layout
-and standard AES column-major order before and after encryption or decryption.
-The AES key bytes are not transposed. This preserves the wire format of the
-original pure-Python implementation. The same algorithm is used for IP150 TCP
-encryption; only the key derivation differs.
+Each block is transposed between Paradox row order and AES column order before
+and after AES; keys are not transposed. IP150 uses the same algorithm with
+different key derivation.
 
-The low-level `encrypt()` and `decrypt()` functions pad nonempty keys shorter
-than 32 bytes with `0xEE` and use only the first 32 bytes of longer keys.
-Empty keys are rejected, as in the original implementation.
+Keys are padded to 32 bytes with `0xEE` or truncated to 32 bytes.
+Empty keys are rejected.
 
-ECB and the `0xEE` padding are requirements of the existing panel protocol,
-not recommended choices for a new protocol. ECB reveals repeated plaintext
-blocks and does not authenticate messages; the serial checksum is not a
-cryptographic integrity check. Switching to authenticated encryption or a
-different padding scheme would require corresponding panel firmware changes
-and would break the legacy wire vectors. SonarCloud rule `python:S5542`
-therefore identifies a real, inherited protocol limitation, not a regression
-introduced by the library replacement.
+**Protocol limitation:** ECB and `0xEE` padding are required for compatibility.
+ECB reveals repeated blocks and provides no authentication; the serial checksum
+is not cryptographic integrity protection (SonarCloud `python:S5542`).
 
 ### Key derivation for serial
 
@@ -85,11 +77,9 @@ key = pc_password_bytes  +  b"\xee" * (32 - len(pc_password_bytes))
 
 ### Padding
 
-Plaintext is padded with `0xEE` bytes to the next 16-byte boundary before
-encryption. Aligned plaintext gets no extra block; empty input produces empty
-output. Low-level `decrypt()` processes only complete 16-byte ciphertext blocks
-(ignoring any partial tail) and retains padding. The serial wrapper strips
-trailing `0xEE` bytes after decryption, while IP150 uses the header payload length.
+Plaintext is padded to 16-byte boundaries with `0xEE`; aligned or empty input
+gets no extra block. `decrypt()` ignores partial ciphertext tails and retains
+padding. Serial strips trailing `0xEE`; IP150 trims to the header payload length.
 
 ---
 
