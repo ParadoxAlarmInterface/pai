@@ -1,8 +1,9 @@
 import asyncio
+import inspect
 from asyncio import Future
 from collections import defaultdict
 import logging
-from typing import Awaitable, Callable, List, Mapping, Union
+from typing import Callable, List, Mapping, Union
 
 from paradox.event import Change, Event, Notification
 from paradox.lib.utils import call_soon_in_main_loop
@@ -14,7 +15,7 @@ logger = logging.getLogger("PAI").getChild(__name__)
 
 class Listener:
     def __init__(self, callback: Union[Callable, Future], **curriedArgs):
-        if not isinstance(callback, (Callable, Future)):
+        if not (callable(callback) or isinstance(callback, Future)):
             raise AssertionError("Wrong callback")
         self.callback = callback
         self.curriedArgs = curriedArgs
@@ -23,9 +24,9 @@ class Listener:
         kwargs2 = self.curriedArgs.copy()
         kwargs2.update(**kwargs)
 
-        if isinstance(self.callback, Callable):
+        if callable(self.callback):
             result = self.callback(**kwargs2)
-            if isinstance(result, Awaitable):
+            if inspect.isawaitable(result):
                 await result
         elif isinstance(self.callback, Future):
             if not self.callback.done():

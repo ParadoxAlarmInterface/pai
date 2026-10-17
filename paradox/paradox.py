@@ -1,9 +1,10 @@
 import asyncio
+import collections.abc
 from binascii import hexlify
 from datetime import datetime
 import logging
 import time
-from typing import Callable, Iterable, Optional
+from typing import Optional
 
 from construct import Container
 import pytz
@@ -521,11 +522,11 @@ class Paradox:
                         self.connection.write(message)
 
                     if reply_expected is not None:
-                        if isinstance(reply_expected, Callable):
+                        if callable(reply_expected):
                             reply = await self.connection.wait_for_message(
                                 reply_expected, timeout=timeout * 2
                             )
-                        elif isinstance(reply_expected, Iterable):
+                        elif isinstance(reply_expected, collections.abc.Iterable):
                             reply = await self.connection.wait_for_message(
                                 lambda m: any(
                                     m.fields.value.po.command == expected

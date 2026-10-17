@@ -1,6 +1,6 @@
 import asyncio
 import binascii
-from collections.abc import Hashable
+from collections.abc import Coroutine, Hashable, Mapping
 from copy import deepcopy
 import functools
 import json
@@ -19,13 +19,13 @@ def call_soon_in_main_loop(fn: typing.Union[typing.Callable, typing.Coroutine]) 
     if threading.current_thread() is threading.main_thread():
         loop = asyncio.get_running_loop()
         main_thread_loop = loop
-        if isinstance(fn, typing.Coroutine):
+        if isinstance(fn, Coroutine):
             loop.create_task(fn)
         else:
             loop.call_soon(fn)
     else:
         assert main_thread_loop is not None and main_thread_loop.is_running()
-        if isinstance(fn, typing.Coroutine):
+        if isinstance(fn, Coroutine):
             asyncio.run_coroutine_threadsafe(
                 fn, loop=main_thread_loop
             )  # Returns concurrent.futures.Future
@@ -111,13 +111,13 @@ def sanitize_key(key):
 
 
 def construct_free(container: Container):
-    if isinstance(container, (Container, typing.Mapping)):
+    if isinstance(container, (Container, Mapping)):
         return {
             k: construct_free(v)
             for k, v in container.items()
             if not (isinstance(k, str) and k.startswith("_"))
         }
-    elif isinstance(container, (ListContainer, typing.List)):
+    elif isinstance(container, (ListContainer, list)):
         return list(construct_free(v) for v in container)
     else:
         return container

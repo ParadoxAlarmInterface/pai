@@ -19,6 +19,8 @@ from construct import (
     ListContainer,
     Struct,
     Subconstruct,
+    stream_read,
+    stream_write,
     this,
 )
 
@@ -131,39 +133,84 @@ def StatusFlags(count, start_index_from=1):
     return FlagsDict(count, start_index_from)
 
 
+class BitFlagsDictArray(Construct):
+    """
+    `count` bytes, each holding 8 named flags (MSB first), as {index: Container}.
+
+    Equivalent to DictArray(count, first_index, BitStruct("_index" / Computed(...), *flags))
+    but decodes the bits directly, which is much faster than a Struct per byte.
+    With `default=False` missing flags raise KeyError on build.
+    """
+
+    def __init__(self, count, first_index, names, default=True):
+        super().__init__()
+        assert len(names) == 8
+        self._count = count
+        self._indexes = range(first_index, first_index + count)
+        self._bits = [(name, 0x80 >> bit) for bit, name in enumerate(names)]
+        self._default = default
+
+    def _parse(self, stream, context, path):
+        data = stream_read(stream, self._count, path)
+        out = Container()
+        for index, byte in zip(self._indexes, data):
+            item = Container(_index=index)
+            for name, mask in self._bits:
+                item[name] = bool(byte & mask)
+            out[index] = item
+        return out
+
+    def _build(self, obj, stream, context, path):
+        if not isinstance(obj, dict):
+            raise TypeError("dict should be passed for encoding")
+        data = bytearray(self._count)
+        for i, index in enumerate(self._indexes):
+            item = obj.get(index) or {}
+            byte = 0
+            for name, mask in self._bits:
+                value = item.get(name, False) if self._default else item[name]
+                if value:
+                    byte |= mask
+            data[i] = byte
+        stream_write(stream, bytes(data), self._count, path)
+        return obj
+
+    def _sizeof(self, context, path):
+        return self._count
+
+
 def ModuleTroubles(count, start_index_from=1):
-    return DictArray(
-        count=count,
-        first_index=start_index_from,
-        subcon=BitStruct(
-            "_index" / Computed(this._index + start_index_from),
-            "aux_trouble" / Flag,
-            "battery_fail" / Flag,
-            "ac_trouble" / Flag,
-            "printer_trouble" / Flag,
-            "fail_to_comm" / Flag,
-            "tlm_trouble" / Flag,
-            "rom_error" / Flag,
-            "tamper" / Flag,
-        ),
+    return BitFlagsDictArray(
+        count,
+        start_index_from,
+        [
+            "aux_trouble",
+            "battery_fail",
+            "ac_trouble",
+            "printer_trouble",
+            "fail_to_comm",
+            "tlm_trouble",
+            "rom_error",
+            "tamper",
+        ],
+        default=False,
     )
 
 
 def ZoneFlags(count, start_index_from=1):
-    return DictArray(
+    return BitFlagsDictArray(
         count,
         start_index_from,
-        BitStruct(
-            "_index" / Computed(this._index + start_index_from),
-            "generated_alarm" / Default(Flag, False),
-            "presently_in_alarm" / Default(Flag, False),
-            "activated_entry_delay" / Default(Flag, False),
-            "activated_intellizone_delay" / Default(Flag, False),
-            "bypassed" / Default(Flag, False),
-            "shutted_down" / Default(Flag, False),
-            "tx_delay" / Default(Flag, False),
-            "supervision_trouble" / Default(Flag, False),
-        ),
+        [
+            "generated_alarm",
+            "presently_in_alarm",
+            "activated_entry_delay",
+            "activated_intellizone_delay",
+            "bypassed",
+            "shutted_down",
+            "tx_delay",
+            "supervision_trouble",
+        ],
     )
 
 
