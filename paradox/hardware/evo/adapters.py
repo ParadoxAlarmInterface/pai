@@ -110,16 +110,25 @@ class EnumerationAdapter(Subconstruct):
         return self.subcon._build(zones, stream, context, path)
 
 
+class FlagsDict(Adapter):
+    """Array of flags exposed as {index: bool}, indexes start from `first_index`"""
+
+    def __init__(self, count, first_index=1):
+        super().__init__(Array(count, Default(Flag, False)))
+        self._indexes = range(first_index, first_index + count)
+
+    def _decode(self, obj, context, path):
+        return Container(zip(self._indexes, obj))
+
+    def _encode(self, obj, context, path):
+        if not isinstance(obj, dict):
+            raise TypeError("dict should be passed for encoding")
+
+        return [obj.get(k) for k in self._indexes]
+
+
 def StatusFlags(count, start_index_from=1):
-    return DictArray(
-        count,
-        start_index_from,
-        Struct(
-            "_index" / Computed(this._index + start_index_from),
-            "flag" / Default(Flag, False),
-        ),
-        pick_key="flag",
-    )
+    return FlagsDict(count, start_index_from)
 
 
 def ModuleTroubles(count, start_index_from=1):

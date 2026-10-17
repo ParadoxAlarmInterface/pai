@@ -62,29 +62,42 @@ class SortableTuple(tuple):
         return self[0] >= rhs[0]
 
 
-def deep_merge(*dicts, extend_lists=False, initializer=None):
+def deep_merge(*dicts, extend_lists=False, initializer=None, copy=True):
+    """
+    Recursively merge dicts left to right into the first one (or `initializer`).
+
+    :param copy: deepcopy merged values. Pass False when the source dicts are
+        throwaway (e.g. freshly parsed) to avoid the deepcopy cost; merged
+        values are then shared with (and may mutate) the sources.
+    """
+    _copy = deepcopy if copy else _identity
+
     def merge_into(d1, d2):
         if d1 is None:
             return d2
         for key, value in d2.items():
             if key not in d1:  # key is missing
-                d1[key] = deepcopy(value)
+                d1[key] = _copy(value)
             elif extend_lists and isinstance(d1[key], list):
                 if isinstance(value, list):
                     # Use list concatenation instead of extend for better performance with large lists
-                    d1[key] = d1[key] + deepcopy(value)
+                    d1[key] = d1[key] + _copy(value)
                 else:
                     # Keep original behavior for non-list values
-                    d1[key].extend(deepcopy(value))
+                    d1[key].extend(_copy(value))
             elif not isinstance(d1[key], dict):
-                d1[key] = deepcopy(value)
+                d1[key] = _copy(value)
             elif isinstance(value, dict):  # Ensure both are dicts before recursion
                 d1[key] = merge_into(d1[key], value)
             else:  # d1[key] is dict but value is not
-                d1[key] = deepcopy(value)
+                d1[key] = _copy(value)
         return d1
 
     return functools.reduce(merge_into, dicts, initializer)
+
+
+def _identity(value):
+    return value
 
 
 re_sanitize_key = re.compile(r"\W")

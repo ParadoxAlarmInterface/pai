@@ -32,7 +32,8 @@ def convert_raw_status(raw_status: Container) -> Dict[str, ElementTypeContainer]
         if not prop_name:
             prop_name = element_type
 
-        out[element_type].deep_merge(_parse_raw_status(prop_name, value))
+        # _parse_raw_status returns fresh dicts, no need to deepcopy them
+        out[element_type].deep_merge(_parse_raw_status(prop_name, value), copy=False)
 
     return out
 

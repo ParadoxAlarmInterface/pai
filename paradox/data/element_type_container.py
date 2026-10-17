@@ -59,8 +59,8 @@ class ElementTypeContainer(dict):
 
             return selected
 
-    def deep_merge(self, *dicts):
-        deep_merge(self, *dicts)
+    def deep_merge(self, *dicts, copy=True):
+        deep_merge(self, *dicts, copy=copy)
 
     def get_index(self, key: Union[str, int]):
         if isinstance(key, int):

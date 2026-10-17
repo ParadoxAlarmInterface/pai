@@ -411,7 +411,10 @@ class Paradox:
                 try:
                     await self.busy.acquire()
                     result = await asyncio.gather(*self.panel.get_status_requests())
-                    merged = deep_merge(*result, extend_lists=True, initializer={})
+                    # replies are freshly parsed and discarded, safe to merge without copying
+                    merged = deep_merge(
+                        *result, extend_lists=True, initializer={}, copy=False
+                    )
                     asyncio.get_running_loop().call_soon(self._process_status, merged)
                     replies_missing = max(0, replies_missing - 1)
                 except ConnectionError:
