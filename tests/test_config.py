@@ -106,6 +106,18 @@ def _make_config(monkeypatch, entries: dict):
     return c
 
 
+def test_mg6250_username_from_config(monkeypatch):
+    monkeypatch.delenv("PAI_MG6250_USERNAME", raising=False)
+    c = _make_config(monkeypatch, {"MG6250_USERNAME": "installer"})
+    assert c.MG6250_USERNAME == "installer"
+
+
+def test_mg6250_username_from_environment(monkeypatch):
+    monkeypatch.setenv("PAI_MG6250_USERNAME", "installer")
+    c = _make_config(monkeypatch, {})
+    assert c.MG6250_USERNAME == "installer"
+
+
 def test_prt3_user_code_empty_accepted(monkeypatch):
     """Empty PRT3_USER_CODE is valid (quick-arm mode)."""
     c = _make_config(monkeypatch, {"PRT3_USER_CODE": ""})

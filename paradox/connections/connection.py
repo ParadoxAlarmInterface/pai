@@ -57,3 +57,8 @@ class Connection(AsyncMessageManager, ConnectionHandler):
     def variable_message_length(self, mode):
         if self._protocol is not None:
             self._protocol.variable_message_length(mode)
+
+    def set_framer(self, framer):
+        """Swap the protocol's framer at runtime (after panel detection)."""
+        if self._protocol is not None:
+            self._protocol.set_framer(framer)

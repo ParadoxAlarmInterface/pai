@@ -278,15 +278,20 @@ class Paradox:
             else:
                 raise ConnectionError("Panel did not replied to InitiateCommunication")
 
-            logger.info("Initiating panel connection")
-            reply = await self.send_wait(
-                self.panel.get_message("StartCommunication"),
-                args=dict(source_id=0x2),
-                reply_expected=0x0,
-            )
+            if initiate_reply.fields.value.get("product_id") == "MAGELLAN_MG6250":
+                # The MG6250 ignores StartCommunication (0x5F); the 0x72 reply
+                # already identifies it.
+                reply = initiate_reply
+            else:
+                logger.info("Initiating panel connection")
+                reply = await self.send_wait(
+                    self.panel.get_message("StartCommunication"),
+                    args=dict(source_id=0x2),
+                    reply_expected=0x0,
+                )
 
-            if reply is None:
-                raise ConnectionError("Panel did not replied to StartCommunication")
+                if reply is None:
+                    raise ConnectionError("Panel did not replied to StartCommunication")
 
             if reply.fields.value.product_id is not None:
                 self.panel = create_panel(
@@ -298,6 +303,9 @@ class Paradox:
                 self.connection.variable_message_length(
                     self.panel.variable_message_length
                 )
+                framer = self.panel.make_framer()
+                if framer is not None:
+                    self.connection.set_framer(framer)
                 ps.sendMessage(
                     "panel_detected",
                     panel=DetectedPanel(

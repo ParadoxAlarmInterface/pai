@@ -78,6 +78,7 @@ import logging
 # PASSWORD = '0000'   			# PC Password. Set to None if Panel has no Password.
 #                                 # In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) ->
 #                                 # PC Communication (Babyware) Tab.
+# MG6250_USERNAME = 'admin'        # MG6250 PC communication username. Set PASSWORD to its PC password (required).
 #
 # POWER_UPDATE_INTERVAL = 60      	# Interval between updates of the battery, DC and VDC voltages
 # PUSH_POWER_UPDATE_WITHOUT_CHANGE = True # Always notify interfaces of power changes

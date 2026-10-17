@@ -16,7 +16,12 @@ class EventMessageHandler(PersistentHandler):
         if not isinstance(data, Container):
             return False
         values = data.fields.value
-        return values.po.command == 0xE and hasattr(values, "event")
+        # MG6250 frames have no `po` sub-struct; skip rather than raise.
+        return (
+            hasattr(values, "po")
+            and values.po.command == 0xE
+            and hasattr(values, "event")
+        )
 
 
 class ErrorMessageHandler(PersistentHandler):
@@ -24,8 +29,12 @@ class ErrorMessageHandler(PersistentHandler):
         # Guard: PRT3 messages are dataclasses, not binary Containers.
         if not isinstance(data, Container):
             return False
-        return data.fields.value.po.command == 0x7 and hasattr(
-            data.fields.value, "message"
+        values = data.fields.value
+        # MG6250 frames have no `po` sub-struct; skip rather than raise.
+        return (
+            hasattr(values, "po")
+            and values.po.command == 0x7
+            and hasattr(values, "message")
         )
 
 

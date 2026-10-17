@@ -3,7 +3,21 @@ import logging
 from unittest.mock import MagicMock, call
 
 from paradox.config import config as cfg
+from paradox.connections.serial.mg6250_framing import MG6250SerialFramer
 from paradox.connections.serial.protocol import SerialConnectionProtocol
+
+
+def test_mg6250_framer_keeps_intrinsic_variable_length():
+    handler = MagicMock()
+    cp = SerialConnectionProtocol(handler)
+    cp.variable_message_length(False)
+    cp.set_framer(MG6250SerialFramer())
+    assert cp.use_variable_message_length is True
+    cp.variable_message_length(False)
+    assert cp.use_variable_message_length is True
+    payload = bytes.fromhex("de00000a00000001951a")
+    cp.data_received(payload)
+    handler.on_message.assert_called_once_with(payload)
 
 
 def test_6byte_message():
