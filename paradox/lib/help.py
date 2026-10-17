@@ -42,7 +42,9 @@ MODULES = {
     "pygobject": dict(
         mandatory=False, desc="the Signal interface", install_name="pygobject>=3.20.0"
     ),
-    "gi": dict(mandatory=False, desc="the Signal interface", install_name="gi>=1.2"),
+    "gi": dict(
+        mandatory=False, desc="the Signal interface", install_name="pygobject>=3.20.0"
+    ),
     "pytz": dict(
         mandatory=False, desc="Panel time sync", install_name="pytz>=2023.3.post1"
     ),
