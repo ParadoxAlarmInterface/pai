@@ -107,13 +107,24 @@ LoginResponse = Struct(
 PAD = 0xEE  # Paradox padding byte
 
 
-def credential_block(password: str) -> bytes:
+def credential_block(password: typing.Union[str, bytes, int]) -> bytes:
     """32-byte credential: make_serial_key(pw) encrypted under itself."""
     key = make_serial_key(password)
     return paradox_encrypt(key, key)
 
 
-def build_pw_block(password: str, client_field: bytes = DEFAULT_CLIENT_FIELD) -> bytes:
+def build_pw_block(
+    password: typing.Union[str, bytes, int, None],
+    client_field: bytes = DEFAULT_CLIENT_FIELD,
+) -> bytes:
+    if password is None:
+        raise AuthenticationFailed("Set PASSWORD to the MG6250 PC password")
+    if isinstance(password, int):
+        password = str(password).zfill(4)
+    if isinstance(password, str):
+        password = password.encode("utf-8")
+    if not 1 <= len(password) <= 255:
+        raise AuthenticationFailed("MG6250 PASSWORD must contain 1 to 255 bytes")
     return (
         PW_HEADER
         + client_field
@@ -191,10 +202,11 @@ class Panel(PanelBase):
     async def initialize_communication(self, password) -> bool:
         """Identify, then log in with the PW_BLOCK credential.
 
-        `password` is the PC password (default "admin"). The username is read
+        `password` must be set to the PC password. The username is read
         from cfg.MG6250_USERNAME (default "admin").
         """
-        username = getattr(cfg, "MG6250_USERNAME", "admin")
+        username = cfg.MG6250_USERNAME
+        pw_block = build_pw_block(password)
 
         # identify (0x00) twice: model/firmware, then a list (supported commands?)
         for session_id in SESSION_IDENTIFY:
@@ -204,7 +216,6 @@ class Panel(PanelBase):
             )
 
         # credential + length use the PC password; the username is appended.
-        pw_block = build_pw_block(password)
         u = username.encode()
         login = build_frame(CMD_LOGIN, SESSION_LOGIN, pw_block + bytes([len(u)]) + u)
         reply = await self.core.send_wait(

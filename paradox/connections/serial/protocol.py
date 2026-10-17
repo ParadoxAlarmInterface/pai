@@ -80,11 +80,13 @@ class SerialConnectionProtocol(ConnectionProtocol):
             self._framer.buffer.append(pending)
 
     def variable_message_length(self, mode: bool) -> None:
-        self._framer.use_variable_message_length = mode
+        # Only the legacy framer supports toggling to fixed-length messages.
+        if isinstance(self._framer, SerialFramer):
+            self._framer.use_variable_message_length = mode
 
     @property
     def use_variable_message_length(self) -> bool:
-        return self._framer.use_variable_message_length
+        return getattr(self._framer, "use_variable_message_length", True)
 
     @property
     def buffer(self) -> bytes:

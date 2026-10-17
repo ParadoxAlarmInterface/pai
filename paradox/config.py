@@ -119,6 +119,7 @@ class Config:
             None,
             [int, str, bytes, type(None)],
         ),  # PC Password. Set to None if Panel has no Password. In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) -> PC Communication (Babyware) Tab.
+        "MG6250_USERNAME": "admin",  # MG6250 PC communication username
         "POWER_UPDATE_INTERVAL": (
             60,
             int,
