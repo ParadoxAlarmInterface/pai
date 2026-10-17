@@ -10,7 +10,7 @@
             <img alt="CI/CD dev" src="https://github.com/ParadoxAlarmInterface/pai/actions/workflows/dev.yml/badge.svg?branch=dev">
         </a>
         <a href="https://hub.docker.com/r/paradoxalarminterface/pai">
-            <img alt="Docker Arch" src="https://img.shields.io/badge/docker_arch-386%7Camd64%7Carmv6%7Carmv7%7Carm64-green?logo=docker">
+            <img alt="Docker Arch" src="https://img.shields.io/badge/docker_arch-amd64%7Carmv6%7Carm64-green?logo=docker">
             <img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/paradoxalarminterface/pai?logo=docker">
         </a>
         <a href="https://snyk.io/test/github/ParadoxAlarmInterface/pai?targetFile=requirements.txt">
