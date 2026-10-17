@@ -8,6 +8,28 @@ from paradox.connections.ip.parsers import (
 from paradox.hardware.parsers import Encrypted
 
 
+@pytest.mark.parametrize(
+    "payload,frame_hex",
+    [
+        (
+            b"abcdefg",
+            "aa070003010000000000eeeeeeeeeeeeaaa607f9a346f6b0e99127bd2b491cc7",
+        ),
+        (
+            bytes(range(16)) + b"\xee",
+            "aa110003010000000000eeeeeeeeeeee9174716e5fa646bb336f71432f9b7de6"
+            "d57f3979b26ab7b95f54d8ce0b969c94",
+        ),
+    ],
+)
+def test_legacy_encrypted_ip_frame(payload, frame_hex):
+    """Fixed wire vectors from dc9384b; IP length preserves trailing 0xEE."""
+    frame = bytes.fromhex(frame_hex)
+    key = b"12345abcde"
+    assert IPMessageRequest.build(dict(payload=payload), password=key) == frame
+    assert IPMessageRequest.parse(frame, password=key).payload == payload
+
+
 def test_IPMessageRequest_defaults():
     key = b"12345abcde"
     test_payload = b"abcdefg"

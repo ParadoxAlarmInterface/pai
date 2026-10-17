@@ -1,7 +1,40 @@
+import pytest
+
 from paradox.lib.crypto import decrypt_serial_message, encrypt_serial_message
 
 # PC password "1234" padded to 32 bytes with 0xEE
 PC_PASSWORD = b"1234"
+
+# Complete wire frames from the pure-Python implementation at dc9384b.
+LEGACY_FRAMES = [
+    (
+        bytes([0x50, 0x08, 0, 0, 0, 0, 0x40, 0x98]),
+        bytes.fromhex("e0feb4d71748c7c49567799f9a9072bf2319fe"),
+    ),
+    (
+        bytes([0x72] + [0] * 35 + [0x72]),
+        bytes.fromhex(
+            "e2fe344c2bf12e6695dbe2b329d84e589059"
+            "60442de4c5e5938ced1cca3cc813b8f00535af956bd5de42dd745caa5c69d64acf"
+        ),
+    ),
+]
+
+
+@pytest.mark.parametrize("payload,frame", LEGACY_FRAMES)
+def test_legacy_serial_frames(payload, frame):
+    assert encrypt_serial_message(payload, PC_PASSWORD) == frame
+    assert decrypt_serial_message(frame, PC_PASSWORD) == payload
+
+
+@pytest.mark.parametrize("payload,frame", LEGACY_FRAMES)
+def test_reject_corrupt_checksum(payload, frame):
+    corrupted = frame[:-1] + bytes([frame[-1] ^ 1])
+    assert decrypt_serial_message(corrupted, PC_PASSWORD) == b""
+
+
+def test_encrypt_empty_returns_empty():
+    assert encrypt_serial_message(b"", PC_PASSWORD) == b""
 
 
 def test_roundtrip_37byte_message():

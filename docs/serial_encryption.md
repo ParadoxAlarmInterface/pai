@@ -50,9 +50,17 @@ frame size : 2 (header) + 48 (AES) + 1 (checksum) = 51 bytes
 
 ## Encryption algorithm
 
-Paradox uses a **custom pure-Python AES-256-ECB** implementation
-(`paradox/lib/crypto.py`).  The same algorithm is used for IP150 TCP
-encryption; only the key derivation differs.
+PAI uses **AES-256-ECB from `cryptography`** (`paradox/lib/crypto.py`).
+Each block is transposed between Paradox row order and AES column order before
+and after AES; keys are not transposed. IP150 uses the same algorithm with
+different key derivation.
+
+Keys are padded to 32 bytes with `0xEE` or truncated to 32 bytes.
+Empty keys are rejected.
+
+**Protocol limitation:** ECB and `0xEE` padding are required for compatibility.
+ECB reveals repeated blocks and provides no authentication; the serial checksum
+is not cryptographic integrity protection (SonarCloud `python:S5542`).
 
 ### Key derivation for serial
 
@@ -69,8 +77,9 @@ key = pc_password_bytes  +  b"\xee" * (32 - len(pc_password_bytes))
 
 ### Padding
 
-Plaintext is padded with `0xEE` bytes to the next 16-byte boundary before
-encryption.  After decryption, trailing `0xEE` bytes are stripped.
+Plaintext is padded to 16-byte boundaries with `0xEE`; aligned or empty input
+gets no extra block. `decrypt()` ignores partial ciphertext tails and retains
+padding. Serial strips trailing `0xEE`; IP150 trims to the header payload length.
 
 ---
 
