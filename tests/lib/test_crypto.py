@@ -39,11 +39,11 @@ LEGACY_VECTORS = [
 
 
 def test_encrypt():
-    assert enc_text == encrypt(dec_text, password)
+    assert encrypt(dec_text, password) == enc_text
 
 
 def test_decrypt():
-    assert dec_text + b"\xee" * 2 == decrypt(enc_text, password)
+    assert decrypt(enc_text, password) == dec_text + b"\xee" * 2
 
 
 @pytest.mark.parametrize("key_length,data_length,ciphertext", LEGACY_VECTORS)

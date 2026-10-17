@@ -61,6 +61,15 @@ The low-level `encrypt()` and `decrypt()` functions pad nonempty keys shorter
 than 32 bytes with `0xEE` and use only the first 32 bytes of longer keys.
 Empty keys are rejected, as in the original implementation.
 
+ECB and the `0xEE` padding are requirements of the existing panel protocol,
+not recommended choices for a new protocol. ECB reveals repeated plaintext
+blocks and does not authenticate messages; the serial checksum is not a
+cryptographic integrity check. Switching to authenticated encryption or a
+different padding scheme would require corresponding panel firmware changes
+and would break the legacy wire vectors. SonarCloud rule `python:S5542`
+therefore identifies a real, inherited protocol limitation, not a regression
+introduced by the library replacement.
+
 ### Key derivation for serial
 
 ```

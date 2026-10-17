@@ -17,6 +17,8 @@ def _cipher(key: bytes) -> Cipher:
     if not key:
         # The legacy key schedule rejected empty keys, even for empty messages.
         raise IndexError("index out of range")
+    # Panel firmware requires ECB and 0xEE padding; changing either breaks the wire
+    # protocol. This is legacy interoperability, not a general-purpose secure cipher.
     return Cipher(algorithms.AES(bytes(key[:32]).ljust(32, PADDING)), modes.ECB())
 
 
