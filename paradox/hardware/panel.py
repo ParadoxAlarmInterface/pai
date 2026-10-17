@@ -148,7 +148,7 @@ class Panel:
 
                 start_time = time()
                 parser = def_parsers[elem_type]
-                if isinstance(parser, typing.Callable):
+                if callable(parser):
                     parser = parser(self.settings)
 
                 assert isinstance(parser, Construct)

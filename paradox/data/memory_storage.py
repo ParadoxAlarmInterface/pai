@@ -1,6 +1,5 @@
 from collections import defaultdict
 import logging
-from typing import Callable
 
 from paradox.config import config as cfg
 from paradox.event import Change
@@ -52,9 +51,7 @@ class MemoryStorage:
 
             old = element.get(property_name)
 
-            if isinstance(
-                property_value, Callable
-            ):  # function to make new value from the old one
+            if callable(property_value):  # function to make new value from the old one
                 try:
                     property_value = property_value(old)
                 except Exception:

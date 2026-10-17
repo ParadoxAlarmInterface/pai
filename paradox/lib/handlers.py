@@ -1,5 +1,6 @@
 from abc import abstractmethod
 import asyncio
+import inspect
 import logging
 from typing import Any, Awaitable, Callable, List, Optional, Union
 
@@ -43,7 +44,7 @@ class FutureHandler(Handler, asyncio.Future):
     def can_handle(self, data) -> bool:
         if self.done():
             raise AlreadyHandledError()
-        if isinstance(self._check_fn, Callable):
+        if callable(self._check_fn):
             return self._check_fn(data)
         return True
 
@@ -64,7 +65,7 @@ class PersistentHandler(Handler):
     async def __call__(self, data):
         result = self._handle(data)
 
-        if isinstance(result, Awaitable):
+        if inspect.isawaitable(result):
             return await result
         else:
             return result

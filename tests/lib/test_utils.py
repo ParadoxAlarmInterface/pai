@@ -54,6 +54,19 @@ def test_deep_merge_extend_lists():
     assert dict(a=[1, 2, 3]) == result
 
 
+@pytest.mark.parametrize("copy", [True, False])
+def test_deep_merge_copy(copy):
+    cs = [
+        Container(a=Container(x=1), l=[1]),
+        Container(a=Container(y=2), b=Container(z=3), l=[2]),
+    ]
+
+    result = deep_merge(*cs, extend_lists=True, initializer={}, copy=copy)
+    assert dict(a=dict(x=1, y=2), b=dict(z=3), l=[1, 2]) == result
+    assert (result["a"] is cs[0]["a"]) is not copy
+    assert (result["b"] is cs[1]["b"]) is not copy
+
+
 def test_sanitize_key():
     assert sanitize_key("Előtér") == "Eloter"
 

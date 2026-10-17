@@ -1,9 +1,10 @@
 import asyncio
+import collections.abc
 from binascii import hexlify
 from datetime import datetime
 import logging
 import time
-from typing import Callable, Iterable, Optional
+from typing import Optional
 
 from construct import Container
 import pytz
@@ -411,7 +412,10 @@ class Paradox:
                 try:
                     await self.busy.acquire()
                     result = await asyncio.gather(*self.panel.get_status_requests())
-                    merged = deep_merge(*result, extend_lists=True, initializer={})
+                    # replies are freshly parsed and discarded, safe to merge without copying
+                    merged = deep_merge(
+                        *result, extend_lists=True, initializer={}, copy=False
+                    )
                     asyncio.get_running_loop().call_soon(self._process_status, merged)
                     replies_missing = max(0, replies_missing - 1)
                 except ConnectionError:
@@ -518,11 +522,11 @@ class Paradox:
                         self.connection.write(message)
 
                     if reply_expected is not None:
-                        if isinstance(reply_expected, Callable):
+                        if callable(reply_expected):
                             reply = await self.connection.wait_for_message(
                                 reply_expected, timeout=timeout * 2
                             )
-                        elif isinstance(reply_expected, Iterable):
+                        elif isinstance(reply_expected, collections.abc.Iterable):
                             reply = await self.connection.wait_for_message(
                                 lambda m: any(
                                     m.fields.value.po.command == expected
