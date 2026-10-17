@@ -27,6 +27,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
 ]
 requires-python = ">=3.8"
 dependencies = [
@@ -73,7 +74,7 @@ exclude = ["tests", "tests.*", "config.*", "docs.*"]
 version = {attr = "paradox.__version__"}
 
 [tool.black]
-target-version = ["py38", "py39", "py310", "py311", "py312", "py313", "py314"]
+target-version = ["py38", "py39", "py310", "py311", "py312", "py313", "py314", "py315"]
 exclude = 'generated'
 
 [tool.isort]

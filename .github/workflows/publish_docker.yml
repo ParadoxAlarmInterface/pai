@@ -42,7 +42,9 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: linux/amd64,linux/arm/v6,linux/arm64/v8
+          platforms: linux/amd64,linux/arm/v7,linux/arm64/v8
           push: true
+          cache-from: type=gha,scope=pai-docker
+          cache-to: type=gha,scope=pai-docker,mode=max
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
