@@ -82,7 +82,7 @@ Zero 2 W, can use it with a suitable 32-bit OS.
 ## Tested Environment
 
 Tested in the following environment:
-* Python 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14 and 3.15
+* Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14 and 3.15
 * Mosquitto MQTT Broker > 1.4.8
 * OrangePi 2G-IOT, NanoPi NEO, and Raspberry Pi 3 through their built in Serial Port (with a level shifter!), or a USB RS232 TTL adapter (CP2102, PL2303, CH340, etc..)
 * Ubuntu Server 16.04.3 LTS

@@ -6,7 +6,7 @@ In both cases ``Paradox.__init__`` runs while there is no running loop, and
 ``asyncio.run`` afterwards creates a *different* loop than the one
 ``asyncio.get_event_loop()`` would have returned at construction time.
 
-On Python 3.8/3.9 ``asyncio.Lock()`` and ``asyncio.Event()`` capture
+On Python 3.9 ``asyncio.Lock()`` and ``asyncio.Event()`` capture
 ``get_event_loop()`` in ``__init__``, so primitives built that early stay bound
 to a loop that never runs. Acquiring an *uncontended* lock never touches the
 bound loop, so panel login and label loading work; the first *contended*
