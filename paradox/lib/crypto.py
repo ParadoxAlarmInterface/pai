@@ -19,7 +19,10 @@ def _cipher(key: bytes) -> Cipher:
         raise IndexError("index out of range")
     # Panel firmware requires ECB and 0xEE padding; changing either breaks the wire
     # protocol. This is legacy interoperability, not a general-purpose secure cipher.
-    return Cipher(algorithms.AES(bytes(key[:32]).ljust(32, PADDING)), modes.ECB())
+    return Cipher(
+        algorithms.AES(bytes(key[:32]).ljust(32, PADDING)),
+        modes.ECB(),  # NOSONAR
+    )
 
 
 def encrypt(ctxt, key):
