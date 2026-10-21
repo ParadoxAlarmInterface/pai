@@ -39,7 +39,7 @@ class IPInterface(Interface):
             logger.info("No alarm set")
             return
 
-        asyncio.get_event_loop().create_task(self.run())
+        asyncio.get_running_loop().create_task(self.run())
 
     async def run(self):
         try:
@@ -80,5 +80,5 @@ class IPInterface(Interface):
         finally:
             self.alarm.connection.deregister_raw_handler(handler_name)
 
-            asyncio.get_event_loop().create_task(self.alarm.resume())
+            asyncio.get_running_loop().create_task(self.alarm.resume())
             logger.info("Client %d disconnected", self.client_nr)

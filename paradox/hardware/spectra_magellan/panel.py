@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import asyncio
 import binascii
 import inspect
@@ -10,10 +8,11 @@ from construct import ChecksumError, Construct, Container
 
 from paradox.config import config as cfg
 from paradox.exceptions import AuthenticationFailed, StatusRequestException
+
 from . import parsers
+from ..panel import Panel as PanelBase
 from .event import event_map
 from .property import property_map
-from ..panel import Panel as PanelBase
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -43,7 +42,8 @@ class Panel(PanelBase):
         "status_base2": 0x1FE0,
         "definitions": {
             "zone": {"addresses": [range(0x730, 0x7A0, 0x03)]},
-            "pgm": {"addresses": [range(0x7A0, 0x800, 0x06)]}},
+            "pgm": {"addresses": [range(0x7A0, 0x800, 0x06)]},
+        },
         "labels": {
             "zone": {"label_offset": 0, "addresses": [range(0x010, 0x210, 0x10)]},
             "pgm": {
@@ -64,7 +64,7 @@ class Panel(PanelBase):
     def __init__(
         self, core, start_communication_response, variable_message_length=True
     ):
-        super(Panel, self).__init__(core, variable_message_length)
+        super().__init__(core, variable_message_length)
 
         self.settings = start_communication_response.fields.value
 
@@ -101,17 +101,17 @@ class Panel(PanelBase):
             else:
                 args = dict(address=address)
 
-            logger.info("Dumping %s: address %x" % (mem_type, address))
+            logger.info(f"Dumping {mem_type}: address {address:x}")
 
             reply = await self.core.send_wait(
                 parsers.ReadEEPROM,
                 args,
-                reply_expected=lambda m: m.fields.value.po.command == 0x5
-                and m.fields.value.address == address,
+                reply_expected=lambda m, a=address: m.fields.value.po.command == 0x5
+                and m.fields.value.address == a,
             )
 
             if reply is None:
-                logger.error("Could not read %s: address %x" % (mem_type, address))
+                logger.error(f"Could not read {mem_type}: address {address:x}")
                 return
 
             data = reply.fields.value.data
@@ -126,7 +126,7 @@ class Panel(PanelBase):
         except ResourceWarning:
             pass
 
-        return super(Panel, self).get_message(name)
+        return super().get_message(name)
 
     def parse_message(
         self, message: bytes, direction="topanel"
@@ -135,7 +135,7 @@ class Panel(PanelBase):
             if message is None or len(message) == 0:
                 return None
 
-            parent_parsed = super(Panel, self).parse_message(message, direction)
+            parent_parsed = super().parse_message(message, direction)
             if parent_parsed:
                 return parent_parsed
 
@@ -174,9 +174,11 @@ class Panel(PanelBase):
 
         except ChecksumError as e:
             logger.error(
-                "ChecksumError %s, message: %s" % (str(e), binascii.hexlify(message))
+                "ChecksumError {}, message: {}".format(
+                    str(e), binascii.hexlify(message)
+                )
             )
-        except:
+        except Exception:
             logger.exception(
                 "Exception parsing message: %s" % (binascii.hexlify(message))
             )
@@ -249,11 +251,25 @@ class Panel(PanelBase):
             return False
 
         accepted = False
+        desired_bypass = command == "bypass"
+        zone_states = self.core.storage.get_container("zone")
 
         for zone in zones:
+            state = zone_states.get(zone)
+            bypassed = state.get("bypassed") if state is not None else None
+            if not isinstance(bypassed, bool):
+                logger.warning(
+                    "Cannot control bypass for zone %s: bypass state is unknown", zone
+                )
+                continue
+            if bypassed == desired_bypass:
+                accepted = True
+                continue
+
             args = dict(action=ZONE_ACTIONS[command], argument=(zone - 1))
+            # This action toggles bypass; retrying a lost reply could undo it.
             reply = await self.core.send_wait(
-                parsers.PerformAction, args, reply_expected=0x4
+                parsers.PerformAction, args, reply_expected=0x4, retries=1
             )
 
             if reply is not None:

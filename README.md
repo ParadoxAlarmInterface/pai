@@ -10,7 +10,7 @@
             <img alt="CI/CD dev" src="https://github.com/ParadoxAlarmInterface/pai/actions/workflows/dev.yml/badge.svg?branch=dev">
         </a>
         <a href="https://hub.docker.com/r/paradoxalarminterface/pai">
-            <img alt="Docker Arch" src="https://img.shields.io/badge/docker_arch-386%7Camd64%7Carmv6%7Carmv7%7Carm64-green?logo=docker">
+            <img alt="Docker Arch" src="https://img.shields.io/badge/docker_arch-amd64%7Carmv7%7Carm64-green?logo=docker">
             <img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/paradoxalarminterface/pai?logo=docker">
         </a>
         <a href="https://snyk.io/test/github/ParadoxAlarmInterface/pai?targetFile=requirements.txt">
@@ -62,10 +62,27 @@ Note: Paradox sells unlock code to re-enable the unencrypted serial port.
 ## How to use
 See [wiki](https://github.com/ParadoxAlarmInterface/pai/wiki/Installation)
 
+### Building the Docker image
+
+Run `docker build -t pai .`. The Python 3.15 Debian slim multi-stage build requires
+a prebuilt `cryptography` wheel, avoiding Rust compilation. A C compiler and
+libffi headers are available in the builder stage for dependencies such as CFFI.
+The runtime image contains the installed Python environment and shared libraries,
+without the compiler toolchain.
+
+Dependencies are installed in a separate layer from the application so
+code changes do not recompile them. The publishing workflow saves all build
+stages in the GitHub Actions cache, including the dependency layer.
+
+Published images support `linux/amd64`, `linux/arm/v7`, and `linux/arm64/v8`.
+32-bit x86 and ARMv6 images are no longer published. Raspberry Pi 1 and the
+original Pi Zero/Zero W cannot run the ARMv7 image; Pi 2 and newer, including
+Zero 2 W, can use it with a suitable 32-bit OS.
+
 ## Tested Environment
 
 Tested in the following environment:
-* Python 3.6, 3.7, 3.8, 3.9, 3.10, 3.11
+* Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14 and 3.15
 * Mosquitto MQTT Broker > 1.4.8
 * OrangePi 2G-IOT, NanoPi NEO, and Raspberry Pi 3 through their built in Serial Port (with a level shifter!), or a USB RS232 TTL adapter (CP2102, PL2303, CH340, etc..)
 * Ubuntu Server 16.04.3 LTS

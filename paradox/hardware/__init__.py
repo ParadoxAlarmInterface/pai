@@ -44,10 +44,12 @@ def create_panel(core, start_communication_response: Container = None) -> Panel:
         from . import spectra_magellan
 
         return spectra_magellan.Panel(core, start_communication_response, False)
+    elif product_id == "MAGELLAN_MG6250":
+        from . import mg6250
+
+        return mg6250.Panel(core, start_communication_response, False)
     else:
         raise NotImplementedError(
             "We are not sure what panel you have (product_id: {}). \
-            Please create an issue. Maybe we can help you.".format(
-                str(product_id)
-            )
+            Please create an issue. Maybe we can help you.".format(str(product_id))
         )

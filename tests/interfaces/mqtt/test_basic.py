@@ -2,15 +2,15 @@ import asyncio
 import datetime
 import json
 
-import pytest
 from paho.mqtt.client import MQTTMessage
+import pytest
 
 from paradox.event import Event
 from paradox.interfaces.mqtt.basic import BasicMQTTInterface
 
 
 def get_interface(mocker):
-    mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_event_loop())
+    mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_running_loop())
     con = mocker.patch("paradox.interfaces.mqtt.core.MQTTConnection")
     con.get_instance.return_value.connected = True
     con.get_instance.return_value.availability_topic = "paradox/interface/availability"
@@ -129,7 +129,7 @@ async def test_mqtt_handle_zone_control_utf8(mocker):
     try:
         await asyncio.sleep(0.01)
 
-        message = MQTTMessage(topic="paradox/control/zones/Előtér".encode("utf-8"))
+        message = MQTTMessage(topic="paradox/control/zones/Előtér".encode())
         message.payload = b"clear_bypass"
 
         interface._mqtt_handle_zone_control(None, None, message)
@@ -152,9 +152,7 @@ async def test_mqtt_handle_send_panic(mocker):
         panic_type = "fire"  # 2
         userid = 3
 
-        message = MQTTMessage(
-            topic=f"paradox/panic/{panic_type}/{partition}".encode("utf-8")
-        )
+        message = MQTTMessage(topic=f"paradox/panic/{panic_type}/{partition}".encode())
         message.payload = str(userid).encode("utf-8")
 
         interface._mqtt_handle_send_panic(None, None, message)
@@ -173,7 +171,7 @@ async def test_mqtt_handle_door_control(mocker):
     try:
         await asyncio.sleep(0.01)
 
-        message = MQTTMessage(topic="paradox/control/doors/Door 1".encode("utf-8"))
+        message = MQTTMessage(topic=b"paradox/control/doors/Door 1")
         message.payload = b"unlock"
 
         interface._mqtt_handle_door_control(None, None, message)

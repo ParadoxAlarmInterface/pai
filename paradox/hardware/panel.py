@@ -1,19 +1,19 @@
-import binascii
-import inspect
-import logging
-import typing
 from abc import abstractmethod
+import binascii
 from collections import defaultdict, namedtuple
+import inspect
 from itertools import chain
+import logging
 from time import time
+import typing
 
 from construct import Construct, Container, EnumIntegerString
 
 from paradox.config import config as cfg, get_limits_for_type
 from paradox.lib.utils import construct_free, sanitize_key
 
-from ..lib import ps
 from . import parsers
+from ..lib import ps
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -33,8 +33,11 @@ class Panel:
         self.variable_message_length = variable_message_length
 
     def parse_message(self, message, direction="topanel") -> typing.Optional[Container]:
-        if message is None or len(message) == 0:
+        if message is None or len(message) < 2:
             return None
+
+        if message[0] >> 4 == 0xE and message[1] == 0xFE:
+            return parsers.Encrypted.parse(message)
 
         if direction == "topanel":
             if message[0] == 0x72 and message[1] == 0:
@@ -46,15 +49,19 @@ class Panel:
                 return parsers.InitiateCommunicationResponse.parse(message)
             elif message[0] == 0x00 and message[4] > 0:
                 return parsers.StartCommunicationResponse.parse(message)
-            else:
-                return None
+
+        return None
+
+    def make_framer(self):
+        """A framer to replace the connection's default one, or None to keep it."""
+        return None
 
     def get_message(self, name) -> Construct:
         clsmembers = dict(inspect.getmembers(parsers))
         if name in clsmembers:
             return clsmembers[name]
         else:
-            raise ResourceWarning("{} parser not found".format(name))
+            raise ResourceWarning(f"{name} parser not found")
 
     @staticmethod
     def get_error_message(error_code) -> str:
@@ -97,7 +104,13 @@ class Panel:
         elif error_code == 0x1C:
             message = "Invalid label number"
         else:
-            message = error_str
+            # Include the hex form so unknown codes can be looked up easily
+            # in Paradox docs / issues (e.g. "29 (0x1D)" reported by panels
+            # in response to PGM and panic commands on some EVO firmwares).
+            if isinstance(error_code, int):
+                message = f"{error_str} (0x{error_code:02X})"
+            else:
+                message = error_str
 
         return message
 
@@ -139,7 +152,7 @@ class Panel:
 
                 start_time = time()
                 parser = def_parsers[elem_type]
-                if isinstance(parser, typing.Callable):
+                if callable(parser):
                     parser = parser(self.settings)
 
                 assert isinstance(parser, Construct)
@@ -170,7 +183,9 @@ class Panel:
                         if definition != "disabled":
                             enabled_indexes.add(index)
 
-                cfg.LIMITS[elem_type] = get_limits_for_type(elem_type, list(enabled_indexes))
+                cfg.LIMITS[elem_type] = get_limits_for_type(
+                    elem_type, list(enabled_indexes)
+                )
                 cfg.LIMITS[elem_type] = list(
                     set(cfg.LIMITS[elem_type]).intersection(enabled_indexes)
                 )
@@ -327,7 +342,7 @@ class Panel:
         mvars = message.fields.value
 
         if mvars.address not in parser_map:
-            logger.error(
+            logger.warning(
                 "Parser for memory address ({}) is not implemented. "
                 "Skipping.".format(mvars.address)
             )
@@ -339,10 +354,8 @@ class Panel:
             if cfg.LOGGING_DUMP_MESSAGES:
                 logger.debug(f"Status parsed({mvars.address}): {res}")
             return res
-        except:
-            logger.exception(
-                "Unable to parse RAM Status Block ({})".format(mvars.address)
-            )
+        except Exception:
+            logger.exception(f"Unable to parse RAM Status Block ({mvars.address})")
             return
 
     @abstractmethod
@@ -356,6 +369,10 @@ class Panel:
     @abstractmethod
     def control_outputs(self, outputs, command) -> bool:
         raise NotImplementedError("override control_outputs in a subclass")
+
+    @abstractmethod
+    def control_module_pgm_outputs(self, module_address, pgm_index, command) -> bool:
+        raise NotImplementedError("override control_module_pgm_outputs in a subclass")
 
     @abstractmethod
     def control_doors(self, doors, command) -> bool:

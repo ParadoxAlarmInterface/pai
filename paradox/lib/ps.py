@@ -1,8 +1,9 @@
 import asyncio
-import logging
+import inspect
 from asyncio import Future
 from collections import defaultdict
-from typing import Awaitable, Callable, List, Mapping, Union
+import logging
+from typing import Callable, List, Mapping, Union
 
 from paradox.event import Change, Event, Notification
 from paradox.lib.utils import call_soon_in_main_loop
@@ -10,12 +11,11 @@ from paradox.lib.utils import call_soon_in_main_loop
 PREFIX = "pai_"
 
 logger = logging.getLogger("PAI").getChild(__name__)
-loop = asyncio.get_event_loop()
 
 
 class Listener:
     def __init__(self, callback: Union[Callable, Future], **curriedArgs):
-        if not isinstance(callback, (Callable, Future)):
+        if not (callable(callback) or isinstance(callback, Future)):
             raise AssertionError("Wrong callback")
         self.callback = callback
         self.curriedArgs = curriedArgs
@@ -24,9 +24,9 @@ class Listener:
         kwargs2 = self.curriedArgs.copy()
         kwargs2.update(**kwargs)
 
-        if isinstance(self.callback, Callable):
+        if callable(self.callback):
             result = self.callback(**kwargs2)
-            if isinstance(result, Awaitable):
+            if inspect.isawaitable(result):
                 await result
         elif isinstance(self.callback, Future):
             if not self.callback.done():
@@ -56,7 +56,7 @@ class PubSub:
 
     async def sendMessage(self, topicName: str, **msgData):
         return await asyncio.gather(
-            *(l.call(**msgData) for l in self.listeners[topicName])
+            *(listener.call(**msgData) for listener in self.listeners[topicName])
         )
 
 

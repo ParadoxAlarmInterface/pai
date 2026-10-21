@@ -1,12 +1,8 @@
-# -*- coding: utf-8 -*-
-
 import logging
 
 from paradox.config import config as cfg
-from paradox.event import (ChangeEvent, Event, EventLevel, LiveEvent,
-                           Notification)
+from paradox.event import ChangeEvent, Event, EventLevel, LiveEvent, Notification
 from paradox.interfaces.text.core import AbstractTextInterface
-from paradox.lib import ps
 from paradox.lib.event_filter import EventTagFilter
 
 logger = logging.getLogger("PAI").getChild(__name__)
@@ -26,7 +22,9 @@ class DummyInterface(AbstractTextInterface):
         if self.notification_filter(notification):
             logger.log(
                 notification.level,
-                "sender: %s, message: %s" % (notification.sender, notification.message),
+                "sender: {}, message: {}".format(
+                    notification.sender, notification.message
+                ),
             )
 
     def handle_panel_event(self, event: Event):
@@ -40,5 +38,5 @@ class DummyInterface(AbstractTextInterface):
             else:
                 logger.log(
                     level.value,
-                    "%s message: %s" % (event.__class__.__name__, event.message),
+                    f"{event.__class__.__name__} message: {event.message}",
                 )

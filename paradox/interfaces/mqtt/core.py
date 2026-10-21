@@ -10,7 +10,7 @@ import typing
 
 from paho.mqtt.client import (
     LOGGING_LEVEL,
-    MQTT_ERR_SUCCESS,
+    CallbackAPIVersion,
     Client,
     MQTTv5,
     MQTTv31,
@@ -58,7 +58,8 @@ class MQTTConnection:
 
     def __init__(self):
         self.client = Client(
-            "pai" + os.urandom(8).hex(),
+            CallbackAPIVersion.VERSION2,
+            client_id="pai" + os.urandom(8).hex(),
             protocol=protocol_map.get(str(cfg.MQTT_PROTOCOL), MQTTv311),
             transport=cfg.MQTT_TRANSPORT,
         )
@@ -72,6 +73,7 @@ class MQTTConnection:
         self.client.on_connect = self._on_connect_cb
         self.client.on_disconnect = self._on_disconnect_cb
         self.state = ConnectionState.NEW
+        self._last_connect_args = None  # replayed to late registrars
         # self.client.enable_logger(logger)
 
         # self.client.on_subscribe = lambda client, userdata, mid, granted_qos: logger.debug("Subscribed: %s" %(mid))
@@ -177,6 +179,20 @@ class MQTTConnection:
 
         self.start()
 
+        # If MQTT was already connected before this registrar started (common
+        # when interfaces register slightly after the MQTT loop connects),
+        # fire on_connect immediately so control subscriptions and futures are
+        # set up correctly.
+        if self.connected and self._last_connect_args is not None:
+            try:
+                if hasattr(cls, "on_connect") and callable(cls.on_connect):
+                    cls.on_connect(*self._last_connect_args)
+            except Exception:
+                logger.exception(
+                    'Failed to call on_connect on late registrar "%s"',
+                    cls.__class__.__name__,
+                )
+
     def unregister(self, cls):
         self.registrars.remove(cls)
 
@@ -197,30 +213,49 @@ class MQTTConnection:
             retain=True,
         )
 
-    def _on_connect_cb(self, client, userdata, flags, result, properties=None):
+    def _on_connect_cb(
+        self, client, userdata, connect_flags, reason_code, properties=None
+    ):
         # called on Thread-6
-        if result == MQTT_ERR_SUCCESS:
+        if not reason_code.is_failure:
             logger.info("MQTT Broker Connected")
             self.state = ConnectionState.CONNECTED
+            self._last_connect_args = (
+                client,
+                userdata,
+                connect_flags,
+                reason_code,
+                properties,
+            )
             self._report_pai_status(self._last_pai_status)
-            self._call_registars("on_connect", client, userdata, flags, result)
+            self._call_registars(
+                "on_connect", client, userdata, connect_flags, reason_code, properties
+            )
         else:
             logger.error(
-                f"Failed to connect to MQTT: {connack_string(result)} ({result})"
+                f"Failed to connect to MQTT: {connack_string(reason_code)} ({reason_code})"
             )
 
-    def _on_disconnect_cb(self, client, userdata, *args, **kwargs):
+    def _on_disconnect_cb(
+        self, client, userdata, disconnect_flags, reason_code, properties=None
+    ):
         # called on Thread-6
-        # Handle different MQTT version signatures by using the first argument as rc
-        rc = args[0] if args else MQTT_ERR_SUCCESS
-
-        if rc == MQTT_ERR_SUCCESS:
+        if not reason_code.is_failure:
             logger.info("MQTT Broker Disconnected")
         else:
-            logger.error(f"MQTT Broker unexpectedly disconnected. Code: {rc}")
+            logger.warning(
+                f"MQTT Broker unexpectedly disconnected. Code: {reason_code}"
+            )
 
         self.state = ConnectionState.NEW
-        self._call_registars("on_disconnect", self.client, userdata, rc)
+        self._call_registars(
+            "on_disconnect",
+            self.client,
+            userdata,
+            disconnect_flags,
+            reason_code,
+            properties,
+        )
 
     def disconnect(self, reasoncode=None, properties=None):
         self.state = ConnectionState.DISCONNECTING
@@ -305,10 +340,12 @@ class AbstractMQTTInterface(ThreadQueueInterface):
         self.mqtt.message_callback_add(sub, callback)
         self.mqtt.subscribe(sub)
 
-    def on_disconnect(self, client, userdata, rc):
+    def on_disconnect(
+        self, client, userdata, disconnect_flags, reason_code, properties=None
+    ):
         """Called from MQTT connection"""
         pass
 
-    def on_connect(self, client, userdata, flags, result):
+    def on_connect(self, client, userdata, connect_flags, reason_code, properties=None):
         """Called from MQTT connection"""
         pass

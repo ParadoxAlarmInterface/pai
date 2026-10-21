@@ -1,8 +1,8 @@
-import logging
 from abc import abstractmethod
+import logging
 
 from paradox.connections.handler import ConnectionHandler
-from paradox.connections.protocols import ConnectionProtocol
+from paradox.connections.protocol_base import ConnectionProtocol
 from paradox.lib.async_message_manager import AsyncMessageManager
 
 logger = logging.getLogger("PAI").getChild(__name__)
@@ -57,3 +57,8 @@ class Connection(AsyncMessageManager, ConnectionHandler):
     def variable_message_length(self, mode):
         if self._protocol is not None:
             self._protocol.variable_message_length(mode)
+
+    def set_framer(self, framer):
+        """Swap the protocol's framer at runtime (after panel detection)."""
+        if self._protocol is not None:
+            self._protocol.set_framer(framer)

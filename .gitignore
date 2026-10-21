@@ -109,3 +109,6 @@ ENV/
 
 # OS X
 .DS_Store
+
+# Local design specs / scratch (not for the repo)
+/docs/superpowers/

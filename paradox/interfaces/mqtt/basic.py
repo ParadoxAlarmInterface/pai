@@ -12,7 +12,12 @@ from paho.mqtt.client import Client, MQTTMessage
 from paradox.config import config as cfg
 from paradox.event import Change, Event, EventLevel, Notification
 from paradox.lib import ps
-from paradox.lib.utils import JSONByteEncoder, call_soon_in_main_loop, sanitize_key
+from paradox.lib.utils import (
+    JSONByteEncoder,
+    call_soon_in_main_loop,
+    sanitize_key,
+    set_future_result_threadsafe,
+)
 
 from .core import AbstractMQTTInterface
 from .helpers import ELEMENT_TOPIC_MAP, get_control_topic_prefix
@@ -26,7 +31,7 @@ def mqtt_handle_decorator(
     func: typing.Callable[
         ["BasicMQTTInterface", ParsedMessage],
         typing.Coroutine[None, "BasicMQTTInterface", ParsedMessage],
-    ]
+    ],
 ):
     async def try_func(*args, **kwargs):
         try:
@@ -65,7 +70,7 @@ def mqtt_handle_decorator(
             topics = topic.split("/")
 
             if len(topics) < 3:
-                logger.error(f"Invalid topic in mqtt message: {message.topic}")
+                logger.warning(f"Invalid topic in mqtt message: {message.topic}")
                 return
 
             content = message.payload.decode("utf-8").strip()
@@ -117,7 +122,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         ps.subscribe(self._handle_panel_change, "changes")
         ps.subscribe(self._handle_panel_event, "events")
 
-    def on_connect(self, mqttc, userdata, flags, result):
+    def on_connect(self, mqttc, userdata, connect_flags, reason_code, properties=None):
         self.subscribe_callback(
             get_control_topic_prefix("output") + "/#",
             self._mqtt_handle_output_control,
@@ -145,8 +150,17 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             self._mqtt_handle_send_panic,
         )
 
-        if not self.connected_future.done():
-            self.connected_future.set_result(True)
+        if cfg.CONNECTION_TYPE == "PRT3":
+            self.subscribe_callback(
+                "{}/{}/{}/+".format(
+                    cfg.MQTT_BASE_TOPIC,
+                    cfg.MQTT_CONTROL_TOPIC,
+                    cfg.MQTT_UTILITY_KEY_TOPIC,
+                ),
+                self._mqtt_handle_utility_key,
+            )
+
+        set_future_result_threadsafe(self.connected_future, True)
 
     @mqtt_handle_decorator
     async def _mqtt_handle_notifications(self, prep: ParsedMessage):
@@ -359,6 +373,31 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             message = "Door command accepted: {}={} user: {}".format(
                 element, command, user
             )
+
+        self._publish_command_status(message)
+
+    @mqtt_handle_decorator
+    async def _mqtt_handle_utility_key(self, prep: ParsedMessage):
+        """PRT3-only: trigger a utility key (UK{nnn}). Payload is ignored."""
+        topics = prep.topics
+        if len(topics) < 4:
+            logger.warning("PRT3 utility key: malformed topic %r", topics)
+            return
+        try:
+            key = int(topics[3])
+        except (ValueError, TypeError):
+            logger.warning("PRT3 utility key: invalid key number %r", topics[3])
+            return
+
+        message = f"Utility key command: key={key}"
+        logger.info(message)
+        self._publish_command_status(message)
+
+        if not await self.alarm.control_utility_key(key):
+            message = f"Utility key command refused: key={key}"
+            logger.warning(message)
+        else:
+            message = f"Utility key command accepted: key={key}"
 
         self._publish_command_status(message)
 

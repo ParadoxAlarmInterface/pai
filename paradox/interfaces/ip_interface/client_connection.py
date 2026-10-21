@@ -1,16 +1,19 @@
 import asyncio
 import binascii
+from enum import Enum, auto
 import logging
 import os
-from enum import Enum, auto
-from typing import Awaitable, Union
 
 from construct import Container
 
 from paradox.config import config as cfg
-from paradox.connections.ip.parsers import (IPMessageCommand, IPMessageRequest,
-                                            IPMessageResponse, IPMessageType,
-                                            IPPayloadConnectResponse)
+from paradox.connections.ip.parsers import (
+    IPMessageCommand,
+    IPMessageRequest,
+    IPMessageResponse,
+    IPMessageType,
+    IPPayloadConnectResponse,
+)
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -64,7 +67,7 @@ class ClientConnection:
             except asyncio.TimeoutError:
                 logger.info("Timeout. Client may have disconnected")
                 break
-            except:
+            except Exception:
                 logger.info("Client disconnected")
                 break
 
@@ -74,12 +77,12 @@ class ClientConnection:
                 continue
 
             if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("APP -> IPI (raw) {}".format(binascii.hexlify(data)))
+                logger.debug(f"APP -> IPI (raw) {binascii.hexlify(data)}")
 
             in_message = IPMessageRequest.parse(data, password=self.connection_key)
 
             if cfg.LOGGING_DUMP_MESSAGES:
-                logger.debug("APP -> IPI (message) {}".format(in_message))
+                logger.debug(f"APP -> IPI (message) {in_message}")
 
             if cfg.LOGGING_DUMP_PACKETS:
                 logger.debug(
@@ -182,12 +185,10 @@ class ClientConnection:
 
     async def _send_to_client(self, container):
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug(
-                "IPI -> APP (payload) {}".format(binascii.hexlify(container.payload))
-            )
+            logger.debug(f"IPI -> APP (payload) {binascii.hexlify(container.payload)}")
         raw = IPMessageResponse.build(container, password=self.connection_key)
         if cfg.LOGGING_DUMP_PACKETS:
-            logger.debug("IPI -> APP (raw) {}".format(binascii.hexlify(raw)))
+            logger.debug(f"IPI -> APP (raw) {binascii.hexlify(raw)}")
         self.client_writer.write(raw)
         await self.client_writer.drain()
 

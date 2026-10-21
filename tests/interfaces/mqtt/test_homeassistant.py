@@ -9,12 +9,13 @@ from paradox.data.model import DetectedPanel
 from paradox.hardware.common import ProductIdEnum
 from paradox.interfaces.mqtt.homeassistant import HomeAssistantMQTTInterface
 from paradox.lib.ps import sendMessage
+
 from tests.hardware.evo.test_panel import create_evo192_panel
 
 
 @pytest.mark.asyncio
 async def test_hass(mocker):
-    mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_event_loop())
+    mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_running_loop())
     mocker.patch.multiple(cfg, MQTT_HOMEASSISTANT_AUTODISCOVERY_ENABLE=True)
     con = mocker.patch("paradox.interfaces.mqtt.core.MQTTConnection")
     con.get_instance.return_value.availability_topic = "paradox/interface/availability"
@@ -44,15 +45,20 @@ async def test_hass(mocker):
         sendMessage(
             "labels_loaded",
             data=dict(
-                partition={1: dict(id=1, label="Partition 1", key="Partition_1")}
+                partition={1: dict(id=1, label="Partition 1", key="Partition_1")},
+                zone={1: dict(id=1, label="Front Door", key="Front_Door")},
             ),
         )
 
-        sendMessage("status_update", status=dict(partition={1: dict(arm=False)}))
+        sendMessage(
+            "status_update",
+            status=dict(partition={1: dict(arm=False)}, zone={1: dict(open=False)}),
+        )
 
         await asyncio.sleep(0.1)
 
-        assert_any_call_with_json(interface.mqtt.publish,
+        assert_any_call_with_json(
+            interface.mqtt.publish,
             "homeassistant/sensor/aabbccdd/pai_status/config",
             {
                 "name": "PAI Status",
@@ -61,16 +67,17 @@ async def test_hass(mocker):
                 "device": {
                     "manufacturer": "Paradox",
                     "model": "EVO192",
-                    "identifiers": ["Paradox_EVO192_aabbccdd"],
+                    "identifiers": ["Paradox_aabbccdd"],
                     "name": "EVO192",
                     "sw_version": "6.80 build 5",
                 },
             },
             0,
-            True
+            True,
         )
 
-        assert_any_call_with_json(interface.mqtt.publish,
+        assert_any_call_with_json(
+            interface.mqtt.publish,
             "homeassistant/alarm_control_panel/aabbccdd/partition_partition_1/config",
             {
                 "name": "Partition Partition 1",
@@ -81,7 +88,7 @@ async def test_hass(mocker):
                 "device": {
                     "manufacturer": "Paradox",
                     "model": "EVO192",
-                    "identifiers": ["Paradox_EVO192_aabbccdd"],
+                    "identifiers": ["Paradox_aabbccdd"],
                     "name": "EVO192",
                     "sw_version": "6.80 build 5",
                 },
@@ -89,12 +96,37 @@ async def test_hass(mocker):
                 "payload_arm_home": "arm_stay",
                 "payload_arm_away": "arm",
                 "payload_arm_night": "arm_sleep",
-                'code_arm_required': False,
-                'code_disarm_required': False,
-                'code_trigger_required': False
+                "code_arm_required": False,
+                "code_disarm_required": False,
+                "code_trigger_required": False,
             },
             0,
-            True
+            True,
+        )
+
+        # A zone is published as its own device, nested under the panel via
+        # via_device, rather than being attached to the panel device directly.
+        assert_any_call_with_json(
+            interface.mqtt.publish,
+            "homeassistant/binary_sensor/aabbccdd/zone_front_door_open/config",
+            {
+                "name": "Zone Front Door Open",
+                "unique_id": "paradox_aabbccdd_zone_front_door_open",
+                "state_topic": "paradox/states/zones/Front_Door/open",
+                "availability_topic": "paradox/interface/availability",
+                "device": {
+                    "manufacturer": "Paradox",
+                    "model": "Zone",
+                    "identifiers": ["Paradox_aabbccdd_zone_Front_Door"],
+                    "name": "Front Door",
+                    "via_device": "Paradox_aabbccdd",
+                },
+                "device_class": "motion",
+                "payload_on": "True",
+                "payload_off": "False",
+            },
+            0,
+            True,
         )
     finally:
         interface.stop()
@@ -103,7 +135,7 @@ async def test_hass(mocker):
 
 
 def _decode_json(value):
-    if isinstance(value, str) and value.startswith(('{', '[')):
+    if isinstance(value, str) and value.startswith(("{", "[")):
         try:
             return json.loads(value)
         except JSONDecodeError:
@@ -114,12 +146,14 @@ def _decode_json(value):
 
 def _decode_arguments(*args, **kwargs):
     new_arg = tuple(_decode_json(arg) for arg in args)
-    new_kwarg = dict((key, _decode_json(val)) for key, val in kwargs)
+    new_kwarg = {key: _decode_json(val) for key, val in kwargs}
     return new_arg, new_kwarg
 
 
 def assert_any_call_with_json(self, *args, **kwargs):
-    actual = [_decode_arguments(*args, **kwargs) for args, kwargs in self.call_args_list]
+    actual = [
+        _decode_arguments(*args, **kwargs) for args, kwargs in self.call_args_list
+    ]
     expected = (args, kwargs)
 
     assert expected in actual

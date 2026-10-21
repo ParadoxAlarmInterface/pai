@@ -1,6 +1,27 @@
-FROM python:3.11-alpine
+FROM python:3.15-slim-trixie AS base
 
-ENV WORK_DIR=workdir \
+FROM base AS builder
+
+# CFFI may need a C compiler on ARMv7; cryptography must use a prebuilt wheel.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends gcc libc6-dev libffi-dev \
+  && rm -rf /var/lib/apt/lists
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
+
+WORKDIR /build
+COPY requirements.txt .
+RUN pip install --no-cache-dir --only-binary=cryptography -r requirements.txt
+
+COPY pyproject.toml README.md LICENSE MANIFEST.in ./
+COPY paradox ./paradox
+RUN pip install --no-cache-dir --no-deps . \
+  && pip check
+
+FROM base AS runtime
+
+ENV PATH="/opt/venv/bin:${PATH}" \
   HASSIO_DATA_PATH=/data \
   PAI_CONFIG_PATH=/etc/pai \
   PAI_LOGGING_PATH=/var/log/pai \
@@ -10,21 +31,12 @@ ENV WORK_DIR=workdir \
 ENV PAI_CONFIG_FILE=${PAI_CONFIG_PATH}/pai.conf \
   PAI_LOGGING_FILE=${PAI_LOGGING_PATH}/paradox.log
 
-RUN apk add --no-cache tzdata \
-  && mkdir -p ${PAI_CONFIG_PATH} ${WORK_DIR} ${PAI_LOGGING_PATH}
+RUN mkdir -p ${PAI_CONFIG_PATH} ${PAI_LOGGING_PATH}
 
-COPY . ${WORK_DIR}
+COPY --from=builder /opt/venv /opt/venv
 COPY config/pai.conf.example ${PAI_CONFIG_FILE}
 
-# OR
-#RUN wget -c https://github.com/jpbarraca/pai/archive/master.tar.gz -O - | tar -xz --strip 1
-#RUN wget -c https://raw.githubusercontent.com/jpbarraca/pai/master/config/pai.conf.example -O ${PAI_CONFIG_PATH}/pai.conf
-
-# install python library
-RUN cd ${WORK_DIR} \
-  && pip3 install --no-cache-dir -r requirements.txt \
-  && pip3 install --no-cache-dir . \
-  && rm -fr ${WORK_DIR}
+RUN python -c "import _cffi_backend; from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes; Cipher(algorithms.AES(bytes(16)), modes.ECB()).encryptor().finalize()"
 
 # conf file from host
 VOLUME ${PAI_CONFIG_PATH}

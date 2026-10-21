@@ -1,10 +1,11 @@
-import logging
 from collections import defaultdict
+import logging
 from typing import Dict
 
 from construct import Container
 
 from paradox.data.element_type_container import ElementTypeContainer
+from paradox.lib.utils import deep_merge
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -15,13 +16,16 @@ def _iterate_properties(data):
             yield (key, value)
     elif isinstance(data, dict):
         for key, value in data.items():
-            if type(key) == str and key.startswith("_"):  # ignore private properties
+            if isinstance(key, str) and key.startswith(
+                "_"
+            ):  # ignore private properties
                 continue
             yield (key, value)
 
 
 def convert_raw_status(raw_status: Container) -> Dict[str, ElementTypeContainer]:
-    out = defaultdict(ElementTypeContainer)
+    # Merge into plain dicts first: ElementTypeContainer's key lookups are slow
+    merged = defaultdict(dict)
 
     for root_key, value in _iterate_properties(raw_status):
         element_type = root_key.split("_")[0]
@@ -30,8 +34,14 @@ def convert_raw_status(raw_status: Container) -> Dict[str, ElementTypeContainer]
         if not prop_name:
             prop_name = element_type
 
-        out[element_type].deep_merge(_parse_raw_status(prop_name, value))
+        # _parse_raw_status returns fresh dicts, no need to deepcopy them
+        deep_merge(
+            merged[element_type], _parse_raw_status(prop_name, value), copy=False
+        )
 
+    out = defaultdict(ElementTypeContainer)
+    for element_type, elements in merged.items():
+        out[element_type] = ElementTypeContainer(elements)
     return out
 
 

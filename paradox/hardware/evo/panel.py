@@ -128,6 +128,8 @@ class Panel_EVOBase(PanelBase):
                     return parsers.PerformPartitionAction.parse(message)
                 elif message[0] == 0xD0:
                     return parsers.PerformZoneAction.parse(message)
+                elif message[0] == 0xA4:
+                    return parsers.PerformModulePGMAction.parse(message)
             else:
                 if message[0] >> 4 == 0x7:
                     return parsers.ErrorMessage.parse(message)
@@ -139,6 +141,8 @@ class Panel_EVOBase(PanelBase):
                     return parsers.PerformActionResponse.parse(message)
                 elif message[0] >> 4 == 0xD:
                     return parsers.PerformZoneActionResponse.parse(message)
+                elif message[0] >> 4 == 0xA:
+                    return parsers.PerformModulePGMActionResponse.parse(message)
                 # elif message[0] == 0x50 and message[2] == 0x80:
                 #     return PanelStatus.parse(message)
                 # elif message[0] == 0x50 and message[2] < 0x80:
@@ -159,7 +163,9 @@ class Panel_EVOBase(PanelBase):
                         return parsers.RequestedEvent.parse(message)
 
         except ChecksumError as e:
-            logger.error("ChecksumError %s, message: %s", e, binascii.hexlify(message))
+            logger.warning(
+                "ChecksumError %s, message: %s", e, binascii.hexlify(message)
+            )
         except Exception:
             logger.exception("Exception parsing message: %s", binascii.hexlify(message))
 
@@ -242,7 +248,7 @@ class Panel_EVOBase(PanelBase):
                 parsers.PerformPartitionAction, args, reply_expected=0x4
             )
         except MappingError:
-            logger.error('Partition command: "%s" is not supported' % command)
+            logger.warning('Partition command: "%s" is not supported' % command)
             return False
 
         if reply:
@@ -269,7 +275,7 @@ class Panel_EVOBase(PanelBase):
                 parsers.PerformZoneAction, args, reply_expected=0xD
             )
         except MappingError:
-            logger.error('Zone command: "%s" is not supported' % command)
+            logger.warning('Zone command: "%s" is not supported' % command)
             return False
 
         if reply:
@@ -293,13 +299,44 @@ class Panel_EVOBase(PanelBase):
                 parsers.PerformPGMAction, args, reply_expected=0x4
             )
         except MappingError:
-            logger.error('PGM command: "%s" is not supported' % command)
+            logger.warning('PGM command: "%s" is not supported' % command)
             return False
 
         if reply:
             logger.info('PGM command: "%s" succeeded' % command)
         else:
             logger.info('PGM command: "%s" failed' % command)
+        return reply is not None
+
+    async def control_module_pgm_outputs(
+        self, module_address: int, pgm_index: int, command: str
+    ) -> bool:
+        """
+        Control PGM module outputs
+        :param int module_address: bus address of the PGM module
+        :param int pgm_index: 1-4 index of the PGM output
+        :param str command: textual command
+        :return: True if accepted
+        """
+        assert 1 <= pgm_index <= parsers.MODULE_PGM_PACKET_SLOTS, (
+            "pgm_index must be between 1 and %d" % parsers.MODULE_PGM_PACKET_SLOTS
+        )
+        pgm_commands = ["release"] * parsers.MODULE_PGM_PACKET_SLOTS
+        pgm_commands[pgm_index - 1] = command
+
+        args = {"module_address": module_address, "pgm_commands": pgm_commands}
+        try:
+            reply = await self.core.send_wait(
+                parsers.PerformModulePGMAction, args, reply_expected=0xA
+            )
+        except MappingError:
+            logger.warning('Module PGM command: "%s" is not supported' % command)
+            return False
+
+        if reply:
+            logger.info('Module PGM command: "%s" succeeded' % command)
+        else:
+            logger.info('Module PGM command: "%s" failed' % command)
         return reply is not None
 
     async def control_doors(self, doors, command) -> bool:
@@ -317,7 +354,7 @@ class Panel_EVOBase(PanelBase):
                 parsers.PerformDoorAction, args, reply_expected=0x4
             )
         except MappingError:
-            logger.error('Door command: "%s" is not supported' % command)
+            logger.warning('Door command: "%s" is not supported' % command)
             return False
 
         if reply:

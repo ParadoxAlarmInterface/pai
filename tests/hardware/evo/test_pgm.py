@@ -1,9 +1,7 @@
-from binascii import hexlify, unhexlify
+from binascii import unhexlify
 
 from paradox.hardware.evo.adapters import PGMFlags
-from paradox.hardware.evo.parsers import (BroadcastRequest, BroadcastResponse,
-                                          PerformPGMAction,
-                                          PGMBroadcastCommand)
+from paradox.hardware.evo.parsers import PerformActionResponse, PerformPGMAction
 
 
 def test_pgm3_activate_and_monitor():
@@ -70,6 +68,19 @@ def test_pgm4_deactivate_and_monitor():
     assert a == expected_out
 
 
+def test_pgm5_activate_and_monitor():
+    # PGM 5 maps to bit 4 of the bitmap (byte offset 6 = 0x10).
+    # Onboard PGM 5 is the only dry relay on the EVO192 mainboard; see
+    # https://github.com/ParadoxAlarmInterface/pai/issues/580
+    expected_out = unhexlify("4013060000001000000000000000030000006c")
+
+    pgms = [5]
+
+    a = PerformPGMAction.build({"fields": {"value": {"pgms": pgms, "command": "on"}}})
+
+    assert a == expected_out
+
+
 def test_pgm_flags_1():
     parser = PGMFlags(1)
     assert parser.sizeof() == 4
@@ -119,4 +130,10 @@ def test_pgm_flags_3():
 
 
 def test_pgm_confirmation():
-    payload = unhexlify("42070000000049")
+    raw = unhexlify("42070000000049")
+    parsed = PerformActionResponse.parse(raw)
+
+    assert parsed.fields.value.po.command == 0x4
+    assert parsed.fields.value.po.status.Winload_connected is True
+    assert parsed.fields.value.po.status.alarm_reporting_pending is False
+    assert parsed.fields.value.packet_length == 7

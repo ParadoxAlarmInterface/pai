@@ -57,7 +57,7 @@ class SystemStatusSensor(AbstractEntity):
 
     def serialize(self):
         config = super().serialize()
-        if self.key == 'power':
-            config['unit_of_measurement'] = 'V'
+        if self.key == "power":
+            config["unit_of_measurement"] = "V"
 
         return config

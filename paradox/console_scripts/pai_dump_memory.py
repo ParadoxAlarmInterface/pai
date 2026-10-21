@@ -19,13 +19,6 @@ from paradox.lib import help
 from paradox.lib.encodings import register_encodings
 from paradox.paradox import Paradox
 
-if sys.version_info < (3, 6,):
-    print(
-        "You are using Python %s.%s, but PAI requires at least Python 3.6"
-        % (sys.version_info[0], sys.version_info[1])
-    )
-    sys.exit(-1)
-
 logger = logging.getLogger("PAI").getChild(__name__)
 
 
@@ -78,8 +71,7 @@ def main():
     # Registering additional encodings
     register_encodings()
 
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(dump_memory(args.file, args.type))
+    asyncio.run(dump_memory(args.file, args.type))
 
 
 if __name__ == "__main__":

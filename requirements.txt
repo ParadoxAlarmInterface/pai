@@ -1,7 +1,8 @@
 argparse>=1.4.0
-construct~=2.9.43
+construct~=2.10.70
+cryptography>=43.0.0
 flake8
-paho_mqtt>=1.5.0,<2
+paho_mqtt>=2.1.0,<3
 
 pre-commit
 pushbullet.py>=0.11.0
@@ -12,7 +13,6 @@ pytz>=2023.3.post1
 # Signal support
 # pygobject>=3.20.0
 # pydbus>=0.6.0
-# gi>=1.2
 pyyaml>=5.2.0
 requests>=2.20.0
 require-python-3

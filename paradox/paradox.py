@@ -1,9 +1,10 @@
 import asyncio
+import collections.abc
 from binascii import hexlify
 from datetime import datetime
 import logging
 import time
-from typing import Callable, Iterable, Optional
+from typing import Optional
 
 from construct import Container
 import pytz
@@ -22,10 +23,11 @@ from paradox.exceptions import (
     async_loop_unhandled_exception_handler,
 )
 from paradox.hardware import Panel, create_panel
+from paradox.hardware.evo.parsers import MODULE_PGM_PACKET_SLOTS
 from paradox.lib import ps
 from paradox.lib.async_message_manager import ErrorMessageHandler, EventMessageHandler
 from paradox.lib.handlers import PersistentHandler
-from paradox.lib.utils import deep_merge
+from paradox.lib.utils import deep_merge, describe_connection, sanitize_key
 from paradox.parsers.status import convert_raw_status
 
 logger = logging.getLogger("PAI").getChild(__name__)
@@ -36,21 +38,77 @@ class Paradox:
         self.panel: Panel = None
         self._connection: Connection = None
         self.retries = retries
-        self.work_loop = asyncio.get_event_loop()
-        self.work_loop.set_exception_handler(async_loop_unhandled_exception_handler)
+        try:
+            self.work_loop = asyncio.get_running_loop()
+            self.work_loop.set_exception_handler(async_loop_unhandled_exception_handler)
+        except RuntimeError:
+            self.work_loop = None
 
         self.storage = Storage()
 
         self._run_state = RunState.STOP
-        self.request_lock = asyncio.Lock()
-        self.busy = asyncio.Lock()
-        self.loop_wait_event = asyncio.Event()
+        # Created lazily: see the loop-affinity note on _loop_primitive().
+        self._request_lock: Optional[asyncio.Lock] = None
+        self._busy: Optional[asyncio.Lock] = None
+        self._loop_wait_event: Optional[asyncio.Event] = None
+
+        # partition_id -> monotonic deadline; while time.monotonic() < deadline,
+        # arm-related properties from RA polling are ignored for that partition.
+        # Set after a disarm command is accepted so a stale RA reply doesn't
+        # briefly re-assert arm=True before the panel internally settles.
+        self._partition_arm_freeze_until: dict = {}
 
         ps.subscribe(self._on_labels_load, "labels_loaded")
-        ps.subscribe(self._on_definitions_load, "definitons_loaded")
+        ps.subscribe(self._on_definitions_load, "definitions_loaded")
         ps.subscribe(self._on_status_update, "status_update")
         ps.subscribe(self._on_event, "events")
         ps.subscribe(self._on_property_change, "changes")
+
+    def _loop_primitive(self, attr: str, factory):
+        """Return a loop-bound asyncio primitive, creating it on first use.
+
+        Paradox is constructed before the event loop exists (``main`` does
+        ``asyncio.run(_run(Paradox()))``, ``pai_dump_memory`` does the same).
+        On Python 3.9 ``asyncio.Lock``/``Event`` capture
+        ``get_event_loop()`` in ``__init__``, so building them there binds them
+        to a loop that is never run. The mismatch stays invisible until the
+        first *contended* acquire -- the fast path never touches the bound loop
+        -- and then raises "got Future attached to a different loop", which
+        aborts every polling cycle and forces a reconnect.
+
+        Creating them on first access instead binds them to the loop that
+        actually runs them. On 3.10+ the primitives no longer bind at
+        construction and this is simply a lazy initialisation.
+        """
+        primitive = getattr(self, attr)
+        if primitive is None:
+            primitive = factory()
+            setattr(self, attr, primitive)
+        return primitive
+
+    @property
+    def request_lock(self) -> asyncio.Lock:
+        return self._loop_primitive("_request_lock", asyncio.Lock)
+
+    @request_lock.setter
+    def request_lock(self, value: asyncio.Lock):
+        self._request_lock = value
+
+    @property
+    def busy(self) -> asyncio.Lock:
+        return self._loop_primitive("_busy", asyncio.Lock)
+
+    @busy.setter
+    def busy(self, value: asyncio.Lock):
+        self._busy = value
+
+    @property
+    def loop_wait_event(self) -> asyncio.Event:
+        return self._loop_primitive("_loop_wait_event", asyncio.Event)
+
+    @loop_wait_event.setter
+    def loop_wait_event(self, value: asyncio.Event):
+        self._loop_wait_event = value
 
     @property
     def run_state(self) -> RunState:
@@ -68,7 +126,7 @@ class Paradox:
             if cfg.CONNECTION_TYPE == "Serial":
                 logger.info("Using Serial Connection")
 
-                from paradox.connections.serial_connection import SerialCommunication
+                from paradox.connections.serial.connection import SerialCommunication
 
                 self._connection = SerialCommunication(
                     port=cfg.SERIAL_PORT,
@@ -100,6 +158,15 @@ class Paradox:
                         port=cfg.IP_CONNECTION_PORT,
                         password=cfg.IP_CONNECTION_PASSWORD,
                     )
+            elif cfg.CONNECTION_TYPE == "PRT3":
+                logger.info("Using PRT3 Serial Connection")
+
+                from paradox.connections.prt3.connection import PRT3SerialConnection
+
+                self._connection = PRT3SerialConnection(
+                    port=cfg.PRT3_SERIAL_PORT,
+                    baud=cfg.PRT3_SERIAL_BAUD,
+                )
             else:
                 raise AssertionError(f"Invalid connection type: {cfg.CONNECTION_TYPE}")
 
@@ -115,7 +182,52 @@ class Paradox:
         self.connection.register_handler(EventMessageHandler(self.handle_event_message))
         self.connection.register_handler(ErrorMessageHandler(self.handle_error_message))
 
+        if cfg.CONNECTION_TYPE == "PRT3":
+            self.connection.register_handler(
+                PersistentHandler(self.handle_prt3_event_message)
+            )
+
+    async def _prt3_connect(self) -> bool:
+        """PRT3-specific panel connection sequence (called from connect())."""
+        from paradox.hardware.prt3.panel import PRT3Panel
+
+        self.panel = PRT3Panel(self)
+        try:
+            if not await self.panel.initialize_communication(None):
+                raise ConnectionError(
+                    "PRT3 serial link unresponsive — no messages received"
+                )
+            # PRT3 has no binary identification exchange; synthesise a
+            # DetectedPanel from the configured port so HA discovery has a
+            # stable device identity to anchor entity unique_ids to.
+            port_id = sanitize_key(cfg.PRT3_SERIAL_PORT) or "prt3"
+            ps.sendMessage(
+                "panel_detected",
+                panel=DetectedPanel(
+                    product_id=None,
+                    model="PRT3",
+                    firmware_version="N/A",
+                    serial_number=f"prt3_{port_id}",
+                ),
+            )
+            self.run_state = RunState.CONNECTED
+            logger.info(
+                "Connected via %s to PRT3 (no panel identification)",
+                describe_connection(),
+            )
+            return True
+        except asyncio.TimeoutError:
+            logger.error("Timeout waiting for PRT3 COMM&ok")
+        except ConnectionError as e:
+            logger.error("PRT3 connect failed: %s", e)
+        self.run_state = RunState.ERROR
+        return False
+
     async def connect(self) -> bool:
+        if self.work_loop is None:
+            self.work_loop = asyncio.get_running_loop()
+            self.work_loop.set_exception_handler(async_loop_unhandled_exception_handler)
+
         if self._connection:
             await self.disconnect()  # socket needs to be also closed
         self.panel = None
@@ -124,10 +236,14 @@ class Paradox:
         logger.info("Connecting to interface")
         if not await self.connection.connect():
             self.run_state = RunState.ERROR
-            logger.error("Failed to connect to interface")
+            logger.error("Failed to connect to interface %s", describe_connection())
             return False
 
         logger.info("Connecting to Panel")
+
+        # PRT3 uses ASCII framing — binary panel detection does not apply.
+        if cfg.CONNECTION_TYPE == "PRT3":
+            return await self._prt3_connect()
 
         if not self.panel:
             self.panel = create_panel(self)
@@ -153,25 +269,43 @@ class Paradox:
                     initiate_reply.fields.value.serial_number
                 ).decode()
 
-                logger.info(f"Panel Identified {model} version {firmware_version}")
+                logger.info(
+                    "Connected via %s to %s version %s",
+                    describe_connection(),
+                    model,
+                    firmware_version,
+                )
             else:
                 raise ConnectionError("Panel did not replied to InitiateCommunication")
 
-            logger.info("Initiating panel connection")
-            reply = await self.send_wait(
-                self.panel.get_message("StartCommunication"),
-                args=dict(source_id=0x2),
-                reply_expected=0x0,
-            )
+            if initiate_reply.fields.value.get("product_id") == "MAGELLAN_MG6250":
+                # The MG6250 ignores StartCommunication (0x5F); the 0x72 reply
+                # already identifies it.
+                reply = initiate_reply
+            else:
+                logger.info("Initiating panel connection")
+                reply = await self.send_wait(
+                    self.panel.get_message("StartCommunication"),
+                    args=dict(source_id=0x2),
+                    reply_expected=0x0,
+                )
 
-            if reply is None:
-                raise ConnectionError("Panel did not replied to StartCommunication")
+                if reply is None:
+                    raise ConnectionError("Panel did not replied to StartCommunication")
 
             if reply.fields.value.product_id is not None:
                 self.panel = create_panel(
                     self, reply
                 )  # Now we know what panel it is. Let's
                 # recreate panel object.
+                # The framing mode is panel family specific and only known
+                # now: SP/Magellan use fixed length messages, EVO variable.
+                self.connection.variable_message_length(
+                    self.panel.variable_message_length
+                )
+                framer = self.panel.make_framer()
+                if framer is not None:
+                    self.connection.set_framer(framer)
                 ps.sendMessage(
                     "panel_detected",
                     panel=DetectedPanel(
@@ -209,6 +343,7 @@ class Paradox:
 
             logger.info("Loading data from panel memory")
             await self.panel.load_memory()
+            self._init_module_pgms()
 
             logger.info("Running")
             self.run_state = RunState.RUN
@@ -240,6 +375,8 @@ class Paradox:
             )
 
     async def sync_time(self):
+        if cfg.CONNECTION_TYPE == "PRT3":
+            return  # PRT3 has no SetTimeDate command
         now = datetime.now().astimezone()
         if cfg.SYNC_TIME_TIMEZONE:
             try:
@@ -283,8 +420,11 @@ class Paradox:
                 try:
                     await self.busy.acquire()
                     result = await asyncio.gather(*self.panel.get_status_requests())
-                    merged = deep_merge(*result, extend_lists=True, initializer={})
-                    self.work_loop.call_soon(self._process_status, merged)
+                    # replies are freshly parsed and discarded, safe to merge without copying
+                    merged = deep_merge(
+                        *result, extend_lists=True, initializer={}, copy=False
+                    )
+                    asyncio.get_running_loop().call_soon(self._process_status, merged)
                     replies_missing = max(0, replies_missing - 1)
                 except ConnectionError:
                     raise
@@ -386,11 +526,11 @@ class Paradox:
                         self.connection.write(message)
 
                     if reply_expected is not None:
-                        if isinstance(reply_expected, Callable):
+                        if callable(reply_expected):
                             reply = await self.connection.wait_for_message(
                                 reply_expected, timeout=timeout * 2
                             )
-                        elif isinstance(reply_expected, Iterable):
+                        elif isinstance(reply_expected, collections.abc.Iterable):
                             reply = await self.connection.wait_for_message(
                                 lambda m: any(
                                     m.fields.value.po.command == expected
@@ -432,7 +572,7 @@ class Paradox:
 
         # Not Found
         if len(zones_selected) == 0:
-            logger.error("No zones selected")
+            logger.warning("No zones selected")
             return False
 
         # Apply state changes
@@ -440,9 +580,9 @@ class Paradox:
         try:
             accepted = await self.panel.control_zones(zones_selected, command)
         except NotImplementedError:
-            logger.error("control_zone is not implemented for this alarm type")
+            logger.warning("control_zone is not implemented for this alarm type")
         except asyncio.CancelledError:
-            logger.error("control_zone canceled")
+            logger.debug("control_zone canceled")
         except asyncio.TimeoutError:
             logger.error("control_zone timeout")
 
@@ -453,13 +593,13 @@ class Paradox:
 
     async def control_partition(self, partition: str, command: str) -> bool:
         command = command.lower()
-        logger.debug(f"Control Partition: {partition} - {command}")
+        logger.info("Control Partition: %s - %s", partition, command)
 
         partitions_selected = self.storage.get_container("partition").select(partition)
 
         # Not Found
         if len(partitions_selected) == 0:
-            logger.error("No partitions selected")
+            logger.warning("No partitions selected")
             return False
 
         # Apply state changes
@@ -467,44 +607,143 @@ class Paradox:
         try:
             accepted = await self.panel.control_partitions(partitions_selected, command)
         except NotImplementedError:
-            logger.error("control_partition is not implemented for this alarm type")
+            logger.warning("control_partition is not implemented for this alarm type")
         except asyncio.CancelledError:
-            logger.error("control_partition canceled")
+            logger.debug("control_partition canceled")
         except asyncio.TimeoutError:
             logger.error("control_partition timeout")
+
+        # Reflect command outcome immediately so HA state matches reality
+        # without waiting for RA polling (which lags 4–7 s on a busy panel)
+        # or for G-events that the panel may not emit for ASCII-initiated
+        # disarms during exit delay.  The panel's &OK echo is authoritative.
+        # The 3 s freeze prevents a stale RA reply (panel hasn't internally
+        # settled yet) from briefly re-asserting arm=True after the disarm.
+        if accepted and cfg.CONNECTION_TYPE == "PRT3" and command == "disarm":
+            change = {
+                "arm": False,
+                "arm_stay": False,
+                "arm_away": False,
+                "arm_force": False,
+                "exit_delay": False,
+                "entry_delay": False,
+            }
+            freeze_deadline = time.monotonic() + 3.0
+            for pid in partitions_selected:
+                if self.storage.get_container_object("partition", pid):
+                    self.storage.update_container_object("partition", pid, change)
+                    self._partition_arm_freeze_until[pid] = freeze_deadline
+            self._update_partition_states()
 
         # Refresh status
         self.request_status_refresh()  # Trigger status update
 
         return accepted
+
+    async def control_utility_key(self, key: int) -> bool:
+        """
+        Send a PRT3 utility key command (UK{nnn}).
+
+        Only supported when CONNECTION_TYPE = 'PRT3'.  Utility keys trigger
+        actions programmed in the panel (1-251); consult panel programming for
+        the mapping.
+
+        :param key: Utility key number, 1-251.
+        :returns:   True if the panel accepted the command, False otherwise.
+        """
+        if cfg.CONNECTION_TYPE != "PRT3":
+            logger.warning(
+                "control_utility_key is only supported with CONNECTION_TYPE = 'PRT3'"
+            )
+            return False
+        try:
+            return await self.panel.send_utility_key(key)
+        except NotImplementedError:
+            logger.warning("send_utility_key not implemented for this panel type")
+            return False
+        except (ValueError, TypeError) as e:
+            logger.warning("control_utility_key: invalid key %r — %s", key, e)
+            return False
+        except asyncio.CancelledError:
+            logger.debug("control_utility_key canceled")
+            raise
+
+    def _init_module_pgms(self):
+        for addr, pgm_count in cfg.MODULE_PGM_ADDRESSES.items():
+            if not isinstance(addr, int) or not (1 <= addr <= 254):
+                logger.warning(
+                    "MODULE_PGM_ADDRESSES: invalid module address %r (expected int 1-254), skipping",
+                    addr,
+                )
+                continue
+            if not isinstance(pgm_count, int) or not (
+                1 <= pgm_count <= MODULE_PGM_PACKET_SLOTS
+            ):
+                logger.warning(
+                    "MODULE_PGM_ADDRESSES: invalid pgm_count %r for address %d (expected int 1-%d), skipping",
+                    pgm_count,
+                    addr,
+                    MODULE_PGM_PACKET_SLOTS,
+                )
+                continue
+            for pgm_index in range(1, pgm_count + 1):
+                key = f"module{addr}_pgm{pgm_index}"
+                self.storage.get_container("module_pgm")[key] = {
+                    "id": pgm_index,
+                    "key": key,
+                    "label": f"Module {addr} PGM {pgm_index}",
+                    "module_address": addr,
+                    "pgm_index": pgm_index,
+                }
+                self.storage.update_container_object("module_pgm", key, {"on": False})
 
     async def control_output(self, output, command) -> bool:
         command = command.lower()
         logger.debug(f"Control Output: {output} - {command}")
 
         outputs_selected = self.storage.get_container("pgm").select(output)
+        if outputs_selected:
+            accepted = False
+            try:
+                accepted = await self.panel.control_outputs(outputs_selected, command)
+            except NotImplementedError:
+                logger.warning("control_output is not implemented for this alarm type")
+            except asyncio.CancelledError:
+                logger.debug("control_output canceled")
+                raise
+            except asyncio.TimeoutError:
+                logger.error("control_output timeout")
+            self.request_status_refresh()
+            return accepted
 
-        # Not Found
-        if len(outputs_selected) == 0:
-            logger.error("No outputs selected")
-            return False
+        module_pgm_selected = self.storage.get_container("module_pgm").select(output)
+        if module_pgm_selected:
+            accepted = False
+            module_pgm_container = self.storage.get_container("module_pgm")
+            for key in module_pgm_selected:
+                out = module_pgm_container[key]
+                try:
+                    accepted = await self.panel.control_module_pgm_outputs(
+                        out["module_address"], out["pgm_index"], command
+                    )
+                except NotImplementedError:
+                    logger.warning(
+                        "control_module_pgm_outputs is not implemented for this alarm type"
+                    )
+                except asyncio.CancelledError:
+                    logger.debug("control_module_pgm_output canceled")
+                    raise
+                except asyncio.TimeoutError:
+                    logger.error("control_output timeout")
+                if accepted:
+                    is_on = command in ("on", "on_override")
+                    self.storage.update_container_object(
+                        "module_pgm", out["key"], {"on": is_on}
+                    )
+            return accepted
 
-        # Apply state changes
-        accepted = False
-        try:
-            accepted = await self.panel.control_outputs(outputs_selected, command)
-        except NotImplementedError:
-            logger.error("control_output is not implemented for this alarm type")
-        except asyncio.CancelledError:
-            logger.error("control_output canceled")
-        except asyncio.TimeoutError:
-            logger.error("control_output timeout")
-        # Apply state changes
-
-        # Refresh status
-        self.request_status_refresh()  # Trigger status update
-
-        return accepted
+        logger.warning("No outputs selected")
+        return False
 
     async def send_panic(self, partition_id, panic_type, user_id) -> bool:
         logger.debug(
@@ -518,15 +757,16 @@ class Paradox:
 
         if partition is None or user is None:
             logger.error("Send panic: user or partition is not found")
+            return False
 
         try:
             return await self.panel.send_panic(
                 [partition["id"]], panic_type, user["id"]
             )
         except NotImplementedError:
-            logger.error("send_panic is not implemented for this alarm type")
+            logger.warning("send_panic is not implemented for this alarm type")
         except asyncio.CancelledError:
-            logger.error("send_panic canceled")
+            logger.debug("send_panic canceled")
         except asyncio.TimeoutError:
             logger.error("send_panic timeout")
 
@@ -540,7 +780,7 @@ class Paradox:
 
         # Not Found
         if len(doors_selected) == 0:
-            logger.error("No doors selected")
+            logger.warning("No doors selected")
             return False
 
         # Apply state changes
@@ -548,9 +788,9 @@ class Paradox:
         try:
             accepted = await self.panel.control_doors(doors_selected, command)
         except NotImplementedError:
-            logger.error("control_door is not implemented for this alarm type")
+            logger.warning("control_door is not implemented for this alarm type")
         except asyncio.CancelledError:
-            logger.error("control_door canceled")
+            logger.debug("control_door canceled")
         except asyncio.TimeoutError:
             logger.error("control_door timeout")
         # Apply state changes
@@ -630,7 +870,7 @@ class Paradox:
         error_enum = message.fields.value.message
 
         if error_enum == "panel_not_connected":
-            asyncio.get_event_loop().create_task(self.disconnect())
+            asyncio.create_task(self.disconnect())
         else:
             message = self.panel.get_error_message(error_enum)
             logger.error(f"Got ERROR Message: {message}")
@@ -638,6 +878,45 @@ class Paradox:
                 raise AuthenticationFailed()
             elif "code lockout" in message:
                 raise CodeLockout()
+
+    def handle_prt3_event_message(self, message):
+        """Dispatch an async PRT3 system event into PAI's event pipeline."""
+        from paradox.hardware.prt3.event import PRT3Event
+        from paradox.hardware.prt3.parser import PRT3SystemEvent
+
+        if not isinstance(message, PRT3SystemEvent):
+            return
+        logger.info(
+            "PRT3 system event: G%03dN%03dA%03d",
+            message.group,
+            message.number,
+            message.area,
+        )
+        try:
+            evt = PRT3Event.from_prt3(message, label_provider=self.get_label)
+        except (KeyError, AttributeError, ValueError) as exc:
+            logger.warning("handle_prt3_event_message: failed to parse event: %s", exc)
+            return
+        try:
+            self._apply_prt3_event_change(evt)
+            ps.sendEvent(evt)
+            if evt.type == "partition":
+                self._update_partition_states()
+        except (KeyError, AttributeError) as exc:
+            logger.warning("handle_prt3_event_message: storage dispatch error: %s", exc)
+        except Exception:
+            logger.exception("handle_prt3_event_message")
+
+    def _apply_prt3_event_change(self, evt):
+        """Apply a PRT3Event's change dict to the relevant storage object(s)."""
+        if not evt.change:
+            return
+        if evt.type == "partition" and evt.id in (0, 255):
+            # Global event: broadcast to every known partition (area=0/255 per spec).
+            for pid in self.storage.get_container("partition").keys():
+                self.storage.update_container_object("partition", pid, evt.change)
+        else:
+            self.storage.update_container_object(evt.type, evt.id, evt.change)
 
     async def disconnect(self):
         logger.info("Disconnecting from the Alarm Panel")
@@ -665,6 +944,8 @@ class Paradox:
 
     def _clean_session(self):
         logger.info("Clean Session")
+        if cfg.CONNECTION_TYPE == "PRT3":
+            return  # PRT3 has no binary CloseConnection frame
         if self.connection.connected:
             if not self.panel:
                 logger.info("No panel, creating generic one")
@@ -694,6 +975,7 @@ class Paradox:
         if "troubles" in status:
             self._process_trouble_statuses(status["troubles"])
 
+        now = time.monotonic()
         for element_type, element_items in status.items():
             if element_type in ["troubles"]:  # troubles was already parsed
                 continue
@@ -705,6 +987,9 @@ class Paradox:
                         list,
                     ),
                 ):
+                    element_item_status = self._filter_arm_freeze(
+                        element_type, element_item_key, element_item_status, now
+                    )
                     self.storage.update_container_object(
                         element_type, element_item_key, element_item_status
                     )
@@ -719,7 +1004,19 @@ class Paradox:
         self._update_partition_states()
 
         if cfg.SYNC_TIME:
-            self.work_loop.create_task(self.sync_time())
+            asyncio.create_task(self.sync_time())
+
+    _ARM_FREEZE_KEYS = frozenset({"arm", "arm_stay", "arm_away", "arm_force"})
+
+    def _filter_arm_freeze(self, element_type, element_key, status, now):
+        """Drop arm-related keys from a partition status dict within the post-disarm freeze window."""
+        if (
+            element_type == "partition"
+            and isinstance(status, dict)
+            and now < self._partition_arm_freeze_until.get(element_key, 0)
+        ):
+            return {k: v for k, v in status.items() if k not in self._ARM_FREEZE_KEYS}
+        return status
 
     def _process_trouble_statuses(self, trouble_statuses):
         global_trouble = False
@@ -761,6 +1058,13 @@ class Paradox:
         current_state is fully HomeAssistant compatible. Check HASS manual before making any changes.
         """
         for _, properties in self.storage.get_container("partition").items():
+            # Definitions are loaded for every partition slot the panel has,
+            # labels only for the ones actually in use, so unlabelled slots sit
+            # in the container without a "key". They cannot be addressed or
+            # published, and update_container_object() requires one.
+            if not isinstance(properties, dict) or "key" not in properties:
+                continue
+
             change = {}
             if any(
                 [

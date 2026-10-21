@@ -1,9 +1,13 @@
 import binascii
 import logging
 
-from paradox.connections.ip.parsers import (IPMessageCommand, IPMessageRequest,
-                                            IPPayloadConnectResponse)
+from paradox.connections.ip.parsers import (
+    IPMessageCommand,
+    IPMessageRequest,
+    IPPayloadConnectResponse,
+)
 from paradox.exceptions import ConnectToIpModuleFailed, PAICriticalException
+from paradox.lib.utils import mask_secret
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -93,9 +97,7 @@ class IPModuleConnectCommand:
         )
         await self.connection.send_raw_ip_message(msg)
         in_message = await self.connection.wait_for_ip_message()
-        logger.debug(
-            "Keep alive response: {}".format(binascii.hexlify(in_message.payload))
-        )
+        logger.debug(f"Keep alive response: {binascii.hexlify(in_message.payload)}")
 
     async def _authenticate_to_ip_module(self):
         logger.info("Authenticating with IP Module")
@@ -131,7 +133,7 @@ class IPModuleConnectCommand:
                 response.hardware_version,
                 response.ip_firmware_major,
                 response.ip_firmware_minor,
-                binascii.hexlify(response.ip_module_serial).decode("utf-8"),
+                mask_secret(response.ip_module_serial),
             )
         )
 

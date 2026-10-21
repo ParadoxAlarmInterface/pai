@@ -51,6 +51,7 @@ ProductIdEnum = Enum(
     MAGELLAN_MG5050=65,
     MAGELLAN_MG5075=66,
     MAGELLAN_MG5050_PLUS=67,
+    MAGELLAN_MG6250=100,
 )
 
 FamilyIdEnum = Enum(

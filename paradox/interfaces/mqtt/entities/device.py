@@ -11,7 +11,10 @@ class Device:
 
     @property
     def model(self):
-        return self.panel.model
+        model = self.panel.model
+        model = model.split("\x00", 1)[0]
+        model = "".join(ch for ch in model if 32 <= ord(ch) < 127)
+        return model.strip()
 
     @property
     def firmware_version(self):
@@ -21,7 +24,7 @@ class Device:
         return dict(
             manufacturer="Paradox",
             model=self.model,
-            identifiers=[f"Paradox_{self.model}_{self.serial_number}"],
+            identifiers=[f"Paradox_{self.serial_number}"],
             name=self.model,
             sw_version=self.firmware_version,
         )

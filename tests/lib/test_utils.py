@@ -1,8 +1,21 @@
+import asyncio
 import json
+import threading
 
 from construct import Container, ListContainer
+import pytest
 
-from paradox.lib.utils import construct_free, deep_merge, sanitize_key, SerializableToJSONEncoder
+from paradox.lib.utils import (
+    SerializableToJSONEncoder,
+    construct_free,
+    deep_merge,
+    describe_connection,
+    format_duration,
+    mask_email,
+    mask_secret,
+    sanitize_key,
+    set_future_result_threadsafe,
+)
 
 
 def test_deep_merge():
@@ -44,12 +57,71 @@ def test_deep_merge_extend_lists():
     assert dict(a=[1, 2, 3]) == result
 
 
+@pytest.mark.parametrize("copy", [True, False])
+def test_deep_merge_copy(copy):
+    cs = [
+        Container(a=Container(x=1), l=[1]),
+        Container(a=Container(y=2), b=Container(z=3), l=[2]),
+    ]
+
+    result = deep_merge(*cs, extend_lists=True, initializer={}, copy=copy)
+    assert dict(a=dict(x=1, y=2), b=dict(z=3), l=[1, 2]) == result
+    assert (result["a"] is cs[0]["a"]) is not copy
+    assert (result["b"] is cs[1]["b"]) is not copy
+
+
 def test_sanitize_key():
     assert sanitize_key("Előtér") == "Eloter"
 
     assert sanitize_key("Living room") == "Living_room"
 
     assert sanitize_key(1) == "1"
+
+
+@pytest.mark.asyncio
+async def test_set_future_result_threadsafe_from_worker_thread():
+    loop = asyncio.get_running_loop()
+    future = loop.create_future()
+    previous_debug = loop.get_debug()
+    loop.set_debug(True)
+    errors = []
+
+    def complete():
+        try:
+            set_future_result_threadsafe(future, "ready")
+            set_future_result_threadsafe(future, "duplicate")
+        except Exception as error:
+            errors.append(error)
+
+    try:
+        thread = threading.Thread(target=complete)
+        thread.start()
+        thread.join()
+
+        assert errors == []
+        assert await asyncio.wait_for(future, timeout=1) == "ready"
+    finally:
+        loop.set_debug(previous_debug)
+
+
+@pytest.mark.asyncio
+async def test_set_future_result_threadsafe_on_owner_loop_is_immediate():
+    future = asyncio.get_running_loop().create_future()
+
+    set_future_result_threadsafe(future, "ready")
+
+    assert future.done()
+    assert future.result() == "ready"
+
+
+@pytest.mark.asyncio
+async def test_set_future_result_threadsafe_reports_closed_loop():
+    loop = asyncio.new_event_loop()
+    future = loop.create_future()
+    loop.close()
+
+    with pytest.raises(RuntimeError, match="Event loop is closed"):
+        set_future_result_threadsafe(future, "ready")
 
 
 def test_construct_free():
@@ -74,3 +146,123 @@ def test_json_serialization():
     data = {1: TestEntity()}
 
     assert '{"1": {"a": "b"}}' == json.dumps(data, cls=SerializableToJSONEncoder)
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        ("7106152c", "****152c"),
+        (b"\x71\x06\x15\x2c", "****152c"),
+        ("abc", "****"),
+        ("", "****"),
+        (None, "****"),
+        (1234567, "****4567"),
+    ],
+)
+def test_mask_secret(value, expected):
+    assert mask_secret(value) == expected
+
+
+def test_mask_secret_keep_zero():
+    assert mask_secret("7106152c", keep=0) == "****"
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        ("john@example.com", "j****@e****.com"),
+        ("a@b.io", "a****@b****.io"),
+        ("notanemail", "****"),
+        ("", "****"),
+        (None, "****"),
+    ],
+)
+def test_mask_email(value, expected):
+    assert mask_email(value) == expected
+
+
+@pytest.mark.parametrize(
+    "seconds,expected",
+    [
+        (None, "unknown"),
+        (0, "0s"),
+        (0.4, "0s"),
+        (45, "45s"),
+        (60, "1m"),
+        (723, "12m 3s"),
+        (3600, "1h"),
+        (8040, "2h 14m"),
+        (315000, "3d 15h"),
+    ],
+)
+def test_format_duration(seconds, expected):
+    assert format_duration(seconds) == expected
+
+
+class _Cfg:
+    def __init__(self, **kwargs):
+        self.CONNECTION_TYPE = "IP"
+        self.SERIAL_PORT = "/dev/ttyS1"
+        self.SERIAL_BAUD = 9600
+        self.PRT3_SERIAL_PORT = "/dev/ttyUSB0"
+        self.PRT3_SERIAL_BAUD = 57600
+        self.IP_CONNECTION_HOST = "192.168.1.10"
+        self.IP_CONNECTION_PORT = 10000
+        self.IP_CONNECTION_BARE = False
+        self.IP_CONNECTION_SITEID = None
+        self.IP_CONNECTION_EMAIL = None
+        self.IP_CONNECTION_PANEL_SERIAL = None
+        self.__dict__.update(kwargs)
+
+
+def test_describe_connection_serial():
+    assert (
+        describe_connection(_Cfg(CONNECTION_TYPE="Serial")) == "Serial(/dev/ttyS1@9600)"
+    )
+
+
+def test_describe_connection_prt3():
+    assert (
+        describe_connection(_Cfg(CONNECTION_TYPE="PRT3")) == "PRT3(/dev/ttyUSB0@57600)"
+    )
+
+
+def test_describe_connection_local_ip():
+    assert describe_connection(_Cfg()) == "IP(192.168.1.10:10000)"
+
+
+def test_describe_connection_bare_ip():
+    assert (
+        describe_connection(_Cfg(IP_CONNECTION_BARE=True))
+        == "IP-bare(192.168.1.10:10000)"
+    )
+
+
+def test_describe_connection_site_masks_secrets():
+    cfg = _Cfg(
+        IP_CONNECTION_SITEID="MySite",
+        IP_CONNECTION_EMAIL="john@example.com",
+        IP_CONNECTION_PANEL_SERIAL="7106152c",
+    )
+    result = describe_connection(cfg)
+
+    assert result == "SITE(MySite / j****@e****.com, serial ****152c)"
+    assert "john@example.com" not in result
+    assert "7106152c" not in result
+
+
+def test_describe_connection_unknown():
+    assert (
+        describe_connection(_Cfg(CONNECTION_TYPE="Carrier Pigeon"))
+        == "Unknown(Carrier Pigeon)"
+    )
+
+
+def test_describe_connection_site_requires_both_id_and_email():
+    """Only one of SITEID/EMAIL set must fall back to the local IP rendering."""
+    assert describe_connection(_Cfg(IP_CONNECTION_SITEID="MySite")) == (
+        "IP(192.168.1.10:10000)"
+    )
+    assert describe_connection(_Cfg(IP_CONNECTION_EMAIL="john@example.com")) == (
+        "IP(192.168.1.10:10000)"
+    )

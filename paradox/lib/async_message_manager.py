@@ -11,17 +11,30 @@ logger = logging.getLogger("PAI").getChild(__name__)
 
 
 class EventMessageHandler(PersistentHandler):
-    def can_handle(self, data: Container) -> bool:
-        assert isinstance(data, Container)
+    def can_handle(self, data) -> bool:
+        # Guard: PRT3 messages are dataclasses, not binary Containers.
+        if not isinstance(data, Container):
+            return False
         values = data.fields.value
-        return values.po.command == 0xE and (not hasattr(values, "requested_event_nr"))
+        # MG6250 frames have no `po` sub-struct; skip rather than raise.
+        return (
+            hasattr(values, "po")
+            and values.po.command == 0xE
+            and hasattr(values, "event")
+        )
 
 
 class ErrorMessageHandler(PersistentHandler):
-    def can_handle(self, data: Container) -> bool:
-        assert isinstance(data, Container)
-        return data.fields.value.po.command == 0x7 and hasattr(
-            data.fields.value, "message"
+    def can_handle(self, data) -> bool:
+        # Guard: PRT3 messages are dataclasses, not binary Containers.
+        if not isinstance(data, Container):
+            return False
+        values = data.fields.value
+        # MG6250 frames have no `po` sub-struct; skip rather than raise.
+        return (
+            hasattr(values, "po")
+            and values.po.command == 0x7
+            and hasattr(values, "message")
         )
 
 
@@ -54,11 +67,11 @@ class AsyncMessageManager:
         self.handler_registry.remove_by_name(name)
 
     def schedule_message_handling(self, message: Container):
-        return asyncio.get_event_loop().create_task(
+        return asyncio.get_running_loop().create_task(
             self.handler_registry.handle(message)
         )
 
     def schedule_raw_message_handling(self, message: Container):
-        return asyncio.get_event_loop().create_task(
+        return asyncio.get_running_loop().create_task(
             self.raw_handler_registry.handle(message)
         )

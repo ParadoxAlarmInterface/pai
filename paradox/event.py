@@ -1,10 +1,9 @@
-import datetime
-import logging
-import time
-import typing
 from collections import namedtuple
 from copy import copy
+import datetime
 from enum import Enum
+import logging
+import time
 
 from construct import Container
 
@@ -70,7 +69,7 @@ class Event:
         if label_provider is not None:
             self.label_provider = label_provider
         else:
-            self.label_provider = lambda type, value: "[{}:{}]".format(type, value)
+            self.label_provider = lambda type, value: f"[{type}:{value}]"
 
     def __repr__(self):
         lvars = {}
@@ -81,11 +80,7 @@ class Event:
             str(self.__class__)
             + "\n"
             + "\n".join(
-                (
-                    "{} = {}".format(item, lvars[item])
-                    for item in lvars
-                    if not item.startswith("_")
-                )
+                f"{item} = {lvars[item]}" for item in lvars if not item.startswith("_")
             )
         )
 
@@ -112,7 +107,7 @@ class Event:
                 continue
 
             value = getattr(self, key)
-            if not key.startswith("_") and not isinstance(value, typing.Callable):
+            if not key.startswith("_") and not callable(value):
                 if isinstance(value, datetime.datetime):
                     dp[key] = str(value.isoformat())
                 elif isinstance(value, Enum):
@@ -122,25 +117,25 @@ class Event:
         return dp
 
     def call_hook(self, *args, **kwargs):
-        if isinstance(self.hook_fn, typing.Callable):
+        if callable(self.hook_fn):
             kwargs["event"] = self
             try:
                 self.hook_fn(*args, **kwargs)
-            except:
+            except Exception:
                 logger.exception("Failed to call event hook")
 
 
 class LiveEvent(Event):
     def __init__(self, event: Container, event_map: dict, label_provider=None):
         raw = event.fields.value
-        if raw.po.command != 0xE:
+        if raw.po.command != 0xE and hasattr(raw, "event"):
             raise AssertionError("Message is not an event")
 
         # parse event map
         if raw.event.major not in event_map:
-            raise AssertionError("Unknown event major: {}".format(raw))
+            raise AssertionError(f"Unknown event major: {raw}")
 
-        super(LiveEvent, self).__init__(label_provider=label_provider)
+        super().__init__(label_provider=label_provider)
 
         self.major = raw.event.major  # Event major code
         self.minor = raw.event.minor  # Event minor code
@@ -177,11 +172,9 @@ class LiveEvent(Event):
                 for k in sub:
                     if k == "message":
                         event_map[k] = (
-                            "{}: {}".format(event_map[k], sub[k])
-                            if k in event_map
-                            else sub[k]
+                            f"{event_map[k]}: {sub[k]}" if k in event_map else sub[k]
                         )
-                    elif isinstance(sub[k], typing.List):  # for tags or other lists
+                    elif isinstance(sub[k], list):  # for tags or other lists
                         event_map[k] = event_map.get(k, []) + sub[k]
                     else:
                         event_map[k] = sub[k]
@@ -190,11 +183,7 @@ class LiveEvent(Event):
         else:
             self.id = self.minor
 
-        callables = (
-            k
-            for k in event_map
-            if isinstance(event_map[k], typing.Callable) and k != "hook_fn"
-        )
+        callables = (k for k in event_map if callable(event_map[k]) and k != "hook_fn")
         for k in callables:
             event_map[k] = event_map[k](self, self.label_provider)
 
@@ -255,9 +244,7 @@ class ChangeEvent(Event):
         self.change = {self.property: self.value}
 
         property_map = copy(property_map[self.property])  # for inplace modifications
-        callables = (
-            k for k in property_map if isinstance(property_map[k], typing.Callable)
-        )
+        callables = (k for k in property_map if callable(property_map[k]))
         for k in callables:
             property_map[k] = property_map[k](self, self.label_provider)
 
