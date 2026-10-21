@@ -251,11 +251,25 @@ class Panel(PanelBase):
             return False
 
         accepted = False
+        desired_bypass = command == "bypass"
+        zone_states = self.core.storage.get_container("zone")
 
         for zone in zones:
+            state = zone_states.get(zone)
+            bypassed = state.get("bypassed") if state is not None else None
+            if not isinstance(bypassed, bool):
+                logger.warning(
+                    "Cannot control bypass for zone %s: bypass state is unknown", zone
+                )
+                continue
+            if bypassed == desired_bypass:
+                accepted = True
+                continue
+
             args = dict(action=ZONE_ACTIONS[command], argument=(zone - 1))
+            # This action toggles bypass; retrying a lost reply could undo it.
             reply = await self.core.send_wait(
-                parsers.PerformAction, args, reply_expected=0x4
+                parsers.PerformAction, args, reply_expected=0x4, retries=1
             )
 
             if reply is not None:
