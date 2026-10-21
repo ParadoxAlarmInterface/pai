@@ -4,6 +4,9 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Test
@@ -25,6 +28,7 @@ jobs:
       name: pypi
       url: https://pypi.org/p/paradox-alarm-interface
     permissions:
+      contents: read
       id-token: write
     steps:
     - uses: actions/checkout@v7
