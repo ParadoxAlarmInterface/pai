@@ -10,6 +10,9 @@ on:
       DOCKERHUB_TOKEN:
         required: true
 
+permissions:
+  contents: read
+
 jobs:
   publish:
     name: Publish to Docker Hub
