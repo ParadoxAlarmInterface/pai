@@ -62,16 +62,6 @@ Note: Paradox sells unlock code to re-enable the unencrypted serial port.
 ## How to use
 See [wiki](https://github.com/ParadoxAlarmInterface/pai/wiki/Installation)
 
-### Spectra/Magellan zone bypass
-
-The panel command toggles bypass rather than setting it explicitly. PAI uses the
-latest cached zone status to send that command only when `bypass` or `clear_bypass`
-requires a change. Commands for zones whose bypass state is unknown are refused
-with a warning. Toggles are not automatically retried, and the normal status
-refresh updates the reported state afterward. Wait for that update before
-repeating a command; concurrent commands or keypad changes can still race with
-the cached state.
-
 ### Building the Docker image
 
 Run `docker build -t pai .`. The Python 3.15 Debian slim multi-stage build requires
