@@ -151,6 +151,22 @@ RAMDataParserMap = {
     7: Struct("pgm_status" / PGMStatusAdapter(Bytes(32))),  # Not supported in firmware versions below 6.x
 }
 
+_MilliVolt = ExprAdapter(Int16ul, lambda obj, ctx: round(obj / 1000.0, 1), 0)
+
+# Plus panels report zeros in the page 0 power bytes and keep millivolt readings at the end of page 5
+RAMDataParserMapPlus = {
+    **RAMDataParserMap,
+    5: Struct(
+        "zone_exit_delay" / StatusAdapter(Bytes(4)),
+        "_not_used0" / Padding(22),
+        "system"
+        / Struct(
+            "power"
+            / Struct("vdc" / _MilliVolt, "dc" / _MilliVolt, "battery" / _MilliVolt),
+        ),
+    ),
+}
+
 LiveEvent = Struct(
     "fields"
     / RawCopy(
