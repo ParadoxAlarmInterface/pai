@@ -18,6 +18,18 @@ from paradox.lib import ps
 logger = logging.getLogger("PAI").getChild(__name__)
 
 
+def strip_command_prefix(body, prefix):
+    """Returns the command without the prefix, or None if the push is not a command"""
+    body = (body or "").strip()
+    if not prefix:
+        return body
+
+    parts = body.split(None, 1)
+    if not parts or parts[0].lower() != prefix.strip().lower():
+        return None
+    return parts[1] if len(parts) > 1 else ""
+
+
 class PushBulletWSClient(WebSocketBaseClient):
     name = "pushbullet"
 
@@ -82,12 +94,19 @@ class PushBulletWSClient(WebSocketBaseClient):
                     # logger.debug('Ignoring outgoing dismissed')
                     continue
 
+                command = strip_command_prefix(
+                    p.get("body"), cfg.PUSHBULLET_COMMAND_PREFIX
+                )
+                if command is None:
+                    logger.debug("Ignoring push without command prefix")
+                    continue
+
                 if (
                     p.get("sender_email_normalized") in cfg.PUSHBULLET_CONTACTS
                     or p.get("direction") == "self"
                 ):
                     future = asyncio.run_coroutine_threadsafe(
-                        self.interface.handle_command(p.get("body")),
+                        self.interface.handle_command(command),
                         self.interface.alarm.work_loop,
                     )
                     ret = future.result(10)

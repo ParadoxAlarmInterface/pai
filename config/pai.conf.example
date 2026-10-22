@@ -186,6 +186,7 @@ import logging
 # PUSHBULLET_ENABLE = False
 # PUSHBULLET_KEY = ''                     # Authentication key used for Pushbullet
 # PUSHBULLET_CONTACTS = []                # Pushbullet user identifiers for notifications and interaction
+# PUSHBULLET_COMMAND_PREFIX = ''          # Only pushes starting with this word are commands, e.g. 'command' for 'command partition all arm'
 # PUSHBULLET_MIN_EVENT_LEVEL = 'INFO'
 ## Event filtering by tags:
 # PUSHBULLET_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
