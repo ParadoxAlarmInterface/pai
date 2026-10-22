@@ -166,6 +166,7 @@ def test_partition_armed_by_pai():
         "Special arming [partition:1]: arming with Winload by [user:0]"
         == event_.message
     )
+    assert event_.change == {"arm": True}
     print(event_)
 
 
@@ -176,6 +177,7 @@ def test_partition_armed_by_user():
     raw = LiveEvent.parse(payload)
     event_ = event.LiveEvent(raw, event_map)
     assert "Arming [partition:8] with [user:2] code" == event_.message
+    assert event_.change == {"arm": True}
     print(event_)
 
 
