@@ -237,6 +237,7 @@ class Config:
         "PUSHBULLET_KEY": "",  # Authentication key used for Pushbullet
         "PUSHBULLET_DEVICE": "pai",  # Destination device for notifications
         "PUSHBULLET_CONTACTS": [],  # Pushbullet user identifiers for notifications and interaction
+        "PUSHBULLET_COMMAND_PREFIX": "",  # If set, only pushes starting with this word are handled as commands, e.g. "command" for "command partition all arm". Default: "" - every push is a command
         "PUSHBULLET_IGNORE_EVENTS": [],  # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
         "PUSHBULLET_ALLOW_EVENTS": [],  # Same as before but as a white list. Default is use EVENT_FILTERS
         "PUSHBULLET_EVENT_FILTERS": [  # list of tags, property changes to include or exclude. See event.py for tag list
