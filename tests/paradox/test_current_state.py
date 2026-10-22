@@ -2,9 +2,12 @@ import asyncio
 import binascii
 from unittest.mock import MagicMock
 
+from construct import Container
 import pytest
 import pytest_asyncio
 
+from paradox.event import LiveEvent as Event
+from paradox.hardware.evo.event import event_map
 from paradox.hardware.evo.parsers import LiveEvent
 from paradox.paradox import Paradox
 
@@ -72,6 +75,50 @@ async def test_current_state_arming(alarm):
         "partition",
         "Partition_1",
         {"current_state": "arming", "target_state": "armed_away"},
+    )
+
+
+@pytest.mark.asyncio
+async def test_late_to_close_refreshes_status_without_asserting_armed(alarm, mocker):
+    send_initial_status(alarm)
+    alarm._on_status_update(
+        status=dict(partition={1: dict(arm=False, exit_delay=True)})
+    )
+
+    raw = Container(
+        fields=Container(
+            value=Container(
+                po=Container(command=0xE),
+                event=Container(major=12, minor=2, minor2=0, partition=1),
+                time=None,
+                partition=1,
+                module_serial=b"\x00" * 4,
+                label_type=b"\x00",
+                label=b"\x00" * 16,
+            )
+        )
+    )
+    event = Event(raw, event_map, label_provider=alarm.get_label)
+    refresh = mocker.spy(alarm, "request_status_refresh")
+
+    assert event.change == {}
+    alarm._on_event(event)
+
+    refresh.assert_called_once_with()
+    assert alarm.storage.get_container_object("partition", 1)["arm"] is False
+    alarm.storage.update_container_object.assert_any_call(
+        "partition",
+        "Partition_1",
+        {"current_state": "arming", "target_state": "disarmed"},
+    )
+
+    alarm._on_status_update(
+        status=dict(partition={1: dict(arm=False, exit_delay=False)})
+    )
+    alarm.storage.update_container_object.assert_any_call(
+        "partition",
+        "Partition_1",
+        {"current_state": "disarmed", "target_state": "disarmed"},
     )
 
 
