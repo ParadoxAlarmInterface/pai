@@ -2,6 +2,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from paradox.connections.connection import Connection
 from paradox.hardware import Panel
 from paradox.paradox import Paradox
 
@@ -151,7 +152,7 @@ async def test_connect_pushes_panel_framing_mode_after_identification(mocker):
 
     alarm = Paradox()
 
-    connection = mocker.MagicMock()
+    connection = mocker.MagicMock(spec=Connection)
     connection.connect = AsyncMock(return_value=True)
     connection.close = AsyncMock()
     alarm._connection = connection
@@ -183,7 +184,7 @@ async def test_connect_pushes_variable_framing_for_evo(mocker):
 
     alarm = Paradox()
 
-    connection = mocker.MagicMock()
+    connection = mocker.MagicMock(spec=Connection)
     connection.connect = AsyncMock(return_value=True)
     connection.close = AsyncMock()
     alarm._connection = connection

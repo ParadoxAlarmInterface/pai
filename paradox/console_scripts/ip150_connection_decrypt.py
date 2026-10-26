@@ -14,6 +14,7 @@ from paradox.connections.ip.parsers import (
     IPMessageType,
     IPPayloadConnectResponse,
 )
+from paradox.connections.serial.e0fe import E0FECodec, is_frame
 from paradox.connections.serial.encryption import make_serial_key
 from paradox.hardware import create_panel
 from paradox.hardware.parsers import Encrypted, InitiateCommunicationResponse
@@ -264,6 +265,7 @@ class SerialFileDecryptor:
     def __init__(self, pc_password=None):
         self.panel = create_panel(None)
         self.key_bytes = make_serial_key(pc_password) if pc_password else None
+        self.e0fe = E0FECodec()
 
     def _direction_str(self, direction):
         return "topanel" if direction == "TX" else "frompanel"
@@ -288,19 +290,31 @@ class SerialFileDecryptor:
         return direction, message
 
     def _handle_encrypted_frame(self, direction, message):
-        """Handle E0 FE encrypted frames. Returns True if AES-decrypted (skip fallback)."""
+        """Handle E0 FE encrypted frames. Returns True if decrypted (skip fallback)."""
+        # An E0 FE frame carries its own length (LE16) and a 16-bit sum, which an
+        # AES or compact frame matches only by coincidence (~1 in 2**24 or
+        # less). Anything that does not also unwrap cleanly falls through.
+        if is_frame(message):
+            try:
+                plaintext = self.e0fe.unwrap(message)
+            except ValueError:
+                pass
+            else:
+                self._print_decrypted("E0 FE", direction, message, plaintext)
+                return True
+
         if self.key_bytes:
             plaintext = decrypt_serial_message(message, self.key_bytes)
             if plaintext:
-                self._print_aes_decrypted(direction, message, plaintext)
+                self._print_decrypted("AES-256", direction, message, plaintext)
                 return True
 
         self._print_encrypted_fallback(message)
         return False
 
-    def _print_aes_decrypted(self, direction, message, plaintext):
+    def _print_decrypted(self, method, direction, message, plaintext):
         print(
-            f"{Colors.ON_WHITE}  AES-256 decrypted ({len(message)}b → {len(plaintext)}b): "
+            f"{Colors.ON_WHITE}  {method} decrypted ({len(message)}b → {len(plaintext)}b): "
             f"{binascii.hexlify(plaintext).decode()}{Colors.ENDC}"
         )
         try:

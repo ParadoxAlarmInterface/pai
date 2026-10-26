@@ -278,6 +278,13 @@ class Paradox:
             else:
                 raise ConnectionError("Panel did not replied to InitiateCommunication")
 
+            await self.connection.on_initiate_communication(
+                initiate_reply,
+                lambda message, check: self.send_wait(
+                    message=message, reply_expected=check
+                ),
+            )
+
             if initiate_reply.fields.value.get("product_id") == "MAGELLAN_MG6250":
                 # The MG6250 ignores StartCommunication (0x5F); the 0x72 reply
                 # already identifies it.
@@ -286,7 +293,7 @@ class Paradox:
                 logger.info("Initiating panel connection")
                 reply = await self.send_wait(
                     self.panel.get_message("StartCommunication"),
-                    args=dict(source_id=0x2),
+                    args=dict(source_id=self.connection.start_communication_source_id),
                     reply_expected=0x0,
                 )
 
@@ -511,6 +518,9 @@ class Paradox:
 
         if message is None and message_type is not None:
             message = message_type.build(dict(fields=dict(value=args)))
+
+        if not self.connection.retransmit_requests:
+            retries = 1
 
         attempt = 1
 
@@ -924,7 +934,12 @@ class Paradox:
 
         self._clean_session()
         if self.connection.connected:
-            await self.connection.close()
+            try:
+                await self.connection.end_session()
+            except Exception:
+                logger.exception("Error while ending the panel session")
+            finally:
+                await self.connection.close()
             logger.info("Disconnected from the Alarm Panel")
 
     async def pause(self):
