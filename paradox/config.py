@@ -34,6 +34,11 @@ class Config:
         "SERIAL_PORT": "/dev/ttyS1",  # Pathname of the Serial Port
         "SERIAL_BAUD": 9600,  # Baud rate of the Serial Port. Use 38400(default setting) or 57600 for EVO
         "SERIAL_ENCRYPTED": False,  # Set True for EVO panels with full serial encryption (firmware >= 7.50)
+        "SERIAL_PROTOCOL": (
+            None,
+            [type(None), str],
+            ["plain", "aes", "e0fe"],
+        ),  # Serial link protocol: plain, aes or e0fe (E0 FE wrapping). None: follow SERIAL_ENCRYPTED
         # PRT3 Connection Details (Paradox PRT3 Printer Module — ASCII serial protocol)
         "PRT3_SERIAL_PORT": "/dev/ttyUSB0",  # Serial port for PRT3 module
         "PRT3_SERIAL_BAUD": (
@@ -403,7 +408,40 @@ class Config:
             sys.stderr.write(err + "\n")
             raise ValueError(err)
 
+        self._check_serial_protocol(entries)
+
         self.CONFIG_LOADED = True
+
+    def _check_serial_protocol(self, entries):
+        protocol = self.SERIAL_PROTOCOL
+        if protocol is None:
+            return
+
+        err = None
+        if "SERIAL_ENCRYPTED" in entries and bool(self.SERIAL_ENCRYPTED) != (
+            protocol == "aes"
+        ):
+            err = (
+                "Error parsing configuration: SERIAL_PROTOCOL = {!r} contradicts "
+                "SERIAL_ENCRYPTED = {!r}. Remove SERIAL_ENCRYPTED.".format(
+                    protocol, self.SERIAL_ENCRYPTED
+                )
+            )
+        elif protocol == "aes" and not self.PASSWORD:
+            err = (
+                "Error parsing configuration: SERIAL_PROTOCOL = 'aes' needs "
+                "PASSWORD, the PC password is the encryption key."
+            )
+        elif protocol == "e0fe" and self.IP_INTERFACE_ENABLE:
+            err = (
+                "Error parsing configuration: SERIAL_PROTOCOL = 'e0fe' does not "
+                "support IP_INTERFACE_ENABLE, its requests bypass the one "
+                "outstanding request rule of the E0 FE session."
+            )
+
+        if err is not None:
+            sys.stderr.write(err + "\n")
+            raise ValueError(err)
 
     def _update_from_environment(self, entries):
         # Updates values from env variables
@@ -497,6 +535,16 @@ def string_to_id_list(input: str):
                 pass
 
     return arr
+
+
+def get_serial_protocol() -> str:
+    """The protocol of a serial link: ``plain``, ``aes`` or ``e0fe``.
+
+    ``SERIAL_PROTOCOL`` when set, otherwise derived from ``SERIAL_ENCRYPTED``.
+    """
+    if config.SERIAL_PROTOCOL is not None:
+        return config.SERIAL_PROTOCOL
+    return "aes" if config.SERIAL_ENCRYPTED else "plain"
 
 
 def get_limits_for_type(elem_type: str, default: list = None):

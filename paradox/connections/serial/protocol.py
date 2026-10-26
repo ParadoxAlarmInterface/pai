@@ -1,7 +1,7 @@
 import binascii
 import logging
 
-from paradox.config import config as cfg
+from paradox.config import config as cfg, get_serial_protocol
 from paradox.connections.protocol_base import ConnectionProtocol
 from paradox.connections.serial.encryption import (
     EncryptedSerialTransport,
@@ -20,8 +20,9 @@ class SerialConnectionProtocol(ConnectionProtocol):
         # disagree about whether the link is encrypted. Encryption needs a
         # password to derive the key; without one there is nothing to decrypt
         # with, so stay in plain mode rather than raising on every frame.
-        self._encrypted_link = bool(cfg.SERIAL_ENCRYPTED and cfg.PASSWORD)
-        if cfg.SERIAL_ENCRYPTED and not cfg.PASSWORD:
+        aes = get_serial_protocol() == "aes"
+        self._encrypted_link = bool(aes and cfg.PASSWORD)
+        if aes and not cfg.PASSWORD:
             logger.error(
                 "SERIAL_ENCRYPTED is set but PASSWORD is empty; "
                 "serial encryption disabled. Set PASSWORD to enable it."
