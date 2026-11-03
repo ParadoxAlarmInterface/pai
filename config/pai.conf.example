@@ -69,6 +69,10 @@ import logging
 #     # 'keypad': range(1, 9)     # Keypads to monitor
 # }
 #
+# MODULE_PGM_ADDRESSES = [
+#     {'address': 4, 'pgm_count': 3},  # EVO module bus address 1-254; PGM count 1-4
+# ]
+#
 # LABEL_ENCODING = 'paradox-en'           # Encoding to use when decoding labels. paradox-* or https://docs.python.org/3/library/codecs.html#standard-encodings
 # LABEL_REFRESH_INTERVAL = 15 * 60        # Interval between refresh of labels
 # OUTPUT_PULSE_DURATION = 1               # Duration of a PGM pulse in seconds
