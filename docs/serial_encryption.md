@@ -1,8 +1,9 @@
 # EVO Serial Encryption (E0 FE frames)
 
-EVO panels with firmware ≥ 7.50.000 encrypt the RS-232 serial bus using a
-Paradox-custom AES-256-ECB algorithm.  The unencrypted serial port can be
-re-enabled with an unlock code from Paradox.
+EVO panels with firmware ≥ 7.50.000 wrap the RS-232 serial bus in `E0 FE`
+frames. Two different wrappings use that header: a keyless one (Format 1)
+and a Paradox-custom AES-256-ECB one (Format 2).  The unencrypted serial port
+can be re-enabled with an unlock code from Paradox.
 
 ---
 
@@ -11,16 +12,66 @@ re-enabled with an unlock code from Paradox.
 Both formats share the same two-byte header (`0xE0`, `0xFE`), but differ
 in everything that follows.
 
-### Format 1 — BabyWare compact (firmware < 7.50 / BabyWare software)
+### Format 1 — keyless E0 FE (used by BabyWare on direct serial)
+
+Observed on an EVO192 firmware 7.86.001 talking to BabyWare over a direct
+serial link. Earlier versions of this document called it "BabyWare compact".
 
 ```
-[E0 | status_nibble] [FE] [length] [0x00] [request_nr] [data...] [checksum] [end]
+[E0] [FE] [LEN lo] [LEN hi] [SEQ] [ENC(prefix + message)...] [SEED] [CK lo] [CK hi]
 ```
 
-- `byte[2]` is the **total frame length** (including all header/trailer bytes).
-- Data payload is short (typically 4–8 bytes); the proprietary encryption
-  algorithm is unknown.
-- PAI passes these frames to the handler unchanged.  They cannot be decrypted.
+| Field | Meaning |
+|---|---|
+| `LEN` | Total frame length, little-endian: `len(prefix + message) + 8`. |
+| `SEQ` | Sequence number of the sender. |
+| `ENC(...)` | Prefix byte plus one ordinary Paradox message, byte-wise enciphered. |
+| `SEED` | Seed the body was enciphered with. |
+| `CK` | `sum(frame[:-2]) & 0xFFFF`, little-endian. |
+
+The wrapped message keeps its own trailing 8-bit checksum, so a decoded body
+is validated twice. For short messages `LEN hi` is `0x00` and `SEQ` is the
+byte that was previously read as a request number.
+
+**Prefix.** `0x70` (`p`) for every message except the identify echo, which
+uses `0x71` (`q`). For a transmitted `q` message every message byte is XORed,
+before enciphering, with `k = msg[12] ^ msg[13] ^ msg[14] ^ msg[15]`. Messages
+the panel sends with a `q` prefix carry no such XOR.
+
+**Cipher.** There is no key; the PC password is not involved. With
+`t = SEED ^ SEQ`, two counters start at `i = t >> 3` (minus 18 if above 18)
+and `r = t & 7` (minus 6 if above 6). Byte `b` enciphers as `x = b ^ X[i]`,
+whose output bit `n` is bit `P[r][n]` of `x`; deciphering inverts the
+permutation, then XORs. After every byte `i` cycles through 0..18 and `r`
+through 0..6.
+
+```
+P[0] = 02 07 04 05 00 03 01 06
+P[1] = 06 01 02 04 00 03 05 07
+P[2] = 02 04 01 03 05 06 07 00
+P[3] = 03 02 06 01 00 04 07 05
+P[4] = 04 06 01 07 02 00 05 03
+P[5] = 06 02 05 07 01 03 00 04
+P[6] = 01 05 06 00 03 07 04 02
+
+X    = cd be 72 2f 69 66 18 7f 5c 26 bd 12 77 e3 5d 71 2c 90 af
+```
+
+**Sequence and seed.** Both start at 0 on a fresh connection. `SEQ`
+increments after each transmitted frame. The receiver deciphers with the
+`SEQ` and `SEED` the frame carries, so a sender may choose any seed; PAI sends
+the current one unchanged. Every valid received frame, including unsolicited events,
+replaces both values with the ones it carries, and the next transmission
+continues from there. Both directions therefore share one state: a lost or
+unanswered frame leaves it unknown, and the session has to be restarted
+rather than the request retransmitted.
+
+**Handshake.** InitiateCommunication and its 37-byte `72 FF` identify reply
+stay unwrapped. The client then sends that reply back as a `q` frame with byte
+35 set to `0xBA` (checksum recomputed) and the panel answers with a `q` frame
+holding the same identify data. StartCommunication (`source_id = 0`) and all
+later messages travel as `p` frames. CloseConnection `70 04 05 79` is
+acknowledged with `72 04 05 7b`.
 
 ### Format 2 — Full-AES (ESP32 firmware / EVO ≥ 7.50)
 
@@ -106,7 +157,7 @@ flag:
 
 | `SERIAL_ENCRYPTED` | `buffer[1] == 0xFE` action |
 |---|---|
-| `False` | Read `buffer[2]` as total frame length (BabyWare compact) |
+| `False` | Read `buffer[2]` as total frame length (E0 FE, passed on undecoded) |
 | `True` | Scan `frame_len = 2 + n×16 + 1` (n = 1…7); accept first valid checksum |
 
 For Format 2, the framer scans incrementally as bytes arrive — no timer is
@@ -154,7 +205,7 @@ pai-decrypt capture.serial --serial --pc-password 0000
 | Frame type | Outcome |
 |---|---|
 | Full-AES E0 FE (≥ 16 bytes AES data) | Decrypted; inner message parsed by panel parsers |
-| BabyWare compact E0 FE (< 16 bytes AES data) | Structure displayed (`request_nr`, raw data); content not decryptable |
+| Keyless E0 FE (< 16 bytes AES data) | Structure displayed (`request_nr` is SEQ, raw data); not decoded by this tool |
 | Regular Paradox frame | Parsed normally |
 
 ---
@@ -190,6 +241,5 @@ pai-decrypt capture.serial --serial --pc-password 0000
   generating the wrong key.  `make_serial_key()` handles `bytes` directly to
   avoid this.
 
-- **BabyWare compact frames are not AES.** These 12–13 byte frames use a
-  proprietary algorithm; brute-forcing the PC password across 0000–9999 yields
-  no valid decryptions.
+- **Keyless E0 FE frames are not AES.** Their cipher has no key (see Format 1), so
+  brute-forcing the PC password as an AES key yields no valid decryptions.
