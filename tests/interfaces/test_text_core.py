@@ -8,6 +8,7 @@ from paradox.interfaces.text.core import strip_command_prefix
     [
         ("partition all arm", "", "partition all arm"),
         ("  partition all arm ", "", "partition all arm"),
+        ("partition  all\tarm", "", "partition all arm"),
         (None, "", ""),
         ("command partition all arm", "command", "partition all arm"),
         ("Command  partition all arm", "command", "partition all arm"),
