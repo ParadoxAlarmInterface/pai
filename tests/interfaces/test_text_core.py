@@ -1,6 +1,6 @@
 import pytest
 
-from paradox.interfaces.text.pushbullet import strip_command_prefix
+from paradox.interfaces.text.core import strip_command_prefix
 
 
 @pytest.mark.parametrize(
@@ -18,6 +18,11 @@ from paradox.interfaces.text.pushbullet import strip_command_prefix
         ("Alarm triggered in zone 3", "command", None),
         (None, "command", None),
         ("", "command", None),
+        ("partition all arm", "   ", "partition all arm"),
+        ("command partition all arm", " Command ", "partition all arm"),
+        ("pai  CMD partition all arm", "pai cmd", "partition all arm"),
+        ("pai partition all arm", "pai cmd", None),
+        ("pai", "pai cmd", None),
     ],
 )
 def test_strip_command_prefix(body, prefix, expected):

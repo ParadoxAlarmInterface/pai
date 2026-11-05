@@ -10,6 +10,24 @@ from paradox.lib.event_filter import EventFilter, EventTagFilter, LiveEventRegex
 logger = logging.getLogger("PAI").getChild(__name__)
 
 
+def strip_command_prefix(body: str | None, prefix: str) -> str | None:
+    """Return body without the leading prefix words, or None if the prefix does not match.
+
+    Matching is case-insensitive and word-based, so "commander" does not match "command".
+    An empty prefix matches every body.
+    """
+    body = (body or "").strip()
+    prefix_words = prefix.lower().split()
+    if not prefix_words:
+        return body
+
+    n = len(prefix_words)
+    parts = body.split(None, n)
+    if [word.lower() for word in parts[:n]] != prefix_words:
+        return None
+    return parts[n] if len(parts) > n else ""
+
+
 class AbstractTextInterface(AsyncInterface):
     """Interface Class using any Text interface"""
 

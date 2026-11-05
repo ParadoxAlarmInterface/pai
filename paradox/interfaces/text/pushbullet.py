@@ -9,25 +9,16 @@ from ws4py.manager import WebSocketManager
 
 from paradox.config import config as cfg
 from paradox.event import EventLevel, Notification
-from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
+from paradox.interfaces.text.core import (
+    ConfiguredAbstractTextInterface,
+    strip_command_prefix,
+)
 from paradox.lib import ps
 
 # Pushbullet interface.
 # Only exposes critical status changes and accepts commands
 
 logger = logging.getLogger("PAI").getChild(__name__)
-
-
-def strip_command_prefix(body, prefix):
-    """Returns the command without the prefix, or None if the push is not a command"""
-    body = (body or "").strip()
-    if not prefix:
-        return body
-
-    parts = body.split(None, 1)
-    if not parts or parts[0].lower() != prefix.strip().lower():
-        return None
-    return parts[1] if len(parts) > 1 else ""
 
 
 class PushBulletWSClient(WebSocketBaseClient):
