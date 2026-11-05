@@ -9,7 +9,10 @@ from ws4py.manager import WebSocketManager
 
 from paradox.config import config as cfg
 from paradox.event import EventLevel, Notification
-from paradox.interfaces.text.core import ConfiguredAbstractTextInterface
+from paradox.interfaces.text.core import (
+    ConfiguredAbstractTextInterface,
+    strip_command_prefix,
+)
 from paradox.lib import ps
 
 # Pushbullet interface.
@@ -82,12 +85,19 @@ class PushBulletWSClient(WebSocketBaseClient):
                     # logger.debug('Ignoring outgoing dismissed')
                     continue
 
+                command = strip_command_prefix(
+                    p.get("body"), cfg.PUSHBULLET_COMMAND_PREFIX
+                )
+                if command is None:
+                    logger.debug("Ignoring push without command prefix")
+                    continue
+
                 if (
                     p.get("sender_email_normalized") in cfg.PUSHBULLET_CONTACTS
                     or p.get("direction") == "self"
                 ):
                     future = asyncio.run_coroutine_threadsafe(
-                        self.interface.handle_command(p.get("body")),
+                        self.interface.handle_command(command),
                         self.interface.alarm.work_loop,
                     )
                     ret = future.result(10)
