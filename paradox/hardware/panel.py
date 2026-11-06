@@ -26,6 +26,7 @@ class Panel:
     property_map = {}  # override in a subclass
     max_eeprom_response_data_length = 0  # override in a subclass
     status_request_addresses = []  # override in a subclass
+    close_connection_supported = True  # Digiplex panels have no logout command
 
     def __init__(self, core, variable_message_length=True):
         self.core = core

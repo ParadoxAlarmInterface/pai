@@ -48,6 +48,10 @@ def create_panel(core, start_communication_response: Container = None) -> Panel:
         from . import mg6250
 
         return mg6250.Panel(core, start_communication_response, False)
+    elif product_id in ["DIGIPLEX_v13", "DIGIPLEX_v2", "DIGIPLEX_NE"]:
+        from . import digiplex
+
+        return digiplex.Panel_DGP848(core, start_communication_response, False)
     else:
         raise NotImplementedError(
             "We are not sure what panel you have (product_id: {}). \
