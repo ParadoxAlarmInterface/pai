@@ -873,7 +873,9 @@ class Paradox:
             # Temporary end
 
             # The event has changes. Update the state
-            if len(evt.change) > 0 and element:
+            # Elements created by load_definitions() have no "key" until labels
+            # are loaded, and update_container_object() requires one.
+            if len(evt.change) > 0 and element and "key" in element:
                 self.storage.update_container_object(evt.type, evt.id, evt.change)
 
             ps.sendEvent(evt)
