@@ -281,7 +281,14 @@ RAMDataParserMap = {
                 "arm_disarm_delay_timer" / Int8ub,
             ),
         ),
-        "_free" / Padding(34),
+        # --- NEW EVOHD+ v1.9 SYSTEM POWER MAPPING ---
+        "_free" / Padding(22), 
+        "power" / Struct(
+            "vdc" / ExprAdapter(Int16ul, lambda obj, ctx: round(obj / 1000.0, 1), lambda obj, ctx: int(obj * 1000)),
+            "battery" / ExprAdapter(Int16ul, lambda obj, ctx: round(obj / 1000.0, 1), lambda obj, ctx: int(obj * 1000)),
+            "dc" / ExprAdapter(Int16ul, lambda obj, ctx: round(obj / 1000.0, 1), lambda obj, ctx: int(obj * 1000)),
+        ),
+        "hardware_status_flags" / Bytes(6),
     ),
     5: Struct(
         "_not_used" / Int8ub,
