@@ -97,8 +97,8 @@ class E0FEConnection(Connection):
         """
         try:
             await self.close()  # type: ignore[no-untyped-call]
-        except asyncio.TimeoutError:
-            logger.warning("E0 FE: previous session did not close in time")
+        except asyncio.TimeoutError as e:
+            raise ConnectionError("E0 FE: previous session did not close in time") from e
         except Exception as e:
             # A transport lost with an error reports it again on close.
             logger.debug("E0 FE: previous session ended with %r", e)

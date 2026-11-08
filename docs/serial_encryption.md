@@ -201,8 +201,10 @@ Tested with an EVO192 on firmware 7.86.001 at 57600 baud.
   StartCommunication reply as for every EVO.
 - **No retransmission.** Each request is sent once and only one request is
   outstanding at a time. A request without a reply, an undecodable frame or a
-  failed write ends the session: the port is closed and PAI reconnects with a
+  failed write ends the session, including corrupt frame lengths, headers and
+  outer checksums. The port is closed and PAI reconnects with a
   full handshake, starting again from seq/seed 0.
+  A replacement transport is not opened until the old transport confirms closure.
 - **No IP interface.** `IP_INTERFACE_ENABLE` cannot be combined with E0 FE
   mode: it forwards requests without waiting for their replies, which would
   break the one outstanding request rule. PAI stops with a configuration

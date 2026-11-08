@@ -53,7 +53,7 @@ class ConnectionProtocol(asyncio.Protocol, ABC):
             self.transport = None
 
         if self._closed is not None:
-            await asyncio.wait_for(self._closed, timeout=cfg.IO_TIMEOUT)
+            await asyncio.wait_for(asyncio.shield(self._closed), timeout=cfg.IO_TIMEOUT)
 
     @abstractmethod
     def send_message(self, message):

@@ -322,6 +322,34 @@ async def test_reconnect_after_transport_error():
     assert sent(connection, 1) == [step[0] for step in HANDSHAKE + [STATUS, CLOSE]]
 
 
+@pytest.mark.parametrize("make", [ScriptedSerial, ScriptedBareIP])
+async def test_reconnect_waits_for_delayed_old_transport_close(monkeypatch, make):
+    connection = make(HANDSHAKE, HANDSHAKE + [STATUS, CLOSE])
+    alarm, _ = make_alarm(connection)
+    assert await alarm.connect()
+    old_protocol = connection.protocol
+    old_transport = connection.transport
+    monkeypatch.setattr(cfg, "IO_TIMEOUT", 0.01)
+    monkeypatch.setattr(
+        old_transport, "close", lambda: setattr(old_transport, "closed", True)
+    )
+    old_protocol.invalidate("lost frame")
+
+    with pytest.raises(ConnectionError, match="previous session did not close"):
+        await alarm.connect()
+
+    assert len(connection.transports) == 1
+    assert not old_protocol._closed.done()
+    old_protocol.connection_lost(None)
+
+    assert await alarm.connect()
+    assert connection.protocol is not old_protocol
+    assert connection.connected
+    assert await read_ram16(alarm) is not None
+    await alarm.disconnect()
+    assert sent(connection, 1) == [step[0] for step in HANDSHAKE + [STATUS, CLOSE]]
+
+
 async def test_bad_frame_ends_the_session():
     connection = ScriptedSerial(
         HANDSHAKE + [(v.TX_READ_RAM16, [v.RX_BAD_INNER_CHECKSUM, v.RX_RAM16])]

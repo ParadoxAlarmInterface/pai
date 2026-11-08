@@ -119,6 +119,29 @@ async def test_bad_frame_invalidates(link):
     assert transport.tx == []
 
 
+@pytest.mark.parametrize(
+    "bad_frame",
+    [
+        v.RX_EVENT_A[:-1] + bytes([v.RX_EVENT_A[-1] ^ 1]),
+        b"\xe0\xfe\xff\xff",
+        b"\x00",
+    ],
+    ids=["corrupt_event", "invalid_length", "lost_header"],
+)
+async def test_framing_error_ends_idle_wrapped_session(link, bad_frame):
+    protocol, transport, handler = link
+    protocol.start_wrapping()
+
+    protocol.data_received(bad_frame + v.RX_EVENT_A)
+
+    assert received(handler) == []
+    assert not protocol.is_active()
+    assert transport.closed
+    with pytest.raises(ConnectionError):
+        protocol.send_message(v.READ_RAM16)
+    assert transport.tx == []
+
+
 async def test_failed_write_invalidates(link):
     protocol, transport, handler = link
     protocol.start_wrapping()

@@ -75,6 +75,12 @@ def test_bad_outer_checksum_costs_one_byte(framer):
     assert frames(framer, corrupt(RX_REPLY, -1) + RX_REPLY) == [(RX_REPLY, True)]
 
 
+def test_strict_framing_reports_bad_outer_checksum():
+    framer = E0FESerialFramer(strict=True)
+    with pytest.raises(ValueError, match="checksum mismatch"):
+        frames(framer, corrupt(RX_REPLY, -1) + RX_REPLY)
+
+
 def test_bad_length_field_costs_one_byte(framer):
     # A length one short of the real frame cannot checksum.
     bad = RX_REPLY[:2] + bytes([RX_REPLY[2] - 1]) + RX_REPLY[3:]

@@ -56,6 +56,7 @@ class E0FESerialConnectionProtocol(SerialConnectionProtocol):
     def start_wrapping(self) -> None:
         """Wrap every message sent from now on, starting with the identify echo."""
         self._wrapping = True
+        self._framer.strict = True
 
     def awaiting_reply_to(self, message: bytes) -> bool:
         """True if ``message`` was the last wrapped request and is unanswered."""
@@ -106,26 +107,27 @@ class E0FESerialConnectionProtocol(SerialConnectionProtocol):
         if not self._valid:
             return
 
-        for frame in self._framer.feed(recv_data):
-            if cfg.LOGGING_DUMP_PACKETS:
-                logger.debug("SER -> PAI %s", binascii.hexlify(frame.data).decode())
-
-            message = frame.data
-            if self._wrapping and not frame.encrypted:
-                self.invalidate("received a plain identify after wrapping started")
-                return
-            if frame.encrypted:
-                if not self._wrapping:
-                    logger.debug("E0 FE: dropping a wrapped frame before the handshake")
-                    continue
-                try:
-                    message = self._codec.unwrap(frame.data)
-                except ValueError as e:
-                    self.invalidate(str(e))
-                    return
+        try:
+            for frame in self._framer.feed(recv_data):
                 if cfg.LOGGING_DUMP_PACKETS:
-                    logger.debug("SER UNWRAP: %s", binascii.hexlify(message).decode())
-                if not _is_live_event(message):
-                    self._awaiting_reply = False
+                    logger.debug("SER -> PAI %s", binascii.hexlify(frame.data).decode())
 
-            self.handler.on_message(message)
+                message = frame.data
+                if self._wrapping and not frame.encrypted:
+                    self.invalidate("received a plain identify after wrapping started")
+                    return
+                if frame.encrypted:
+                    if not self._wrapping:
+                        logger.debug(
+                            "E0 FE: dropping a wrapped frame before the handshake"
+                        )
+                        continue
+                    message = self._codec.unwrap(frame.data)
+                    if cfg.LOGGING_DUMP_PACKETS:
+                        logger.debug("SER UNWRAP: %s", binascii.hexlify(message).decode())
+                    if not _is_live_event(message):
+                        self._awaiting_reply = False
+
+                self.handler.on_message(message)
+        except ValueError as e:
+            self.invalidate(str(e))
