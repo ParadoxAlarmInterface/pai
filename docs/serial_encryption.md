@@ -138,7 +138,7 @@ padding. Serial strips trailing `0xEE`; IP150 trims to the header payload length
 
 ### Outgoing messages (`SerialConnectionProtocol.send_message`)
 
-When `SERIAL_ENCRYPTED = True`, `connection_made()` wraps the raw asyncio
+In AES mode, `connection_made()` wraps the raw asyncio
 transport with `EncryptedSerialTransport`.  Every call to `transport.write()`
 transparently passes through `encrypt_serial_message()` before hitting the
 wire.
@@ -152,13 +152,13 @@ PAI message bytes
 
 ### Incoming messages (`SerialConnectionProtocol.data_received`)
 
-The framer distinguishes the two E0 FE modes by the `SERIAL_ENCRYPTED` config
-flag:
+The framer distinguishes the E0 FE modes by the configured serial protocol:
 
-| `SERIAL_ENCRYPTED` | `buffer[1] == 0xFE` action |
+| Mode | `buffer[1] == 0xFE` action |
 |---|---|
-| `False` | Read `buffer[2]` as total frame length (E0 FE, passed on undecoded) |
-| `True` | Scan `frame_len = 2 + n×16 + 1` (n = 1…7); accept first valid checksum |
+| plain | Read `buffer[2]` as total frame length (keyless E0 FE, passed on undecoded) |
+| AES | Scan `frame_len = 2 + n×16 + 1` (n = 1…7); accept first valid checksum |
+| E0 FE | `E0FESerialFramer`: LE16 length, 16-bit checksum; `E0FECodec` unwraps |
 
 For Format 2, the framer scans incrementally as bytes arrive — no timer is
 needed.  The decrypted payload is forwarded to `handler.on_message()`
@@ -168,13 +168,50 @@ immediately once a valid checksum boundary is found.
 
 ```python
 # pai.conf
-SERIAL_ENCRYPTED = True   # default: False
+SERIAL_PROTOCOL = "aes"   # "plain", "aes" or "e0fe"; default: unset
 PASSWORD = "0000"         # PC password (same as used for non-encrypted serial)
 ```
 
-`SERIAL_ENCRYPTED` applies to both `SERIAL_PORT` and `IP_CONNECTION_BARE` connections.
-Both use `SerialConnectionProtocol`, so the same framing and decryption logic is active
-for either transport.
+| `SERIAL_PROTOCOL` | Serial link |
+|---|---|
+| unset | Decided by `SERIAL_ENCRYPTED`: `False` (default) plain, `True` Format 2 |
+| `"plain"` | Unwrapped messages |
+| `"aes"` | Format 2 (AES); requires `PASSWORD` |
+| `"e0fe"` | Format 1 |
+
+`SERIAL_ENCRYPTED = True` is the same as `SERIAL_PROTOCOL = "aes"`. Setting both
+to values that disagree, for example `SERIAL_PROTOCOL = "e0fe"` with
+`SERIAL_ENCRYPTED = True`, stops PAI with a configuration error. There is no
+automatic detection: the mode is whatever the configuration says.
+
+The setting applies to both `SERIAL_PORT` and `IP_CONNECTION_BARE` connections.
+Both use `SerialConnectionProtocol` (or its E0 FE subclass), so the same framing
+and decryption logic is active for either transport.
+
+### E0 FE mode (`SERIAL_PROTOCOL = "e0fe"`)
+
+Tested with an EVO192 on firmware 7.86.001 at 57600 baud.
+
+- **Handshake.** After the plain identify exchange PAI checks that byte 35
+  of the identify reply is `0xA0` and stops otherwise, without retrying. Other
+  panels or firmware only log a warning. The echo is accepted only if the
+  wrapped answer repeats bytes 0-34 of the identify with byte 35 `0x00`.
+  A plain identify received after wrapping starts ends the session.
+  StartCommunication uses `source_id = 0`; the login is built from the
+  StartCommunication reply as for every EVO.
+- **No retransmission.** Each request is sent once and only one request is
+  outstanding at a time. A request without a reply, an undecodable frame or a
+  failed write ends the session, including corrupt frame lengths, headers and
+  outer checksums. The port is closed and PAI reconnects with a
+  full handshake, starting again from seq/seed 0.
+  A replacement transport is not opened until the old transport confirms closure.
+- **No IP interface.** `IP_INTERFACE_ENABLE` cannot be combined with E0 FE
+  mode: it forwards requests without waiting for their replies, which would
+  break the one outstanding request rule. PAI stops with a configuration
+  error.
+- **Disconnect.** PAI waits up to 2 seconds for the `72 04 05 7b`
+  acknowledgement of CloseConnection. On a session that has already ended,
+  or while a request is still unanswered, nothing is sent.
 
 ---
 
@@ -218,7 +255,11 @@ pai-decrypt capture.serial --serial --pc-password 0000
 | `paradox/connections/serial/encryption.py` | `EncryptedSerialTransport`, `make_serial_key()` |
 | `paradox/connections/serial/framing.py` | `SerialFramer` — pure byte framing and AES block scan |
 | `paradox/connections/serial/protocol.py` | `SerialConnectionProtocol` — asyncio glue and dispatch |
-| `paradox/config.py` | `SERIAL_ENCRYPTED` flag |
+| `paradox/connections/serial/e0fe.py` | `E0FECodec`: E0 FE wrap/unwrap and seq/seed state |
+| `paradox/connections/serial/e0fe_framing.py` | `E0FESerialFramer`: E0 FE byte framing |
+| `paradox/connections/serial/e0fe_protocol.py` | `E0FESerialConnectionProtocol`: E0 FE wrapping on the link |
+| `paradox/connections/serial/e0fe_connection.py` | E0 FE handshake, no retransmission, close acknowledgement |
+| `paradox/config.py` | `SERIAL_PROTOCOL` and `SERIAL_ENCRYPTED` settings |
 | `paradox/console_scripts/ip150_connection_decrypt.py` | Offline capture decryption tool |
 | `tests/lib/test_serial_crypto.py` | Unit tests for encrypt/decrypt roundtrips |
 | `tests/connection/serial/test_protocol.py` | Integration tests for framing and decryption |

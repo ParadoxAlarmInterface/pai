@@ -9,7 +9,7 @@ from typing import Optional
 from construct import Container
 import pytz
 
-from paradox.config import config as cfg, get_limits_for_type
+from paradox.config import config as cfg, get_limits_for_type, get_serial_protocol
 from paradox.connections.connection import Connection
 from paradox.data.enums import RunState
 from paradox.data.memory_storage import MemoryStorage as Storage
@@ -128,9 +128,17 @@ class Paradox:
             if cfg.CONNECTION_TYPE == "Serial":
                 logger.info("Using Serial Connection")
 
-                from paradox.connections.serial.connection import SerialCommunication
+                from paradox.connections.serial.connection import (
+                    E0FESerialCommunication,
+                    SerialCommunication,
+                )
 
-                self._connection = SerialCommunication(
+                serial_class = (
+                    E0FESerialCommunication
+                    if get_serial_protocol() == "e0fe"
+                    else SerialCommunication
+                )
+                self._connection = serial_class(
                     port=cfg.SERIAL_PORT,
                     baud=cfg.SERIAL_BAUD,
                 )
@@ -138,9 +146,17 @@ class Paradox:
                 logger.info("Using IP Connection")
 
                 if cfg.IP_CONNECTION_BARE:
-                    from paradox.connections.ip.connection import BareIPConnection
+                    from paradox.connections.ip.connection import (
+                        BareIPConnection,
+                        E0FEBareIPConnection,
+                    )
 
-                    self._connection = BareIPConnection(
+                    bare_class = (
+                        E0FEBareIPConnection
+                        if get_serial_protocol() == "e0fe"
+                        else BareIPConnection
+                    )
+                    self._connection = bare_class(
                         host=cfg.IP_CONNECTION_HOST, port=cfg.IP_CONNECTION_PORT
                     )
                 elif cfg.IP_CONNECTION_SITEID and cfg.IP_CONNECTION_EMAIL:
@@ -1003,7 +1019,12 @@ class Paradox:
             logger.info("Cleaning previous session. Closing connection")
             # Write directly as this can be called from other contexts
 
-            self.connection.write(panel.get_message("CloseConnection").build(dict()))
+            try:
+                self.connection.write(
+                    panel.get_message("CloseConnection").build(dict())
+                )
+            except ConnectionError as e:
+                logger.warning("Could not send CloseConnection: %s", e)
 
     def _on_labels_load(self, data):
         for k, d in data.items():

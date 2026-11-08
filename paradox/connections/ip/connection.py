@@ -10,6 +10,8 @@ from paradox.connections.handler import IPConnectionHandler
 from paradox.connections.ip.commands import IPModuleConnectCommand
 from paradox.connections.ip.protocol import IPConnectionProtocol
 from paradox.connections.ip.stun_session import StunSession
+from paradox.connections.serial.e0fe_connection import E0FEConnection
+from paradox.connections.serial.e0fe_protocol import E0FESerialConnectionProtocol
 from paradox.connections.serial.protocol import SerialConnectionProtocol
 from paradox.exceptions import PAICriticalException
 from paradox.lib.handlers import FutureHandler, HandlerRegistry
@@ -69,6 +71,17 @@ class BareIPConnection(MultiAttemptConnection):
 
     def _make_protocol(self):
         return SerialConnectionProtocol(self)
+
+
+class E0FEBareIPConnection(E0FEConnection, BareIPConnection):
+    """Serial tunnel over TCP to a panel in ``E0 FE`` mode."""
+
+    async def connect(self) -> bool:
+        await self.close_ended_session()
+        return await super().connect()
+
+    def _make_protocol(self):
+        return E0FESerialConnectionProtocol(self)
 
 
 class IPConnectionWithEncryption(MultiAttemptConnection, IPConnectionHandler, ABC):

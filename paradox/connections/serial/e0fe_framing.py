@@ -39,6 +39,10 @@ class E0FESerialFramer(Framer):
     buffer head -- never waiting unbounded.
     """
 
+    def __init__(self, strict: bool = False) -> None:
+        super().__init__()
+        self.strict = strict
+
     def _next_frame(self) -> Optional[Frame]:
         """Return the next :class:`Frame`, or ``None`` to wait for more data."""
         while True:
@@ -82,6 +86,8 @@ class E0FESerialFramer(Framer):
             return Frame(candidate, encrypted=encrypted)
 
     def _discard(self, reason: str) -> None:
+        if self.strict:
+            raise ValueError("E0 FE: framing error (%s)" % reason)
         dropped = self.buffer.discard()
         logger.debug(
             "E0 FE: discarding byte %s (%s)", binascii.hexlify(dropped).decode(), reason

@@ -4,6 +4,7 @@ import asyncio
 
 import pytest
 
+from paradox.config import config as cfg
 from paradox.connections.handler import ConnectionHandler
 from paradox.connections.protocol_base import ConnectionProtocol
 
@@ -87,6 +88,17 @@ async def test_close_waits_for_connection_lost(protocol):
 
 async def test_close_is_safe_before_connection_made(handler):
     await DummyProtocol(handler).close()
+
+
+async def test_close_timeout_does_not_cancel_connection_loss(protocol, monkeypatch):
+    monkeypatch.setattr(cfg, "IO_TIMEOUT", 0.01)
+    with pytest.raises(asyncio.TimeoutError):
+        await protocol.close()
+
+    assert not protocol._closed.done()
+    protocol.connection_lost(None)
+    await protocol.close()
+    assert protocol._closed.result() is None
 
 
 async def test_clean_close_is_not_logged_as_an_error(protocol, caplog):
