@@ -300,6 +300,13 @@ def decode_date(raw: bytes) -> typing.Optional[datetime.datetime]:
     return datetime.datetime(raw[0] * 100 + raw[1], *raw[2:6])
 
 
+def limited_indexes(elem_type: str, indexes: typing.Iterable[int]) -> typing.List[int]:
+    """Keep the indexes cfg.LIMITS allows, like the other panels: configured
+    indexes this panel does not have are ignored, not read."""
+    limits = get_limits_for_type(elem_type)
+    return [i for i in indexes if limits is None or i in limits]
+
+
 def credential_block(password: typing.Union[str, bytes, int]) -> bytes:
     """32-byte credential: make_serial_key(pw) encrypted under itself."""
     key = make_serial_key(password)
@@ -609,10 +616,10 @@ class Panel(PanelBase):
         data = {}
         for elem_type, (obj, count) in LABEL_OBJECTS.items():
             start_time = time.time()
-            indexes = get_limits_for_type(elem_type, list(range(1, count + 1)))
+            indexes = limited_indexes(elem_type, range(1, count + 1))
             objects = await self.read_objects(obj, indexes, (FIELD_SERIAL, FIELD_LABEL))
             elements = data[elem_type] = {}
-            for index in sorted(indexes):
+            for index in indexes:
                 fields = objects.get(index, {})
                 serial = fields.get(FIELD_SERIAL, b"")
                 if obj == OBJ_ZONE:
@@ -633,7 +640,7 @@ class Panel(PanelBase):
 
         # Users have no serial: list them all, as for the other panels.
         start_time = time.time()
-        indexes = get_limits_for_type("user", list(range(1, USER_COUNT + 1)))
+        indexes = limited_indexes("user", range(1, USER_COUNT + 1))
         users = await self.read_objects(OBJ_USER, indexes, (FIELD_LABEL,))
         data["user"] = {
             index: self.label_element(
@@ -645,11 +652,7 @@ class Panel(PanelBase):
 
         # Only the partition that can be controlled is listed.
         start_time = time.time()
-        indexes = [
-            i
-            for i in get_limits_for_type("partition", CONTROL_PARTITIONS)
-            if i in CONTROL_PARTITIONS
-        ]
+        indexes = limited_indexes("partition", CONTROL_PARTITIONS)
         areas = await self.read_objects(OBJ_AREA, indexes, (AREA_FIELD_LABEL,))
         data["partition"] = {
             i: self.label_element(

@@ -366,6 +366,18 @@ async def test_transact_without_reply_raises():
         await panel.transact(SERVICE_OBJECTS, b"")
 
 
+async def test_control_partition_returns_false_when_panel_is_silent():
+    core = Paradox()
+    core.send_wait = AsyncMock(side_effect=asyncio.TimeoutError)  # as after retries
+    core.panel = session_panel(0xB4, 0x62, SET_TIME_KEY, core)
+    core.panel.panel_serial = bytes(4)
+    core.storage.get_container("partition").deep_merge(
+        {1: {"id": 1, "key": "Partition 1"}}
+    )
+
+    assert await core.control_partition("1", "arm") is False
+
+
 # zone status capture: session selector 94, mode 42; zone 6 open
 STATUS_KEY = bytes.fromhex("7abcbf6fdb5b1ea322646767d363868b")
 SYSTEM_REPLY = bytes.fromhex(
@@ -680,6 +692,24 @@ async def test_load_labels_names_partition_without_area_label(monkeypatch):
     assert labels["partition"] == {
         1: {"id": 1, "key": "Partition_1", "label": "Partition 1"}
     }
+
+
+async def test_load_labels_ignores_limits_outside_panel_range(monkeypatch):
+    monkeypatch.setattr(
+        cfg, "LIMITS", {"zone": [1, 65], "user": [2, 17], "partition": [1, 2]}
+    )
+    panel = session_panel(0x3E, 0x00, ZONES_KEY)
+    requested = {}
+
+    async def read_objects(obj, indexes, fields):
+        requested[obj] = list(indexes)
+        return {i: {FIELD_SERIAL: bytes(6)} for i in indexes} if obj == OBJ_ZONE else {}
+
+    panel.read_objects = read_objects
+    await panel.load_labels()
+    assert requested[OBJ_ZONE] == [1]
+    assert requested[OBJ_USER] == [2]
+    assert requested[OBJ_AREA] == [1]
 
 
 @pytest.mark.parametrize(
