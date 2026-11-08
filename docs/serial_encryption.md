@@ -205,7 +205,7 @@ pai-decrypt capture.serial --serial --pc-password 0000
 | Frame type | Outcome |
 |---|---|
 | Full-AES E0 FE (≥ 16 bytes AES data) | Decrypted; inner message parsed by panel parsers |
-| Keyless E0 FE (< 16 bytes AES data) | Structure displayed (`request_nr` is SEQ, raw data); not decoded by this tool |
+| Keyless E0 FE (LE16 length and 16-bit checksum valid) | Decoded; inner message parsed by panel parsers |
 | Regular Paradox frame | Parsed normally |
 
 ---
