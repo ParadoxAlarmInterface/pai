@@ -341,6 +341,39 @@ async def test_end_session_runs_once_between_close_message_and_transport_close()
 
 
 @pytest.mark.asyncio
+async def test_overlapping_disconnects_serialize_session_teardown():
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    calls = 0
+
+    class Waiting(ScriptedSerial):
+        async def end_session(self) -> None:
+            nonlocal calls
+            calls += 1
+            entered.set()
+            await release.wait()
+
+    connection = Waiting(EVO_REPLIES)
+    alarm = make_alarm(connection)
+    assert await alarm.connect()
+
+    first = asyncio.create_task(alarm.disconnect())
+    await entered.wait()
+    second = asyncio.create_task(alarm.disconnect())
+    await asyncio.sleep(0)
+
+    assert calls == 1
+    assert connection.transport is not None and not connection.transport.closed
+    assert [m.hex() for m in connection.transport.tx] == EVO_TX
+
+    release.set()
+    await asyncio.gather(first, second)
+
+    assert calls == 1
+    assert connection.transport is not None and connection.transport.closed
+
+
+@pytest.mark.asyncio
 async def test_transport_closes_when_end_session_fails():
     class Failing(ScriptedSerial):
         async def end_session(self) -> None:

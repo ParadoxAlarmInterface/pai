@@ -50,6 +50,7 @@ class Paradox:
         # Created lazily: see the loop-affinity note on _loop_primitive().
         self._request_lock: Optional[asyncio.Lock] = None
         self._busy: Optional[asyncio.Lock] = None
+        self._disconnect_lock: Optional[asyncio.Lock] = None
         self._loop_wait_event: Optional[asyncio.Event] = None
 
         # partition_id -> monotonic deadline; while time.monotonic() < deadline,
@@ -950,18 +951,19 @@ class Paradox:
             self.storage.update_container_object(evt.type, evt.id, evt.change)
 
     async def disconnect(self):
-        logger.info("Disconnecting from the Alarm Panel")
-        self.run_state = RunState.STOP
+        async with self._loop_primitive("_disconnect_lock", asyncio.Lock):
+            logger.info("Disconnecting from the Alarm Panel")
+            self.run_state = RunState.STOP
 
-        self._clean_session()
-        if self.connection.connected:
-            try:
-                await self.connection.end_session()
-            except Exception:
-                logger.exception("Error while ending the panel session")
-            finally:
-                await self.connection.close()
-            logger.info("Disconnected from the Alarm Panel")
+            self._clean_session()
+            if self.connection.connected:
+                try:
+                    await self.connection.end_session()
+                except Exception:
+                    logger.exception("Error while ending the panel session")
+                finally:
+                    await self.connection.close()
+                logger.info("Disconnected from the Alarm Panel")
 
     async def pause(self):
         logger.info("Pausing PAI")
