@@ -217,10 +217,7 @@ class Panel:
                 data, elem_type, addresses, label_offset=elem_def["label_offset"]
             )
 
-            logger.info(
-                f"{elem_type.title()} labels loaded ({round(time()-start_time, 2)}s): "
-                + f"{', '.join([v['label'] for v in data[elem_type].values()])}"
-            )
+            self.log_labels_loaded(elem_type, data[elem_type], start_time)
 
         return data
 
@@ -302,28 +299,42 @@ class Panel:
             template = {}
 
         async for index, data in self._eeprom_batch_reader(addresses, field_length):
-            b_label = data[label_offset : label_offset + field_length].strip(b"\0 ")
+            label = self.decode_label(data[label_offset : label_offset + field_length])
+            element_dict[index] = self.label_element(elem_type, index, label, template)
 
-            label = b_label.replace(b"\0", b" ")
+    @staticmethod
+    def decode_label(raw: bytes) -> str:
+        """Decode a raw label field using cfg.LABEL_ENCODING."""
+        b_label = raw.strip(b"\0 ")
 
-            try:
-                label = label.decode(cfg.LABEL_ENCODING)
-            except UnicodeDecodeError:
-                logger.warning(
-                    "Unable to properly decode label {} using the {} encoding.\n \
-                    Specify a different encoding using the LABEL_ENCODING configuration option.".format(
-                        b_label, cfg.LABEL_ENCODING
-                    )
+        label = b_label.replace(b"\0", b" ")
+
+        try:
+            return label.decode(cfg.LABEL_ENCODING)
+        except UnicodeDecodeError:
+            logger.warning(
+                "Unable to properly decode label {} using the {} encoding.\n \
+                Specify a different encoding using the LABEL_ENCODING configuration option.".format(
+                    b_label, cfg.LABEL_ENCODING
                 )
-                label = label.decode("utf-8", errors="ignore")
-
-            properties = template.copy()
-            properties["id"] = index
-            properties["key"] = sanitize_key(label) or sanitize_key(
-                f"{elem_type} {index}"
             )
-            properties["label"] = label
-            element_dict[index] = properties
+            return label.decode("utf-8", errors="ignore")
+
+    @staticmethod
+    def label_element(elem_type: str, index: int, label: str, template=None) -> dict:
+        """Element properties (template + id, key, label) for the labels dict."""
+        properties = dict(template or {})
+        properties["id"] = index
+        properties["key"] = sanitize_key(label) or sanitize_key(f"{elem_type} {index}")
+        properties["label"] = label
+        return properties
+
+    @staticmethod
+    def log_labels_loaded(elem_type: str, elements: dict, start_time: float):
+        logger.info(
+            f"{elem_type.title()} labels loaded ({round(time()-start_time, 2)}s): "
+            + f"{', '.join([v['label'] for v in elements.values()])}"
+        )
 
     @abstractmethod
     def initialize_communication(self, password):

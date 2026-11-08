@@ -22,7 +22,9 @@ async def test_hass(mocker):
     con.get_instance.return_value.pai_status_topic = "paradox/interface/pai_status"
 
     alarm = mocker.MagicMock()
-
+    alarm.storage.get_container.return_value = {
+        "module4_pgm1": {"key": "module4_pgm1", "label": "Module 4 PGM 1"}
+    }
     alarm.panel = create_evo192_panel(alarm)
     interface = HomeAssistantMQTTInterface(alarm)
     interface.start()
@@ -124,6 +126,31 @@ async def test_hass(mocker):
                 "device_class": "motion",
                 "payload_on": "True",
                 "payload_off": "False",
+            },
+            0,
+            True,
+        )
+
+        assert_any_call_with_json(
+            interface.mqtt.publish,
+            "homeassistant/switch/aabbccdd/pgm_module4_pgm1_on/config",
+            {
+                "name": "Pgm Module 4 PGM 1 On",
+                "unique_id": "paradox_aabbccdd_pgm_module4_pgm1_on",
+                "state_topic": "paradox/states/outputs/module4_pgm1/on",
+                "command_topic": "paradox/control/outputs/module4_pgm1",
+                "availability_topic": "paradox/interface/availability",
+                "device": {
+                    "manufacturer": "Paradox",
+                    "model": "EVO192",
+                    "identifiers": ["Paradox_aabbccdd"],
+                    "name": "EVO192",
+                    "sw_version": "6.80 build 5",
+                },
+                "state_on": "True",
+                "state_off": "False",
+                "payload_on": "on_override",
+                "payload_off": "off_override",
             },
             0,
             True,

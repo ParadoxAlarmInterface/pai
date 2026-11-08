@@ -156,11 +156,13 @@ class E0FECodec:
         self.seq = (self.seq + 1) & 0xFF
         return frame
 
-    def unwrap(self, frame: bytes) -> bytes:
+    def unwrap(self, frame: bytes, transmitted: bool = False) -> bytes:
         """Return the message carried by ``frame`` and adopt its seq/seed.
 
         Raises ``ValueError`` if the frame structure, either checksum or the
-        prefix is invalid; the state is then left untouched.
+        prefix is invalid; the state is then left untouched. Set
+        ``transmitted`` for a frame sent by the PC, whose identify message has
+        an additional XOR that must be reversed.
         """
         if not is_frame(frame):
             raise ValueError("E0 FE: invalid frame")
@@ -169,6 +171,11 @@ class E0FECodec:
         if body[0] not in (PREFIX_PLAIN, PREFIX_IDENTIFY):
             raise ValueError("E0 FE: unknown prefix 0x%02x" % body[0])
         message = body[1:]
+        if transmitted and body[0] == PREFIX_IDENTIFY:
+            if len(message) < 16:
+                raise ValueError("E0 FE: identify message too short")
+            key = message[12] ^ message[13] ^ message[14] ^ message[15]
+            message = bytes(b ^ key for b in message)
         if not _checksum_ok(message):
             raise ValueError("E0 FE: message checksum mismatch")
 

@@ -1,10 +1,51 @@
+from datetime import datetime
+import json
 from unittest.mock import AsyncMock
 
 import pytest
 
 from paradox.connections.connection import Connection
-from paradox.hardware import Panel
+from paradox.config import Config, config as cfg
+from paradox.hardware import Panel, create_panel
 from paradox.paradox import Paradox
+
+
+@pytest.mark.parametrize(
+    "connection_type, product_id, supported",
+    [
+        ("Serial", "MAGELLAN_MG6250", False),
+        ("PRT3", None, False),
+        ("Serial", "DIGIPLEX_EVO_192", True),
+        ("Serial", "MAGELLAN_MG5050", True),
+    ],
+)
+async def test_sync_time_respects_panel_support(
+    monkeypatch, mocker, connection_type, product_id, supported
+):
+    monkeypatch.setattr(cfg, "CONNECTION_TYPE", connection_type)
+    monkeypatch.setattr(cfg, "SYNC_TIME", True)
+    monkeypatch.setattr(cfg, "SYNC_TIME_TIMEZONE", "")
+    alarm = Paradox()
+    alarm.panel = create_panel(
+        alarm, _start_communication_reply(product_id) if product_id else None
+    )
+    alarm.storage.get_container("system").deep_merge(
+        {"date": {"time": datetime(2000, 1, 1)}}
+    )
+    drift_check = mocker.spy(alarm, "_is_time_sync_required")
+    alarm.send_wait = AsyncMock()
+
+    await alarm.sync_time()
+
+    if supported:
+        drift_check.assert_called_once()
+        alarm.send_wait.assert_awaited_once()
+        assert alarm.send_wait.call_args.args[0] is alarm.panel.get_message(
+            "SetTimeDate"
+        )
+    else:
+        drift_check.assert_not_called()
+        alarm.send_wait.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -53,6 +94,74 @@ def _add_module_pgm(alarm, module_address, pgm_index):
     }
     alarm.storage.update_container_object("module_pgm", key, {"on": False})
     return key
+
+
+def test_init_module_pgms_from_json(tmp_path, monkeypatch, mocker):
+    options = tmp_path / "options.json"
+    options.write_text(
+        json.dumps(
+            {
+                "MODULE_PGM_ADDRESSES": [
+                    {"address": 4, "pgm_count": 3},
+                    {"address": 7, "pgm_count": 1},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("PAI_MODULE_PGM_ADDRESSES", raising=False)
+    config = Config()
+    config.load(str(options))
+    mocker.patch("paradox.paradox.cfg", config)
+    mocker.patch("paradox.lib.ps.sendChange")
+
+    alarm = Paradox()
+    alarm._init_module_pgms()
+    outputs = alarm.storage.get_container("module_pgm")
+
+    assert set(outputs) == {
+        "module4_pgm1",
+        "module4_pgm2",
+        "module4_pgm3",
+        "module7_pgm1",
+    }
+    assert outputs["module4_pgm3"]["module_address"] == 4
+    assert outputs["module4_pgm3"]["pgm_index"] == 3
+    assert outputs["module4_pgm3"]["on"] is False
+
+
+def test_init_module_pgms_skips_invalid_and_duplicate_entries(
+    monkeypatch, mocker, caplog
+):
+    monkeypatch.setattr(
+        cfg,
+        "MODULE_PGM_ADDRESSES",
+        [
+            "invalid",
+            {"address": "4", "pgm_count": 3},
+            {"address": True, "pgm_count": 1},
+            {"address": 255, "pgm_count": 1},
+            {"address": 4, "pgm_count": True},
+            {"address": 4, "pgm_count": 5},
+            {"address": 4, "pgm_count": 2},
+            {"address": 4, "pgm_count": 4},
+            {"address": 254, "pgm_count": 1},
+        ],
+    )
+    mocker.patch("paradox.lib.ps.sendChange")
+
+    alarm = Paradox()
+    alarm._init_module_pgms()
+
+    assert set(alarm.storage.get_container("module_pgm")) == {
+        "module4_pgm1",
+        "module4_pgm2",
+        "module254_pgm1",
+    }
+    assert "invalid module entry" in caplog.text
+    assert "invalid module address" in caplog.text
+    assert "invalid pgm_count" in caplog.text
+    assert "duplicate module address 4" in caplog.text
 
 
 @pytest.mark.asyncio

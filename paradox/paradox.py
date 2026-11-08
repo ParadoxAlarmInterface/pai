@@ -1,6 +1,6 @@
 import asyncio
-import collections.abc
 from binascii import hexlify
+import collections.abc
 from datetime import datetime
 import logging
 import time
@@ -50,7 +50,9 @@ class Paradox:
         # Created lazily: see the loop-affinity note on _loop_primitive().
         self._request_lock: Optional[asyncio.Lock] = None
         self._busy: Optional[asyncio.Lock] = None
+        self._disconnect_lock: Optional[asyncio.Lock] = None
         self._loop_wait_event: Optional[asyncio.Event] = None
+        self._disconnecting = False
 
         # partition_id -> monotonic deadline; while time.monotonic() < deadline,
         # arm-related properties from RA polling are ignored for that partition.
@@ -246,6 +248,7 @@ class Paradox:
 
         if self._connection:
             await self.disconnect()  # socket needs to be also closed
+        self._disconnecting = False
         self.panel = None
 
         self.run_state = RunState.INIT
@@ -398,8 +401,11 @@ class Paradox:
             )
 
     async def sync_time(self):
-        if cfg.CONNECTION_TYPE == "PRT3":
-            return  # PRT3 has no SetTimeDate command
+        if (
+            cfg.CONNECTION_TYPE == "PRT3"
+            or self.panel.settings.get("product_id") == "MAGELLAN_MG6250"
+        ):
+            return  # Neither protocol implements SetTimeDate.
         now = datetime.now().astimezone()
         if cfg.SYNC_TIME_TIMEZONE:
             try:
@@ -528,6 +534,9 @@ class Paradox:
         timeout=cfg.IO_TIMEOUT,
         reply_expected=None,
     ) -> Optional[Container]:
+        if self._disconnecting:
+            raise ConnectionError("Disconnecting")
+
         # Connection closed
         if not self.connection.connected:
             raise ConnectionError("Not connected")
@@ -545,6 +554,9 @@ class Paradox:
                 logger.debug("Request retry (attempt %d/%d)", attempt, retries)
 
             async with self.request_lock:
+                if self._disconnecting:
+                    raise ConnectionError("Disconnecting")
+
                 t1 = time.time()
                 result = "unknown"
                 try:
@@ -695,14 +707,23 @@ class Paradox:
             raise
 
     def _init_module_pgms(self):
-        for addr, pgm_count in cfg.MODULE_PGM_ADDRESSES.items():
-            if not isinstance(addr, int) or not (1 <= addr <= 254):
+        seen_addresses = set()
+        for module in cfg.MODULE_PGM_ADDRESSES:
+            if not isinstance(module, dict):
+                logger.warning(
+                    "MODULE_PGM_ADDRESSES: invalid module entry %r (expected a mapping), skipping",
+                    module,
+                )
+                continue
+            addr = module.get("address")
+            pgm_count = module.get("pgm_count")
+            if type(addr) is not int or not (1 <= addr <= 254):
                 logger.warning(
                     "MODULE_PGM_ADDRESSES: invalid module address %r (expected int 1-254), skipping",
                     addr,
                 )
                 continue
-            if not isinstance(pgm_count, int) or not (
+            if type(pgm_count) is not int or not (
                 1 <= pgm_count <= MODULE_PGM_PACKET_SLOTS
             ):
                 logger.warning(
@@ -712,6 +733,13 @@ class Paradox:
                     MODULE_PGM_PACKET_SLOTS,
                 )
                 continue
+            if addr in seen_addresses:
+                logger.warning(
+                    "MODULE_PGM_ADDRESSES: duplicate module address %d, skipping",
+                    addr,
+                )
+                continue
+            seen_addresses.add(addr)
             for pgm_index in range(1, pgm_count + 1):
                 key = f"module{addr}_pgm{pgm_index}"
                 self.storage.get_container("module_pgm")[key] = {
@@ -883,7 +911,9 @@ class Paradox:
             # Temporary end
 
             # The event has changes. Update the state
-            if len(evt.change) > 0 and element:
+            # Elements created by load_definitions() have no "key" until labels
+            # are loaded, and update_container_object() requires one.
+            if len(evt.change) > 0 and element and "key" in element:
                 self.storage.update_container_object(evt.type, evt.id, evt.change)
 
             ps.sendEvent(evt)
@@ -945,18 +975,20 @@ class Paradox:
             self.storage.update_container_object(evt.type, evt.id, evt.change)
 
     async def disconnect(self):
-        logger.info("Disconnecting from the Alarm Panel")
-        self.run_state = RunState.STOP
+        async with self._loop_primitive("_disconnect_lock", asyncio.Lock):
+            self._disconnecting = True
+            logger.info("Disconnecting from the Alarm Panel")
+            self.run_state = RunState.STOP
 
-        self._clean_session()
-        if self.connection.connected:
-            try:
-                await self.connection.end_session()
-            except Exception:
-                logger.exception("Error while ending the panel session")
-            finally:
-                await self.connection.close()
-            logger.info("Disconnected from the Alarm Panel")
+            self._clean_session()
+            if self.connection.connected:
+                try:
+                    await self.connection.end_session()
+                except Exception:
+                    logger.exception("Error while ending the panel session")
+                finally:
+                    await self.connection.close()
+                logger.info("Disconnected from the Alarm Panel")
 
     async def pause(self):
         logger.info("Pausing PAI")

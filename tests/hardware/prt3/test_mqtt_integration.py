@@ -53,6 +53,7 @@ async def test_prt3_connect_emits_panel_detected(monkeypatch):
     paradox = Paradox.__new__(Paradox)
     paradox.request_lock = asyncio.Lock()
     paradox.busy = asyncio.Lock()
+    paradox._disconnect_lock = None
     paradox.loop_wait_event = asyncio.Event()
     paradox._run_state = RunState.STOP
     paradox.work_loop = None
@@ -107,6 +108,7 @@ async def test_prt3_connect_no_panel_detected_on_comm_fail(monkeypatch):
     paradox = Paradox.__new__(Paradox)
     paradox.request_lock = asyncio.Lock()
     paradox.busy = asyncio.Lock()
+    paradox._disconnect_lock = None
     paradox.loop_wait_event = asyncio.Event()
     paradox._run_state = RunState.STOP
     paradox.work_loop = None
