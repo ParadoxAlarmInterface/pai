@@ -112,6 +112,10 @@ def test_q_prefix_received_without_xor(codec):
     assert codec.unwrap(RX_IDENTIFY) == IDENTIFY_REPLY
 
 
+def test_q_prefix_transmitted_xor_is_reversed(codec):
+    assert codec.unwrap(TX_IDENTIFY, transmitted=True) == IDENTIFY_ECHO
+
+
 def test_minimal_frame(codec):
     assert len(RX_MINIMAL) == MIN_FRAME_LENGTH
     assert codec.unwrap(RX_MINIMAL) == b"\x00"
