@@ -69,6 +69,10 @@ import logging
 #     # 'keypad': range(1, 9)     # Keypads to monitor
 # }
 #
+# MODULE_PGM_ADDRESSES = [
+#     {'address': 4, 'pgm_count': 3},  # EVO module bus address 1-254; PGM count 1-4
+# ]
+#
 # LABEL_ENCODING = 'paradox-en'           # Encoding to use when decoding labels. paradox-* or https://docs.python.org/3/library/codecs.html#standard-encodings
 # LABEL_REFRESH_INTERVAL = 15 * 60        # Interval between refresh of labels
 # OUTPUT_PULSE_DURATION = 1               # Duration of a PGM pulse in seconds
@@ -186,6 +190,7 @@ import logging
 # PUSHBULLET_ENABLE = False
 # PUSHBULLET_KEY = ''                     # Authentication key used for Pushbullet
 # PUSHBULLET_CONTACTS = []                # Pushbullet user identifiers for notifications and interaction
+# PUSHBULLET_COMMAND_PREFIX = ''          # Only pushes starting with this prefix are commands, e.g. 'command' for 'command partition all arm'
 # PUSHBULLET_MIN_EVENT_LEVEL = 'INFO'
 ## Event filtering by tags:
 # PUSHBULLET_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list
