@@ -111,6 +111,9 @@ class E0FESerialConnectionProtocol(SerialConnectionProtocol):
                 logger.debug("SER -> PAI %s", binascii.hexlify(frame.data).decode())
 
             message = frame.data
+            if self._wrapping and not frame.encrypted:
+                self.invalidate("received a plain identify after wrapping started")
+                return
             if frame.encrypted:
                 if not self._wrapping:
                     logger.debug("E0 FE: dropping a wrapped frame before the handshake")

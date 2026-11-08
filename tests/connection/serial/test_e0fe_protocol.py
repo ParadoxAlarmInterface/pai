@@ -70,6 +70,18 @@ async def test_every_valid_frame_sets_the_state(link):
     assert transport.tx == [v.TX_READ_RAM16_ELSEWHERE]
 
 
+async def test_plain_answer_after_wrapping_invalidates(link):
+    protocol, transport, handler = link
+    protocol.start_wrapping()
+    protocol.send_message(v.ECHO)
+
+    protocol.data_received(v.ANSWER + v.RX_ANSWER)
+
+    assert received(handler) == []
+    assert not protocol.is_active()
+    assert transport.closed
+
+
 async def test_one_request_at_a_time(link):
     protocol, transport, handler = link
     protocol.start_wrapping()

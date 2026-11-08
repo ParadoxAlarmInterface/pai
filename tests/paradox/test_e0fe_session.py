@@ -226,9 +226,10 @@ async def test_panel_not_in_e0fe_mode_is_critical(mode):
     [
         [v.RX_EVENT_A],
         [v.IDENTIFY],
+        [v.ANSWER],
         [v.RX_ANSWER_WRONG],
     ],
-    ids=["event", "plain_identify", "wrong_answer"],
+    ids=["event", "plain_identify", "plain_matching_answer", "wrong_answer"],
 )
 async def test_echo_needs_the_matching_answer(answers):
     connection = ScriptedSerial([(v.INITIATE, [v.IDENTIFY]), (v.TX_ECHO, answers)])

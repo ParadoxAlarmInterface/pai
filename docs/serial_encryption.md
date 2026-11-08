@@ -195,7 +195,8 @@ Tested with an EVO192 on firmware 7.86.001 at 57600 baud.
 - **Handshake.** After the plain identify exchange PAI checks that byte 35
   of the identify reply is `0xA0` and stops otherwise, without retrying. Other
   panels or firmware only log a warning. The echo is accepted only if the
-  answer repeats bytes 0-34 of the identify with byte 35 `0x00`.
+  wrapped answer repeats bytes 0-34 of the identify with byte 35 `0x00`.
+  A plain identify received after wrapping starts ends the session.
   StartCommunication uses `source_id = 0`; the login is built from the
   StartCommunication reply as for every EVO.
 - **No retransmission.** Each request is sent once and only one request is
