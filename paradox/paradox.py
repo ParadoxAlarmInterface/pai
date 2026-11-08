@@ -52,6 +52,7 @@ class Paradox:
         self._busy: Optional[asyncio.Lock] = None
         self._disconnect_lock: Optional[asyncio.Lock] = None
         self._loop_wait_event: Optional[asyncio.Event] = None
+        self._disconnecting = False
 
         # partition_id -> monotonic deadline; while time.monotonic() < deadline,
         # arm-related properties from RA polling are ignored for that partition.
@@ -231,6 +232,7 @@ class Paradox:
 
         if self._connection:
             await self.disconnect()  # socket needs to be also closed
+        self._disconnecting = False
         self.panel = None
 
         self.run_state = RunState.INIT
@@ -516,6 +518,9 @@ class Paradox:
         timeout=cfg.IO_TIMEOUT,
         reply_expected=None,
     ) -> Optional[Container]:
+        if self._disconnecting:
+            raise ConnectionError("Disconnecting")
+
         # Connection closed
         if not self.connection.connected:
             raise ConnectionError("Not connected")
@@ -533,6 +538,9 @@ class Paradox:
                 logger.debug("Request retry (attempt %d/%d)", attempt, retries)
 
             async with self.request_lock:
+                if self._disconnecting:
+                    raise ConnectionError("Disconnecting")
+
                 t1 = time.time()
                 result = "unknown"
                 try:
@@ -952,6 +960,7 @@ class Paradox:
 
     async def disconnect(self):
         async with self._loop_primitive("_disconnect_lock", asyncio.Lock):
+            self._disconnecting = True
             logger.info("Disconnecting from the Alarm Panel")
             self.run_state = RunState.STOP
 

@@ -374,6 +374,40 @@ async def test_overlapping_disconnects_serialize_session_teardown():
 
 
 @pytest.mark.asyncio
+async def test_disconnect_rejects_queued_requests_after_close_message():
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    class Waiting(ScriptedSerial):
+        async def end_session(self) -> None:
+            entered.set()
+            await release.wait()
+
+    connection = Waiting(EVO_REPLIES)
+    alarm = make_alarm(connection)
+    assert await alarm.connect()
+
+    async with alarm.request_lock:
+        queued = asyncio.create_task(
+            alarm.send_wait(message=bytes.fromhex("5000"), reply_expected=None)
+        )
+        await asyncio.sleep(0)
+        assert not queued.done()
+
+        disconnect = asyncio.create_task(alarm.disconnect())
+        await entered.wait()
+
+    with pytest.raises(ConnectionError, match="Disconnecting"):
+        await queued
+    assert connection.transport is not None
+    assert [m.hex() for m in connection.transport.tx] == EVO_TX
+
+    release.set()
+    await disconnect
+    assert connection.transport.closed
+
+
+@pytest.mark.asyncio
 async def test_transport_closes_when_end_session_fails():
     class Failing(ScriptedSerial):
         async def end_session(self) -> None:
