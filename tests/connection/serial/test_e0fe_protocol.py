@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from paradox.connections.serial.e0fe import E0FECodec
 from paradox.connections.serial.e0fe_protocol import E0FESerialConnectionProtocol
 
 from tests.connection.serial import e0fe_vectors as v
@@ -119,6 +120,18 @@ async def test_failed_write_invalidates(link):
     with pytest.raises(ConnectionError):
         protocol.send_message(v.READ_RAM16)
     assert transport.tx == []
+
+
+async def test_short_valid_reply_is_dispatched(link):
+    protocol, transport, handler = link
+    protocol.start_wrapping()
+    protocol.send_message(v.READ_RAM16)
+
+    protocol.data_received(E0FECodec().wrap(b"\x00"))
+
+    assert received(handler) == [b"\x00"]
+    assert not protocol.awaiting_reply_to(v.READ_RAM16)
+    assert protocol.is_active()
 
 
 async def test_invalid_message_is_not_sent(link):

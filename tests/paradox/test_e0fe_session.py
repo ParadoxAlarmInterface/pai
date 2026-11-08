@@ -405,6 +405,37 @@ async def test_no_close_while_a_request_is_unanswered():
         await request
 
 
+async def test_concurrent_disconnect_blocks_requests_and_sends_close_once(monkeypatch):
+    connection = ScriptedSerial(HANDSHAKE + [STATUS, CLOSE])
+    alarm, received = make_alarm(connection)
+    assert await alarm.connect()
+    assert await read_ram16(alarm) is not None
+    ending = asyncio.Event()
+    release = asyncio.Event()
+    end_session = connection.end_session
+
+    async def paused_end_session():
+        ending.set()
+        await release.wait()
+        await end_session()
+
+    monkeypatch.setattr(connection, "end_session", paused_end_session)
+    first = asyncio.create_task(alarm.disconnect())
+    await asyncio.wait_for(ending.wait(), 1)
+    second = asyncio.create_task(alarm.disconnect())
+    try:
+        with pytest.raises(ConnectionError, match="Disconnecting"):
+            await read_ram16(alarm)
+        assert not connection.transport.closed
+    finally:
+        release.set()
+        await asyncio.wait_for(asyncio.gather(first, second), 1)
+
+    assert received[-1] == v.CLOSE_ACK
+    assert sent(connection) == [step[0] for step in HANDSHAKE + [STATUS, CLOSE]]
+    assert connection.transport.closed
+
+
 async def test_no_close_on_an_invalid_session():
     connection = ScriptedSerial(
         HANDSHAKE + [(v.TX_READ_RAM16, [v.RX_BAD_INNER_CHECKSUM])]

@@ -28,7 +28,7 @@ cfg: Any = config
 
 def _is_live_event(message: bytes) -> bool:
     """Unsolicited ``Ex FF`` event: it is not the answer to any request."""
-    return message[0] >> 4 == 0xE and message[1] == 0xFF
+    return len(message) >= 2 and message[0] >> 4 == 0xE and message[1] == 0xFF
 
 
 class E0FESerialConnectionProtocol(SerialConnectionProtocol):
