@@ -290,27 +290,26 @@ class SerialFileDecryptor:
         return direction, message
 
     def _handle_encrypted_frame(self, direction, message):
-        """Handle E0 FE encrypted frames. Returns True if decrypted (skip fallback)."""
+        """Decode and print an encrypted frame, falling back when decoding fails."""
         # An E0 FE frame carries its own length (LE16) and a 16-bit sum, which an
         # AES or compact frame matches only by coincidence (~1 in 2**24 or
         # less). Anything that does not also unwrap cleanly falls through.
         if is_frame(message):
             try:
-                plaintext = self.e0fe.unwrap(message)
+                plaintext = self.e0fe.unwrap(message, transmitted=direction == "TX")
             except ValueError:
                 pass
             else:
                 self._print_decrypted("E0 FE", direction, message, plaintext)
-                return True
+                return
 
         if self.key_bytes:
             plaintext = decrypt_serial_message(message, self.key_bytes)
             if plaintext:
                 self._print_decrypted("AES-256", direction, message, plaintext)
-                return True
+                return
 
         self._print_encrypted_fallback(message)
-        return False
 
     def _print_decrypted(self, method, direction, message, plaintext):
         print(
@@ -372,8 +371,7 @@ class SerialFileDecryptor:
             )
 
             if self._is_encrypted_frame(message):
-                if self._handle_encrypted_frame(direction, message):
-                    continue
+                self._handle_encrypted_frame(direction, message)
             else:
                 self._handle_plain_frame(direction, message)
 

@@ -92,11 +92,7 @@ class Config:
         "KEEP_ALIVE_INTERVAL": 10,  # Interval between status updates
         "IO_TIMEOUT": 0.5,  # Timeout for IO operations
         "LIMITS": {},  # By default all zones will be monitored
-        "MODULE_PGM_ADDRESSES": (
-            {},
-            dict,
-            None,
-        ),  # Map of bus module address -> pgm count, e.g. {4: 4}
+        "MODULE_PGM_ADDRESSES": [],  # Entries with bus module address and PGM count
         "LABEL_ENCODING": "paradox-en",  # Encoding to use when decoding labels. paradox-* or https://docs.python.org/3/library/codecs.html#standard-encodings
         "LABEL_REFRESH_INTERVAL": (
             15 * 60,
@@ -237,6 +233,7 @@ class Config:
         "PUSHBULLET_KEY": "",  # Authentication key used for Pushbullet
         "PUSHBULLET_DEVICE": "pai",  # Destination device for notifications
         "PUSHBULLET_CONTACTS": [],  # Pushbullet user identifiers for notifications and interaction
+        "PUSHBULLET_COMMAND_PREFIX": "",  # Only pushes starting with this prefix are commands, e.g. "command" for "command partition all arm". Empty: every push is a command
         "PUSHBULLET_IGNORE_EVENTS": [],  # List of tuples or regexp matching "type,label,property=value,property2=value" eg. [(major, minor), "zone:HOME:entry_delay=True", ...]
         "PUSHBULLET_ALLOW_EVENTS": [],  # Same as before but as a white list. Default is use EVENT_FILTERS
         "PUSHBULLET_EVENT_FILTERS": [  # list of tags, property changes to include or exclude. See event.py for tag list
