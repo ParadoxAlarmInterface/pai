@@ -375,8 +375,11 @@ class Paradox:
             )
 
     async def sync_time(self):
-        if cfg.CONNECTION_TYPE == "PRT3":
-            return  # PRT3 has no SetTimeDate command
+        if (
+            cfg.CONNECTION_TYPE == "PRT3"
+            or self.panel.settings.get("product_id") == "MAGELLAN_MG6250"
+        ):
+            return  # Neither protocol implements SetTimeDate.
         now = datetime.now().astimezone()
         if cfg.SYNC_TIME_TIMEZONE:
             try:

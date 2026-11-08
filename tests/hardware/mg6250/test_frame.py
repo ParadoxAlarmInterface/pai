@@ -29,6 +29,7 @@ from paradox.hardware.mg6250.panel import (
     OBJ_ZONE_STATUS,
     PARTITION_ACTIONS,
     PARTITION_STATUS_FIELD,
+    SERVICE_CONTROL,
     SERVICE_OBJECTS,
     SYSTEM_FIELD_STATUS,
     ZONE_ALARM_MEMORY,
@@ -45,7 +46,9 @@ from paradox.hardware.mg6250.panel import (
     decode_date,
     parse_records,
 )
+from paradox.lib.crypto import encrypt as paradox_encrypt
 from paradox.lib.handlers import HandlerRegistry
+from paradox.paradox import Paradox
 from paradox.parsers.status import convert_raw_status
 
 IDENTIFY = bytes.fromhex("de00000a00000001951a")
@@ -244,6 +247,41 @@ def test_parse_records_stops_at_padding():
     assert (parsed.obj, parsed.index, parsed.fields) == (1, 2, {1: b"AB"})
 
 
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "000e0001000200000100000241",  # truncated record
+        "000d0001000200000100000241",  # truncated field within complete record
+        "000e000100020001010000024142",  # record error status
+        "000e000100020000010100024142",  # field error status
+        "000e00010002000001000002414201",  # junk after valid record
+        "000e0001000200000100000241420000",  # more than one terminator
+    ],
+)
+def test_parse_records_rejects_malformed_or_failed_reads(raw):
+    with pytest.raises(StatusRequestException, match="record reply"):
+        parse_records(bytes.fromhex(raw))
+
+
+@pytest.mark.parametrize("padding", [b"", b"\xee" * 6, b"\x00", b"\x00" + b"\xee" * 5])
+def test_parse_records_preserves_field_ending_in_padding_byte(padding):
+    (record,) = parse_records(bytes.fromhex("000e0001000200000100000241ee") + padding)
+    assert record.fields == {1: b"A\xee"}
+
+
+async def test_read_records_merges_fields_across_fragments():
+    panel = session_panel(0xB4, 0x62, SET_TIME_KEY)
+    panel.transact = AsyncMock(
+        return_value=[
+            bytes.fromhex("000e000100020000010000024142") + b"\xee" * 2,
+            bytes.fromhex("000d0001000200000000000100") + b"\xee" * 3,
+        ]
+    )
+    assert await panel.read_records([(OBJ_ZONE, 2, [0, 1])]) == {
+        (OBJ_ZONE, 2): {0: b"\x00", 1: b"AB"}
+    }
+
+
 async def test_transact_acks_last_fragment():
     core = AsyncMock()
     core.connection = MagicMock()
@@ -269,6 +307,45 @@ async def test_transact_pauses_after_last_ack():
     start = loop.time()
     await panel.transact(SERVICE_OBJECTS, b"")
     assert loop.time() - start >= ACK_GAP
+
+
+@pytest.mark.parametrize("fragment_count", [1, 2])
+async def test_transact_serializes_fragments_and_ack_gap(fragment_count):
+    core = Paradox()
+    core._connection = MagicMock(connected=True)
+    panel = session_panel(0xB4, 0x62, SET_TIME_KEY, core)
+    writes = []
+    loop = asyncio.get_running_loop()
+    core.connection.write.side_effect = lambda raw: writes.append((loop.time(), raw))
+
+    async def wait_for_message(check, timeout):
+        header, _ = panel.decrypt_data(payload(writes[-1][1]))
+        await asyncio.sleep(0)  # let the other transaction queue behind send_wait
+        fragment = 1 if header.kind == KIND_DATA else header.fragment + 1
+        if header.tid != 1 or fragment == fragment_count:
+            fragment |= LAST_FRAGMENT
+        reply = Frame.parse(
+            panel.build_data_frame(
+                panel._encrypted_header(header.tid, fragment, KIND_DATA, header.service)
+                + b"\x01\x00"
+                + paradox_encrypt(bytes(16), panel.session_key)
+            )
+        )
+        assert check(reply)
+        return reply
+
+    core.connection.wait_for_message = AsyncMock(side_effect=wait_for_message)
+    await asyncio.wait_for(
+        asyncio.gather(
+            panel.transact(SERVICE_OBJECTS, b""),
+            panel.transact(SERVICE_CONTROL, b""),
+        ),
+        timeout=2,
+    )
+
+    headers = [panel.decrypt_data(payload(raw))[0] for _, raw in writes]
+    assert [header.tid for header in headers] == [1] * (fragment_count + 1) + [2, 2]
+    assert writes[-2][0] - writes[-3][0] >= ACK_GAP
 
 
 def test_panel_ack_handler_takes_only_acks():
@@ -375,7 +452,7 @@ def status_reads(counters, zones=None, partition=bytes(6)):
 
     async def read_records(requests):
         requests = list(requests)
-        if requests[0][0] == OBJ_ZONE_STATUS:
+        if requests[0][0] != OBJ_SYSTEM:
             return {
                 (obj, i): (
                     {ZONE_STATUS_FIELD: zones.get(i, bytes([i == 6, 4, 0]))}
@@ -486,8 +563,65 @@ async def test_request_status_without_counter_raises():
         await panel.request_status(OBJ_CLOCK)
 
 
+@pytest.mark.parametrize(
+    "obj, index, fields",
+    [
+        (OBJ_ZONE_STATUS, 6, None),
+        (OBJ_ZONE_STATUS, 6, {}),
+        (OBJ_ZONE_STATUS, 6, {ZONE_STATUS_FIELD: b""}),
+        (OBJ_ZONE_STATUS, 6, {ZONE_STATUS_FIELD: b"\x04"}),
+        (OBJ_PARTITION_STATUS, 1, None),
+        (OBJ_PARTITION_STATUS, 1, {}),
+        (OBJ_PARTITION_STATUS, 1, {PARTITION_STATUS_FIELD: b""}),
+        (OBJ_PARTITION_STATUS, 1, {PARTITION_STATUS_FIELD: b"\x77"}),
+        (OBJ_PARTITION_STATUS, 1, {PARTITION_STATUS_FIELD: b"\x77\x02"}),
+    ],
+)
+async def test_incomplete_status_preserves_snapshot_and_retries(obj, index, fields):
+    panel = session_panel(0x94, 0x42, STATUS_KEY)
+    panel._zones = [1, 6]
+    read_records = status_reads(
+        [1, 2, 2],
+        zones={6: b"\x04\x30\x00"},
+        partition=bytes.fromhex("770240000000"),
+    )
+    panel.read_records = read_records
+    expected = await panel.request_status(0)
+    old_zones = panel._zone_status
+    old_partitions = panel._partition_status
+
+    async def incomplete_read(requests):
+        records = await read_records(requests)
+        if (obj, index) in records:
+            if fields is None:
+                del records[obj, index]
+            else:
+                records[obj, index] = fields
+        return records
+
+    panel.read_records = AsyncMock(side_effect=incomplete_read)
+    with pytest.raises(StatusRequestException, match="status reply"):
+        await panel.request_status(0)
+    assert panel._zone_status is old_zones
+    assert panel._partition_status is old_partitions
+    assert panel._change_counter == 1
+
+    panel.read_records = read_records
+    assert await panel.request_status(0) == expected
+    assert panel._change_counter == 2
+    assert read_records.await_count == 6
+
+
+async def test_request_status_without_enrolled_zones():
+    panel = session_panel(0x94, 0x42, STATUS_KEY)
+    panel.read_records = status_reads([1])
+    status = await panel.request_status(0)
+    assert status.zone_open == {}
+    assert status.partition_arm == {1: False}
+
+
 async def test_load_labels_skips_empty_slots(monkeypatch):
-    monkeypatch.setattr(cfg, "LIMITS", {})
+    monkeypatch.setattr(cfg, "LIMITS", {"zone": [1, 2]})
     panel = session_panel(0x3E, 0x00, ZONES_KEY)
 
     async def read_objects(obj, indexes, fields):
@@ -519,11 +653,10 @@ async def test_load_labels_skips_empty_slots(monkeypatch):
             "id": 1,
             "key": "Zone_1",
             "label": "Zone 1",
-            "definition": "Instant (Sleep / Full Arm)",
         }
     }
     assert labels["keypad"] == {}
-    assert panel._status_zones() == [1]  # status polls enrolled zones only
+    assert panel._zones == [1]  # status polls enrolled zones only
     assert labels["user"] == {
         1: {"id": 1, "key": "System_Master", "label": "System Master"}
     }
@@ -535,14 +668,47 @@ async def test_load_labels_names_partition_without_area_label(monkeypatch):
     panel = session_panel(0x3E, 0x00, ZONES_KEY)
 
     async def read_objects(obj, indexes, fields):
+        if obj == OBJ_ZONE:
+            return {index: {FIELD_SERIAL: bytes(6)} for index in indexes}
         return {}
 
     panel.read_objects = read_objects
     labels = await panel.load_labels()
+    assert labels["zone"] == {}
+    assert panel._zones == []
     assert labels["user"] == {}
     assert labels["partition"] == {
         1: {"id": 1, "key": "Partition_1", "label": "Partition 1"}
     }
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [None, {}, {FIELD_SERIAL: b""}, {FIELD_SERIAL: b"\x10\x20"}],
+)
+async def test_load_labels_rejects_incomplete_enrollment(monkeypatch, fields):
+    monkeypatch.setattr(cfg, "LIMITS", {"zone": [1, 6]})
+    panel = session_panel(0x3E, 0x00, ZONES_KEY)
+    panel._zones = [1, 6]
+    objects = {
+        1: {FIELD_SERIAL: bytes.fromhex("102009018700")},
+        6: {FIELD_SERIAL: bytes.fromhex("102009018700")},
+    }
+
+    async def read_objects(obj, indexes, requested_fields):
+        return objects if obj == OBJ_ZONE else {}
+
+    panel.read_objects = read_objects
+    valid_zone = objects.pop(6)
+    if fields is not None:
+        objects[6] = fields
+    with pytest.raises(StatusRequestException, match="enrollment reply for zone 6"):
+        await panel.load_labels()
+    assert panel._zones == [1, 6]
+
+    objects[6] = valid_zone
+    labels = await panel.load_labels()
+    assert sorted(labels["zone"]) == panel._zones == [1, 6]
 
 
 # arm-full-09.pcapng (same session as the zone status capture): arm request and its reply,

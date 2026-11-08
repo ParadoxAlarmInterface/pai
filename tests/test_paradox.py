@@ -1,9 +1,49 @@
+from datetime import datetime
 from unittest.mock import AsyncMock
 
 import pytest
 
-from paradox.hardware import Panel
+from paradox.config import config as cfg
+from paradox.hardware import Panel, create_panel
 from paradox.paradox import Paradox
+
+
+@pytest.mark.parametrize(
+    "connection_type, product_id, supported",
+    [
+        ("Serial", "MAGELLAN_MG6250", False),
+        ("PRT3", None, False),
+        ("Serial", "DIGIPLEX_EVO_192", True),
+        ("Serial", "MAGELLAN_MG5050", True),
+    ],
+)
+async def test_sync_time_respects_panel_support(
+    monkeypatch, mocker, connection_type, product_id, supported
+):
+    monkeypatch.setattr(cfg, "CONNECTION_TYPE", connection_type)
+    monkeypatch.setattr(cfg, "SYNC_TIME", True)
+    monkeypatch.setattr(cfg, "SYNC_TIME_TIMEZONE", "")
+    alarm = Paradox()
+    alarm.panel = create_panel(
+        alarm, _start_communication_reply(product_id) if product_id else None
+    )
+    alarm.storage.get_container("system").deep_merge(
+        {"date": {"time": datetime(2000, 1, 1)}}
+    )
+    drift_check = mocker.spy(alarm, "_is_time_sync_required")
+    alarm.send_wait = AsyncMock()
+
+    await alarm.sync_time()
+
+    if supported:
+        drift_check.assert_called_once()
+        alarm.send_wait.assert_awaited_once()
+        assert alarm.send_wait.call_args.args[0] is alarm.panel.get_message(
+            "SetTimeDate"
+        )
+    else:
+        drift_check.assert_not_called()
+        alarm.send_wait.assert_not_awaited()
 
 
 @pytest.mark.asyncio

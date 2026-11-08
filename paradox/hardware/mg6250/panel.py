@@ -4,7 +4,7 @@ Login, labels (zones, keypads, repeaters, sirens, users, partition 1), the
 panel clock, battery and AC voltage, zone open/alarm and partition 1 exit
 delay/armed/alarm as status (the alarm bits are provisional), and arm / arm
 stay / arm sleep / disarm of partition 1. Stay/sleep status and other
-controls are not implemented.
+controls, including time synchronization, are not implemented.
 """
 
 import asyncio
@@ -21,15 +21,18 @@ from construct import (
     ConstructError,
     Container,
     FixedSized,
+    FocusedSeq,
     GreedyBytes,
     GreedyRange,
     Int8ub,
     Int16ub,
     Int16ul,
+    Optional,
     Prefixed,
     RawCopy,
     Rebuild,
     Struct,
+    Terminated,
     len_,
     this,
 )
@@ -179,43 +182,6 @@ FIELD_LABEL = 1  # 16 bytes
 # zone reads 00 00 00 01 87 00. change-zone: BabyWare wrote definition
 # 09 -> 08 for zones 4-7.
 ZONE_DEFINITION = 2
-# MG6250 programming guide, table 4 (BabyWare's names)
-ZONE_DEFINITIONS = {
-    0: "Disabled",
-    1: "Entry Delay 1",
-    2: "Entry Delay 2",
-    3: "Entry Delay 1 (Full Arm)",
-    4: "Entry Delay 2 (Full Arm)",
-    5: "Follow",
-    6: "Follow (Sleep / Full Arm)",
-    7: "Follow (Full Arm)",
-    8: "Instant",
-    9: "Instant (Sleep / Full Arm)",
-    10: "Instant (Full Arm)",
-    11: "Instant Fire",
-    12: "Delayed Fire",
-    13: "Instant Fire Silent",
-    14: "Delayed Fire Silent",
-    15: "24Hr Buzzer",
-    16: "24Hr Burglary",
-    17: "24Hr Hold Up",
-    18: "24Hr Gas",
-    19: "24Hr Heat",
-    20: "24Hr Water",
-    21: "24Hr Freeze",
-    22: "24Hr Panic",
-    23: "Follow No Pre-Alarm",
-    24: "Instant No Pre-Alarm",
-    25: "Keyswitch Maintain",
-    26: "Keyswitch Momentary",
-    27: "Entry Delay 1 (Sleep / Full Arm)",
-    28: "Entry Delay 2 (Sleep / Full Arm)",
-    29: "Unarmed",
-    33: "Custom 1",
-    34: "Custom 2",
-    35: "Custom 3",
-    36: "Custom 4",
-}
 CLOCK_FIELDS = (0, 1, 2, 3)  # BabyWare's selection; field 1 is the date
 CLOCK_FIELD_DATE = 1  # century, year, month, day, hour, minute
 # battery | AC | unknown, one byte each. BabyWare showed Battery 5.3 V and AC
@@ -228,7 +194,6 @@ SYSTEM_FIELD_STATUS = 1  # byte 0: counter, changes when a zone does
 # byte 0: non-zero = open (01; 04 on the zone in alarm); byte 1: flags below;
 # byte 2 unknown
 ZONE_STATUS_FIELD = 0
-ZONE_COUNT = 64
 # Provisional, from one alarm capture (and set-sms for the memory flag).
 # Zone status byte 1: 0x04 on every zone during the exit delay (not used),
 # 0x10 on the zone in alarm, 0x20 alarm in memory (stays once closed).
@@ -250,12 +215,30 @@ LABEL_OBJECTS = {
 }
 READ_BATCH = 8  # objects per request, keeps the request in one frame
 
+ReadRecordRequest = Struct(
+    "op" / Const(OP_READ, Int8ub),
+    "length" / Rebuild(Int8ub, 7 + 2 * len_(this.fields)),
+    "obj" / Int16ub,
+    "index" / Int16ub,
+    "reserved" / Const(0, Int8ub),
+    "fields"
+    / GreedyRange(
+        Struct(
+            "id" / Int8ub,
+            "reserved" / Const(0, Int8ub),
+        )
+    ),
+)
+
 
 def build_read_record(obj: int, index: int, fields: typing.Iterable[int]) -> bytes:
-    """op | len | obj (BE16) | index (BE16) | 00 | (field, 00)..."""
-    body = obj.to_bytes(2, "big") + index.to_bytes(2, "big") + b"\x00"
-    body += b"".join(bytes([f, 0]) for f in fields)
-    return bytes([OP_READ, 2 + len(body)]) + body
+    return ReadRecordRequest.build(
+        {
+            "obj": obj,
+            "index": index,
+            "fields": [{"id": field} for field in fields],
+        }
+    )
 
 
 class FieldsAdapter(Adapter):
@@ -267,7 +250,7 @@ class FieldsAdapter(Adapter):
 
 RecordField = Struct(
     "id" / Int8ub,
-    "status" / Int8ub,
+    "status" / Const(0, Int8ub),
     "value" / Prefixed(Int16ub, GreedyBytes),
 )
 
@@ -279,16 +262,24 @@ Record = Struct(
     "length" / Int8ub,
     "obj" / Int16ub,
     "index" / Int16ub,
-    "status" / Bytes(2),
+    "status" / Const(bytes(2)),
     "fields"
     / FieldsAdapter(
-        FixedSized(this.length - RECORD_HEADER_LEN, GreedyRange(RecordField))
+        FixedSized(
+            this.length - RECORD_HEADER_LEN,
+            FocusedSeq("fields", "fields" / GreedyRange(RecordField), Terminated),
+        )
     ),
 )
 
-# GreedyRange stops at the first record that does not parse: trailing 0xEE
-# padding reads as length 0xEE, which never fits in what is left.
-Records = GreedyRange(Record)
+# Captures end with a zero terminator before padding; some have no padding.
+Records = FocusedSeq(
+    "records",
+    "records" / GreedyRange(Record),
+    Optional(Const(b"\x00")),
+    GreedyRange(Const(PAD, Int8ub)),
+    Terminated,
+)
 
 
 def parse_records(data: bytes) -> typing.List[Container]:
@@ -297,7 +288,10 @@ def parse_records(data: bytes) -> typing.List[Container]:
     record = op | len | obj (BE16) | index (BE16) | status (2) | fields...
     field  = id | status | len (BE16) | value
     """
-    return Records.parse(data)
+    try:
+        return Records.parse(data)
+    except ConstructError as exc:
+        raise StatusRequestException("MG6250: invalid record reply") from exc
 
 
 def decode_date(raw: bytes) -> typing.Optional[datetime.datetime]:
@@ -368,7 +362,7 @@ class PanelAckHandler(Handler):
 class Panel(PanelBase):
     event_map = {}  # TODO
     property_map = {}  # TODO
-    status_request_addresses = [OBJ_CLOCK]
+    status_request_addresses = [0]
 
     def __init__(
         self, core, start_communication_response=None, variable_message_length=False
@@ -381,7 +375,8 @@ class Panel(PanelBase):
         self.session = None  # LoginResponse once logged in
         self.session_key = None  # 16-byte AES key for cmd 0x24 traffic
         self._tid = 0
-        self._zones = None  # enrolled zones, from load_labels
+        self._transaction_lock = None
+        self._zones = []  # enrolled zones, set by load_labels before polling
         self._change_counter = None  # last object 0x1c counter seen
         # read when the counter changes: {zone: field 0}, {partition: field 0}
         self._zone_status = None
@@ -479,25 +474,30 @@ class Panel(PanelBase):
 
         Each fragment is padded on its own, so parse them separately.
         """
-        self._tid = self._tid % 0xFF + 1
-        tid = self._tid
-        message = self.build_request(tid, service, data)
-        fragments = []
-        while True:
-            reply = await self.core.send_wait(
-                message=message,
-                reply_expected=lambda m: self._is_reply(m, tid, service),
-            )
-            if reply is None:
-                raise StatusRequestException(f"MG6250: no reply to request {tid}")
-            header, reply_data = self.decrypt_data(bytes(reply.fields.value.payload))
-            fragments.append(reply_data)
-            message = self.build_ack(tid, header.fragment, service)
-            if header.fragment & LAST_FRAGMENT:
-                # send_wait without a reply would resend it; write the ack once.
-                self.core.connection.write(message)
-                await asyncio.sleep(ACK_GAP)
-                return fragments
+        if self._transaction_lock is None:
+            self._transaction_lock = asyncio.Lock()
+        async with self._transaction_lock:
+            self._tid = self._tid % 0xFF + 1
+            tid = self._tid
+            message = self.build_request(tid, service, data)
+            fragments = []
+            while True:
+                reply = await self.core.send_wait(
+                    message=message,
+                    reply_expected=lambda m: self._is_reply(m, tid, service),
+                )
+                if reply is None:
+                    raise StatusRequestException(f"MG6250: no reply to request {tid}")
+                header, reply_data = self.decrypt_data(
+                    bytes(reply.fields.value.payload)
+                )
+                fragments.append(reply_data)
+                message = self.build_ack(tid, header.fragment, service)
+                if header.fragment & LAST_FRAGMENT:
+                    # send_wait without a reply would resend it; write the ack once.
+                    self.core.connection.write(message)
+                    await asyncio.sleep(ACK_GAP)
+                    return fragments
 
     async def read_records(
         self, requests: typing.Iterable[typing.Tuple[int, int, typing.Iterable[int]]]
@@ -612,21 +612,21 @@ class Panel(PanelBase):
             indexes = get_limits_for_type(elem_type, list(range(1, count + 1)))
             objects = await self.read_objects(obj, indexes, (FIELD_SERIAL, FIELD_LABEL))
             elements = data[elem_type] = {}
-            for index, fields in sorted(objects.items()):
+            for index in sorted(indexes):
+                fields = objects.get(index, {})
                 serial = fields.get(FIELD_SERIAL, b"")
                 if obj == OBJ_ZONE:
-                    enrolled = len(serial) > ZONE_DEFINITION and serial[ZONE_DEFINITION]
+                    if len(serial) <= ZONE_DEFINITION:
+                        raise StatusRequestException(
+                            f"MG6250: incomplete enrollment reply for zone {index}"
+                        )
+                    enrolled = serial[ZONE_DEFINITION]
                 else:
                     enrolled = any(serial)
                 if not enrolled:
                     continue  # nothing enrolled at this index, or zone disabled
                 label = self.decode_label(fields.get(FIELD_LABEL, b""))
                 element = self.label_element(elem_type, index, label)
-                if obj == OBJ_ZONE:
-                    definition = serial[ZONE_DEFINITION]
-                    element["definition"] = ZONE_DEFINITIONS.get(
-                        definition, f"Definition {definition}"
-                    )
                 elements[index] = element
             self.log_labels_loaded(elem_type, elements, start_time)
         self._zones = sorted(data["zone"])
@@ -663,12 +663,7 @@ class Panel(PanelBase):
         self.log_labels_loaded("partition", data["partition"], start_time)
         return data
 
-    def _status_zones(self) -> typing.List[int]:
-        if self._zones is not None:
-            return self._zones
-        return get_limits_for_type("zone", list(range(1, ZONE_COUNT + 1)))
-
-    async def request_status(self, nr) -> typing.Optional[Container]:
+    async def request_status(self, _nr) -> typing.Optional[Container]:
         """Panel clock, battery and AC voltage, zone open/alarm and partition
         exit delay/armed/alarm.
 
@@ -688,26 +683,33 @@ class Panel(PanelBase):
         counter = counter[0]
         if self._zone_status is None or counter != self._change_counter:
             records = await self.read_records(
-                [
-                    (OBJ_ZONE_STATUS, i, [ZONE_STATUS_FIELD])
-                    for i in self._status_zones()
-                ]
+                [(OBJ_ZONE_STATUS, i, [ZONE_STATUS_FIELD]) for i in self._zones]
                 + [
                     (OBJ_PARTITION_STATUS, i, [PARTITION_STATUS_FIELD])
                     for i in CONTROL_PARTITIONS
                 ]
             )
-            self._zone_status = {
-                index: fields[ZONE_STATUS_FIELD].ljust(2, b"\x00")
-                for (obj, index), fields in records.items()
-                if obj == OBJ_ZONE_STATUS and ZONE_STATUS_FIELD in fields
+            zones = {
+                index: records.get((OBJ_ZONE_STATUS, index), {}).get(
+                    ZONE_STATUS_FIELD, b""
+                )[:2]
+                for index in self._zones
             }
-            self._partition_status = {
-                index: fields[PARTITION_STATUS_FIELD].ljust(3, b"\x00")
-                for (obj, index), fields in records.items()
-                if obj == OBJ_PARTITION_STATUS and PARTITION_STATUS_FIELD in fields
+            partitions = {
+                index: records.get((OBJ_PARTITION_STATUS, index), {}).get(
+                    PARTITION_STATUS_FIELD, b""
+                )[:3]
+                for index in CONTROL_PARTITIONS
             }
-            # only once the zones are read, so a failed read is retried
+            if any(len(value) < 2 for value in zones.values()):
+                raise StatusRequestException("MG6250: incomplete zone status reply")
+            if any(len(value) < 3 for value in partitions.values()):
+                raise StatusRequestException(
+                    "MG6250: incomplete partition status reply"
+                )
+            # Commit the whole snapshot together so an incomplete read is retried.
+            self._zone_status = zones
+            self._partition_status = partitions
             self._change_counter = counter
 
         system = Container(date=Container(time=decode_date(date)))
@@ -772,11 +774,8 @@ class Panel(PanelBase):
                 logger.exception("MG6250: %s failed", command)
                 continue
             reply = b"".join(fragments)
-            serial_end = len(CONTROL_PREFIX) + len(self.panel_serial)
-            status = reply[serial_end : serial_end + len(CONTROL_OK)]
-            if reply[len(CONTROL_PREFIX) : serial_end] == self.panel_serial and (
-                status == CONTROL_OK
-            ):
+            expected_reply = CONTROL_PREFIX + self.panel_serial + CONTROL_OK
+            if reply.startswith(expected_reply):
                 accepted = True
             else:
                 logger.error("MG6250: %s refused, reply %s", command, reply.hex())
