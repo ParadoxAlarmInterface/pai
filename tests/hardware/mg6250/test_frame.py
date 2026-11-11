@@ -10,6 +10,7 @@ from paradox.connections.serial.encryption import make_serial_key
 from paradox.event import LiveEvent
 from paradox.exceptions import AuthenticationFailed, StatusRequestException
 from paradox.hardware.mg6250.panel import (
+    AC_VOLTS_PER_STEP,
     ACK_GAP,
     AREA_FIELD_LABEL,
     CLOCK_FIELD_DATE,
@@ -28,6 +29,9 @@ from paradox.hardware.mg6250.panel import (
     OBJ_AREA,
     OBJ_CLOCK,
     OBJ_PARTITION_STATUS,
+    OBJ_PGM,
+    OBJ_SETTINGS,
+    SETTINGS_FIELD_OPTIONS,
     OBJ_SYSTEM,
     OBJ_USER,
     OBJ_ZONE,
@@ -227,7 +231,8 @@ async def test_busy_login_drops_stale_session(monkeypatch, tmp_path, read):
     panel = Panel(core)
     panel.read_records = read
     assert await panel.initialize_communication("admin") is False
-    assert panel.session is None and panel.session_key is None
+    assert panel.session is None
+    assert panel.session_key is None
     assert not (tmp_path / "s.json").exists()  # not tried again at the next login
 
 
@@ -622,9 +627,12 @@ async def test_request_status_reports_clock_and_zones():
     assert status.system.date.time == datetime.datetime(2026, 10, 25, 14, 5)
     assert status.zone_open == {1: False, 6: True}
     assert (status.system.power.battery, status.system.power.ac) == (5.3, 0.0)
+    # 46 5f 09 on mains: BabyWare shows AC 7.5 V
+    assert round(0x5F * AC_VOLTS_PER_STEP, 1) == 7.5
     converted = convert_raw_status(status)
     assert converted["zone"][6] == {
         "open": True,
+        "bypassed": False,
         "presently_in_alarm": False,
         "generated_alarm": False,
     }
@@ -1048,6 +1056,7 @@ def test_property_map_covers_what_the_panel_publishes():
         "current_state",
         "target_state",
         "open",
+        "bypassed",
         "presently_in_alarm",
         "generated_alarm",
         "time",
@@ -1093,11 +1102,13 @@ async def test_request_status_reports_zone_alarm():
 
     assert converted["zone"][15] == {
         "open": True,
+        "bypassed": False,
         "presently_in_alarm": True,
         "generated_alarm": True,
     }
     assert converted["zone"][14] == {
         "open": False,
+        "bypassed": False,
         "presently_in_alarm": False,
         "generated_alarm": True,
     }
@@ -1185,7 +1196,7 @@ async def test_request_status_without_enrolled_zones():
 
 
 async def test_load_labels_skips_empty_slots(monkeypatch):
-    monkeypatch.setattr(cfg, "LIMITS", {"zone": [1, 2]})
+    monkeypatch.setattr(cfg, "LIMITS", {"zone": [1, 2], "pgm": [1, 2]})
     panel = session_panel(0x3E, 0x00, ZONES_KEY)
 
     async def read_objects(obj, indexes, fields):
@@ -1195,6 +1206,13 @@ async def test_load_labels_skips_empty_slots(monkeypatch):
         if obj == OBJ_AREA:
             assert (list(indexes), list(fields)) == ([1], [AREA_FIELD_LABEL])
             return {1: {AREA_FIELD_LABEL: b"Maison".ljust(16)}}
+        if obj == OBJ_SETTINGS:
+            assert (list(indexes), list(fields)) == ([1], [SETTINGS_FIELD_OPTIONS])
+            # as BabyWare wrote it with area 2 disabled
+            return {1: {SETTINGS_FIELD_OPTIONS: bytes.fromhex("158712fe2020200810")}}
+        if obj == OBJ_PGM:
+            assert (list(indexes), list(fields)) == ([1, 2], [FIELD_LABEL])
+            return {1: {FIELD_LABEL: b"Output 01".ljust(16)}, 2: {}}
         assert list(fields) == [FIELD_SERIAL, FIELD_LABEL]
         if obj != OBJ_ZONE:
             return {1: {FIELD_SERIAL: bytes(6), FIELD_LABEL: b"Keypad 1".ljust(16)}}
@@ -1227,6 +1245,51 @@ async def test_load_labels_skips_empty_slots(monkeypatch):
         1: {"id": 1, "key": "System_Master", "label": "System Master"}
     }
     assert labels["partition"] == {1: {"id": 1, "key": "Maison", "label": "Maison"}}
+    assert labels["pgm"] == {
+        1: {"id": 1, "key": "Output_01", "label": "Output 01"},
+        2: {"id": 2, "key": "Output_02", "label": "Output 02"},
+    }
+
+
+async def test_load_labels_lists_area_2_when_the_panel_has_two(monkeypatch):
+    """Section [2000] option 7 (long-tid-wrapped-many-operations: 55 87...)."""
+    monkeypatch.setattr(cfg, "LIMITS", {"zone": [1], "pgm": []})
+    panel = session_panel(0x3E, 0x00, ZONES_KEY)
+
+    async def read_objects(obj, indexes, fields):
+        if obj == OBJ_ZONE:  # ENTREE moved to area 2
+            return {1: {FIELD_SERIAL: bytes.fromhex("525701028700")}}
+        if obj == OBJ_SETTINGS:
+            return {1: {SETTINGS_FIELD_OPTIONS: bytes.fromhex("550712fe2020200810")}}
+        if obj == OBJ_AREA:
+            return {i: {AREA_FIELD_LABEL: b"Area %d" % i} for i in indexes}
+        return {}
+
+    panel.read_objects = read_objects
+    labels = await panel.load_labels()
+    assert sorted(labels["partition"]) == panel._partitions == [1, 2]
+    assert labels["partition"][2]["key"] == "Area_2"
+
+    # both partitions are then read at each status change
+    panel.read_records = status_reads([1], zones={1: bytes.fromhex("000004")})
+    status = await panel.request_status(OBJ_CLOCK)
+    assert status.partition_arm == {1: False, 2: False}
+    assert status.partition_ready_status == {1: True, 2: True}
+
+
+async def test_request_status_reports_bypass():
+    """ENTREE read 20 00 00 from BabyWare's bypass to its clear: not open."""
+    panel = session_panel(0x94, 0x42, STATUS_KEY)
+    panel._zones = [1, 6]
+    panel._zone_partitions = {1: 1, 6: 1}
+    panel.read_records = status_reads(
+        [15], zones={1: bytes.fromhex("200000"), 6: bytes.fromhex("210000")}
+    )
+
+    status = await panel.request_status(OBJ_CLOCK)
+
+    assert status.zone_bypassed == {1: True, 6: True}
+    assert status.zone_open == {1: False, 6: True}
 
 
 async def test_load_labels_names_partition_without_area_label(monkeypatch):
@@ -1579,7 +1642,8 @@ async def test_close_connection_logs_out(monkeypatch, tmp_path):
     panel._log_enabled = True
     panel.close_connection()
     core.connection.write.assert_called_once_with(LOGOUT_REQUEST)
-    assert panel.session is None and panel.session_key is None
+    assert panel.session is None
+    assert panel.session_key is None
     assert panel._log_enabled is False
     assert not path.exists()  # it cannot be resumed any more
 
@@ -1643,3 +1707,64 @@ async def test_tid_wraps_to_zero_as_babyware():
         )
         tids.append(header.tid)
     assert tids == [255, 0, 1]
+
+
+# long-tid-wrapped-many-operations.pcapng, decrypted (panel serial 02002de7)
+@pytest.mark.parametrize(
+    "command, partition, request_hex",
+    [
+        ("arm_stay", 2, "00ff000000000002002de711020001000000"),
+        ("disarm", 2, "00ff000000000002002de710020001000000"),
+        ("arm_stay", 1, "00ff000000000002002de711010001000000"),
+    ],
+)
+async def test_partition_2_control_matches_capture(command, partition, request_hex):
+    panel, _ = control_panel()
+    panel.panel_serial = bytes.fromhex("02002de7")
+    panel._partitions = [1, 2]
+    reply = bytes.fromhex("00ff000000000002002de7000000")
+    panel.transact = AsyncMock(return_value=[reply])
+
+    assert await panel.control_partitions([partition], command) is True
+
+    panel.transact.assert_awaited_once_with(SERVICE_CONTROL, bytes.fromhex(request_hex))
+
+
+@pytest.mark.parametrize(
+    "command, pgm, request_hex",
+    [
+        ("on", 1, "03ff000000000002002de70201000100000000000000000000"),
+        ("off", 1, "03ff000000000002002de70101000100000000000000000000"),
+        ("release", 1, "03ff000000000002002de70301000100000000000000000000"),
+        ("on", 2, "03ff000000000002002de70202000100000000000000000000"),
+    ],
+)
+async def test_output_control_matches_capture(command, pgm, request_hex):
+    panel, _ = control_panel()
+    panel.panel_serial = bytes.fromhex("02002de7")
+    reply = bytes.fromhex("03ff000000000002002de7000000")
+    panel.transact = AsyncMock(return_value=[reply])
+
+    assert await panel.control_outputs([pgm], command) is True
+
+    panel.transact.assert_awaited_once_with(SERVICE_CONTROL, bytes.fromhex(request_hex))
+
+
+async def test_output_pulse_is_on_then_off(monkeypatch):
+    monkeypatch.setattr(cfg, "OUTPUT_PULSE_DURATION", 0)
+    panel, _ = control_panel()
+    reply = bytes.fromhex("03ff0000000000") + PANEL_SERIAL + bytes(3)
+    panel.transact = AsyncMock(return_value=[reply])
+
+    assert await panel.control_outputs([2], "pulse") is True
+
+    actions = [c.args[1][11:13] for c in panel.transact.await_args_list]
+    assert actions == [b"\x02\x02", b"\x01\x02"]
+
+
+@pytest.mark.parametrize("outputs, command", [([1], "toggle"), ([9], "on")])
+async def test_output_control_refuses_what_is_not_known(outputs, command):
+    panel, _ = control_panel()
+    panel.transact = AsyncMock()
+    assert await panel.control_outputs(outputs, command) is False
+    panel.transact.assert_not_awaited()

@@ -1,10 +1,11 @@
 """Paradox MG6250 panel support (encrypted link)
 
-Login, labels (zones, keypads, repeaters, sirens, users, partition 1), the
-panel clock, battery and AC voltage, zone open/alarm and partition 1 exit
-delay/armed (stay, sleep or full)/alarm as status (the alarm bits are
-provisional), arm / arm stay / arm sleep / disarm of partition 1, and zone
-bypass and definition. Other controls are not implemented.
+Login, labels (zones, keypads, repeaters, sirens, users, partitions, outputs),
+the panel clock, battery and AC voltage, zone open/bypassed/alarm and partition
+exit delay/armed (stay, sleep or full)/alarm as status (the alarm bits are
+provisional), arm / arm stay / arm sleep / disarm of partitions 1 and 2, zone
+bypass and definition, and output on / off / release. Other controls are not
+implemented.
 """
 
 import asyncio
@@ -182,14 +183,20 @@ WRITE_SETTLE = 1
 # poll while the clock is off, and each try opens a programming session
 SET_TIME_RETRY = 600
 
-# Service 0x18 request: CONTROL_PREFIX | panel serial | action | CONTROL_TARGET.
+# Service 0x18 request: prefix | panel serial | action | target number | tail.
+# The first prefix byte is the target type: 00 partition, 01 zone, 03 PGM.
 # The reply echoes prefix and serial, then 3 status bytes (00 00 00 = done).
-# One capture per action (arm-sleep-09, arm-full-09, stay).
+# One capture per action (arm-sleep-09, arm-full-09, stay); stay arm and
+# disarm of partitions 1 and 2 in long-tid-wrapped-many-operations.
 PARTITION_ACTIONS = {"disarm": 0x10, "arm_stay": 0x11, "arm_sleep": 0x12, "arm": 0x13}
 CONTROL_PREFIX = b"\x00\xff" + bytes(5)
-# Target number, then bytes the same in every capture. All arms were on partition
-# 1 (bypass shows the number is first), so only partition 1 can be controlled.
-CONTROL_TARGET = bytes.fromhex("010001000000")
+CONTROL_TAIL = bytes.fromhex("0001000000")  # the same in every capture
+# long-tid-wrapped-many-operations: BabyWare's Activate, Deactivate and Release
+# on PGM 1 then 2 sent 02, 01, 03, in that order.
+CONTROL_PGM_PREFIX = b"\x03\xff" + bytes(5)
+CONTROL_PGM_TAIL = bytes.fromhex("0001") + bytes(10)
+PGM_ACTIONS = {"on": 0x02, "off": 0x01, "release": 0x03}
+PGM_PULSE = "pulse"  # on, cfg.OUTPUT_PULSE_DURATION, off
 # captures/bypass: 01 sets and 00 clears, not a toggle; the target is the zone
 CONTROL_ZONE_PREFIX = b"\x01\xff" + bytes(5)
 ZONE_ACTIONS = {"bypass": 0x01, "clear_bypass": 0x00}
@@ -198,7 +205,7 @@ ZONE_ACTIONS = {"bypass": 0x01, "clear_bypass": 0x00}
 # to 9; change-zone: zones 4-7).
 ZONE_DEFINITION_COMMAND = "definition_"
 CONTROL_OK = bytes(3)
-CONTROL_PARTITIONS = [1]
+PARTITIONS = [1, 2]  # 2 only with section [2000] option 7, see load_labels
 IDENTIFY_SERIAL = slice(8, 12)  # panel serial in the first identify reply
 
 # Objects (big-endian ids), with the index count BabyWare reads
@@ -206,6 +213,13 @@ OBJ_ZONE = 0x0001
 OBJ_KEYPAD = 0x0009
 OBJ_REPEATER = 0x000B
 OBJ_SIREN = 0x000D
+OBJ_PGM = 0x0005  # field 1 label ("Output 01")
+PGM_COUNT = 8
+# Field 1: one byte per section from [2000] on, option 1 = bit 0 (55 87 12 fe
+# ...). BabyWare wrote 15 <-> 55 to disable / enable area 2.
+OBJ_SETTINGS = 0x0017
+SETTINGS_FIELD_OPTIONS = 1
+OPTION_TWO_PARTITIONS = 0x40  # [2000] option 7
 OBJ_SYSTEM = 0x001C
 OBJ_ZONE_STATUS = 0x001E
 OBJ_CLOCK = 0x0024
@@ -266,21 +280,26 @@ ZONE_DEFINITION_NUMBERS = {name: n for n, name in ZONE_DEFINITIONS.items()}
 CLOCK_FIELDS = (0, 1, 2, 3)  # BabyWare's selection; field 1 is the date
 CLOCK_FIELD_DATE = 1  # century, year, month, day, hour, minute
 # battery | AC | unknown, one byte each. BabyWare showed Battery 5.3 V and AC
-# 0.0 for 42 00 0c: 0.08 V per step (20.4 V full scale). The AC byte uses the
-# same scale: 0x5f = 7.6 V on mains with the 7.5 V adapter (2026-11-04).
+# 0.0 for 42 00 0c: 0.08 V per step (20.4 V full scale). On mains with the
+# 7.5 V adapter the AC byte is 0x5f and BabyWare shows 7.5 V (2026-11-11): a
+# little less per step, from this one point.
 CLOCK_FIELD_POWER = 2
 VOLTS_PER_STEP = 0.08
+AC_VOLTS_PER_STEP = 0.079
 SYSTEM_FIELDS = (0, 1)  # what BabyWare polls every 20 s
 SYSTEM_FIELD_STATUS = 1  # byte 0: counter, changes when a zone does
-# byte 0: non-zero = open (01; 04 on the zone in alarm); byte 1: flags below;
-# byte 2 unknown
+# byte 0: 0x20 bypassed (long-tid-wrapped-many-operations: 20 from BabyWare's
+# bypass to its clear), any other bit = open (01; 04 on the zone in alarm);
+# byte 1: flags below; byte 2: 0x04 during the exit delay of partition 2
 ZONE_STATUS_FIELD = 0
+ZONE_BYPASSED = 0x20
 # Provisional, from one alarm capture (and set-sms for the memory flag).
 # Zone status byte 1: 0x04 on every zone during the exit delay (not used),
 # 0x10 on the zone in alarm, 0x20 alarm in memory (stays once closed).
 ZONE_IN_ALARM = 0x10
 ZONE_ALARM_MEMORY = 0x20
-# Partition status field 0: state | flags | flags | 3 unknown. Seen:
+# Partition status field 0: state | flags | flags | 3 unknown. Index 1-2 =
+# partition 1-2, same layout (area 2: 01 00 01 then 05 00 00 on a stay arm). Seen:
 # disarmed 00 00 00; exit delay 01 / 02 / 03 00 01 and armed 05 / 06 / 07
 # 00 00 for stay / sleep / full arm; alarm (full arm) 77 02 40. Provisional,
 # second byte: 10 armed with a zone open (the plain arm command, no force
@@ -556,6 +575,7 @@ class Panel(PanelBase):
         self._tid = 0
         self._transaction_lock = None
         self._zones = []  # enrolled zones, set by load_labels before polling
+        self._partitions = PARTITIONS[:1]  # set by load_labels
         self._zone_partitions = {}  # {zone: partition byte}, from load_labels
         # {zone: definition byte}, from load_labels and our own writes: a
         # change made in BabyWare shows after a restart only
@@ -977,9 +997,15 @@ class Panel(PanelBase):
         }
         self.log_labels_loaded("user", data["user"], start_time)
 
-        # Only the partition that can be controlled is listed.
+        # Area 2 is listed only when the panel is set for two partitions.
         start_time = time.time()
-        indexes = limited_indexes("partition", CONTROL_PARTITIONS)
+        settings = await self.read_objects(
+            OBJ_SETTINGS, [1], (SETTINGS_FIELD_OPTIONS,)
+        )
+        options = settings.get(1, {}).get(SETTINGS_FIELD_OPTIONS, b"")
+        two = bool(options) and bool(options[0] & OPTION_TWO_PARTITIONS)
+        indexes = limited_indexes("partition", PARTITIONS if two else PARTITIONS[:1])
+        self._partitions = indexes
         areas = await self.read_objects(OBJ_AREA, indexes, (AREA_FIELD_LABEL,))
         data["partition"] = {
             i: self.label_element(
@@ -991,6 +1017,21 @@ class Panel(PanelBase):
             for i in indexes
         }
         self.log_labels_loaded("partition", data["partition"], start_time)
+
+        # No enrollment field is known for the outputs: all are listed, for
+        # control only (their state is not decoded).
+        start_time = time.time()
+        indexes = limited_indexes("pgm", range(1, PGM_COUNT + 1))
+        pgms = await self.read_objects(OBJ_PGM, indexes, (FIELD_LABEL,))
+        data["pgm"] = {
+            index: self.label_element(
+                "pgm",
+                index,
+                self.decode_label(fields.get(FIELD_LABEL, b"")) or f"Output {index:02}",
+            )
+            for index, fields in sorted(pgms.items())
+        }
+        self.log_labels_loaded("pgm", data["pgm"], start_time)
         return data
 
     async def request_status(self, _nr) -> typing.Optional[Container]:
@@ -1016,7 +1057,7 @@ class Panel(PanelBase):
                 [(OBJ_ZONE_STATUS, i, [ZONE_STATUS_FIELD]) for i in self._zones]
                 + [
                     (OBJ_PARTITION_STATUS, i, [PARTITION_STATUS_FIELD])
-                    for i in CONTROL_PARTITIONS
+                    for i in self._partitions
                 ]
             )
             zones = {
@@ -1029,7 +1070,7 @@ class Panel(PanelBase):
                 index: records.get((OBJ_PARTITION_STATUS, index), {}).get(
                     PARTITION_STATUS_FIELD, b""
                 )[:3]
-                for index in CONTROL_PARTITIONS
+                for index in self._partitions
             }
             if any(len(value) < 2 for value in zones.values()):
                 raise StatusRequestException("MG6250: incomplete zone status reply")
@@ -1047,14 +1088,15 @@ class Panel(PanelBase):
         if len(power) >= 2:
             system.power = Container(
                 battery=round(power[0] * VOLTS_PER_STEP, 1),
-                ac=round(power[1] * VOLTS_PER_STEP, 1),
+                ac=round(power[1] * AC_VOLTS_PER_STEP, 1),
             )
         await self._publish_new_events()
         zones = self._zone_status
         partitions = self._partition_status
         return Container(
             system=system,
-            zone_open={i: v[0] != 0 for i, v in zones.items()},
+            zone_open={i: self._zone_open(v) for i, v in zones.items()},
+            zone_bypassed={i: bool(v[0] & ZONE_BYPASSED) for i, v in zones.items()},
             zone_presently_in_alarm={
                 i: bool(v[1] & ZONE_IN_ALARM) for i, v in zones.items()
             },
@@ -1086,6 +1128,10 @@ class Panel(PanelBase):
                 i: self._partition_ready(i, zones) for i in partitions
             },
         )
+
+    @staticmethod
+    def _zone_open(status: bytes) -> bool:
+        return bool(status[0] & ~ZONE_BYPASSED)
 
     @staticmethod
     def _armed_in(status: bytes, mode: int) -> bool:
@@ -1198,7 +1244,8 @@ class Panel(PanelBase):
         ready" while a motion detector is open.
         """
         return not any(
-            status[0] and self._zone_partitions.get(zone, partition) & partition
+            self._zone_open(status)
+            and self._zone_partitions.get(zone, partition) & partition
             for zone, status in zones.items()
         )
 
@@ -1264,7 +1311,7 @@ class Panel(PanelBase):
             CONTROL_ZONE_PREFIX
             + self.panel_serial
             + bytes([action, zone])
-            + CONTROL_TARGET[1:]
+            + CONTROL_TAIL
         )
 
     def _control_accepted(self, prefix: bytes, reply: bytes) -> bool:
@@ -1297,7 +1344,7 @@ class Panel(PanelBase):
                     definition,
                 )
         except (StatusRequestException, asyncio.TimeoutError) as e:
-            logger.error("MG6250: setting zone %d definition failed: %s", zone, e)
+            logger.exception("MG6250: setting zone %d definition failed: %s", zone, e)
             return False
         if self._zone_definitions.get(zone) != definition:
             self._zone_definitions[zone] = definition
@@ -1329,7 +1376,7 @@ class Panel(PanelBase):
             logger.warning("MG6250: zone command %r is not supported", command)
             return False
         if self.panel_serial is None:
-            logger.error("MG6250: panel serial unknown (no identify reply)")
+            logger.exception("MG6250: panel serial unknown (no identify reply)")
             return False
 
         accepted = False
@@ -1355,11 +1402,25 @@ class Panel(PanelBase):
             self._change_counter = None  # read the status again at the next poll
         return accepted
 
-    def build_control(self, action: int) -> bytes:
-        return CONTROL_PREFIX + self.panel_serial + bytes([action]) + CONTROL_TARGET
+    def build_control(self, action: int, partition: int = 1) -> bytes:
+        return (
+            CONTROL_PREFIX
+            + self.panel_serial
+            + bytes([action, partition])
+            + CONTROL_TAIL
+        )
+
+    def build_pgm_control(self, pgm: int, action: int) -> bytes:
+        return (
+            CONTROL_PGM_PREFIX
+            + self.panel_serial
+            + bytes([action, pgm])
+            + CONTROL_PGM_TAIL
+        )
 
     async def control_partitions(self, partitions, command) -> bool:
-        """Arm, arm stay, arm sleep or disarm partition 1; True if accepted."""
+        """Arm, arm stay, arm sleep or disarm partitions; True if one was
+        accepted."""
         action = PARTITION_ACTIONS.get(command)
         if action is None:
             logger.warning("MG6250: partition command %r is not supported", command)
@@ -1370,15 +1431,15 @@ class Panel(PanelBase):
 
         accepted = False
         for partition in partitions:
-            if partition not in CONTROL_PARTITIONS:
-                logger.warning("MG6250: only partition 1 can be controlled")
+            if partition not in self._partitions:
+                logger.warning("MG6250: partition %d is not in use", partition)
                 continue
             try:
                 fragments = await self.transact(
-                    SERVICE_CONTROL, self.build_control(action)
+                    SERVICE_CONTROL, self.build_control(action, partition)
                 )
             except StatusRequestException as e:
-                logger.error("MG6250: %s failed: %s", command, e)
+                logger.exception("MG6250: %s failed: %s", command, e)
                 continue
             reply = b"".join(fragments)
             expected_reply = CONTROL_PREFIX + self.panel_serial + CONTROL_OK
@@ -1391,8 +1452,42 @@ class Panel(PanelBase):
                 logger.error("MG6250: %s refused, reply %s", command, reply.hex())
         return accepted
 
+    async def _control_pgm(self, pgm: int, command: str) -> bool:
+        try:
+            fragments = await self.transact(
+                SERVICE_CONTROL, self.build_pgm_control(pgm, PGM_ACTIONS[command])
+            )
+        except StatusRequestException as e:
+            logger.exception("MG6250: %s of output %d failed: %s", command, pgm, e)
+            return False
+        reply = b"".join(fragments)
+        accepted = self._control_accepted(CONTROL_PGM_PREFIX, reply)
+        if not accepted:
+            logger.error(
+                "MG6250: %s of output %d refused, reply %s", command, pgm, reply.hex()
+            )
+        return accepted
+
     async def control_outputs(self, outputs, command) -> bool:
-        return await self._not_supported("output control")
+        """on, off, release (BabyWare's Activate, Deactivate, Release) or
+        pulse; True if one was accepted. The output state is not read back."""
+        if command != PGM_PULSE and command not in PGM_ACTIONS:
+            logger.warning("MG6250: output command %r is not supported", command)
+            return False
+        if self.panel_serial is None:
+            logger.error("MG6250: panel serial unknown (no identify reply)")
+            return False
+
+        accepted = False
+        for pgm in outputs:
+            if not 1 <= pgm <= PGM_COUNT:
+                logger.warning("MG6250: there is no output %d", pgm)
+            elif command != PGM_PULSE:
+                accepted |= await self._control_pgm(pgm, command)
+            elif await self._control_pgm(pgm, "on"):
+                await asyncio.sleep(cfg.OUTPUT_PULSE_DURATION)
+                accepted |= await self._control_pgm(pgm, "off")
+        return accepted
 
     async def control_module_pgm_outputs(
         self, module_address, pgm_index, command
