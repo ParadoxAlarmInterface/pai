@@ -16,6 +16,8 @@ from paradox.paradox import Paradox
 
 logger = logging.getLogger("PAI")
 
+MIN_RETRY_WAIT = 5  # seconds before any reconnect
+
 
 def get_format(level):
     if level <= logging.DEBUG:
@@ -121,8 +123,9 @@ async def _run(alarm: Paradox):
 
     while alarm is not None:
         logger.info("Starting...")
-        retry_time_wait = 2 ^ retry
-        retry_time_wait = 30 if retry_time_wait > 30 else retry_time_wait
+        # Never reconnect at once: a panel that is still closing the previous
+        # session (MG6250 logout) refuses the new login as busy.
+        retry_time_wait = min(30, max(MIN_RETRY_WAIT, 2 ** min(retry, 5)))
 
         try:
             if await alarm.full_connect():

@@ -78,3 +78,22 @@ async def test_banner_reports_version_and_connection(caplog):
 
     assert any("PAI " in m for m in messages)
     assert any("Connection:" in m for m in messages)
+
+
+async def test_reconnect_always_waits(caplog):
+    """No immediate reconnect: the MG6250 answers busy right after a logout."""
+    waits = []
+
+    async def record_sleep(delay, *args, **kwargs):
+        waits.append(delay)
+
+    alarm = FakeAlarm(["ok", "ok", "fail", "fail", "fail", "fail", "fail", "stop"])
+    interface_manager = MagicMock()
+    interface_manager.interfaces = []
+    with patch.object(
+        pai_main, "InterfaceManager", return_value=interface_manager
+    ), patch.object(pai_main.asyncio, "sleep", new=record_sleep):
+        await pai_main._run(alarm)
+
+    assert waits and min(waits) >= pai_main.MIN_RETRY_WAIT
+    assert max(waits) == 30
