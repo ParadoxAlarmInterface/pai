@@ -369,6 +369,26 @@ class Panel:
             logger.exception(f"Unable to parse RAM Status Block ({mvars.address})")
             return
 
+    def close_connection(self):
+        """Tell the panel the session ends. Only writes: no reply is awaited."""
+        self.core.connection.write(self.get_message("CloseConnection").build(dict()))
+
+    async def set_time(self, now) -> typing.Optional[bool]:
+        """Set the panel clock; True if the panel accepted it, None if the panel
+        did not try (a subclass may hold back retries)."""
+        args = dict(
+            century=int(now.year / 100),
+            year=int(now.year % 100),
+            month=now.month,
+            day=now.day,
+            hour=now.hour,
+            minute=now.minute,
+        )
+        reply = await self.core.send_wait(
+            self.get_message("SetTimeDate"), args, reply_expected=0x3, timeout=10
+        )
+        return reply is not None
+
     @abstractmethod
     def control_zones(self, zones, command) -> bool:
         raise NotImplementedError("override control_zones in a subclass")

@@ -36,6 +36,7 @@ logger = logging.getLogger("PAI").getChild(__name__)
 class Paradox:
     def __init__(self, retries=3):
         self.panel: Panel = None
+        self._syncing_time = False
         self._connection: Connection = None
         self.retries = retries
         try:
@@ -406,6 +407,10 @@ class Paradox:
             or self.panel.settings.get("product_id") == "MAGELLAN_MG6250"
         ):
             return  # Neither protocol implements SetTimeDate.
+        if self._syncing_time:
+            # Started again at every status update, and the clock is only read back
+            # after this one ends.
+            return
         now = datetime.now().astimezone()
         if cfg.SYNC_TIME_TIMEZONE:
             try:
@@ -420,23 +425,18 @@ class Paradox:
         if not self._is_time_sync_required(now.replace(tzinfo=None)):
             return
 
-        args = dict(
-            century=int(now.year / 100),
-            year=int(now.year % 100),
-            month=now.month,
-            day=now.day,
-            hour=now.hour,
-            minute=now.minute,
-        )
-
         logger.debug("Synchronizing panel time")
-        reply = await self.send_wait(
-            self.panel.get_message("SetTimeDate"), args, reply_expected=0x3, timeout=10
-        )
-        if reply is None:
-            logger.warning("Could not set panel time")
-        else:
-            logger.info("Panel time synchronized")
+        self._syncing_time = True
+        try:
+            result = await self.panel.set_time(now)
+            if result is None:
+                pass  # the panel skipped it, and said why when it stopped trying
+            elif result:
+                logger.info("Panel time synchronized")
+            else:
+                logger.warning("Could not set panel time")
+        finally:
+            self._syncing_time = False
 
     async def loop(self):
         logger.debug("Loop start")
@@ -1018,11 +1018,8 @@ class Paradox:
 
             logger.info("Cleaning previous session. Closing connection")
             # Write directly as this can be called from other contexts
-
             try:
-                self.connection.write(
-                    panel.get_message("CloseConnection").build(dict())
-                )
+                panel.close_connection()
             except ConnectionError as e:
                 logger.warning("Could not send CloseConnection: %s", e)
 
