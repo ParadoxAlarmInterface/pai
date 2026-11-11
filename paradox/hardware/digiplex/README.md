@@ -111,6 +111,35 @@ rejected.
 - **Instant arm is reported as a full arm** (no stay bit), so Home Assistant's
   "night" mode is mapped to stay arm to keep `armed_home` meaningful.
 
+## Configuration
+
+The panel does not expose the physical type of a zone: zone definitions only
+describe behaviour (instant, entry delay, 24h fire, ...), not whether a zone is
+a PIR, a contact or a glass-break detector. The type is therefore set
+explicitly, per zone key, and never guessed from the label text — a panel
+programmed in any language behaves the same.
+
+```python
+# Zone key -> Home Assistant binary_sensor device_class.
+# Unlisted zones default to "motion".
+ZONE_DEVICE_CLASS = {
+    "garazas": "motion",
+    "fasado_durys": "door",
+    "garazo_vartai": "garage_door",
+    "miegamojo_langas": "window",
+    "miegamojo_duzis": "vibration",
+    "gaisras": "smoke",
+    "sirena_deze_tamp": "tamper",
+}
+
+# Partition number -> partition name shown in Home Assistant.
+# Missing entries default to "Partition <number>".
+PARTITION_NAMES = {1: "House", 2: "Garage"}
+```
+
+The zone key is the normalised EEPROM label (see `sanitize_key`), for example
+`vaiku rytu lang.` → `vaiku_rytu_lang`.
+
 ## Tested environment
 
 | | |
@@ -119,7 +148,7 @@ rejected.
 | Partitions | 2 — house (perimeter/stay arming) and garage |
 | Zones | 48 on board, 26 assigned, labels read from EEPROM |
 | Transport | ESP8266 (NodeMCU) running an ESPHome `uart_tcp` bridge (UART ↔ TCP), 19200 8N1 |
-| PAI connection | `IP_CONNECTION_BARE`, PC password `0000` |
+| PAI connection | `IP_CONNECTION_BARE`, 4-digit PC password |
 | PAI version | 3.9.0-dev, Python 3.15, Home Assistant OS (aarch64) |
 | Reference meter | battery 13.68 V, PSU/AUX 13.66 V — used for the calibration above |
 
@@ -133,7 +162,7 @@ Notes:
 
 ## Testing
 
-- `tests/hardware/digiplex/test_parsers.py` — golden frames (checksums, INIT,
+- `tests/hardware/digiplex/test_parsers.py` — recorded frames (checksums, INIT,
   login, READ), adapters (zones, partitions, voltages) and the MONITOR frame
   builder.
 - Live verification on a DGP-848: two partitions armed/disarmed independently,

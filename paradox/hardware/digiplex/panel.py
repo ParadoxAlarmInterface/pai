@@ -5,12 +5,13 @@ import typing
 
 from construct import Construct, Container
 
+from paradox.config import config as cfg
 from paradox.exceptions import AuthenticationFailed, StatusRequestException
 from paradox.lib.utils import sanitize_key
 
 from . import parsers
 from ..panel import Panel as PanelBase
-from .adapters import publishes_tamper, zone_device_class
+from .adapters import PARTITION_COUNT, publishes_tamper, zone_device_class
 from .property import RAMDataParserMap, property_map
 
 logger = logging.getLogger("PAI").getChild(__name__)
@@ -183,14 +184,24 @@ class Panel_DGP848(PanelBase):
                 "id": i,
                 "key": key,
                 "label": label,
-                "device_class": zone_device_class(label),
+                "device_class": zone_device_class(key, cfg.ZONE_DEVICE_CLASS),
             }
         self._named_zones = set(data["zone"].keys())
         self._zone_device_class = {
             i: info["device_class"] for i, info in data["zone"].items()
         }
-        for i, name in ((1, "Namas"), (2, "Garažas")):
-            data["partition"][i] = {"id": i, "key": sanitize_key(name), "label": name}
+        partition_names = cfg.PARTITION_NAMES or {}
+        for i in range(1, PARTITION_COUNT + 1):
+            name = (
+                partition_names.get(str(i))
+                or partition_names.get(i)
+                or f"Partition {i}"
+            )
+            data["partition"][i] = {
+                "id": i,
+                "key": sanitize_key(name),
+                "label": name,
+            }
 
         logger.info("Digiplex: labels loaded from EEPROM — %d named zones", len(keys))
         return dict(data)

@@ -1,6 +1,10 @@
 """Adapters that turn Digiplex RAM bytes into ``convert_raw_status()`` values."""
 
+import logging
+
 from construct import Adapter
+
+logger = logging.getLogger("PAI").getChild(__name__)
 
 
 def _as_int(obj) -> int:
@@ -54,35 +58,46 @@ class VoltageAdapter(Adapter):
         return int(round(obj / self.step))
 
 
-def zone_device_class(label: str) -> str:
-    """Zone label -> Home Assistant binary_sensor device_class.
+# Home Assistant binary_sensor device classes accepted in ZONE_DEVICE_CLASS.
+ZONE_DEVICE_CLASSES = (
+    "motion",
+    "door",
+    "window",
+    "garage_door",
+    "smoke",
+    "vibration",
+    "tamper",
+    "gas",
+    "moisture",
+    "occupancy",
+    "opening",
+    "safety",
+    "problem",
+)
+DEFAULT_ZONE_DEVICE_CLASS = "motion"
 
-    Derived from the EEPROM labels of this installation (2026-10-25):
-        "vaiku rytu lang."      -> window
-        "vaiku pietu duz."      -> vibration   (glass break)
-        "garazo vartai"         -> garage_door
-        "fasado durys"          -> door
-        "sirena, deze, tamp"    -> tamper
-        "gaisras"               -> smoke
-        room names (PIR)        -> motion      (default)
 
-    Works on the label text, so renaming a zone in the panel keeps its type
-    as long as the keyword survives.
+def zone_device_class(zone_key: str, mapping: dict | None = None) -> str:
+    """Zone key -> Home Assistant binary_sensor device_class.
+
+    The panel does not expose the physical sensor type: zone definitions only
+    describe behaviour (instant, entry delay, 24h fire, ...), not whether a
+    zone is a PIR, a contact or a glass-break detector. The mapping therefore
+    comes from the ``ZONE_DEVICE_CLASS`` configuration option (zone key ->
+    device_class) and never from the label text, so it works the same for a
+    panel programmed in any language. Unlisted zones default to "motion".
     """
-    lab = label.lower()
-    if "gaisras" in lab or "dumu" in lab or "dūm" in lab:
-        return "smoke"
-    if "duz" in lab or "dūž" in lab or "stiklo" in lab:
-        return "vibration"
-    if "vartai" in lab:
-        return "garage_door"
-    if "dur" in lab:
-        return "door"
-    if "lang" in lab:
-        return "window"
-    if "tamp" in lab:
-        return "tamper"
-    return "motion"
+    device_class = (mapping or {}).get(zone_key, DEFAULT_ZONE_DEVICE_CLASS)
+    if device_class not in ZONE_DEVICE_CLASSES:
+        logger.warning(
+            "Ignoring unknown device_class %r for zone %r, using %r",
+            device_class,
+            zone_key,
+            DEFAULT_ZONE_DEVICE_CLASS,
+        )
+        return DEFAULT_ZONE_DEVICE_CLASS
+
+    return device_class
 
 
 # Only these zone types physically have a tamper switch on this installation:
@@ -110,7 +125,7 @@ def publishes_tamper(device_class: str) -> bool:
 #
 # Measured on our panel:
 #   armed full    0x0195 = 0x01   (armed)
-#   armed partial 0x0195 = 0x05   (armed + stay)  -> "dalinė apsauga"
+#   armed partial 0x0195 = 0x05   (armed + stay)  -> partial arm (stay)
 #   garage armed  0x019A = 0x01   (armed)
 #   0x0196 goes 1 -> 3 -> 1 during the 20 s exit delay (bit1).
 #

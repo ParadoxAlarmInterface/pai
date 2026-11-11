@@ -1,8 +1,9 @@
-"""Golden-frame tests for the Digiplex protocol parsers.
+"""Recorded-frame tests for the Digiplex protocol parsers.
 
-Every frame here was either captured live from a DGP-848 (firmware build
-A095, 2026-10) or published in ParadoxAlarmInterface/pai#257 (avilleret,
-firmware build A096).
+Every frame here was either captured byte-for-byte from a real DGP-848
+(firmware build A095, 2026-10) or published in
+ParadoxAlarmInterface/pai#257 (avilleret, firmware build A096). They are
+regression fixtures: the driver must produce exactly these bytes.
 """
 
 from construct import Bytes
@@ -16,59 +17,59 @@ from paradox.hardware.digiplex.adapters import (
 )
 from paradox.hardware.digiplex.property import RAMDataParserMap
 
-# --- golden frames -------------------------------------------------------
+# --- recorded frames -----------------------------------------------------
 
-# INIT / StartCommunication (protokolas.md §7)
-GOLDEN_INIT = bytes.fromhex("5F 20 " + "00 " * 34 + "7F")
+# INIT / StartCommunication (captured from the panel)
+RECORDED_INIT = bytes.fromhex("5F 20 " + "00 " * 34 + "7F")
 
 # StartCommunication response of our DGP-848 (live capture)
-GOLDEN_INIT_RESPONSE = bytes.fromhex(
+RECORDED_INIT_RESPONSE = bytes.fromhex(
     "00 00 08 10 00 04 13 00 00 00 00 00 06 12 02 A0 95 " + "00 " * 19 + "7E"
 )
 
 # The same response from issue #257 (avilleret's DGP-848, fw A096)
-GOLDEN_INIT_RESPONSE_257 = bytes.fromhex(
+RECORDED_INIT_RESPONSE_257 = bytes.fromhex(
     "00 00 08 10 00 04 14 00 48 17 00 00 06 12 02 A0 96 " + "00 " * 19 + "DF"
 )
 
 # LOGIN response (live capture)
-GOLDEN_LOGIN_RESPONSE = bytes.fromhex("10 " + "00 " * 35 + "10")
+RECORDED_LOGIN_RESPONSE = bytes.fromhex("10 " + "00 " * 35 + "10")
 
-# READ request for RAM 0x8153, 12 bytes (protokolas.md §7)
-GOLDEN_READ_REQUEST = bytes.fromhex("56 00 81 53 " + "00 " * 32 + "2A")
+# READ request for RAM 0x8153, 12 bytes (captured from the panel)
+RECORDED_READ_REQUEST = bytes.fromhex("56 00 81 53 " + "00 " * 32 + "2A")
 
 # ERROR / busy response (live capture: "session busy")
-GOLDEN_ERROR_RESPONSE = bytes.fromhex("70 " + "00 " * 35 + "70")
+RECORDED_ERROR_RESPONSE = bytes.fromhex("70 " + "00 " * 35 + "70")
 
 
 def _frame(payload: bytes) -> bytes:
     return payload + bytes([sum(payload) % 256])
 
 
-def test_checksums_of_golden_frames_are_valid():
+def test_checksums_of_recorded_frames_are_valid():
     for name, frame in {
-        "init": GOLDEN_INIT,
-        "init_response": GOLDEN_INIT_RESPONSE,
-        "init_response_257": GOLDEN_INIT_RESPONSE_257,
-        "login_response": GOLDEN_LOGIN_RESPONSE,
-        "read_request": GOLDEN_READ_REQUEST,
-        "error": GOLDEN_ERROR_RESPONSE,
+        "init": RECORDED_INIT,
+        "init_response": RECORDED_INIT_RESPONSE,
+        "init_response_257": RECORDED_INIT_RESPONSE_257,
+        "login_response": RECORDED_LOGIN_RESPONSE,
+        "read_request": RECORDED_READ_REQUEST,
+        "error": RECORDED_ERROR_RESPONSE,
     }.items():
         assert len(frame) == 37, name
         assert frame[36] == sum(frame[:36]) % 256, name
 
 
-def test_build_start_communication_matches_golden_init():
-    """PAI's StartCommunication with source_id=0 must equal the golden INIT.
+def test_build_start_communication_matches_recorded_init():
+    """PAI's StartCommunication with source_id=0 must equal the recorded INIT.
     (DGP-848 silently ignores every other source_id - live tested.)"""
     message = parsers.StartCommunication.build(
         dict(fields=dict(value=dict(source_id=0)))
     )
-    assert message == GOLDEN_INIT
+    assert message == RECORDED_INIT
 
 
 def test_parse_init_response():
-    parsed = parsers.StartCommunicationResponse.parse(GOLDEN_INIT_RESPONSE)
+    parsed = parsers.StartCommunicationResponse.parse(RECORDED_INIT_RESPONSE)
     v = parsed.fields.value
     assert v.po.command == 0
     assert v.product_id == "DIGIPLEX_v13"  # product_id byte is 0x00
@@ -76,21 +77,21 @@ def test_parse_init_response():
     assert v.firmware.revision == 13
     assert v.password_hint == b"\x00\x00"
     assert v.firmware_build == 0xA095
-    assert parsed.checksum == GOLDEN_INIT_RESPONSE[36:37]
+    assert parsed.checksum == RECORDED_INIT_RESPONSE[36:37]
 
 
 def test_parse_init_response_issue257():
     """Cross-check with the frames published in issue #257."""
-    parsed = parsers.StartCommunicationResponse.parse(GOLDEN_INIT_RESPONSE_257)
+    parsed = parsers.StartCommunicationResponse.parse(RECORDED_INIT_RESPONSE_257)
     v = parsed.fields.value
     assert v.product_id == "DIGIPLEX_v13"
     assert v.password_hint == b"\x48\x17"
     assert v.firmware_build == 0xA096
 
 
-def test_build_read_ram_matches_golden():
+def test_build_read_ram_matches_recorded():
     message = parsers.build_read_ram(0x8153, 12)
-    assert message == GOLDEN_READ_REQUEST
+    assert message == RECORDED_READ_REQUEST
 
 
 def test_build_read_ram_count_encoding():
@@ -118,25 +119,25 @@ def test_parse_read_response():
 def test_build_login_echoes_init_response():
     """LOGIN = init response echo with the PC password (BCD) at [8..9].
     With password 0000 the frame equals the init response itself."""
-    login = parsers.build_login(GOLDEN_INIT_RESPONSE[:36], b"\x00\x00")
-    assert login == GOLDEN_INIT_RESPONSE
+    login = parsers.build_login(RECORDED_INIT_RESPONSE[:36], b"\x00\x00")
+    assert login == RECORDED_INIT_RESPONSE
 
 
 def test_build_login_other_password():
-    login = parsers.build_login(GOLDEN_INIT_RESPONSE[:36], b"\x48\x17")
+    login = parsers.build_login(RECORDED_INIT_RESPONSE[:36], b"\x48\x17")
     assert login[8:10] == b"\x48\x17"
-    assert login[:8] == GOLDEN_INIT_RESPONSE[:8]
+    assert login[:8] == RECORDED_INIT_RESPONSE[:8]
     assert login[36] == sum(login[:36]) % 256
-    assert login != GOLDEN_INIT_RESPONSE
+    assert login != RECORDED_INIT_RESPONSE
 
 
 def test_parse_login_response():
-    parsed = parsers.InitializeCommunicationResponse.parse(GOLDEN_LOGIN_RESPONSE)
+    parsed = parsers.InitializeCommunicationResponse.parse(RECORDED_LOGIN_RESPONSE)
     assert parsed.fields.value.po.command == 1
 
 
 def test_parse_error_response():
-    parsed = parsers.ErrorMessage.parse(GOLDEN_ERROR_RESPONSE)
+    parsed = parsers.ErrorMessage.parse(RECORDED_ERROR_RESPONSE)
     assert parsed.fields.value.po.command == 7
     assert parsed.fields.value.message == 0
 
@@ -310,22 +311,22 @@ def test_entry_delay_flag():
 
 
 @pytest.mark.parametrize(
-    ("label", "expected"),
+    ("zone_key", "mapping", "expected"),
     [
-        ("vaiku rytu lang.", "window"),
-        ("miegamojo langas", "window"),
-        ("vaiku pietu duz.", "vibration"),
-        ("svetaines duzis", "vibration"),
-        ("garazo vartai", "garage_door"),
-        ("fasado durys", "door"),
-        ("sirena, deze, tamp", "tamper"),
-        ("gaisras", "smoke"),
-        ("virtuve", "motion"),
-        ("miegamasis", "motion"),
+        ("garazas", {}, "motion"),
+        ("garazas", {"garazas": "motion"}, "motion"),
+        ("fasado_durys", {"fasado_durys": "door"}, "door"),
+        ("vaiku_rytu_lang", {"vaiku_rytu_lang": "window"}, "window"),
+        ("garazo_vartai", {"garazo_vartai": "garage_door"}, "garage_door"),
+        ("miegamojo_duzis", {"miegamojo_duzis": "vibration"}, "vibration"),
+        ("sirena_deze_tamp", {"sirena_deze_tamp": "tamper"}, "tamper"),
+        ("gaisras", {"gaisras": "smoke"}, "smoke"),
+        ("virtuve", {"other": "door"}, "motion"),
+        ("virtuve", {"virtuve": "not_a_device_class"}, "motion"),
     ],
 )
-def test_zone_device_class(label, expected):
-    assert zone_device_class(label) == expected
+def test_zone_device_class(zone_key, mapping, expected):
+    assert zone_device_class(zone_key, mapping) == expected
 
 
 @pytest.mark.parametrize(
