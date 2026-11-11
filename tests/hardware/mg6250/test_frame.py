@@ -1625,3 +1625,21 @@ async def test_time_sync_does_not_overlap():
     alarm.panel.set_time.assert_awaited_once()
     await alarm.sync_time()  # and it can run again afterwards
     assert alarm.panel.set_time.await_count == 2
+
+
+async def test_tid_wraps_to_zero_as_babyware():
+    """255 is followed by 0 (long-tid-wrapped-many-operations.pcapng)."""
+    panel, core = control_panel()
+    panel._tid = 254
+    tids = []
+    for _ in range(3):
+        await panel.control_partitions([1], "arm")
+        header, _data = panel.decrypt_data(
+            bytes(
+                Frame.parse(
+                    core.send_wait.call_args.kwargs["message"]
+                ).fields.value.payload
+            )
+        )
+        tids.append(header.tid)
+    assert tids == [255, 0, 1]

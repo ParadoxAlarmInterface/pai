@@ -682,7 +682,9 @@ class Panel(PanelBase):
         if self._transaction_lock is None:
             self._transaction_lock = asyncio.Lock()
         async with self._transaction_lock:
-            self._tid = self._tid % 0xFF + 1
+            # A byte counter, as BabyWare's: 255 is followed by 0. Skipping 0
+            # makes the panel ignore every request after the 255th.
+            self._tid = (self._tid + 1) & 0xFF
             tid = self._tid
             message = self.build_request(tid, service, data)
             fragments = []
