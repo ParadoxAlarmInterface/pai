@@ -27,6 +27,8 @@ import logging
 ### Serial Connection Details
 # SERIAL_PORT = '/dev/ttyS1' 		# Pathname of the Serial Port
 # SERIAL_BAUD = 9600              # 9600 for SP/MG. For EVO: Use 38400(default setting) or 57600. 115200 for + versions
+# SERIAL_PROTOCOL = None          # 'plain', 'aes' or 'e0fe' (E0 FE wrapping). None: SERIAL_ENCRYPTED decides
+# SERIAL_ENCRYPTED = False        # True: AES serial encryption, same as SERIAL_PROTOCOL = 'aes'
 #
 ### PRT3 ASCII Printer Module Connection
 # CONNECTION_TYPE = 'PRT3'
@@ -190,6 +192,7 @@ import logging
 # PUSHBULLET_ENABLE = False
 # PUSHBULLET_KEY = ''                     # Authentication key used for Pushbullet
 # PUSHBULLET_CONTACTS = []                # Pushbullet user identifiers for notifications and interaction
+# PUSHBULLET_COMMAND_PREFIX = ''          # Only pushes starting with this prefix are commands, e.g. 'command' for 'command partition all arm'
 # PUSHBULLET_MIN_EVENT_LEVEL = 'INFO'
 ## Event filtering by tags:
 # PUSHBULLET_EVENT_FILTERS = [ # list of tags to include or exclude see hardware event.py for tag list

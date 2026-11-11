@@ -9,7 +9,7 @@ from typing import Optional
 from construct import Container
 import pytz
 
-from paradox.config import config as cfg, get_limits_for_type
+from paradox.config import config as cfg, get_limits_for_type, get_serial_protocol
 from paradox.connections.connection import Connection
 from paradox.data.enums import RunState
 from paradox.data.memory_storage import MemoryStorage as Storage
@@ -50,7 +50,9 @@ class Paradox:
         # Created lazily: see the loop-affinity note on _loop_primitive().
         self._request_lock: Optional[asyncio.Lock] = None
         self._busy: Optional[asyncio.Lock] = None
+        self._disconnect_lock: Optional[asyncio.Lock] = None
         self._loop_wait_event: Optional[asyncio.Event] = None
+        self._disconnecting = False
 
         # partition_id -> monotonic deadline; while time.monotonic() < deadline,
         # arm-related properties from RA polling are ignored for that partition.
@@ -126,9 +128,17 @@ class Paradox:
             if cfg.CONNECTION_TYPE == "Serial":
                 logger.info("Using Serial Connection")
 
-                from paradox.connections.serial.connection import SerialCommunication
+                from paradox.connections.serial.connection import (
+                    E0FESerialCommunication,
+                    SerialCommunication,
+                )
 
-                self._connection = SerialCommunication(
+                serial_class = (
+                    E0FESerialCommunication
+                    if get_serial_protocol() == "e0fe"
+                    else SerialCommunication
+                )
+                self._connection = serial_class(
                     port=cfg.SERIAL_PORT,
                     baud=cfg.SERIAL_BAUD,
                 )
@@ -136,9 +146,17 @@ class Paradox:
                 logger.info("Using IP Connection")
 
                 if cfg.IP_CONNECTION_BARE:
-                    from paradox.connections.ip.connection import BareIPConnection
+                    from paradox.connections.ip.connection import (
+                        BareIPConnection,
+                        E0FEBareIPConnection,
+                    )
 
-                    self._connection = BareIPConnection(
+                    bare_class = (
+                        E0FEBareIPConnection
+                        if get_serial_protocol() == "e0fe"
+                        else BareIPConnection
+                    )
+                    self._connection = bare_class(
                         host=cfg.IP_CONNECTION_HOST, port=cfg.IP_CONNECTION_PORT
                     )
                 elif cfg.IP_CONNECTION_SITEID and cfg.IP_CONNECTION_EMAIL:
@@ -335,6 +353,7 @@ class Paradox:
 
         if self._connection:
             await self.disconnect()  # socket needs to be also closed
+        self._disconnecting = False
         self.panel = None
 
         self.run_state = RunState.INIT
@@ -389,6 +408,13 @@ class Paradox:
             else:
                 raise ConnectionError("Panel did not replied to InitiateCommunication")
 
+            await self.connection.on_initiate_communication(
+                initiate_reply,
+                lambda message, check: self.send_wait(
+                    message=message, reply_expected=check
+                ),
+            )
+
             if initiate_reply.fields.value.get("product_id") == "MAGELLAN_MG6250":
                 # The MG6250 ignores StartCommunication (0x5F); the 0x72 reply
                 # already identifies it.
@@ -397,7 +423,7 @@ class Paradox:
                 logger.info("Initiating panel connection")
                 reply = await self.send_wait(
                     self.panel.get_message("StartCommunication"),
-                    args=dict(source_id=0x2),
+                    args=dict(source_id=self.connection.start_communication_source_id),
                     reply_expected=0x0,
                 )
 
@@ -486,8 +512,11 @@ class Paradox:
             )
 
     async def sync_time(self):
-        if cfg.CONNECTION_TYPE == "PRT3":
-            return  # PRT3 has no SetTimeDate command
+        if (
+            cfg.CONNECTION_TYPE == "PRT3"
+            or self.panel.settings.get("product_id") == "MAGELLAN_MG6250"
+        ):
+            return  # Neither protocol implements SetTimeDate.
         now = datetime.now().astimezone()
         if cfg.SYNC_TIME_TIMEZONE:
             try:
@@ -616,12 +645,18 @@ class Paradox:
         timeout=cfg.IO_TIMEOUT,
         reply_expected=None,
     ) -> Optional[Container]:
+        if self._disconnecting:
+            raise ConnectionError("Disconnecting")
+
         # Connection closed
         if not self.connection.connected:
             raise ConnectionError("Not connected")
 
         if message is None and message_type is not None:
             message = message_type.build(dict(fields=dict(value=args)))
+
+        if not self.connection.retransmit_requests:
+            retries = 1
 
         attempt = 1
 
@@ -630,6 +665,9 @@ class Paradox:
                 logger.debug("Request retry (attempt %d/%d)", attempt, retries)
 
             async with self.request_lock:
+                if self._disconnecting:
+                    raise ConnectionError("Disconnecting")
+
                 t1 = time.time()
                 result = "unknown"
                 try:
@@ -984,7 +1022,9 @@ class Paradox:
             # Temporary end
 
             # The event has changes. Update the state
-            if len(evt.change) > 0 and element:
+            # Elements created by load_definitions() have no "key" until labels
+            # are loaded, and update_container_object() requires one.
+            if len(evt.change) > 0 and element and "key" in element:
                 self.storage.update_container_object(evt.type, evt.id, evt.change)
 
             ps.sendEvent(evt)
@@ -1046,13 +1086,20 @@ class Paradox:
             self.storage.update_container_object(evt.type, evt.id, evt.change)
 
     async def disconnect(self):
-        logger.info("Disconnecting from the Alarm Panel")
-        self.run_state = RunState.STOP
+        async with self._loop_primitive("_disconnect_lock", asyncio.Lock):
+            self._disconnecting = True
+            logger.info("Disconnecting from the Alarm Panel")
+            self.run_state = RunState.STOP
 
-        self._clean_session()
-        if self.connection.connected:
-            await self.connection.close()
-            logger.info("Disconnected from the Alarm Panel")
+            self._clean_session()
+            if self.connection.connected:
+                try:
+                    await self.connection.end_session()
+                except Exception:
+                    logger.exception("Error while ending the panel session")
+                finally:
+                    await self.connection.close()
+                logger.info("Disconnected from the Alarm Panel")
 
     async def pause(self):
         logger.info("Pausing PAI")
@@ -1088,7 +1135,12 @@ class Paradox:
             logger.info("Cleaning previous session. Closing connection")
             # Write directly as this can be called from other contexts
 
-            self.connection.write(panel.get_message("CloseConnection").build(dict()))
+            try:
+                self.connection.write(
+                    panel.get_message("CloseConnection").build(dict())
+                )
+            except ConnectionError as e:
+                logger.warning("Could not send CloseConnection: %s", e)
 
     def _on_labels_load(self, data):
         for k, d in data.items():

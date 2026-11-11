@@ -7,6 +7,8 @@ import serial_asyncio
 
 from paradox.connections.connection import Connection
 from paradox.connections.handler import ConnectionHandler
+from paradox.connections.serial.e0fe_connection import E0FEConnection
+from paradox.connections.serial.e0fe_protocol import E0FESerialConnectionProtocol
 from paradox.connections.serial.protocol import SerialConnectionProtocol
 from paradox.exceptions import SerialConnectionOpenFailed
 
@@ -76,3 +78,14 @@ class SerialCommunication(Connection, ConnectionHandler):
             open_timeout_handler.cancel()
 
         return False
+
+
+class E0FESerialCommunication(E0FEConnection, SerialCommunication):
+    """Serial port connection in ``E0 FE`` mode."""
+
+    async def connect(self) -> bool:
+        await self.close_ended_session()
+        return await super().connect()
+
+    def make_protocol(self):
+        return E0FESerialConnectionProtocol(self)
