@@ -182,3 +182,30 @@ async def test_mqtt_handle_door_control(mocker):
         interface.stop()
         interface.join()
         assert not interface.is_alive()
+
+
+@pytest.mark.asyncio
+async def test_definitions_loaded_again_are_published_again(mocker):
+    mocker.patch("paradox.interfaces.mqtt.basic.cfg.MQTT_PUBLISH_DEFINITIONS", True)
+    interface = get_interface(mocker)
+    try:
+        await asyncio.sleep(0.01)
+        interface._handle_panel_definitions(
+            {"zone": {14: {"definition": "instant_full"}}}
+        )
+        interface._handle_panel_labels({"zone": {14: {"key": "IR_S_SOL"}}})
+        await asyncio.sleep(0.01)
+        interface.mqtt.publish.assert_any_call(
+            "paradox/definitions/zones/IR_S_SOL/definition", "instant_full", 0, True
+        )
+
+        interface.mqtt.publish.reset_mock()
+        interface._handle_panel_definitions({"zone": {14: {"definition": "instant"}}})
+        await asyncio.sleep(0.01)
+        interface.mqtt.publish.assert_any_call(
+            "paradox/definitions/zones/IR_S_SOL/definition", "instant", 0, True
+        )
+    finally:
+        interface.stop()
+        interface.join()
+        assert not interface.is_alive()

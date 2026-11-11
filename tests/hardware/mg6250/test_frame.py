@@ -7,6 +7,7 @@ import pytest
 
 from paradox.config import config as cfg
 from paradox.connections.serial.encryption import make_serial_key
+from paradox.event import LiveEvent
 from paradox.exceptions import AuthenticationFailed, StatusRequestException
 from paradox.hardware.mg6250.panel import (
     ACK_GAP,
@@ -15,38 +16,55 @@ from paradox.hardware.mg6250.panel import (
     CLOCK_FIELD_POWER,
     CMD_DATA,
     CMD_IDENTIFY,
+    CMD_LOGIN,
     FIELD_LABEL,
     FIELD_SERIAL,
     KIND_ACK,
+    KIND_ACK_REPEAT,
     KIND_DATA,
     LAST_FRAGMENT,
+    LOG_OP_RANGE,
+    LOG_OP_READ,
     OBJ_AREA,
     OBJ_CLOCK,
     OBJ_PARTITION_STATUS,
     OBJ_SYSTEM,
     OBJ_USER,
     OBJ_ZONE,
+    ZONE_DEFINITIONS,
     OBJ_ZONE_STATUS,
     PARTITION_ACTIONS,
     PARTITION_STATUS_FIELD,
+    PROGRAMMING_BEGIN,
+    PROGRAMMING_END,
     SERVICE_CONTROL,
+    SERVICE_EVENT_LOG,
     SERVICE_OBJECTS,
+    SERVICE_PROGRAMMING,
+    SET_TIME_RETRY,
     SYSTEM_FIELD_STATUS,
     ZONE_ALARM_MEMORY,
     ZONE_IN_ALARM,
     ZONE_STATUS_FIELD,
     Frame,
+    LogEvent,
     LoginResponse,
     Panel,
     PanelAckHandler,
     build_frame,
+    build_log_request,
     build_pw_block,
     build_read_record,
+    build_set_time_record,
     credential_block,
     decode_date,
+    parse_log_records,
     parse_records,
 )
+from paradox.lib import ps
 from paradox.lib.crypto import encrypt as paradox_encrypt
+from paradox.hardware.spectra_magellan import parsers as sp_parsers
+from paradox.hardware.spectra_magellan.panel import Panel as SpectraPanel
 from paradox.lib.handlers import HandlerRegistry
 from paradox.paradox import Paradox
 from paradox.parsers.status import convert_raw_status
@@ -145,6 +163,91 @@ async def test_login_registers_panel_ack_handler_once():
         core.send_wait.side_effect = [None, None, Frame.parse(LOGIN_REPLY)]
         assert await panel.initialize_communication("admin") is True
     assert len(core.connection.handler_registry) == 1
+
+
+@pytest.mark.parametrize("status", [0x05, 0x85])
+async def test_login_busy_is_retryable(status):
+    """A session still open is not fatal: return False so PAI retries."""
+    core = AsyncMock()
+    reply = Frame.parse(build_frame(CMD_LOGIN, 2, bytes([status])))
+    core.send_wait.side_effect = [None, None, reply]
+    assert await Panel(core).initialize_communication("admin") is False
+
+
+BUSY_REPLY = build_frame(CMD_LOGIN, 2, b"\x05")
+
+
+def login_core():
+    core = AsyncMock()
+    core.connection = MagicMock()
+    core.connection.handler_registry = HandlerRegistry()
+    return core
+
+
+async def test_login_saves_session(monkeypatch, tmp_path):
+    path = tmp_path / "session.json"
+    monkeypatch.setattr(cfg, "MG6250_SESSION_FILE", str(path))
+    core = login_core()
+    core.send_wait.side_effect = [None, None, Frame.parse(LOGIN_REPLY)]
+    panel = Panel(core)
+    assert await panel.initialize_communication("admin") is True
+
+    assert path.stat().st_mode & 0o777 == 0o600
+    saved = Panel._load_session()
+    assert (saved.selector, saved.mode) == (0x08, 0x26)
+    assert saved.session_key == panel.session_key
+
+
+async def test_busy_login_resumes_saved_session(monkeypatch, tmp_path):
+    monkeypatch.setattr(cfg, "MG6250_SESSION_FILE", str(tmp_path / "s.json"))
+    core = login_core()
+    core.send_wait.side_effect = [None, None, Frame.parse(LOGIN_REPLY)]
+    await Panel(core).initialize_communication("admin")  # saves the session
+
+    core = login_core()
+    core.send_wait.side_effect = [None, None, Frame.parse(BUSY_REPLY)]
+    panel = Panel(core)
+    panel.read_records = AsyncMock(return_value={(OBJ_SYSTEM, 1): {1: b"\x05"}})
+    assert await panel.initialize_communication("admin") is True
+    assert (panel.session.selector, panel.session.mode) == (0x08, 0x26)
+    assert len(core.connection.handler_registry) == 1  # panel acks handled
+
+
+@pytest.mark.parametrize(
+    "read", [AsyncMock(return_value={}), AsyncMock(side_effect=asyncio.TimeoutError)]
+)
+async def test_busy_login_drops_stale_session(monkeypatch, tmp_path, read):
+    monkeypatch.setattr(cfg, "MG6250_SESSION_FILE", str(tmp_path / "s.json"))
+    core = login_core()
+    core.send_wait.side_effect = [None, None, Frame.parse(LOGIN_REPLY)]
+    await Panel(core).initialize_communication("admin")
+
+    core = login_core()
+    core.send_wait.side_effect = [None, None, Frame.parse(BUSY_REPLY)]
+    panel = Panel(core)
+    panel.read_records = read
+    assert await panel.initialize_communication("admin") is False
+    assert panel.session is None and panel.session_key is None
+    assert not (tmp_path / "s.json").exists()  # not tried again at the next login
+
+
+async def test_busy_login_without_saved_session(monkeypatch, tmp_path):
+    monkeypatch.setattr(cfg, "MG6250_SESSION_FILE", str(tmp_path / "missing.json"))
+    core = login_core()
+    core.send_wait.side_effect = [None, None, Frame.parse(BUSY_REPLY)]
+    panel = Panel(core)
+    panel.read_records = AsyncMock()
+    assert await panel.initialize_communication("admin") is False
+    panel.read_records.assert_not_awaited()
+
+
+@pytest.mark.parametrize("status", [0x81, 0x83, 0x84])
+async def test_login_refused_is_fatal(status):
+    core = AsyncMock()
+    reply = Frame.parse(build_frame(CMD_LOGIN, 2, bytes([status])))
+    core.send_wait.side_effect = [None, None, reply]
+    with pytest.raises(AuthenticationFailed):
+        await Panel(core).initialize_communication("admin")
 
 
 def test_decrypt_captured_data_frame():
@@ -348,14 +451,39 @@ async def test_transact_serializes_fragments_and_ack_gap(fragment_count):
     assert writes[-2][0] - writes[-3][0] >= ACK_GAP
 
 
-def test_panel_ack_handler_takes_only_acks():
+def test_panel_ack_handler_takes_the_session_frames():
     handler = PanelAckHandler(session_panel(0xB4, 0x62, SET_TIME_KEY))
     assert handler.can_handle(Frame.parse(SET_TIME_ACK))
-    assert not handler.can_handle(Frame.parse(SET_TIME_REPLY))
+    assert handler.can_handle(Frame.parse(SET_TIME_REPLY))
     assert not handler.can_handle(Frame.parse(IDENTIFY))
     assert not PanelAckHandler(Panel(AsyncMock())).can_handle(
         Frame.parse(SET_TIME_ACK)
     )  # no session key yet
+
+
+async def test_repeated_reply_is_acked_again_and_others_are_left_alone():
+    # 2026-11-08: a retried status read, the panel resent its reply about 2 s later
+    core = AsyncMock()
+    core.connection = MagicMock()
+    core.send_wait.return_value = Frame.parse(SET_TIME_REPLY)
+    panel = session_panel(0xB4, 0x62, SET_TIME_KEY, core)
+    handler = PanelAckHandler(panel)
+
+    # A reply still awaited (not acked yet) must not be answered from here
+    await handler(Frame.parse(SET_TIME_REPLY))
+    core.connection.write.assert_not_called()
+
+    await panel.transact(SERVICE_OBJECTS, b"")
+    core.connection.write.reset_mock()
+    await handler(Frame.parse(SET_TIME_REPLY))
+    (frame,) = core.connection.write.call_args.args
+    header = panel.decrypt_data(payload(frame))[0]
+    assert (header.tid, header.fragment, header.kind) == (1, 0x8001, KIND_ACK_REPEAT)
+    assert payload(frame)[17:] == b"\x02"
+
+    core.connection.write.reset_mock()
+    await handler(Frame.parse(SET_TIME_ACK))  # the panel's own ack: nothing to do
+    core.connection.write.assert_not_called()
 
 
 async def test_transact_without_reply_raises():
@@ -528,6 +656,430 @@ async def test_request_status_reports_partition(raw, expected):
     ) == expected
 
 
+@pytest.mark.parametrize(
+    "raw, mode",
+    [
+        # armed-stay-disarmed-sleep-disarm, slepp-armed-disarmed-open,
+        # alarm-ir-etage: exit delay then armed for each arm mode
+        # the mode bits are already set in the exit delay: not armed yet
+        ("010001000000", None),
+        ("050000000000", "stay"),
+        ("020001000000", None),
+        ("060000000000", "sleep"),
+        ("030001000000", None),
+        ("070000000000", "away"),
+        # alarm-ir-etage: in alarm while fully armed
+        ("770240000000", "away"),
+        ("000000000000", None),
+    ],
+)
+async def test_request_status_reports_arm_mode(raw, mode):
+    panel = session_panel(0x1E, 0xE0, ALARM_KEY)
+    panel._zones = [15]
+    panel.read_records = status_reads([2], partition=bytes.fromhex(raw))
+
+    converted = convert_raw_status(await panel.request_status(OBJ_CLOCK))
+
+    partition = converted["partition"][1]
+    modes = {m: partition[f"arm_{m}"] for m in ("stay", "sleep", "away")}
+    assert modes == {m: m == mode for m in modes}
+
+
+@pytest.mark.parametrize(
+    "raw, forced",
+    [
+        # arm-bypass-disarm: full arm with zone 12 open
+        ("031001000000", True),
+        ("071000000000", True),
+        # alarm-ir-etage: full arm with all zones closed
+        ("030001000000", False),
+        ("070000000000", False),
+        # exit-delay-audio: disarmed after an alarm
+        ("000200000000", False),
+    ],
+)
+async def test_request_status_reports_forced_arm(raw, forced):
+    panel = session_panel(0x1E, 0xE0, ALARM_KEY)
+    panel._zones = [15]
+    panel.read_records = status_reads([2], partition=bytes.fromhex(raw))
+
+    converted = convert_raw_status(await panel.request_status(OBJ_CLOCK))
+
+    assert converted["partition"][1]["arm_force"] is forced
+
+
+# set_time.pcapng, decrypted: the same 8 bytes then 00 00 in the session replies
+SET_TIME_RECORD = "05100024000100010006141a0a101404"
+CLOCK_WRITE_REPLY = bytes.fromhex("050d0024000100000400010000")
+BEGIN_REPLY = bytes.fromhex("00000000ffffffff0000")
+END_REPLY = bytes.fromhex("01000000ffffffff0000")
+SET_TIME_NOW = datetime.datetime(2026, 10, 16, 20, 4)
+
+
+def test_set_time_record_matches_capture():
+    assert build_set_time_record(SET_TIME_NOW).hex() == SET_TIME_RECORD
+
+
+def set_time_panel(monkeypatch, replies):
+    monkeypatch.setattr("paradox.hardware.mg6250.panel.WRITE_SETTLE", 0)
+    panel = session_panel(0xB4, 0x62, SET_TIME_KEY)
+    panel.transact = AsyncMock(side_effect=replies)
+    return panel
+
+
+async def test_set_time_is_a_write_inside_a_programming_session(monkeypatch):
+    panel = set_time_panel(
+        monkeypatch, [[BEGIN_REPLY], [CLOCK_WRITE_REPLY], [END_REPLY]]
+    )
+    assert await panel.set_time(SET_TIME_NOW) is True
+    assert [c.args for c in panel.transact.await_args_list] == [
+        (SERVICE_PROGRAMMING, bytes.fromhex("00000000ffffffff3c00")),
+        (SERVICE_OBJECTS, bytes.fromhex(SET_TIME_RECORD)),
+        (SERVICE_PROGRAMMING, bytes.fromhex("01000000ffffffff")),
+    ]
+
+
+async def test_set_time_refused_session_writes_nothing_and_is_not_retried(monkeypatch):
+    refused = bytes.fromhex("00000000ffffffff0100")
+    panel = set_time_panel(monkeypatch, [[refused]])
+    assert await panel.set_time(SET_TIME_NOW) is False
+    assert await panel.set_time(SET_TIME_NOW) is None  # not tried again
+    panel.transact.assert_awaited_once()  # and no End after a refused Begin
+
+
+async def test_set_time_refused_write_is_not_retried(monkeypatch):
+    refused = bytes.fromhex("050d0024000100010400010000")
+    panel = set_time_panel(monkeypatch, [[BEGIN_REPLY], [refused], [END_REPLY]])
+    assert await panel.set_time(SET_TIME_NOW) is False
+    assert await panel.set_time(SET_TIME_NOW) is None
+    assert panel.transact.await_count == 3
+
+
+@pytest.mark.parametrize(
+    "failure", [asyncio.TimeoutError(), StatusRequestException("no reply")]
+)
+async def test_set_time_lost_begin_reply_still_ends_the_session(monkeypatch, failure):
+    # the panel may have opened the programming session all the same
+    panel = set_time_panel(monkeypatch, [failure, [END_REPLY]])
+    assert await panel.set_time(SET_TIME_NOW) is False
+    assert [c.args[1] for c in panel.transact.await_args_list] == [
+        PROGRAMMING_BEGIN,
+        PROGRAMMING_END,
+    ]
+
+
+async def test_set_time_lost_end_reply_keeps_the_accepted_write(monkeypatch):
+    panel = set_time_panel(
+        monkeypatch,
+        [[BEGIN_REPLY], [CLOCK_WRITE_REPLY], asyncio.TimeoutError()],
+    )
+    assert await panel.set_time(SET_TIME_NOW) is True
+
+
+async def test_set_time_lost_reply_is_retried_later(monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr(
+        "paradox.hardware.mg6250.panel.time.monotonic", lambda: clock[0]
+    )
+    panel = set_time_panel(
+        monkeypatch,
+        [
+            [BEGIN_REPLY],
+            asyncio.TimeoutError(),
+            [END_REPLY],
+            [BEGIN_REPLY],
+            [CLOCK_WRITE_REPLY],
+            [END_REPLY],
+        ],
+    )
+    assert await panel.set_time(SET_TIME_NOW) is False
+    clock[0] += SET_TIME_RETRY - 1
+    assert await panel.set_time(SET_TIME_NOW) is None  # too early
+    assert panel.transact.await_count == 3
+    clock[0] += 1
+    assert await panel.set_time(SET_TIME_NOW) is True
+
+
+async def test_set_time_refused_write_still_ends_the_session(monkeypatch):
+    refused = bytes.fromhex("050d0024000100010400010000")
+    panel = set_time_panel(monkeypatch, [[BEGIN_REPLY], [refused], [END_REPLY]])
+    assert await panel.set_time(SET_TIME_NOW) is False
+    assert panel.transact.await_args.args[1] == bytes.fromhex("01000000ffffffff")
+
+
+@pytest.mark.parametrize(
+    "failure", [asyncio.TimeoutError(), StatusRequestException("no reply")]
+)
+async def test_set_time_lost_write_still_ends_the_session(monkeypatch, failure):
+    panel = set_time_panel(monkeypatch, [[BEGIN_REPLY], failure, [END_REPLY]])
+    assert await panel.set_time(SET_TIME_NOW) is False
+    assert panel.transact.await_count == 3
+    assert panel.transact.await_args.args[1] == bytes.fromhex("01000000ffffffff")
+
+
+async def test_base_panel_set_time_still_sends_set_time_date():
+    # SP/MG and EVO keep using the SetTimeDate message
+    core = AsyncMock()
+    start = Container(fields=Container(value=Container(firmware=Container(version=7))))
+    panel = SpectraPanel(core, start)
+    assert await panel.set_time(SET_TIME_NOW) is True
+    call = core.send_wait.await_args
+    assert call.args[0] is panel.get_message("SetTimeDate")
+    assert call.args[1] == dict(
+        century=20, year=26, month=10, day=16, hour=20, minute=4
+    )
+    assert call.kwargs["reply_expected"] == 0x3
+
+
+# pf-salon-open: event log requests and replies, decrypted
+LOG_RANGE_REQUEST = "010d00010192720000ffffffff"
+LOG_RANGE_REPLY = "0113000001010092720000ae7200001d00000000"
+LOG_READ_REQUEST = "001100010192720000ae72000000000000"
+
+
+def log_event(number, major, minor, label=b"", label_type=1, area=1):
+    return (
+        number.to_bytes(4, "little")
+        + bytes([0x1F, major, minor, area])
+        + bytes.fromhex("141a0b071602")  # 2026-11-07 22:02
+        + bytes.fromhex("000100fbff")
+        + bytes([label_type])
+        + label.ljust(16, b" ")
+    )
+
+
+def log_reply(first, last, events):
+    body = (
+        bytes([0, 19 + len(events) * 36])
+        + bytes.fromhex("0000010100")
+        + first.to_bytes(4, "little")
+        + last.to_bytes(4, "little")
+        + len(events).to_bytes(4, "little")
+        + b"".join(events)
+    )
+    return body + bytes([0xEE]) * (-len(body) % 16)
+
+
+def range_reply(first, last):
+    return bytes.fromhex(
+        "01130000010100"
+        + first.to_bytes(4, "little").hex()
+        + last.to_bytes(4, "little").hex()
+        + (last - first + 1).to_bytes(4, "little").hex()
+    )
+
+
+def test_log_requests_match_capture():
+    assert build_log_request(LOG_OP_RANGE, 0x7292).hex() == LOG_RANGE_REQUEST
+    assert build_log_request(LOG_OP_READ, 0x7292, 0x72AE).hex() == LOG_READ_REQUEST
+
+
+def test_parse_log_range_reply():
+    (record,) = parse_log_records(bytes.fromhex(LOG_RANGE_REPLY))
+    assert (record.op, record.first, record.last, record.count) == (
+        LOG_OP_RANGE,
+        0x7292,
+        0x72AE,
+        29,
+    )
+    assert record.events == []
+
+
+def test_parse_log_read_reply():
+    data = log_reply(
+        0x7292, 0x7293, [log_event(0x7292, 6, 3), log_event(0x7293, 41, 5)]
+    )
+    (record,) = parse_log_records(data)
+    assert [(e.number, e.major, e.minor) for e in record.events] == [
+        (0x7292, 6, 3),
+        (0x7293, 41, 5),
+    ]
+
+
+def log_panel(replies):
+    """A logged-in panel whose log requests get `replies`, one list of fragments each."""
+    core = MagicMock()
+    core.get_label.return_value = None
+    panel = session_panel(0x94, 0x42, STATUS_KEY, core)
+    panel._log_enabled = True
+    panel.transact = AsyncMock(side_effect=replies)
+    return panel, core
+
+
+async def test_first_poll_only_notes_the_log_position():
+    panel, core = log_panel([[range_reply(0x7292, 0x72AE)]])
+    await panel._publish_new_events()
+    assert panel._log_last == 0x72AE
+    panel.transact.assert_awaited_once_with(
+        SERVICE_EVENT_LOG, build_log_request(LOG_OP_RANGE, 0)
+    )
+    core.handle_event_message.assert_not_called()
+
+
+async def test_no_new_event_reads_nothing():
+    panel, core = log_panel([[range_reply(0x7292, 0x72AE)]])
+    panel._log_last = 0x72AE
+    await panel._publish_new_events()
+    panel.transact.assert_awaited_once_with(
+        SERVICE_EVENT_LOG, build_log_request(LOG_OP_RANGE, 0x72AE)
+    )
+    core.handle_event_message.assert_not_called()
+
+
+async def test_log_going_back_follows_it_without_publishing():
+    # log cleared: the old position would never be passed again
+    panel, core = log_panel(
+        [
+            [range_reply(1, 3)],
+            [range_reply(1, 4)],
+            [log_reply(4, 4, [log_event(4, 47, 15)])],
+        ]
+    )
+    panel._log_last = 0x72AE
+    await panel._publish_new_events()
+    assert panel._log_last == 3
+    core.handle_event_message.assert_not_called()
+
+    await panel._publish_new_events()
+    panel.transact.assert_awaited_with(
+        SERVICE_EVENT_LOG, build_log_request(LOG_OP_READ, 4, 4)
+    )
+    core.handle_event_message.assert_called_once()
+    assert panel._log_last == 4
+
+
+async def test_new_events_are_published_once_in_order():
+    events = [log_event(0x72AF, 47, 15), log_event(0x72B0, 42, 1)]
+    panel, core = log_panel(
+        [[range_reply(0x7292, 0x72B0)], [log_reply(0x72AF, 0x72B0, events)]]
+    )
+    panel._log_last = 0x72AE
+    await panel._publish_new_events()
+    panel.transact.assert_awaited_with(
+        SERVICE_EVENT_LOG, build_log_request(LOG_OP_READ, 0x72AF, 0x72B0)
+    )
+    messages = [
+        c.args[0].fields.value for c in core.handle_event_message.call_args_list
+    ]
+    assert [(m.event.major, m.event.minor) for m in messages] == [(47, 15), (42, 1)]
+    assert messages[0].time == datetime.datetime(2026, 11, 7, 22, 2)
+    assert panel._log_last == 0x72B0
+
+
+@pytest.mark.parametrize(
+    "failure", [asyncio.TimeoutError(), StatusRequestException("no reply")]
+)
+async def test_refused_first_request_stops_reading_the_log(failure):
+    panel, core = log_panel([failure])
+    await panel._publish_new_events()
+    assert panel._log_enabled is False
+    await panel._publish_new_events()  # no second request
+    panel.transact.assert_awaited_once()
+
+
+async def test_later_failure_keeps_reading_the_log():
+    panel, core = log_panel([asyncio.TimeoutError(), [range_reply(0x7292, 0x72AE)]])
+    panel._log_last = 0x72AE
+    await panel._publish_new_events()
+    assert panel._log_enabled is True
+    await panel._publish_new_events()
+    assert panel.transact.await_count == 2
+
+
+def live_event(panel, major, minor, label=b""):
+    message = panel._log_event_message(
+        LogEvent.parse(log_event(0x7292, major, minor, label))
+    )
+    labels = {("partition", 1): "Area 1", ("zone", 15): "IR ETAGE"}
+    return LiveEvent(message, Panel.event_map, lambda t, i: labels.get((t, i)))
+
+
+@pytest.mark.parametrize(
+    "major, minor, kind, text",
+    [
+        (6, 3, "partition", "Partition Area 1 armed in stay mode"),
+        (6, 4, "partition", "Partition Area 1 armed in sleep mode"),
+        (41, 5, "partition", "Partition Area 1 armed via BabyWare"),
+        (45, 1, "partition", "Partition Area 1 disarmed via BabyWare"),
+        (54, 2, "system", "Software log on"),
+        (55, 4, "system", "Console tamper"),
+        (56, 4, "system", "Console tamper restore"),
+        (55, 12, "system", "Fail to communicate personal reporting"),
+        (22, 66, "system", "Battery voltage level"),
+    ],
+)
+def test_log_event_messages(major, minor, kind, text):
+    panel, core = log_panel([])
+    event = live_event(panel, major, minor)
+    assert (event.type, event.message) == (kind, text)
+
+
+def test_log_event_uses_todays_label_and_changes_no_state():
+    panel, core = log_panel([])
+    core.get_label.side_effect = lambda t, i: (
+        "IR ETAGE" if (t, i) == ("zone", 15) else None
+    )
+    event = live_event(panel, 47, 15, b"Zone 15")  # the label when it was saved
+    assert (event.type, event.id, event.label) == ("zone", 15, "IR ETAGE")
+    assert event.message == "Zone IR ETAGE in alarm"
+    assert event.change == {}
+
+
+def test_saved_events_change_no_state():
+    # tables 11 and 12: polling stays the source of state
+    for major, event in Panel.event_map.items():
+        if major > 3:
+            assert "change" not in event, major
+            for sub in event.get("sub", {}).values():
+                assert not isinstance(sub, dict) or "change" not in sub, major
+
+
+def test_property_map_covers_what_the_panel_publishes():
+    # every property request_status publishes, and PAI's derived states
+    for name in (
+        "arm",
+        "arm_stay",
+        "arm_sleep",
+        "arm_away",
+        "arm_force",
+        "exit_delay",
+        "audible_alarm",
+        "ready_status",
+        "current_state",
+        "target_state",
+        "open",
+        "presently_in_alarm",
+        "generated_alarm",
+        "time",
+        "battery",
+        "ac",
+    ):
+        assert name in Panel.property_map
+
+
+@pytest.mark.parametrize(
+    "zones, zone_partitions, ready",
+    [
+        ({8: b"\x00\x00\x00", 12: b"\x00\x00\x00"}, {8: 1, 12: 1}, True),
+        # open-closed-open-closed-ready: ST F CUISINE and ST SEJOUR G
+        ({8: b"\x01\x00\x00", 12: b"\x01\x00\x00"}, {8: 1, 12: 1}, False),
+        ({8: b"\x00\x00\x00", 12: b"\x01\x00\x00"}, {8: 1, 12: 3}, False),
+        # open zone of the other partition, or of an unknown one
+        ({8: b"\x01\x00\x00", 12: b"\x00\x00\x00"}, {8: 2, 12: 1}, True),
+        ({8: b"\x01\x00\x00", 12: b"\x00\x00\x00"}, {}, False),
+    ],
+)
+async def test_request_status_calculates_ready(zones, zone_partitions, ready):
+    panel = session_panel(0x1E, 0xE0, ALARM_KEY)
+    panel._zones = sorted(zones)
+    panel._zone_partitions = zone_partitions
+    panel.read_records = status_reads([2], zones=zones)
+
+    converted = convert_raw_status(await panel.request_status(OBJ_CLOCK))
+
+    assert converted["partition"][1]["ready_status"] is ready
+
+
 async def test_request_status_reports_zone_alarm():
     panel = session_panel(0x1E, 0xE0, ALARM_KEY)
     panel._zones = [14, 15]
@@ -668,7 +1220,9 @@ async def test_load_labels_skips_empty_slots(monkeypatch):
         }
     }
     assert labels["keypad"] == {}
+    assert panel._zone_partitions == {1: 1}
     assert panel._zones == [1]  # status polls enrolled zones only
+    assert panel._zone_definitions == {1: 9}
     assert labels["user"] == {
         1: {"id": 1, "key": "System_Master", "label": "System Master"}
     }
@@ -787,6 +1341,14 @@ async def test_arm_matches_capture():
     core.connection.write.assert_called_once()  # ack of the panel's reply
 
 
+async def test_accepted_control_forces_status_reread():
+    """A disarm does not move the 0x1c counter: the next poll must re-read."""
+    panel, _ = control_panel()
+    panel._change_counter = 0x42
+    assert await panel.control_partitions([1], "disarm") is True
+    assert panel._change_counter is None
+
+
 @pytest.mark.parametrize(
     "command, action",
     [("arm", 0x13), ("arm_sleep", 0x12), ("arm_stay", 0x11), ("disarm", 0x10)],
@@ -830,3 +1392,236 @@ async def test_control_without_reply_is_not_accepted():
     panel, core = control_panel()
     panel.transact = AsyncMock(side_effect=StatusRequestException("no reply"))
     assert await panel.control_partitions([1], "arm") is False
+
+
+async def test_control_before_login_is_refused():
+    # 2026-11-07: an MQTT arm_sleep arrived while PAI was reconnecting
+    panel, core = control_panel()
+    panel.session = None
+    assert await panel.control_partitions([1], "arm_sleep") is False
+    core.send_wait.assert_not_awaited()
+
+
+# captures/bypass: zone 12, panel serial replaced by 01020304
+ZONE_BYPASS_REQUEST = "01ff00000000000102030401" + "0c0001000000"
+ZONE_CLEAR_REQUEST = "01ff00000000000102030400" + "0c0001000000"
+ZONE_CONTROL_REPLY = "01ff0000000000" + "01020304" + "000000"
+
+
+@pytest.mark.parametrize(
+    "command, request_hex",
+    [("bypass", ZONE_BYPASS_REQUEST), ("clear_bypass", ZONE_CLEAR_REQUEST)],
+)
+async def test_zone_control_matches_capture(command, request_hex):
+    panel, core = control_panel()
+    panel.transact = AsyncMock(return_value=[bytes.fromhex(ZONE_CONTROL_REPLY)])
+    assert await panel.control_zones([12], command) is True
+    panel.transact.assert_awaited_once_with(SERVICE_CONTROL, bytes.fromhex(request_hex))
+    assert panel._change_counter is None  # the next poll reads the status again
+
+
+async def test_zone_control_refuses_unknown_command():
+    panel, core = control_panel()
+    panel.transact = AsyncMock()
+    assert await panel.control_zones([12], "toggle") is False
+    panel.transact.assert_not_awaited()
+
+
+async def test_zone_control_reports_refusal():
+    panel, core = control_panel()
+    panel._change_counter = 7
+    refused = bytes.fromhex("01ff0000000000" + "01020304" + "010000")
+    panel.transact = AsyncMock(return_value=[refused])
+    assert await panel.control_zones([12], "bypass") is False
+    assert panel._change_counter == 7
+
+
+async def test_zone_control_without_reply_or_login_is_not_accepted():
+    panel, core = control_panel()
+    panel.transact = AsyncMock(side_effect=StatusRequestException("no reply"))
+    assert await panel.control_zones([12], "bypass") is False
+    panel, core = control_panel()
+    panel.session = None
+    assert await panel.control_zones([12], "bypass") is False
+    core.send_wait.assert_not_awaited()
+
+
+# captures/send-zone-sleep: BabyWare set zone 14 (IR S/SOL) from Instant (Full
+# Arm) to Instant (Sleep / Full Arm)
+ZONE_FIELD_BEFORE = bytes.fromhex("bb8b0a018700")
+ZONE_DEFINITION_WRITE = "0110" + "0001000e" + "00" + "00" + "0006" + "bb8b09018700"
+ZONE_WRITE_REPLY = bytes.fromhex("010b0001000e0000000000")
+
+
+def definition_panel(monkeypatch, replies, field=ZONE_FIELD_BEFORE):
+    monkeypatch.setattr("paradox.hardware.mg6250.panel.WRITE_SETTLE", 0)
+    monkeypatch.setattr("paradox.lib.ps.sendMessage", MagicMock())
+    panel, core = control_panel()
+    panel._zone_definitions = {14: field[2]}
+    panel.read_objects = AsyncMock(return_value={14: {FIELD_SERIAL: field}})
+    panel.transact = AsyncMock(side_effect=replies)
+    return panel
+
+
+@pytest.mark.parametrize("command", ["definition_9", "definition_instant_sleep_full"])
+async def test_zone_definition_write_matches_capture(monkeypatch, command):
+    panel = definition_panel(
+        monkeypatch, [[BEGIN_REPLY], [ZONE_WRITE_REPLY], [END_REPLY]]
+    )
+    assert await panel.control_zones([14], command) is True
+    panel.read_objects.assert_awaited_once_with(OBJ_ZONE, [14], (FIELD_SERIAL,))
+    assert [c.args for c in panel.transact.await_args_list] == [
+        (SERVICE_PROGRAMMING, bytes.fromhex("00000000ffffffff3c00")),
+        (SERVICE_OBJECTS, bytes.fromhex(ZONE_DEFINITION_WRITE)),
+        (SERVICE_PROGRAMMING, bytes.fromhex("01000000ffffffff")),
+    ]
+    assert panel._zone_definitions == {14: 9}
+    # published again, under paradox/definitions
+    ps.sendMessage.assert_called_once_with(
+        "definitions_loaded",
+        data={"zone": {14: {"definition": "instant_sleep_full", "partition": None}}},
+    )
+
+
+async def test_zone_definition_already_set_writes_nothing(monkeypatch):
+    panel = definition_panel(monkeypatch, [])
+    assert await panel.control_zones([14], "definition_instant_full") is True
+    panel.transact.assert_not_awaited()
+    ps.sendMessage.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "definition_0",
+        "definition_disabled",
+        "definition_30",
+        "definition_",
+        "definition_x",
+    ],
+)
+async def test_zone_definition_refuses_unknown_definitions(monkeypatch, command):
+    panel = definition_panel(monkeypatch, [])
+    assert await panel.control_zones([14], command) is False
+    panel.read_objects.assert_not_awaited()
+    panel.transact.assert_not_awaited()
+
+
+async def test_zone_definition_refuses_a_zone_not_enrolled(monkeypatch):
+    panel = definition_panel(monkeypatch, [], field=bytes.fromhex("000000018700"))
+    assert await panel.control_zones([14], "definition_9") is False
+    panel.transact.assert_not_awaited()
+
+
+async def test_zone_definition_refused_write_ends_the_session(monkeypatch):
+    refused = bytes.fromhex("010b0001000e0001000000")
+    panel = definition_panel(monkeypatch, [[BEGIN_REPLY], [refused], [END_REPLY]])
+    assert await panel.control_zones([14], "definition_9") is False
+    assert panel.transact.await_count == 3
+    assert panel._zone_definitions == {14: 10}
+
+
+async def test_zone_definition_lost_write_ends_the_session(monkeypatch):
+    panel = definition_panel(
+        monkeypatch, [[BEGIN_REPLY], StatusRequestException("no reply"), [END_REPLY]]
+    )
+    assert await panel.control_zones([14], "definition_9") is False
+    assert panel.transact.await_args_list[-1].args == (
+        SERVICE_PROGRAMMING,
+        bytes.fromhex("01000000ffffffff"),
+    )
+    assert panel._zone_definitions == {14: 10}
+
+
+async def test_definitions_are_named_as_for_the_sp_mg_panels():
+    panel, core = control_panel()
+    panel._zone_definitions = {14: 9, 15: 10, 16: 99}
+    panel._zone_partitions = {14: 1, 15: 1, 16: 3}
+    assert await panel.load_definitions() == {
+        "zone": {
+            14: {"definition": "instant_sleep_full", "partition": 1},
+            15: {"definition": "instant_full", "partition": 1},
+            16: {"definition": 99, "partition": 3},  # not in the guide
+        }
+    }
+    sp_names = sp_parsers.DefinitionsParserMap["zone"].definition
+    for number, name in ZONE_DEFINITIONS.items():
+        if number <= 26:
+            assert sp_names.encmapping[name] == number
+
+
+async def test_load_memory_sends_definitions_then_labels(mocker):
+    panel, core = control_panel()
+    panel.load_labels = AsyncMock(return_value={"zone": {}})
+    panel._zone_definitions = {14: 9}
+    panel._zone_partitions = {14: 1}
+    send = mocker.patch("paradox.lib.ps.sendMessage")
+    await panel.load_memory()
+    assert [c.args[0] for c in send.call_args_list] == [
+        "definitions_loaded",
+        "labels_loaded",
+    ]
+    assert send.call_args_list[0].kwargs["data"]["zone"][14]["definition"] == (
+        "instant_sleep_full"
+    )
+
+
+# captures/refresh-disconnect: BabyWare disconnecting from session 91 69
+LOGOUT_REQUEST = bytes.fromhex("de01000c0000000191692 8b5".replace(" ", ""))
+
+
+async def test_close_connection_logs_out(monkeypatch, tmp_path):
+    path = tmp_path / "session.json"
+    path.write_text("{}")
+    monkeypatch.setattr(cfg, "MG6250_SESSION_FILE", str(path))
+    core = MagicMock()
+    panel = session_panel(0x91, 0x69, STATUS_KEY, core)
+    panel._log_enabled = True
+    panel.close_connection()
+    core.connection.write.assert_called_once_with(LOGOUT_REQUEST)
+    assert panel.session is None and panel.session_key is None
+    assert panel._log_enabled is False
+    assert not path.exists()  # it cannot be resumed any more
+
+
+def test_close_connection_without_a_session_sends_the_generic_close():
+    core = MagicMock()
+    panel = Panel(core)
+    panel.close_connection()
+    core.connection.write.assert_called_once_with(
+        panel.get_message("CloseConnection").build(dict())
+    )
+
+
+def test_base_panel_close_connection_is_unchanged():
+    core = MagicMock()
+    start = Container(fields=Container(value=Container(firmware=Container(version=7))))
+    panel = SpectraPanel(core, start)
+    panel.close_connection()
+    core.connection.write.assert_called_once_with(
+        panel.get_message("CloseConnection").build(dict())
+    )
+
+
+async def test_time_sync_does_not_overlap():
+    # The core starts it at every status update; set_time takes over a second
+    alarm = Paradox()
+    alarm.panel = MagicMock()
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def set_time(now):
+        started.set()
+        await release.wait()
+        return True
+
+    alarm.panel.set_time = AsyncMock(side_effect=set_time)
+    alarm._is_time_sync_required = lambda now: True
+    first = asyncio.create_task(alarm.sync_time())
+    await started.wait()
+    await alarm.sync_time()
+    release.set()
+    await first
+    alarm.panel.set_time.assert_awaited_once()
+    await alarm.sync_time()  # and it can run again afterwards
+    assert alarm.panel.set_time.await_count == 2

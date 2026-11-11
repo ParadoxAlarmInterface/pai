@@ -121,6 +121,10 @@ class Config:
             [int, str, bytes, type(None)],
         ),  # PC Password. Set to None if Panel has no Password. In Babyware: Right click on your panel -> Properties -> PC Communication (Babyware) -> PC Communication (Babyware) Tab.
         "MG6250_USERNAME": "admin",  # MG6250 PC communication username
+        "MG6250_SESSION_FILE": (
+            None,
+            [str, type(None)],
+        ),  # File to keep the MG6250 session key in; when the panel says "busy" (previous session still open), PAI resumes that session instead of waiting for a power cycle. E.g. '/etc/pai/mg6250-session.json'
         "PUSH_UPDATE_WITHOUT_CHANGE": False,  # Always notify interfaces of all changes
         # MQTT
         "MQTT_ENABLE": False,  # Enable MQTT Interface

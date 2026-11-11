@@ -436,6 +436,9 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
         if not self.definitions_future.done():
             self.definitions_future.set_result(data)
+        elif self.labels_future.done():
+            # loaded again after a change (MG6250 zone definition write)
+            self._publish_definitions()
 
     def _handle_panel_change(self, change: Change):
         attribute = change.property
@@ -495,10 +498,10 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             retain=cfg.MQTT_RETAIN,
         )
 
-    def _on_ready(self):
+    def _publish_definitions(self):
         if cfg.MQTT_PUBLISH_DEFINITIONS:
             for element_type in self.definitions:  # zones, partitions
-                labels = self.labels[element_type]
+                labels = self.labels.get(element_type, {})
                 definitions = self.definitions[element_type]
                 for i in definitions:  # numeric index
                     if i not in labels:
@@ -515,6 +518,9 @@ class BasicMQTTInterface(AbstractMQTTInterface):
                             attribute,
                             definition[attribute],
                         )
+
+    def _on_ready(self):
+        self._publish_definitions()
 
         if (
             cfg.MQTT_DASH_PUBLISH

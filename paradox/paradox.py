@@ -402,11 +402,8 @@ class Paradox:
             )
 
     async def sync_time(self):
-        if (
-            cfg.CONNECTION_TYPE == "PRT3"
-            or self.panel.settings.get("product_id") == "MAGELLAN_MG6250"
-        ):
-            return  # Neither protocol implements SetTimeDate.
+        if cfg.CONNECTION_TYPE == "PRT3":
+            return  # PRT3 has no SetTimeDate command
         if self._syncing_time:
             # Started again at every status update, and the clock is only read back
             # after this one ends.
