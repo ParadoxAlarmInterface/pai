@@ -98,6 +98,14 @@ class Config:
         "IO_TIMEOUT": 0.5,  # Timeout for IO operations
         "LIMITS": {},  # By default all zones will be monitored
         "MODULE_PGM_ADDRESSES": [],  # Entries with bus module address and PGM count
+        # Digiplex: zone key -> Home Assistant binary_sensor device_class.
+        # The panel does not expose the physical sensor type (zone definitions
+        # describe behaviour only), so the mapping has to be explicit. Zones
+        # that are not listed default to "motion".
+        "ZONE_DEVICE_CLASS": {},
+        # Digiplex: partition number -> name used in Home Assistant.
+        # Missing entries default to "Partition <number>".
+        "PARTITION_NAMES": {},
         "LABEL_ENCODING": "paradox-en",  # Encoding to use when decoding labels. paradox-* or https://docs.python.org/3/library/codecs.html#standard-encodings
         "LABEL_REFRESH_INTERVAL": (
             15 * 60,

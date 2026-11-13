@@ -8,6 +8,9 @@ class AbstractStatusBinarySensor(AbstractEntity):
 
         self.label = entity.get("label", entity["key"].replace("_", " "))
         self.property = property
+        # Per-entity device_class (currently only Digiplex zones provide one).
+        # None means "let the concrete sensor decide its default".
+        self.device_class = entity.get("device_class")
 
         self.key = sanitize_key(entity["key"])
 
@@ -38,7 +41,7 @@ class ZoneStatusBinarySensor(AbstractStatusBinarySensor):
     def serialize(self):
         config = super().serialize()
         if self.property == 'open':
-            config['device_class'] = 'motion'
+            config['device_class'] = self.device_class or 'motion'
 
         return config
 

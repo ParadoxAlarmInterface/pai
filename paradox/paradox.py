@@ -241,6 +241,111 @@ class Paradox:
         self.run_state = RunState.ERROR
         return False
 
+    async def _digiplex_connect(self) -> bool:
+        """Digiplex (DGP-48/848/NE96) panel connection sequence (issue #257).
+
+        Such panels ignore InitiateCommunication (0x72) and identify
+        themselves in the StartCommunication (0x5F) response, which they only
+        accept with source_id=0.
+
+        The panel allows a single PC session at a time and keeps it open after
+        a connection loss: it is released only after ~15-25 s of absolute line
+        silence. Every request (even a rejected one) resets that timer, so
+        retries must be slow and silent - otherwise the panel never releases
+        the previous session and reconnection becomes impossible.
+        """
+        from paradox.hardware.digiplex import Panel_DGP848
+
+        self.panel = Panel_DGP848(self)
+        self.connection.variable_message_length(self.panel.variable_message_length)
+
+        try:
+            reply = await self._digiplex_wait_for_panel()
+
+            if reply.fields.value.product_id not in (
+                "DIGIPLEX_v13",
+                "DIGIPLEX_v2",
+                "DIGIPLEX_NE",
+            ):
+                raise ConnectionError(
+                    "Unsupported Digiplex product_id: %s"
+                    % reply.fields.value.product_id
+                )
+
+            self._digiplex_register_panel(reply)
+
+            if not await self.panel.initialize_communication(cfg.PASSWORD):
+                raise ConnectionError("Failed to initialize communication")
+
+            self.run_state = RunState.CONNECTED
+            logger.info("Connection OK")
+            return True
+        except asyncio.TimeoutError:
+            logger.error("Timeout while connecting to Digiplex panel")
+        except ConnectionError:
+            logger.exception("Digiplex connect failed")
+        self.run_state = RunState.ERROR
+        return False
+
+    async def _digiplex_wait_for_panel(self):
+        """Send StartCommunication until the panel accepts it (command 0x00).
+
+        A reply with another command means the panel is still busy with the
+        previous session; no reply means the frame was dropped. Both cases
+        need 30s of absolute line silence, otherwise the panel never releases
+        the old session.
+        """
+        from paradox.hardware.digiplex.parsers import StartCommunication
+
+        deadline = time.time() + 120
+        while True:
+            try:
+                reply = await self.send_wait(
+                    StartCommunication,
+                    args={"source_id": 0},
+                    reply_expected=[0x0, 0x7],
+                    retries=1,
+                )
+            except asyncio.TimeoutError:
+                reply = None
+
+            if reply is not None and reply.fields.value.po.command == 0x0:
+                return reply
+
+            if reply is None:
+                logger.info("Digiplex panel did not reply. Waiting 30s before retry")
+            else:
+                logger.info(
+                    "Digiplex panel reports a busy session. Waiting 30s of "
+                    "line silence for the panel to release it"
+                )
+
+            if time.time() + 30 >= deadline:
+                raise ConnectionError("Panel did not release its previous session")
+            await asyncio.sleep(30)
+
+    def _digiplex_register_panel(self, reply):
+        """Create the panel for the detected product and publish the device."""
+        self.panel = create_panel(self, reply)
+        self.connection.variable_message_length(self.panel.variable_message_length)
+        framer = self.panel.make_framer()
+        if framer is not None:
+            self.connection.set_framer(framer)
+
+        ps.sendMessage(
+            "panel_detected",
+            panel=DetectedPanel(
+                product_id=reply.fields.value.product_id,
+                model="Digiplex DGP",
+                firmware_version="{}.{} build {:#06x}".format(
+                    reply.fields.value.firmware.version,
+                    reply.fields.value.firmware.revision,
+                    reply.fields.value.firmware_build,
+                ),
+                serial_number=hexlify(reply.fields.value.serial_number).decode(),
+            ),
+        )
+
     async def connect(self) -> bool:
         if self.work_loop is None:
             self.work_loop = asyncio.get_running_loop()
@@ -269,11 +374,17 @@ class Paradox:
             self.connection.variable_message_length(self.panel.variable_message_length)
 
         try:
-            initiate_reply = await self.send_wait(
-                self.panel.get_message("InitiateCommunication"),
-                None,
-                reply_expected=0x7,
-            )
+            try:
+                initiate_reply = await self.send_wait(
+                    self.panel.get_message("InitiateCommunication"),
+                    None,
+                    reply_expected=0x7,
+                )
+            except asyncio.TimeoutError:
+                # Digiplex (DGP-48/848/NE96) panels do not implement
+                # InitiateCommunication (0x72) at all: they answer only to
+                # StartCommunication (0x5F) with source_id=0 (issue #257).
+                return await self._digiplex_connect()
 
             if initiate_reply:
                 model = initiate_reply.fields.value.label.strip(b"\0 ").decode(
@@ -1016,6 +1127,11 @@ class Paradox:
             else:
                 panel = self.panel
 
+            if not panel.close_connection_supported:
+                # Digiplex panels have no logout command: sending one is an
+                # error and would reset the panel's session release timer.
+                return
+
             logger.info("Cleaning previous session. Closing connection")
             # Write directly as this can be called from other contexts
 
@@ -1159,6 +1275,8 @@ class Paradox:
 
             if properties.get("exit_delay"):  # Redefine if pending
                 change["current_state"] = "arming"
+            elif properties.get("entry_delay"):  # Entry delay: waiting for a code
+                change["current_state"] = "pending"
 
             self.storage.update_container_object("partition", properties["key"], change)
 
