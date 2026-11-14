@@ -13,7 +13,6 @@ from paradox.paradox import Paradox
 @pytest.mark.parametrize(
     "connection_type, product_id, supported",
     [
-        ("Serial", "MAGELLAN_MG6250", False),
         ("PRT3", None, False),
         ("Serial", "DIGIPLEX_EVO_192", True),
         ("Serial", "MAGELLAN_MG5050", True),
@@ -46,6 +45,44 @@ async def test_sync_time_respects_panel_support(
     else:
         drift_check.assert_not_called()
         alarm.send_wait.assert_not_awaited()
+
+
+async def test_sync_time_uses_the_mg6250_programming_session(monkeypatch):
+    monkeypatch.setattr(cfg, "CONNECTION_TYPE", "Serial")
+    monkeypatch.setattr(cfg, "SYNC_TIME", True)
+    monkeypatch.setattr(cfg, "SYNC_TIME_TIMEZONE", "")
+    alarm = Paradox()
+    alarm.panel = create_panel(alarm, _start_communication_reply("MAGELLAN_MG6250"))
+    alarm.storage.get_container("system").deep_merge(
+        {"date": {"time": datetime(2000, 1, 1)}}
+    )
+    alarm.panel.set_time = AsyncMock(return_value=True)
+    alarm.send_wait = AsyncMock()
+
+    await alarm.sync_time()
+
+    alarm.panel.set_time.assert_awaited_once()
+    alarm.send_wait.assert_not_awaited()  # no SetTimeDate
+
+
+@pytest.mark.parametrize("result, warned", [(None, False), (False, True)])
+async def test_sync_time_warns_only_when_set_time_was_tried(
+    monkeypatch, caplog, result, warned
+):
+    # None: the panel held the try back (e.g. it refused before), at every poll
+    monkeypatch.setattr(cfg, "CONNECTION_TYPE", "Serial")
+    monkeypatch.setattr(cfg, "SYNC_TIME", True)
+    monkeypatch.setattr(cfg, "SYNC_TIME_TIMEZONE", "")
+    alarm = Paradox()
+    alarm.panel = create_panel(alarm, _start_communication_reply("MAGELLAN_MG6250"))
+    alarm.storage.get_container("system").deep_merge(
+        {"date": {"time": datetime(2000, 1, 1)}}
+    )
+    alarm.panel.set_time = AsyncMock(return_value=result)
+
+    await alarm.sync_time()
+
+    assert ("Could not set panel time" in caplog.text) is warned
 
 
 @pytest.mark.asyncio
