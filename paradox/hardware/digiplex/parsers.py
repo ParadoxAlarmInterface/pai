@@ -262,15 +262,15 @@ def build_read_ram(address: int, count: int = 32, bus_address: int = 0) -> bytes
         raise ValueError("count must be 1..32")
     c = count % 32
     return ReadRAM.build(
-        dict(
-            fields=dict(
-                value=dict(
-                    po=dict(count_hi=c >> 1),
-                    bus=dict(count_lo=bool(c & 1), bus_address=bus_address),
-                    address=address,
-                )
-            )
-        )
+        {
+            "fields": {
+                "value": {
+                    "po": {"count_hi": c >> 1},
+                    "bus": {"count_lo": bool(c & 1), "bus_address": bus_address},
+                    "address": address,
+                }
+            }
+        }
     )
 
 

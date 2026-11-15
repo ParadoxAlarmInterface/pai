@@ -254,9 +254,9 @@ class Paradox:
         retries must be slow and silent - otherwise the panel never releases
         the previous session and reconnection becomes impossible.
         """
-        from paradox.hardware.digiplex import Panel_DGP848
+        from paradox.hardware.digiplex import PanelDGP848
 
-        self.panel = Panel_DGP848(self)
+        self.panel = PanelDGP848(self)
         self.connection.variable_message_length(self.panel.variable_message_length)
 
         try:

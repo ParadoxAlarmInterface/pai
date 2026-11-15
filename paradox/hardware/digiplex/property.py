@@ -23,20 +23,20 @@ from .adapters import (
     PARTITION_COUNT,
     PARTITION_OFFSET,
     PARTITION_STRIDE,
-    PartitionStatus,
+    partition_status,
     VoltageAdapter,
-    ZoneFlags,
+    zone_flags,
 )
 
 RAMDataParserMap = {
     0x8153: Struct(
-        "zone_open" / ZoneFlags(48),
-        "zone_tamper" / ZoneFlags(48),
+        "zone_open" / zone_flags(48),
+        "zone_tamper" / zone_flags(48),
         Padding(20),
     ),
     0x8185: Struct(
         Padding(PARTITION_OFFSET),  # 0x0185..0x0194
-        "partition_status" / PartitionStatus(PARTITION_COUNT),
+        "partition_status" / partition_status(PARTITION_COUNT),
         Padding(32 - PARTITION_OFFSET - PARTITION_COUNT * PARTITION_STRIDE),
     ),
     0x800B: Struct(
@@ -55,33 +55,33 @@ RAMDataParserMap = {
 
 # Property changes -> synthesized events (see paradox.event.ChangeEvent).
 property_map = {
-    "open": dict(
-        level=EventLevel.INFO,
-        message={
+    "open": {
+        "level": EventLevel.INFO,
+        "message": {
             "True": "{Type} {label} is open",
             "False": "{Type} {label} is closed",
         },
-    ),
-    "tamper": dict(
-        level=EventLevel.CRITICAL,
-        tags=["trouble"],
-        message={
+    },
+    "tamper": {
+        "level": EventLevel.CRITICAL,
+        "tags": ["trouble"],
+        "message": {
             "True": "{Type} {label} tamper",
             "False": "{Type} {label} tamper restored",
         },
-    ),
-    "arm": dict(
-        level=EventLevel.CRITICAL,
-        message={
+    },
+    "arm": {
+        "level": EventLevel.CRITICAL,
+        "message": {
             "True": "{Type} {label} is armed",
             "False": "{Type} {label} is disarmed",
         },
-    ),
-    "audible_alarm": dict(
-        level=EventLevel.CRITICAL,
-        message={
+    },
+    "audible_alarm": {
+        "level": EventLevel.CRITICAL,
+        "message": {
             "True": "{Type} {label} in alarm",
             "False": "{Type} {label} alarm stopped",
         },
-    ),
+    },
 }

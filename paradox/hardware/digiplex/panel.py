@@ -32,7 +32,7 @@ ZONES = 48
 ZONE_LABELS_BASE = 0x2000
 
 
-class Panel_DGP848(PanelBase):
+class PanelDGP848(PanelBase):
     """Paradox Digiplex panel (DGP-48 / DGP-848 / DGP-NE96).
 
     Protocol facts (all verified live against a DGP-848, firmware A095):
@@ -354,3 +354,7 @@ class Panel_DGP848(PanelBase):
             'Partition command "%s" accepted for partitions %s', command, partitions
         )
         return True
+
+
+# Keep the original name available for integrations importing it directly.
+Panel_DGP848 = PanelDGP848

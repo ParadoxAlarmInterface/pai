@@ -18,7 +18,7 @@ from ..evo.adapters import DictArray, StatusFlags
 logger = logging.getLogger("PAI").getChild(__name__)
 
 
-def ZoneFlags(count: int):
+def zone_flags(count: int):
     """``count`` bits -> {zone: bool}; bit 0 (LSB) of the first byte is zone 1."""
     return BitsSwapped(Bitwise(StatusFlags(count)))
 
@@ -138,6 +138,6 @@ Partition = BitStruct(
 )
 
 
-def PartitionStatus(count: int):
+def partition_status(count: int):
     """``count`` 5-byte partition blocks -> {partition: {property: bool}}."""
     return DictArray(count, 1, Partition)

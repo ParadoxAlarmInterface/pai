@@ -5,6 +5,6 @@ ParadoxAlarmInterface/pai#257: Digiplex panels ignore InitiateCommunication
 (0x72) and only answer to StartCommunication (0x5F) with ``source_id=0``.
 """
 
-from .panel import Panel_DGP848
+from .panel import PanelDGP848, Panel_DGP848
 
-__all__ = ["Panel_DGP848"]
+__all__ = ["PanelDGP848", "Panel_DGP848"]

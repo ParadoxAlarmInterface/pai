@@ -7,7 +7,7 @@ from construct import Container
 import pytest
 
 from paradox.config import config as cfg
-from paradox.hardware.digiplex.panel import ZONE_LABELS_BASE, Panel_DGP848
+from paradox.hardware.digiplex.panel import ZONE_LABELS_BASE, PanelDGP848
 
 
 def _labels(names: dict) -> dict:
@@ -29,9 +29,9 @@ def _zone_status(open_zones=(), tamper_zones=()) -> bytes:
     return bits(open_zones) + bits(tamper_zones)
 
 
-def _panel(labels: dict) -> Panel_DGP848:
+def _panel(labels: dict) -> PanelDGP848:
     memory = _labels(labels)
-    panel = Panel_DGP848(MagicMock())
+    panel = PanelDGP848(MagicMock())
     panel._read_eeprom = AsyncMock(side_effect=lambda address, count: memory[address])
     return panel
 
@@ -133,7 +133,7 @@ def test_ne96_warns_about_unsupported_zones(caplog):
     )
 
     with caplog.at_level(logging.WARNING):
-        Panel_DGP848(MagicMock(), response)
+        PanelDGP848(MagicMock(), response)
 
     assert "only zones 1-48 and partitions 1-2 are supported" in caplog.text
 

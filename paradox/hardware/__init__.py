@@ -53,7 +53,7 @@ def create_panel(core, start_communication_response: Container = None) -> Panel:
         # a DGP-848 (zones 1-48, partitions 1-2) and warns on DGP-NE96.
         from . import digiplex
 
-        return digiplex.Panel_DGP848(core, start_communication_response, False)
+        return digiplex.PanelDGP848(core, start_communication_response, False)
     else:
         raise NotImplementedError(
             "We are not sure what panel you have (product_id: {}). \
