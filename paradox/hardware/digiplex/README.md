@@ -184,7 +184,7 @@ configurations that cannot hold maps:
 zones:
   garazas:
     name: Garage
-    area: garage
+    area: Garage
     device_class: motion
     open: Motion
     tamper: Tamper
@@ -198,7 +198,8 @@ system:
   pai_status: PAI status
 ```
 
-- `name` — device name; `area` — Home Assistant area; `device_class` — zone type.
+- `name` - device name; `area` - Home Assistant area **name** (not its id);
+  `device_class` - zone type.
 - a property key (`open`, `tamper`, …) — entity name. An empty value means the
   entity takes the device name (single-sensor zones).
 - `partitions` goes to `DIGIPLEX_PARTITION_NAMES`, `system` keys are

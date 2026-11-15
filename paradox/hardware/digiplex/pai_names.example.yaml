@@ -23,18 +23,18 @@ zones:
     open: ""
   garage_door:
     name: Garage door
-    area: garage
+    area: Garage
     device_class: garage_door
     open: ""
   garage_motion:
     name: Garage
-    area: garage
+    area: Garage
     device_class: motion
     open: Motion
     tamper: Tamper
   living_room_motion:
     name: Living room
-    area: living_room
+    area: Living room
     device_class: motion
     open: Motion
     tamper: Tamper
