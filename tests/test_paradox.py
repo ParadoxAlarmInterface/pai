@@ -118,6 +118,8 @@ def test_init_module_pgms_from_json(tmp_path, monkeypatch, mocker):
     mocker.patch("paradox.lib.ps.sendChange")
 
     alarm = Paradox()
+    alarm.panel = Panel(alarm)
+    alarm.panel.module_pgm_packet_slots = 4
     alarm._init_module_pgms()
     outputs = alarm.storage.get_container("module_pgm")
 
@@ -153,6 +155,8 @@ def test_init_module_pgms_skips_invalid_and_duplicate_entries(
     mocker.patch("paradox.lib.ps.sendChange")
 
     alarm = Paradox()
+    alarm.panel = Panel(alarm)
+    alarm.panel.module_pgm_packet_slots = 4
     alarm._init_module_pgms()
 
     assert set(alarm.storage.get_container("module_pgm")) == {
@@ -164,6 +168,18 @@ def test_init_module_pgms_skips_invalid_and_duplicate_entries(
     assert "invalid module address" in caplog.text
     assert "invalid pgm_count" in caplog.text
     assert "duplicate module address 4" in caplog.text
+
+
+def test_init_module_pgms_skips_unsupported_panel(monkeypatch, mocker, caplog):
+    monkeypatch.setattr(cfg, "MODULE_PGM_ADDRESSES", [{"address": 4, "pgm_count": 1}])
+    mocker.patch("paradox.lib.ps.sendChange")
+
+    alarm = Paradox()
+    alarm.panel = Panel(alarm)
+    alarm._init_module_pgms()
+
+    assert alarm.storage.get_container("module_pgm") == {}
+    assert "current panel does not support module PGMs" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -264,6 +280,7 @@ async def test_connect_pushes_panel_framing_mode_after_identification(mocker):
     alarm = Paradox()
 
     connection = mocker.MagicMock(spec=Connection)
+    connection.panel_protocol = "binary"
     connection.connect = AsyncMock(return_value=True)
     connection.close = AsyncMock()
     alarm._connection = connection
@@ -296,6 +313,7 @@ async def test_connect_pushes_variable_framing_for_evo(mocker):
     alarm = Paradox()
 
     connection = mocker.MagicMock(spec=Connection)
+    connection.panel_protocol = "binary"
     connection.connect = AsyncMock(return_value=True)
     connection.close = AsyncMock()
     alarm._connection = connection

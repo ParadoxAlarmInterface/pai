@@ -48,11 +48,14 @@ from paradox.hardware.prt3.parser import (
     PRT3CommandEcho,
     PRT3CommStatus,
     PRT3LabelReply,
+    PRT3SystemEvent,
     PRT3ZoneStatus,
     parse_line,
 )
+from paradox.hardware.prt3.event import PRT3Event
 from paradox.hardware.prt3.property import property_map
 from paradox.lib.utils import sanitize_key
+from paradox.lib import ps
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -150,6 +153,44 @@ class PRT3Panel(Panel):
             logger.warning("PRT3: non-ASCII message: %r", message)
             return None
         return parse_line(line)
+
+    def handle_async_message(self, message):
+        """Dispatch an async PRT3 system event into PAI's event pipeline."""
+        if not isinstance(message, PRT3SystemEvent):
+            return
+        logger.info(
+            "PRT3 system event: G%03dN%03dA%03d",
+            message.group,
+            message.number,
+            message.area,
+        )
+        try:
+            evt = PRT3Event.from_prt3(message, label_provider=self.core.get_label)
+        except (KeyError, AttributeError, ValueError) as exc:
+            logger.warning("handle_async_message: failed to parse event: %s", exc)
+            return
+        try:
+            self.core.dispatch_panel_event(evt)
+        except (KeyError, AttributeError) as exc:
+            logger.warning("handle_async_message: storage dispatch error: %s", exc)
+        except Exception:
+            logger.exception("handle_async_message")
+
+    def on_partition_command(self, partitions, command):
+        # The &OK echo is authoritative; suppress stale RA arm bits for 3 s.
+        if command != "disarm":
+            return
+        change = {
+            "arm": False,
+            "arm_stay": False,
+            "arm_away": False,
+            "arm_force": False,
+            "exit_delay": False,
+            "entry_delay": False,
+        }
+        self.core.apply_partition_state_change(
+            partitions, change, arm_freeze_seconds=3.0
+        )
 
     # ------------------------------------------------------------------
     # Internal request/reply helper
@@ -254,7 +295,6 @@ class PRT3Panel(Panel):
         The ``password`` argument is accepted for interface compatibility but
         ignored — PRT3 has no password exchange.
         """
-        from paradox.hardware.prt3.parser import PRT3SystemEvent
 
         def _any_prt3_msg(m):
             return isinstance(

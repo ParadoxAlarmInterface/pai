@@ -823,8 +823,7 @@ PerformPGMAction = Struct(
     "checksum" / PacketChecksum(Bytes(1)),
 )
 
-# Fixed number of PGM command slots in the 0xA4 packet — a protocol constant,
-# not the number of PGMs a specific module exposes (which is configured separately).
+# The 0xA4 EVO packet carries one command byte per slot.
 MODULE_PGM_PACKET_SLOTS = 4
 
 PerformModulePGMAction = Struct(

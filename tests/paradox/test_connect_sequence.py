@@ -17,6 +17,7 @@ import pytest
 from paradox.config import config as cfg
 from paradox.connections.connection import Connection, Exchange
 from paradox.connections.ip.connection import BareIPConnection, LocalIPConnection
+from paradox.connections.prt3.connection import PRT3SerialConnection
 from paradox.connections.serial.connection import SerialCommunication
 from paradox.connections.serial.protocol import SerialConnectionProtocol
 from paradox.hardware.mg6250 import Panel as MG6250Panel
@@ -505,7 +506,7 @@ async def test_digiplex_detected_when_initiate_times_out(mocker, fast_digiplex):
 
     # Busy panel: Start again after silence, then login; no logout frame.
     assert tx[:-1] == [INITIATE, DGP_START, DGP_START]
-    assert tx[-1].startswith("00000810000413001234")
+    assert tx[-1] == ("000008100004130012340000061202a095" + "00" * 19 + "c4")
     identity = next(
         c.kwargs["panel"]
         for c in detected.call_args_list
@@ -527,3 +528,17 @@ async def test_digiplex_gives_up_silently_while_busy(mocker, fast_digiplex):
 
     # Teardown must not reset the panel's session release timer.
     assert connection.transport.tx[-1].hex() == DGP_START
+
+
+@pytest.mark.asyncio
+async def test_prt3_probe_bytes_without_binary_discovery(monkeypatch):
+    class ScriptedPRT3(PRT3SerialConnection, ScriptedSerial):
+        async def wait_for_message(self, check_fn=None, timeout=None):
+            # Shorten only the spontaneous-listen window, not the real probe.
+            return await super().wait_for_message(
+                check_fn, timeout=0.001 if timeout == 2.0 else timeout
+            )
+
+    monkeypatch.setattr(cfg, "CONNECTION_TYPE", "PRT3")
+    connection = ScriptedPRT3({ord("R"): b"RA001DOOOOOO\r"})
+    assert await run_session(connection) == [b"RA001\r".hex()]

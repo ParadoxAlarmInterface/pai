@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch, call
 import pytest
 
 from paradox.data.model import DetectedPanel
+from paradox.connections.prt3.connection import PRT3SerialConnection
 from paradox.interfaces.mqtt.entities.button import UtilityKeyButton
 from paradox.interfaces.mqtt.entities.device import Device
 from paradox.interfaces.mqtt.entities.factory import MQTTAutodiscoveryEntityFactory
@@ -64,7 +65,8 @@ async def test_prt3_connect_emits_panel_detected(monkeypatch):
     paradox.storage = MemoryStorage()
 
     # Mock connection.connect() → True
-    mock_conn = AsyncMock()
+    mock_conn = MagicMock(spec=PRT3SerialConnection)
+    mock_conn.panel_protocol = "prt3"
     mock_conn.connect = AsyncMock(return_value=True)
     mock_conn.connected = True
     paradox._connection = mock_conn
@@ -118,7 +120,8 @@ async def test_prt3_connect_no_panel_detected_on_comm_fail(monkeypatch):
     from paradox.data.memory_storage import MemoryStorage
     paradox.storage = MemoryStorage()
 
-    mock_conn = AsyncMock()
+    mock_conn = MagicMock(spec=PRT3SerialConnection)
+    mock_conn.panel_protocol = "prt3"
     mock_conn.connect = AsyncMock(return_value=True)
     paradox._connection = mock_conn
 

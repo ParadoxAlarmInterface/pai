@@ -42,9 +42,13 @@ def _make_paradox(monkeypatch, connection_type="PRT3"):
 
     paradox.storage = MemoryStorage()
 
-    mock_panel = MagicMock()
+    from paradox.hardware.panel import Panel
+    from paradox.hardware.prt3.panel import PRT3Panel
+
+    mock_panel = PRT3Panel(paradox) if connection_type == "PRT3" else Panel(paradox)
     mock_panel.control_partitions = AsyncMock(return_value=True)
-    mock_panel.send_utility_key = AsyncMock(return_value=True)
+    if connection_type == "PRT3":
+        mock_panel.send_utility_key = AsyncMock(return_value=True)
     paradox.panel = mock_panel
 
     paradox._connection = MagicMock()
@@ -125,13 +129,12 @@ async def test_control_utility_key_prt3_accepted(monkeypatch):
 
 
 async def test_control_utility_key_non_prt3_returns_false(monkeypatch):
-    """Non-PRT3 connection type: returns False without calling panel."""
+    """A driver without utility keys returns False through its default method."""
     paradox, mock_panel = _make_paradox(monkeypatch, connection_type="Serial")
 
     result = await paradox.control_utility_key(5)
 
     assert result is False
-    mock_panel.send_utility_key.assert_not_awaited()
 
 
 async def test_control_utility_key_panel_rejects(monkeypatch):
@@ -191,7 +194,7 @@ async def test_utility_key_panel_rejection_is_false(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# handle_prt3_event_message — global partition event broadcast
+# handle_async_message — global partition event broadcast
 # ---------------------------------------------------------------------------
 
 
@@ -230,7 +233,7 @@ def test_global_disarm_event_clears_exit_delay_on_all_partitions(monkeypatch):
 
         # Simulate a global disarm event: area=0 means "all areas"
         msg = PRT3SystemEvent(group=14, number=1, area=0)
-        paradox.handle_prt3_event_message(msg)
+        paradox.handle_async_message(msg)
 
     p1 = paradox.storage.get_container_object("partition", 1)
     p2 = paradox.storage.get_container_object("partition", 2)
@@ -252,7 +255,7 @@ def test_global_disarm_area255_clears_exit_delay_on_all_partitions(monkeypatch):
         paradox = _make_paradox_with_partitions(monkeypatch)
 
         msg = PRT3SystemEvent(group=14, number=1, area=255)
-        paradox.handle_prt3_event_message(msg)
+        paradox.handle_async_message(msg)
 
     p1 = paradox.storage.get_container_object("partition", 1)
     p2 = paradox.storage.get_container_object("partition", 2)
@@ -268,7 +271,7 @@ def test_specific_area_disarm_only_updates_that_partition(monkeypatch):
         paradox = _make_paradox_with_partitions(monkeypatch)
 
         msg = PRT3SystemEvent(group=14, number=1, area=2)
-        paradox.handle_prt3_event_message(msg)
+        paradox.handle_async_message(msg)
 
     p1 = paradox.storage.get_container_object("partition", 1)
     p2 = paradox.storage.get_container_object("partition", 2)
@@ -294,7 +297,7 @@ def test_event_for_unmapped_zone_is_not_dropped(monkeypatch):
 
         # G024 = "Zone in alarm" per PRT3 spec; zone 100 is unlabeled.
         msg = PRT3SystemEvent(group=24, number=100, area=1)
-        paradox.handle_prt3_event_message(msg)
+        paradox.handle_async_message(msg)
 
         zone = paradox.storage.get_container_object("zone", 100)
         assert zone is not None, "zone 100 must be auto-created by the event"
@@ -418,6 +421,6 @@ def test_keypad_disarm_ends_entry_delay(monkeypatch):
         paradox = _make_paradox_with_partitions(monkeypatch)
         paradox.storage.get_container("partition")[1]["entry_delay"] = True
 
-        paradox.handle_prt3_event_message(PRT3SystemEvent(group=13, number=1, area=1))
+        paradox.handle_async_message(PRT3SystemEvent(group=13, number=1, area=1))
 
     assert paradox.storage.get_container_object("partition", 1)["entry_delay"] is False
