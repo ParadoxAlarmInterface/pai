@@ -2128,7 +2128,7 @@ async def test_cancelled_pulse_logs_cleanup_failure_and_propagates_cancellation(
     with pytest.raises(asyncio.CancelledError):
         await task
 
-    assert "could not stop output 2 pulse" in caplog.text
+    assert "output 2 may still be on; pulse cleanup failed" in caplog.text
 
 
 def pulse_panel_with_live_sender():
@@ -2197,12 +2197,40 @@ async def test_pulse_stops_output_if_on_was_sent_without_a_reply(failure):
     assert panel._control_pgm.await_args_list[-1].args == (2, "off")
 
 
-async def test_refused_pulse_on_does_not_send_off():
-    panel, _ = control_panel()
-    panel.transact = AsyncMock(return_value=[b"refused"])
+@pytest.mark.parametrize(
+    "reply, cleanup",
+    [
+        (bytes.fromhex("03ff0000000000") + PANEL_SERIAL + b"\x01\x00\x00", False),
+        (b"malformed", True),
+    ],
+)
+async def test_pulse_handles_refused_and_invalid_replies(monkeypatch, reply, cleanup):
+    monkeypatch.setattr("paradox.hardware.mg6250.panel.ACK_GAP", 0)
+    panel, core = pulse_panel_with_live_sender()
+    padding = -len(reply) % 16
+    response = panel.build_data_frame(
+        panel._encrypted_header(1, LAST_FRAGMENT | 1, KIND_DATA, SERVICE_CONTROL)
+        + bytes([1, padding])
+        + paradox_encrypt(reply + b"\xee" * padding, panel.session_key)
+    )
+    core.connection.wait_for_message = AsyncMock(return_value=Frame.parse(response))
+    panel._stop_pulse = AsyncMock()
 
     assert await panel.control_outputs([2], "pulse") is False
-    panel.transact.assert_awaited_once()
+    if cleanup:
+        panel._stop_pulse.assert_awaited_once_with(2)
+    else:
+        panel._stop_pulse.assert_not_awaited()
+    assert core.connection._protocol.send_message.call_count == 2  # request and ack
+
+
+async def test_pulse_warns_when_off_is_refused(monkeypatch, caplog):
+    monkeypatch.setattr(cfg, "OUTPUT_PULSE_DURATION", 0)
+    panel, _ = control_panel()
+    panel._control_pgm = AsyncMock(side_effect=[True, False])
+
+    assert await panel.control_outputs([2], "pulse") is False
+    assert "output 2 may still be on after pulse" in caplog.text
 
 
 @pytest.mark.parametrize("outputs, command", [([1], "toggle"), ([9], "on")])

@@ -1538,8 +1538,17 @@ class Panel(PanelBase):
         accepted = self._control_accepted(CONTROL_PGM_PREFIX, reply)
         if not accepted:
             logger.error(
-                "MG6250: %s of output %d refused, reply %s", command, pgm, reply.hex()
+                "MG6250: %s of output %d not accepted, reply %s",
+                command,
+                pgm,
+                reply.hex(),
             )
+            prefix = CONTROL_PGM_PREFIX + self.panel_serial
+            if on_write is not None and (
+                not reply.startswith(prefix)
+                or len(reply) < len(prefix) + len(CONTROL_OK)
+            ):
+                raise StatusRequestException("MG6250: invalid output control reply")
         return accepted
 
     async def _stop_pulse(self, pgm: int):
@@ -1547,12 +1556,18 @@ class Panel(PanelBase):
             # Allow the normal retries, but do not wait indefinitely for a lock.
             timeout = max(10, cfg.IO_TIMEOUT * 10 + ACK_GAP + 1)
             if not await asyncio.wait_for(self._control_pgm(pgm, "off"), timeout):
-                logger.error("MG6250: could not stop output %d pulse", pgm)
+                logger.error(
+                    "MG6250: output %d may still be on; pulse cleanup failed", pgm
+                )
         except asyncio.CancelledError:
-            logger.error("MG6250: stopping output %d pulse was cancelled", pgm)
+            logger.error(
+                "MG6250: output %d may still be on; pulse cleanup cancelled", pgm
+            )
             raise
         except (ConnectionError, asyncio.TimeoutError):
-            logger.exception("MG6250: could not stop output %d pulse", pgm)
+            logger.exception(
+                "MG6250: output %d may still be on; pulse cleanup failed", pgm
+            )
 
     async def _pulse_pgm(self, pgm: int) -> bool:
         on_sent = False
@@ -1566,7 +1581,10 @@ class Panel(PanelBase):
                 return False
             on_sent = True
             await asyncio.sleep(cfg.OUTPUT_PULSE_DURATION)
-            return await self._control_pgm(pgm, "off")
+            stopped = await self._control_pgm(pgm, "off")
+            if not stopped:
+                logger.error("MG6250: output %d may still be on after pulse", pgm)
+            return stopped
         except (
             asyncio.CancelledError,
             asyncio.TimeoutError,

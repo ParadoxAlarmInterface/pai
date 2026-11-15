@@ -80,6 +80,8 @@ delivery. A new login replaces it; an unsuccessful resume keeps it for retry.
 State comes from polling, not historical log entries. Event log polling retries
 if initialization fails; entries before the first successful read are not
 replayed. Live event reception and PGM state reporting are not implemented.
+Pulse cleanup is best effort; after a lost connection, verify the output on the
+panel.
 Status decoding is based on packet captures: validate arm, exit-delay and
 bypass behavior on your hardware before relying on it.
 
