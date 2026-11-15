@@ -64,6 +64,22 @@ async def test_labelled_zone_keeps_key_on_fallback_collision():
     assert zones[1]["label"] == "Zone 1"
 
 
+async def test_labels_use_configured_encoding(monkeypatch):
+    monkeypatch.setattr(cfg, "LABEL_ENCODING", "latin-1")
+
+    zones = (await _panel({1: b"gar\xe1\xbeas"}).load_labels())["zone"]
+
+    assert zones[1]["label"] == "gar\xe1\xbeas"
+
+
+async def test_case_only_label_collision_gets_suffix(monkeypatch):
+    monkeypatch.setattr(cfg, "PARTITION_NAMES", {"1": "House", "2": "house"})
+    labels = await _panel({1: b"Kitchen", 2: b"kitchen"}).load_labels()
+
+    assert [labels["zone"][i]["key"] for i in (1, 2)] == ["Kitchen", "kitchen_2"]
+    assert [labels["partition"][i]["key"] for i in (1, 2)] == ["House", "house_2"]
+
+
 async def test_zone_limits_select_zones(monkeypatch):
     monkeypatch.setattr(cfg, "LIMITS", {"zone": "2,5"})
     panel = _panel({1: b"fasado durys", 2: b"virtuve"})

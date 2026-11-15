@@ -272,10 +272,7 @@ class PanelDGP848(PanelBase):
             raw.extend(chunk)
 
         labels = {
-            i: bytes(raw[(i - 1) * 16 : i * 16])
-            .replace(b"\x00", b" ")
-            .decode("ascii", "replace")
-            .strip()
+            i: self.decode_label(bytes(raw[(i - 1) * 16 : i * 16])).strip()
             for i in range(1, ZONES + 1)
         }
         # A failed read on reconnect keeps the zone already published (key
@@ -323,11 +320,11 @@ class PanelDGP848(PanelBase):
     def _make_keys_unique(elements) -> None:
         """Suffix a key already taken by an earlier element with the element
         ID (e.g. zones 7 and 24 are both 'garazo vartai' -> 'garazo_vartai_24')."""
-        keys = set()
+        keys = set()  # case-insensitive: HA lowercases entity IDs
         for element in elements:
-            while element["key"] in keys:
+            while element["key"].lower() in keys:
                 element["key"] = f"{element['key']}_{element['id']}"
-            keys.add(element["key"])
+            keys.add(element["key"].lower())
 
     @staticmethod
     def _selected(elem_type: str, supported: int, configured=()) -> list:
