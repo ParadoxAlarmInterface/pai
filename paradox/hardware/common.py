@@ -1,4 +1,17 @@
-from construct import Checksum, Enum, ExprAdapter, Int8ub, Rebuild, this
+from construct import (
+    Adapter,
+    Array,
+    Checksum,
+    Container,
+    Default,
+    Enum,
+    ExprAdapter,
+    Flag,
+    Int8ub,
+    ListContainer,
+    Rebuild,
+    this,
+)
 
 
 def calculate_checksum(message):
@@ -89,3 +102,63 @@ CommunicationSourceIDEnum = Enum(
     VDMP3_Direct=10,
     VDMP3_GSM=11,
 )
+
+
+class DictArray(Adapter):
+    def __init__(self, count, first_index, subcon, pick_key: str = None):
+        super().__init__(Array(count, subcon))
+        self._first_index = first_index
+        self._pick_key = pick_key
+
+    def _decode(self, obj, context, path):
+        if not isinstance(obj, list):
+            raise TypeError("list should be passed for decoding")
+
+        n_obj = Container()
+        for item in obj:
+            v = item
+            if self._pick_key:
+                v = item.get(self._pick_key)
+            n_obj[item._index] = v
+
+        return n_obj
+
+    def _encode(self, obj, context, path):
+        if not isinstance(obj, dict):
+            raise TypeError("dict should be passed for decoding")
+
+        n_obj = ListContainer()
+
+        count = self.subcon.count  # Array count
+
+        for k in range(self._first_index, self._first_index + count):
+            o = {"_index": k}
+            v = obj.get(k)
+            if v is not None:
+                if self._pick_key:
+                    v = {self._pick_key: v}
+                o.update(v)
+            n_obj.append(o)
+
+        return n_obj
+
+
+class FlagsDict(Adapter):
+    """Array of flags exposed as {index: bool}, indexes start from `first_index`"""
+
+    def __init__(self, count, first_index=1):
+        super().__init__(Array(count, Default(Flag, False)))
+        self._indexes = range(first_index, first_index + count)
+
+    def _decode(self, obj, context, path):
+        return Container(zip(self._indexes, obj))
+
+    def _encode(self, obj, context, path):
+        if not isinstance(obj, dict):
+            raise TypeError("dict should be passed for encoding")
+
+        return [obj.get(k) for k in self._indexes]
+
+
+def StatusFlags(count, start_index_from=1):
+    return FlagsDict(count, start_index_from)

@@ -1,5 +1,4 @@
 import asyncio
-from binascii import hexlify
 import collections.abc
 from datetime import datetime
 import logging
@@ -13,21 +12,19 @@ from paradox.config import config as cfg, get_limits_for_type, get_serial_protoc
 from paradox.connections.connection import Connection
 from paradox.data.enums import RunState
 from paradox.data.memory_storage import MemoryStorage as Storage
-from paradox.data.model import DetectedPanel
 from paradox.event import Change, ChangeEvent, Event, LiveEvent
 from paradox.exceptions import (
     AuthenticationFailed,
     CodeLockout,
-    PanelNotDetected,
     StatusRequestException,
     async_loop_unhandled_exception_handler,
 )
-from paradox.hardware import Panel, create_panel
+from paradox.hardware import Panel, detect_panel
 from paradox.hardware.evo.parsers import MODULE_PGM_PACKET_SLOTS
 from paradox.lib import ps
 from paradox.lib.async_message_manager import ErrorMessageHandler, EventMessageHandler
 from paradox.lib.handlers import PersistentHandler
-from paradox.lib.utils import deep_merge, describe_connection, sanitize_key
+from paradox.lib.utils import deep_merge, describe_connection
 from paradox.parsers.status import convert_raw_status
 
 logger = logging.getLogger("PAI").getChild(__name__)
@@ -205,41 +202,13 @@ class Paradox:
                 PersistentHandler(self.handle_prt3_event_message)
             )
 
-    async def _prt3_connect(self) -> bool:
-        """PRT3-specific panel connection sequence (called from connect())."""
-        from paradox.hardware.prt3.panel import PRT3Panel
-
-        self.panel = PRT3Panel(self)
-        try:
-            if not await self.panel.initialize_communication(None):
-                raise ConnectionError(
-                    "PRT3 serial link unresponsive — no messages received"
-                )
-            # PRT3 has no binary identification exchange; synthesise a
-            # DetectedPanel from the configured port so HA discovery has a
-            # stable device identity to anchor entity unique_ids to.
-            port_id = sanitize_key(cfg.PRT3_SERIAL_PORT) or "prt3"
-            ps.sendMessage(
-                "panel_detected",
-                panel=DetectedPanel(
-                    product_id=None,
-                    model="PRT3",
-                    firmware_version="N/A",
-                    serial_number=f"prt3_{port_id}",
-                ),
-            )
-            self.run_state = RunState.CONNECTED
-            logger.info(
-                "Connected via %s to PRT3 (no panel identification)",
-                describe_connection(),
-            )
-            return True
-        except asyncio.TimeoutError:
-            logger.error("Timeout waiting for PRT3 COMM&ok")
-        except ConnectionError as e:
-            logger.error("PRT3 connect failed: %s", e)
-        self.run_state = RunState.ERROR
-        return False
+    def install_panel(self, panel: Panel):
+        """Make ``panel`` decode incoming messages and set its framing."""
+        self.panel = panel
+        self.connection.variable_message_length(panel.variable_message_length)
+        framer = panel.make_framer()
+        if framer is not None:
+            self.connection.set_framer(framer)
 
     async def connect(self) -> bool:
         if self.work_loop is None:
@@ -260,94 +229,13 @@ class Paradox:
 
         logger.info("Connecting to Panel")
 
-        # PRT3 uses ASCII framing — binary panel detection does not apply.
-        if cfg.CONNECTION_TYPE == "PRT3":
-            return await self._prt3_connect()
-
-        if not self.panel:
-            self.panel = create_panel(self)
-            self.connection.variable_message_length(self.panel.variable_message_length)
-
         try:
-            initiate_reply = await self.send_wait(
-                self.panel.get_message("InitiateCommunication"),
-                None,
-                reply_expected=0x7,
-            )
+            panel, identity = await detect_panel(self)
 
-            if initiate_reply:
-                model = initiate_reply.fields.value.label.strip(b"\0 ").decode(
-                    cfg.LABEL_ENCODING
-                )
-                firmware_version = "{}.{} build {}".format(
-                    initiate_reply.fields.value.application.version,
-                    initiate_reply.fields.value.application.revision,
-                    initiate_reply.fields.value.application.build,
-                )
-                serial_number = hexlify(
-                    initiate_reply.fields.value.serial_number
-                ).decode()
-
-                logger.info(
-                    "Connected via %s to %s version %s",
-                    describe_connection(),
-                    model,
-                    firmware_version,
-                )
-            else:
-                raise ConnectionError("Panel did not replied to InitiateCommunication")
-
-            await self.connection.on_initiate_communication(
-                initiate_reply,
-                lambda message, check: self.send_wait(
-                    message=message, reply_expected=check
-                ),
-            )
-
-            if initiate_reply.fields.value.get("product_id") == "MAGELLAN_MG6250":
-                # The MG6250 ignores StartCommunication (0x5F); the 0x72 reply
-                # already identifies it.
-                reply = initiate_reply
-            else:
-                logger.info("Initiating panel connection")
-                reply = await self.send_wait(
-                    self.panel.get_message("StartCommunication"),
-                    args=dict(source_id=self.connection.start_communication_source_id),
-                    reply_expected=0x0,
-                )
-
-                if reply is None:
-                    raise ConnectionError("Panel did not replied to StartCommunication")
-
-            if reply.fields.value.product_id is not None:
-                self.panel = create_panel(
-                    self, reply
-                )  # Now we know what panel it is. Let's
-                # recreate panel object.
-                # The framing mode is panel family specific and only known
-                # now: SP/Magellan use fixed length messages, EVO variable.
-                self.connection.variable_message_length(
-                    self.panel.variable_message_length
-                )
-                framer = self.panel.make_framer()
-                if framer is not None:
-                    self.connection.set_framer(framer)
-                ps.sendMessage(
-                    "panel_detected",
-                    panel=DetectedPanel(
-                        product_id=reply.fields.value.product_id,
-                        model=model,
-                        firmware_version=firmware_version,
-                        serial_number=serial_number,
-                    ),
-                )
-            else:
-                raise PanelNotDetected("Failed to detect panel")
-
-            result = await self.panel.initialize_communication(cfg.PASSWORD)
-            if not result:
+            if not await panel.initialize_communication(cfg.PASSWORD):
                 raise ConnectionError("Failed to initialize communication")
 
+            ps.sendMessage("panel_detected", panel=identity)
             self.run_state = RunState.CONNECTED
             logger.info("Connection OK")
             return True
@@ -401,11 +289,8 @@ class Paradox:
             )
 
     async def sync_time(self):
-        if (
-            cfg.CONNECTION_TYPE == "PRT3"
-            or self.panel.settings.get("product_id") == "MAGELLAN_MG6250"
-        ):
-            return  # Neither protocol implements SetTimeDate.
+        if not self.panel.supports_time_sync:
+            return
         now = datetime.now().astimezone()
         if cfg.SYNC_TIME_TIMEZONE:
             try:
@@ -1007,24 +892,18 @@ class Paradox:
 
     def _clean_session(self):
         logger.info("Clean Session")
-        if cfg.CONNECTION_TYPE == "PRT3":
-            return  # PRT3 has no binary CloseConnection frame
-        if self.connection.connected:
-            if not self.panel:
-                logger.info("No panel, creating generic one")
-                panel = create_panel(self)
-            else:
-                panel = self.panel
+        if not self.connection.connected or not self.panel:
+            return
+        frame = self.panel.build_close_connection()
+        if frame is None:
+            return
 
-            logger.info("Cleaning previous session. Closing connection")
-            # Write directly as this can be called from other contexts
-
-            try:
-                self.connection.write(
-                    panel.get_message("CloseConnection").build(dict())
-                )
-            except ConnectionError as e:
-                logger.warning("Could not send CloseConnection: %s", e)
+        logger.info("Cleaning previous session. Closing connection")
+        # Write directly as this can be called from other contexts
+        try:
+            self.connection.write(frame)
+        except ConnectionError as e:
+            logger.warning("Could not send CloseConnection: %s", e)
 
     def _on_labels_load(self, data):
         for k, d in data.items():
@@ -1157,8 +1036,12 @@ class Paradox:
             else:
                 change["target_state"] = change["current_state"] = "disarmed"
 
-            if properties.get("exit_delay"):  # Redefine if pending
-                change["current_state"] = "arming"
+            # An alarm outranks entry/exit delay
+            if change["current_state"] != "triggered":
+                if properties.get("exit_delay"):  # Redefine if pending
+                    change["current_state"] = "arming"
+                elif properties.get("entry_delay"):  # Entry delay: waiting for a code
+                    change["current_state"] = "pending"
 
             self.storage.update_container_object("partition", properties["key"], change)
 

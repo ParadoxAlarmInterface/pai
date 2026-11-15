@@ -1,7 +1,9 @@
 import json
 
+import pytest
 import pytest_asyncio
 
+from paradox.config import config as cfg
 from paradox.data.model import DetectedPanel
 from paradox.interfaces.mqtt.entities.device import Device
 from paradox.interfaces.mqtt.entities.factory import MQTTAutodiscoveryEntityFactory
@@ -62,6 +64,26 @@ def test_zone_binary_sensor_serialize(mqtt_entity_factory):
     }
 
     assert binary_sensor.configuration_topic == "homeassistant/binary_sensor/1234abcd/zone_zone_1_open/config"
+
+
+@pytest.mark.parametrize(
+    ("mapping", "expected"),
+    [
+        ({"fasado_durys": "door"}, "door"),
+        ({"fasado_durys": "garage_door"}, "garage_door"),
+        ({"other": "door"}, "motion"),
+        ({"fasado_durys": "not_a_device_class"}, "motion"),
+    ],
+)
+def test_zone_binary_sensor_device_class(mqtt_entity_factory, monkeypatch, mapping, expected):
+    monkeypatch.setattr(cfg, "ZONE_DEVICE_CLASS", mapping)
+    zone = {"key": "fasado_durys", "label": "fasado durys"}
+
+    open_sensor = mqtt_entity_factory.make_zone_status_binary_sensor(zone, "open")
+    tamper_sensor = mqtt_entity_factory.make_zone_status_binary_sensor(zone, "tamper")
+
+    assert open_sensor.serialize()["device_class"] == expected
+    assert "device_class" not in tamper_sensor.serialize()
 
 
 def test_trouble_binary_sensor_serialize(mqtt_entity_factory):

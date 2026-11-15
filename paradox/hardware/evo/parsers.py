@@ -35,20 +35,20 @@ from construct import (
 
 from ..common import (
     CommunicationSourceIDEnum,
+    DictArray,
     PacketChecksum,
     PacketLength,
     ProductIdEnum,
+    StatusFlags,
     calculate_checksum,
 )
 from .adapters import (
     DateAdapter,
-    DictArray,
     EnumerationAdapter,
     EventAdapter,
     ModuleTroubles,
     PartitionStatus,
     PGMFlags,
-    StatusFlags,
     ZoneFlagBitStruct,
     ZoneFlags,
 )

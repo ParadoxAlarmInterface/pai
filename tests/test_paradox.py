@@ -7,6 +7,7 @@ import pytest
 from paradox.connections.connection import Connection
 from paradox.config import Config, config as cfg
 from paradox.hardware import Panel, create_panel
+from paradox.hardware.prt3.panel import PRT3Panel
 from paradox.paradox import Paradox
 
 
@@ -26,9 +27,10 @@ async def test_sync_time_respects_panel_support(
     monkeypatch.setattr(cfg, "SYNC_TIME", True)
     monkeypatch.setattr(cfg, "SYNC_TIME_TIMEZONE", "")
     alarm = Paradox()
-    alarm.panel = create_panel(
-        alarm, _start_communication_reply(product_id) if product_id else None
-    )
+    if connection_type == "PRT3":
+        alarm.panel = PRT3Panel(alarm)
+    else:
+        alarm.panel = create_panel(alarm, _start_communication_reply(product_id))
     alarm.storage.get_container("system").deep_merge(
         {"date": {"time": datetime(2000, 1, 1)}}
     )
@@ -317,3 +319,40 @@ async def test_connect_pushes_variable_framing_for_evo(mocker):
     assert isinstance(alarm.panel, Panel_EVO192)
     assert connection.variable_message_length.call_count == 2
     assert connection.variable_message_length.call_args_list[-1][0][0] is True
+
+
+@pytest.mark.parametrize(
+    "delay, alarm_flag",
+    [
+        ("entry_delay", "audible_alarm"),
+        ("entry_delay", "silent_alarm"),
+        ("exit_delay", "fire_alarm"),
+    ],
+)
+def test_alarm_overrides_entry_and_exit_delay(mocker, delay, alarm_flag):
+    mocker.patch("paradox.lib.ps.sendChange")
+    alarm = Paradox()
+    alarm.storage.get_container("partition").deep_merge(
+        {"area_1": {"key": "area_1", "arm": True, delay: True, alarm_flag: True}}
+    )
+
+    alarm._update_partition_states()
+
+    partition = alarm.storage.get_container("partition")["area_1"]
+    assert partition["current_state"] == "triggered"
+
+
+@pytest.mark.parametrize(
+    "delay, expected", [("entry_delay", "pending"), ("exit_delay", "arming")]
+)
+def test_delay_without_alarm_sets_transitional_state(mocker, delay, expected):
+    mocker.patch("paradox.lib.ps.sendChange")
+    alarm = Paradox()
+    alarm.storage.get_container("partition").deep_merge(
+        {"area_1": {"key": "area_1", "arm": True, delay: True}}
+    )
+
+    alarm._update_partition_states()
+
+    partition = alarm.storage.get_container("partition")["area_1"]
+    assert partition["current_state"] == expected

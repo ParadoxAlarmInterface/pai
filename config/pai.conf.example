@@ -47,6 +47,9 @@ import logging
 #     5: 'Activate Garden Lights',   # publish {} or omit to disable
 # }
 #
+### Digiplex panel
+# DIGIPLEX_PARTITION_NAMES = {1: 'House', 2: 'Garage'}  # Missing names default to 'Partition <number>'
+#
 ### IP Connection Details
 # IP_CONNECTION_HOST = '127.0.0.1'	# IP Module address when using direct IP Connection
 # IP_CONNECTION_PORT = 10000		    # IP Module port when using direct IP Connection
@@ -147,6 +150,10 @@ import logging
 #     'open',
 #     'tamper'
 # ]
+# ZONE_DEVICE_CLASS = {  # Zone key -> Home Assistant device_class of the zone "open" sensor. Default: 'motion'
+#     'front_door': 'door',
+#     'kitchen_window': 'window',
+# }
 #
 ### Dash App
 # MQTT_DASH_PUBLISH = False

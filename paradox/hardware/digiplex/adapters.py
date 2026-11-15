@@ -1,0 +1,97 @@
+"""Construct helpers that turn Digiplex RAM bytes into ``convert_raw_status()`` values."""
+
+from construct import (
+    Adapter,
+    BitStruct,
+    BitsSwapped,
+    Bitwise,
+    Computed,
+    Flag,
+    Padding,
+    this,
+)
+
+from ..common import DictArray, StatusFlags
+
+
+def zone_flags(count: int):
+    """``count`` bits -> {zone: bool}; bit 0 (LSB) of the first byte is zone 1."""
+    return BitsSwapped(Bitwise(StatusFlags(count)))
+
+
+# Calibrated 2026-10-25 against a multimeter (see VoltageAdapter docstring):
+#   battery 13.68 V   -> raw 0x53 (83)   => 0.16482 V/step
+#   PSU     13.66 V   -> raw 0xF2 (242)  => 0.05645 V/step
+PSU_V_PER_STEP = 0.05645
+BATTERY_V_PER_STEP = 0.16482
+
+
+class VoltageAdapter(Adapter):
+    """Raw byte -> volts, using a per-register scale.
+
+    Calibrated 2026-10-25 against a multimeter on this installation:
+
+        battery terminals 13.68 V -> raw 83   => 0.16482 V/step
+        PSU / AUX output  13.66 V -> raw 242  => 0.05645 V/step
+
+    Before calibration a flat 0.1 V/step was used, which produced the
+    impossible pair "PSU 24.2 V / battery 8.3 V".
+    """
+
+    def __init__(self, subcon, step: float):
+        super().__init__(subcon)
+        self.step = step
+
+    def _decode(self, obj, context, path):
+        return round(obj * self.step, 2)
+
+    def _encode(self, obj, context, path):
+        return int(round(obj / self.step))
+
+
+# Partition status: 5-byte blocks starting at RAM 0x0195 (see README.md),
+# read as part of the 32 byte block at 0x0185. Layout cross-checked against
+# adumat/paradox-dgp-mqtt (2026-08) and against our own captures:
+#
+#   block +0 (arm/alarm flags):
+#       bit0 armed, bit1 force arm, bit2 stay arm, bit3 no entry,
+#       bit4 strobe alarm, bit5 silent alarm, bit6 audible alarm
+#   block +1 (status flags):
+#       bit0 ready, bit1 exit delay, bit2 entry delay,
+#       bit3 unknown (set on adumat's panel, clear on ours), bit4 alarm in memory
+#
+# Measured on our panel:
+#   armed full    0x0195 = 0x01   (armed)
+#   armed partial 0x0195 = 0x05   (armed + stay)  -> partial arm (stay)
+#   garage armed  0x019A = 0x01   (armed)
+#   0x0196 goes 1 -> 3 -> 1 during the 20 s exit delay (bit1).
+#
+# DGP-848 supports 8 partitions, but only partitions 1 and 2 are covered by
+# our captures, so only those two are decoded.
+PARTITION_OFFSET = 0x0195 - 0x0185  # 16
+PARTITION_STRIDE = 5
+PARTITION_COUNT = 2
+
+Partition = BitStruct(
+    "_index" / Computed(this._index + 1),
+    # +0, MSB first
+    Padding(1),
+    "audible_alarm" / Flag,  # bit6
+    "silent_alarm" / Flag,  # bit5
+    Padding(2),
+    "arm_stay" / Flag,  # bit2
+    Padding(1),
+    "arm" / Flag,  # bit0
+    # +1, MSB first
+    Padding(5),
+    "entry_delay" / Flag,  # bit2
+    "exit_delay" / Flag,  # bit1
+    Padding(1),
+    # +2..+4: no known meaning
+    Padding(24),
+)
+
+
+def partition_status(count: int):
+    """``count`` 5-byte partition blocks -> {partition: {property: bool}}."""
+    return DictArray(count, 1, Partition)
