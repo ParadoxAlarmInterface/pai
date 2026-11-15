@@ -1146,6 +1146,35 @@ async def test_duplicate_log_records_are_not_published_twice():
 
 
 @pytest.mark.parametrize(
+    "declared_length,same_fragment", [(29, False), (55, False), (29, True)]
+)
+async def test_truncated_log_record_does_not_skip_later_event(
+    declared_length, same_fragment
+):
+    complete = log_reply(5, 5, [log_event(5, 47, 15)])
+    truncated = bytes([0, declared_length]) + complete[2:29]
+    later = log_reply(6, 6, [log_event(6, 42, 1)])
+    broken = [truncated + later] if same_fragment else [truncated, later]
+    panel, core = log_panel(
+        [
+            [range_reply(1, 6)],
+            broken,
+            [range_reply(1, 6)],
+            [complete, later],
+        ]
+    )
+    panel._log_last = 4
+
+    await panel._publish_new_events()
+    assert panel._log_last == 4
+    core.handle_event_message.assert_not_called()
+
+    await panel._publish_new_events()
+    assert panel._log_last == 6
+    assert core.handle_event_message.call_count == 2
+
+
+@pytest.mark.parametrize(
     "failure", [asyncio.TimeoutError(), StatusRequestException("no reply")]
 )
 async def test_first_log_request_is_retried_with_backoff(monkeypatch, failure):
@@ -2231,6 +2260,23 @@ async def test_pulse_warns_when_off_is_refused(monkeypatch, caplog):
 
     assert await panel.control_outputs([2], "pulse") is False
     assert "output 2 may still be on after pulse" in caplog.text
+
+
+async def test_overlapping_pulse_on_same_output_is_rejected(monkeypatch):
+    monkeypatch.setattr(cfg, "OUTPUT_PULSE_DURATION", 0.01)
+    panel, _ = control_panel()
+    panel._control_pgm = AsyncMock(return_value=True)
+
+    first, second = await asyncio.gather(
+        panel.control_outputs([2], "pulse"), panel.control_outputs([2], "pulse")
+    )
+
+    assert (first, second) == (True, False)
+    assert [c.args for c in panel._control_pgm.await_args_list] == [
+        (2, "on"),
+        (2, "off"),
+    ]
+    assert await panel.control_outputs([2], "pulse") is True
 
 
 @pytest.mark.parametrize("outputs, command", [([1], "toggle"), ([9], "on")])

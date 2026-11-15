@@ -388,8 +388,12 @@ def parse_log_records(data: bytes) -> typing.List[Container]:
         length = data[i + 1]
         raw = data[i : i + length]
         i += length
-        if len(raw) < length or len(raw) < LogRecord.sizeof():
-            continue
+        if (
+            len(raw) < length
+            or len(raw) < LogRecord.sizeof()
+            or (len(raw) - LogRecord.sizeof()) % LOG_EVENT_LEN
+        ):
+            raise StatusRequestException("MG6250: truncated event log record")
         record = LogRecord.parse(raw)
         events = raw[LogRecord.sizeof() :]
         record.events = [
@@ -595,6 +599,7 @@ class Panel(PanelBase):
         self._acked = collections.deque(maxlen=ACKED_KEPT)  # (tid, fragment)
         self._log_last = None  # number of the last event published
         self._log_retry_at = 0.0
+        self._pulsing = set()  # outputs with a pulse in progress
         self._change_counter = None  # last object 0x1c counter seen
         # read when the counter changes: {zone: field 0}, {partition: field 0}
         self._zone_status = None
@@ -1238,6 +1243,13 @@ class Panel(PanelBase):
                 SERVICE_EVENT_LOG,
                 build_log_request(LOG_OP_READ, first, log_range.last),
             )
+            events = [
+                event
+                for fragment in fragments
+                for record in parse_log_records(fragment)
+                if record.op == LOG_OP_READ
+                for event in record.events
+            ]
         except (StatusRequestException, asyncio.TimeoutError) as e:
             if self._log_last is None:
                 self._log_retry_at = time.monotonic() + LOG_INITIAL_RETRY
@@ -1249,13 +1261,6 @@ class Panel(PanelBase):
             else:
                 logger.debug("MG6250: event log read failed: %s", e)
             return
-        events = [
-            event
-            for fragment in fragments
-            for record in parse_log_records(fragment)
-            if record.op == LOG_OP_READ
-            for event in record.events
-        ]
         for event in sorted(events, key=lambda e: e.number):
             if event.number <= self._log_last:
                 continue
@@ -1570,6 +1575,17 @@ class Panel(PanelBase):
             )
 
     async def _pulse_pgm(self, pgm: int) -> bool:
+        # An overlapping pulse would be cut short by the first pulse's OFF.
+        if pgm in self._pulsing:
+            logger.warning("MG6250: output %d is already pulsing", pgm)
+            return False
+        self._pulsing.add(pgm)
+        try:
+            return await self._pulse_pgm_once(pgm)
+        finally:
+            self._pulsing.discard(pgm)
+
+    async def _pulse_pgm_once(self, pgm: int) -> bool:
         on_sent = False
 
         def mark_on_sent():
