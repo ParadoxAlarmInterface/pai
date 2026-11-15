@@ -6,15 +6,10 @@ ParadoxAlarmInterface/pai#257 (avilleret, firmware build A096). They are
 regression fixtures: the driver must produce exactly these bytes.
 """
 
-from construct import Bytes
 import pytest
 
 from paradox.hardware.digiplex import parsers
-from paradox.hardware.digiplex.adapters import (
-    StatusAdapter,
-    publishes_tamper,
-    zone_device_class,
-)
+from paradox.hardware.digiplex.adapters import zone_device_class
 from paradox.hardware.digiplex.property import RAMDataParserMap
 
 # --- recorded frames -----------------------------------------------------
@@ -140,13 +135,6 @@ def test_parse_error_response():
     parsed = parsers.ErrorMessage.parse(RECORDED_ERROR_RESPONSE)
     assert parsed.fields.value.po.command == 7
     assert parsed.fields.value.message == 0
-
-
-def test_zone_status_adapter_bits():
-    """bit0 (LSB) of the first byte is zone 1 (live capture: zone 17 open)."""
-    r = StatusAdapter(Bytes(6))._decode(bytes.fromhex("00 00 01 00 00 00"), None, None)
-    assert r[17] is True
-    assert all(r[i] is False for i in range(1, 49) if i != 17)
 
 
 def test_zone_block_parser():
@@ -329,17 +317,12 @@ def test_zone_device_class(zone_key, mapping, expected):
     assert zone_device_class(zone_key, mapping) == expected
 
 
-@pytest.mark.parametrize(
-    ("device_class", "expected"),
-    [
-        ("motion", True),
-        ("vibration", True),
-        ("tamper", True),
-        ("window", False),
-        ("door", False),
-        ("garage_door", False),
-        ("smoke", False),
-    ],
-)
-def test_publishes_tamper(device_class, expected):
-    assert publishes_tamper(device_class) is expected
+def test_parse_event_response_full_frame():
+    payload = bytes([0xE0, 0xFF]) + bytes(range(1, 35))
+    frame = _frame(payload)
+    assert len(frame) == 37
+
+    parsed = parsers.EventResponse.parse(frame)
+
+    assert parsed.fields.value.raw == payload[1:]
+    assert parsed.checksum == frame[36:]

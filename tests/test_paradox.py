@@ -317,3 +317,40 @@ async def test_connect_pushes_variable_framing_for_evo(mocker):
     assert isinstance(alarm.panel, Panel_EVO192)
     assert connection.variable_message_length.call_count == 2
     assert connection.variable_message_length.call_args_list[-1][0][0] is True
+
+
+@pytest.mark.parametrize(
+    "delay, alarm_flag",
+    [
+        ("entry_delay", "audible_alarm"),
+        ("entry_delay", "silent_alarm"),
+        ("exit_delay", "fire_alarm"),
+    ],
+)
+def test_alarm_overrides_entry_and_exit_delay(mocker, delay, alarm_flag):
+    mocker.patch("paradox.lib.ps.sendChange")
+    alarm = Paradox()
+    alarm.storage.get_container("partition").deep_merge(
+        {"area_1": {"key": "area_1", "arm": True, delay: True, alarm_flag: True}}
+    )
+
+    alarm._update_partition_states()
+
+    partition = alarm.storage.get_container("partition")["area_1"]
+    assert partition["current_state"] == "triggered"
+
+
+@pytest.mark.parametrize(
+    "delay, expected", [("entry_delay", "pending"), ("exit_delay", "arming")]
+)
+def test_delay_without_alarm_sets_transitional_state(mocker, delay, expected):
+    mocker.patch("paradox.lib.ps.sendChange")
+    alarm = Paradox()
+    alarm.storage.get_container("partition").deep_merge(
+        {"area_1": {"key": "area_1", "arm": True, delay: True}}
+    )
+
+    alarm._update_partition_states()
+
+    partition = alarm.storage.get_container("partition")["area_1"]
+    assert partition["current_state"] == expected

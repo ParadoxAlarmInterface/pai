@@ -5,13 +5,12 @@ import typing
 
 from construct import Construct, Container
 
-from paradox.config import config as cfg
+from paradox.config import config as cfg, get_limits_for_type
 from paradox.exceptions import AuthenticationFailed, StatusRequestException
-from paradox.lib.utils import sanitize_key
 
 from . import parsers
 from ..panel import Panel as PanelBase
-from .adapters import PARTITION_COUNT, publishes_tamper, zone_device_class
+from .adapters import PARTITION_COUNT, zone_device_class
 from .property import RAMDataParserMap, property_map
 
 logger = logging.getLogger("PAI").getChild(__name__)
@@ -25,7 +24,8 @@ STATUS_READ_LENGTHS = {
     0x800B: 3,  # PSU / battery voltages
 }
 
-ZONES = 48  # DGP-848 has 48 on-board zones
+# Zones 1-48 (DGP-848). Where the NE96 keeps zones 49-96 is not known.
+ZONES = 48
 
 # EEPROM: zone label table (16 byte slots, \0 separates words).
 # Verified live on 2026-10-24: z.1='vaiku rytu lang.' ... z.48='gaisras'.
@@ -76,12 +76,19 @@ class Panel_DGP848(PanelBase):
             if start_communication_response is not None
             else b""
         )
-        # Zones that have a label (really used by this installation)
-        self._named_zones: set = set()
-        # Zone number -> device_class, used for tamper filtering
-        self._zone_device_class: dict = {}
+        # Zones / partitions published by this installation (see load_labels)
+        self._zones: set = set()
+        self._partitions: set = set()
         # Last published partition state, for change-only logging
         self._last_partitions: dict | None = None
+
+        if self.settings.get("product_id") == "DIGIPLEX_NE":
+            logger.warning(
+                "Digiplex NE: only zones 1-%d and partitions 1-%d are supported, "
+                "the memory map beyond these is not known",
+                ZONES,
+                PARTITION_COUNT,
+            )
 
     @property
     def status_request_addresses(self):
@@ -162,7 +169,15 @@ class Panel_DGP848(PanelBase):
         16 byte slots starting at 0x2000, \0 separates words (e.g.
         'vaiku\\0pietu\\0lang'). Read in 32 byte blocks (two zones per block),
         which proved the most reliable way (no timeouts during the EEPROM
-        dump). Zones without a label are skipped - they are not assigned.
+        dump).
+
+        The zone definition layout of this family is unknown, so which zones
+        are in use cannot be read from the panel: zones 1-48 are published
+        unless ``LIMITS["zone"]`` restricts them. Unlabelled zones get a
+        "Zone <n>" fallback; their keys are allocated after the labelled
+        zones, so a fallback never changes the key of a labelled zone.
+        Partitions 1-2 are published unless ``LIMITS["partition"]`` restricts
+        them; ``PARTITION_NAMES`` only supplies their labels.
         """
         data = defaultdict(dict)
         raw = bytearray()
@@ -170,41 +185,68 @@ class Panel_DGP848(PanelBase):
             chunk = await self._read_eeprom(base, 32)
             raw.extend(chunk if len(chunk) == 32 else bytes(32))
 
-        keys = set()
-        for i in range(1, ZONES + 1):
-            slot = bytes(raw[(i - 1) * 16 : i * 16])
-            label = slot.replace(b"\x00", b" ").decode("ascii", "replace").strip()
-            if not label:
-                continue  # unassigned zone (empty EEPROM slot) - skip it
-            key = sanitize_key(label) or f"zone_{i}"
-            if key in keys:  # e.g. zones 7 and 24 are both 'garazo vartai'
-                key = f"{key}_{i}"
-            keys.add(key)
-            data["zone"][i] = {
-                "id": i,
-                "key": key,
-                "label": label,
-                "device_class": zone_device_class(key, cfg.ZONE_DEVICE_CLASS),
-            }
-        self._named_zones = set(data["zone"].keys())
-        self._zone_device_class = {
-            i: info["device_class"] for i, info in data["zone"].items()
+        labels = {
+            i: bytes(raw[(i - 1) * 16 : i * 16])
+            .replace(b"\x00", b" ")
+            .decode("ascii", "replace")
+            .strip()
+            for i in range(1, ZONES + 1)
         }
-        partition_names = cfg.PARTITION_NAMES or {}
-        for i in range(1, PARTITION_COUNT + 1):
-            name = (
-                partition_names.get(str(i))
-                or partition_names.get(i)
-                or f"Partition {i}"
-            )
-            data["partition"][i] = {
-                "id": i,
-                "key": sanitize_key(name),
-                "label": name,
-            }
 
-        logger.info("Digiplex: labels loaded from EEPROM — %d named zones", len(keys))
+        # Keys are allocated over all zones (labelled first) before LIMITS is
+        # applied, so neither fallbacks nor LIMITS change a labelled zone's key.
+        keys = set()
+        elements = {}
+        named = [i for i in range(1, ZONES + 1) if labels[i]]
+        unnamed = [i for i in range(1, ZONES + 1) if not labels[i]]
+        for i in named + unnamed:
+            element = self.label_element("zone", i, labels[i])
+            element["label"] = labels[i] or f"Zone {i}"
+            if element["key"] in keys:  # e.g. zones 7 and 24 are both 'garazo vartai'
+                element["key"] = f"{element['key']}_{i}"
+            while not labels[i] and element["key"] in keys:
+                element["key"] = f"{element['key']}_{i}"
+            keys.add(element["key"])
+            elements[i] = element
+
+        for i in self._selected("zone", ZONES):
+            element = elements[i]
+            element["device_class"] = zone_device_class(
+                element["key"], cfg.ZONE_DEVICE_CLASS
+            )
+            data["zone"][i] = element
+        data["zone"] = dict(sorted(data["zone"].items()))
+        self._zones = set(data["zone"])
+
+        partition_names = {int(k): v for k, v in (cfg.PARTITION_NAMES or {}).items()}
+        for i in self._selected("partition", PARTITION_COUNT, partition_names):
+            name = partition_names.get(i) or f"Partition {i}"
+            data["partition"][i] = self.label_element("partition", i, name)
+        self._partitions = set(data["partition"])
+
+        logger.info(
+            "Digiplex: labels loaded from EEPROM - zones %s, partitions %s",
+            sorted(self._zones),
+            sorted(self._partitions),
+        )
         return dict(data)
+
+    @staticmethod
+    def _selected(elem_type: str, supported: int, configured=()) -> list:
+        """IDs 1..supported, restricted by ``LIMITS[elem_type]``. Configured IDs
+        beyond what this driver reads are reported instead of silently dropped."""
+        selected = get_limits_for_type(elem_type, list(range(1, supported + 1)))
+        unsupported = sorted(
+            {i for i in [*selected, *configured] if not 1 <= i <= supported}
+        )
+        if unsupported:
+            logger.warning(
+                "Digiplex: %s %s not supported (only 1-%d are read)",
+                elem_type,
+                unsupported,
+                supported,
+            )
+        return sorted({i for i in selected if 1 <= i <= supported})
 
     async def _read_eeprom(self, address: int, count: int) -> bytes:
         """EEPROM read (address without the 0x8000 bit). A longer timeout is
@@ -235,33 +277,24 @@ class Panel_DGP848(PanelBase):
         if result is None:
             return None
 
-        self._keep_published_zones(result)
+        self._keep_published(result)
         self._log_partition_changes(result)
         return result
 
-    def _keep_published_zones(self, result):
-        """Publish only what the panel actually has.
+    def _keep_published(self, result):
+        """Publish only the zones and partitions selected in load_labels().
 
-        Zones without an EEPROM label are not assigned, and tamper is only
-        reported for zone types that have a tamper switch (motion, glass
-        break, siren/cabinet); contacts and the fire detector would just add
-        noise.
+        Tamper is published for every published zone: the configured
+        device_class only changes how Home Assistant shows the open state.
         """
-        if not self._named_zones:
-            return
-
-        for k in ("zone_open", "zone_tamper"):
-            if k in result:
-                result[k] = {
-                    i: v for i, v in result[k].items() if i in self._named_zones
-                }
-
-        if "zone_tamper" in result:
-            result["zone_tamper"] = {
-                i: v
-                for i, v in result["zone_tamper"].items()
-                if publishes_tamper(self._zone_device_class.get(i, "motion"))
-            }
+        selections = (
+            ("zone_open", self._zones),
+            ("zone_tamper", self._zones),
+            ("partition_status", self._partitions),
+        )
+        for key, published in selections:
+            if published and key in result:
+                result[key] = {i: v for i, v in result[key].items() if i in published}
 
     def _log_partition_changes(self, result):
         """Log partition changes only when they happen, so the add-on log

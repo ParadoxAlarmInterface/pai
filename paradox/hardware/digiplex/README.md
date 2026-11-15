@@ -35,19 +35,21 @@ The family differs from EVO in ways that make the generic panel code unusable:
 |---|---|
 | `0x0153..0x0158` | zone status 1–48, bit 0 = zone 1, `1` = open |
 | `0x0159..0x015E` | tamper status 1–48, same bit layout |
-| `0x0195..` | partition status, 5-byte blocks per partition (see below) |
+| `0x0195..0x019E` | partition status 1–2, 5-byte blocks per partition (see below) |
 | `0x000B` | unfiltered AC sample per poll — not a usable voltage, not published |
 | `0x000C` | PSU / AUX voltage |
 | `0x000D` | battery voltage |
 | `0x2000..` | zone labels, 16 bytes per zone, `\0` separates words |
 
-Partition block layout (partition 1 at `0x0195`, partition 2 at `0x019A`, …):
+Partition block layout (partition 1 at `0x0195`, partition 2 at `0x019A`; both
+are read with the 32 byte `READ 0x8185`):
 
 ```
 +0  arm/alarm flags: bit0 armed, bit1 force, bit2 stay, bit3 no entry,
                      bit4 strobe alarm, bit5 silent alarm, bit6 audible alarm
 +1  status flags:    bit0 ready, bit1 exit delay, bit2 entry delay,
-                     bit3 partition enabled, bit4 alarm in memory
+                     bit3 unknown (set on adumat's panel, clear on ours),
+                     bit4 alarm in memory
 ```
 
 Measured values on the reference panel:
@@ -97,6 +99,17 @@ rejected.
 
 ## Limitations (all measured, not assumed)
 
+- **Zones 1–48 and partitions 1–2 only.** The DGP-848 supports 8 partitions
+  and the DGP-NE96 96 zones, but our captures only cover partitions 1–2 and
+  zones 1–48. On a DGP-NE96 a warning is logged at startup, and zones or
+  partitions beyond that range in `LIMITS` / `PARTITION_NAMES` are logged as
+  unsupported instead of being silently dropped.
+- **Which zones exist is not read from the panel.** The zone definition
+  layout in EEPROM is unknown, so all zones 1–48 are published unless
+  `LIMITS["zone"]` restricts them. Unlabelled zones are named `Zone <n>`;
+  their keys are allocated after the labelled zones, so they never change the
+  key of a labelled zone.
+
 - **No event history.** The panel does not broadcast `0xE0` frames, and event
   log requests (`0xE` + number) are answered with an echo of the request. The
   event buffer exists (it is readable by WinLoad), but its protocol is not
@@ -120,8 +133,9 @@ explicitly, per zone key, and never guessed from the label text — a panel
 programmed in any language behaves the same.
 
 ```python
-# Zone key -> Home Assistant binary_sensor device_class.
-# Unlisted zones default to "motion".
+# Zone key -> Home Assistant binary_sensor device_class of the "open" sensor.
+# Unlisted zones default to "motion". Tamper is published for every zone; use
+# HOMEASSISTANT_PUBLISH_ZONE_PROPERTIES to hide it.
 ZONE_DEVICE_CLASS = {
     "garazas": "motion",
     "fasado_durys": "door",
@@ -132,9 +146,14 @@ ZONE_DEVICE_CLASS = {
     "sirena_deze_tamp": "tamper",
 }
 
-# Partition number -> partition name shown in Home Assistant.
-# Missing entries default to "Partition <number>".
+# Partition number -> partition name shown in Home Assistant. Only supplies
+# labels: missing entries default to "Partition <number>". Partitions 1-2 are
+# published unless LIMITS["partition"] restricts them.
 PARTITION_NAMES = {1: "House", 2: "Garage"}
+
+# Optional: publish only these zones / partitions (default: zones 1-48,
+# partitions 1-2).
+LIMITS = {"zone": "1-26,30", "partition": [1]}
 ```
 
 The zone key is the normalised EEPROM label (see `sanitize_key`), for example
@@ -163,8 +182,12 @@ Notes:
 ## Testing
 
 - `tests/hardware/digiplex/test_parsers.py` — recorded frames (checksums, INIT,
-  login, READ), adapters (zones, partitions, voltages) and the MONITOR frame
-  builder.
+  login, READ), RAM block parsers (zones, partitions, voltages) and the MONITOR
+  frame builder.
+- `tests/hardware/digiplex/test_adapters.py` — bit order of the zone and
+  partition decoders.
+- `tests/hardware/digiplex/test_panel.py` — which zones and partitions are
+  published, and that tamper is kept for every zone.
 - Live verification on a DGP-848: two partitions armed/disarmed independently,
   entry delay reported as HA `pending`, exit delay as `arming`, voltages
   matching the multimeter, 26 zone labels read from EEPROM.

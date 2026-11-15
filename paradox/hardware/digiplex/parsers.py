@@ -181,7 +181,7 @@ EventResponse = Struct(
                     "NeWare_connected" / Flag,
                 ),
             ),
-            "raw" / Bytes(34),
+            "raw" / Bytes(35),
         )
     ),
     "checksum" / PacketChecksum(Bytes(1)),

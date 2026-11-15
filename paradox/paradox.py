@@ -1273,10 +1273,12 @@ class Paradox:
             else:
                 change["target_state"] = change["current_state"] = "disarmed"
 
-            if properties.get("exit_delay"):  # Redefine if pending
-                change["current_state"] = "arming"
-            elif properties.get("entry_delay"):  # Entry delay: waiting for a code
-                change["current_state"] = "pending"
+            # An alarm outranks entry/exit delay
+            if change["current_state"] != "triggered":
+                if properties.get("exit_delay"):  # Redefine if pending
+                    change["current_state"] = "arming"
+                elif properties.get("entry_delay"):  # Entry delay: waiting for a code
+                    change["current_state"] = "pending"
 
             self.storage.update_container_object("partition", properties["key"], change)
 

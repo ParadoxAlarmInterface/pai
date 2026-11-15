@@ -49,6 +49,8 @@ def create_panel(core, start_communication_response: Container = None) -> Panel:
 
         return mg6250.Panel(core, start_communication_response, False)
     elif product_id in ["DIGIPLEX_v13", "DIGIPLEX_v2", "DIGIPLEX_NE"]:
+        # One driver for the family; it only reads the memory range captured on
+        # a DGP-848 (zones 1-48, partitions 1-2) and warns on DGP-NE96.
         from . import digiplex
 
         return digiplex.Panel_DGP848(core, start_communication_response, False)

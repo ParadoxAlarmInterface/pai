@@ -8,33 +8,36 @@ returns the flat status dict consumed by ``convert_raw_status()``:
 Memory map (verified live on a DGP-848, firmware build A095):
     0x0153..0x0158  zone status 1-48 (bit0=LSB=zone 1, 1=open)
     0x0159..0x015E  tamper status 1-48
-    0x0195..        partition status, 5-byte blocks (see adapters.py)
+    0x0195..0x019E  partition status 1-2, 5-byte blocks (see adapters.py)
     0x000C          PSU voltage
     0x000D          battery voltage
 """
 
-from construct import Bytes, Padding, Struct
+from construct import Byte, Padding, Struct
 
 from paradox.event import EventLevel
 
 from .adapters import (
     BATTERY_V_PER_STEP,
     PSU_V_PER_STEP,
-    PartitionStatusAdapter,
-    StatusAdapter,
+    PARTITION_COUNT,
+    PARTITION_OFFSET,
+    PARTITION_STRIDE,
+    PartitionStatus,
     VoltageAdapter,
+    ZoneFlags,
 )
 
 RAMDataParserMap = {
     0x8153: Struct(
-        "zone_open" / StatusAdapter(Bytes(6)),
-        "zone_tamper" / StatusAdapter(Bytes(6)),
+        "zone_open" / ZoneFlags(48),
+        "zone_tamper" / ZoneFlags(48),
         Padding(20),
     ),
     0x8185: Struct(
-        # 0x0185..0x01A4: partition status blocks start at 0x0195
-        "partition_status"
-        / PartitionStatusAdapter(Bytes(32)),
+        Padding(PARTITION_OFFSET),  # 0x0185..0x0194
+        "partition_status" / PartitionStatus(PARTITION_COUNT),
+        Padding(32 - PARTITION_OFFSET - PARTITION_COUNT * PARTITION_STRIDE),
     ),
     0x800B: Struct(
         Padding(1),  # 0x000B: unfiltered AC sample - intentionally unpublished
@@ -42,8 +45,8 @@ RAMDataParserMap = {
         / Struct(
             "power"
             / Struct(
-                "psu" / VoltageAdapter(Bytes(1), PSU_V_PER_STEP),  # 0x000C
-                "battery" / VoltageAdapter(Bytes(1), BATTERY_V_PER_STEP),  # 0x000D
+                "psu" / VoltageAdapter(Byte, PSU_V_PER_STEP),  # 0x000C
+                "battery" / VoltageAdapter(Byte, BATTERY_V_PER_STEP),  # 0x000D
             )
         ),
         Padding(29),

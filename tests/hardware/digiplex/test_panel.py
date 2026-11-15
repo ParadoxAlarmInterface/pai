@@ -1,0 +1,154 @@
+"""Which Digiplex zones / partitions are published (load_labels + status)."""
+
+import logging
+from unittest.mock import AsyncMock, MagicMock
+
+from construct import Container
+import pytest
+
+from paradox.config import config as cfg
+from paradox.hardware.digiplex.panel import ZONE_LABELS_BASE, Panel_DGP848
+
+
+def _labels(names: dict) -> dict:
+    """EEPROM label blocks (32 bytes = two zones) keyed by address."""
+    raw = bytearray(48 * 16)
+    for zone, name in names.items():
+        raw[(zone - 1) * 16 : (zone - 1) * 16 + len(name)] = name
+    return {
+        ZONE_LABELS_BASE + offset: bytes(raw[offset : offset + 32])
+        for offset in range(0, len(raw), 32)
+    }
+
+
+def _zone_status(open_zones=(), tamper_zones=()) -> bytes:
+    def bits(zones):
+        value = sum(1 << (zone - 1) for zone in zones)
+        return value.to_bytes(6, "little")
+
+    return bits(open_zones) + bits(tamper_zones)
+
+
+def _panel(labels: dict) -> Panel_DGP848:
+    memory = _labels(labels)
+    panel = Panel_DGP848(MagicMock())
+    panel._read_eeprom = AsyncMock(side_effect=lambda address, count: memory[address])
+    return panel
+
+
+@pytest.fixture(autouse=True)
+def config(monkeypatch):
+    monkeypatch.setattr(cfg, "LIMITS", {})
+    monkeypatch.setattr(cfg, "ZONE_DEVICE_CLASS", {})
+    monkeypatch.setattr(cfg, "PARTITION_NAMES", {})
+
+
+async def test_all_zones_are_published_with_fallback_labels():
+    zones = (await _panel({1: b"fasado\x00durys", 2: b"virtuve"}).load_labels())[
+        "zone"
+    ]
+
+    assert sorted(zones) == list(range(1, 49))
+    assert zones[1]["label"] == "fasado durys"
+    assert zones[1]["key"] == "fasado_durys"
+    assert zones[30]["label"] == "Zone 30"
+    assert zones[30]["key"] == "zone_30"
+
+
+async def test_labelled_zone_keeps_key_on_fallback_collision():
+    zones = (await _panel({2: b"zone 1"}).load_labels())["zone"]
+
+    assert zones[2]["key"] == "zone_1"
+    assert zones[1]["key"] == "zone_1_1"
+    assert zones[1]["label"] == "Zone 1"
+
+
+async def test_zone_limits_select_zones(monkeypatch):
+    monkeypatch.setattr(cfg, "LIMITS", {"zone": "2,5"})
+    panel = _panel({1: b"fasado durys", 2: b"virtuve"})
+
+    zones = (await panel.load_labels())["zone"]
+
+    assert sorted(zones) == [2, 5]
+    assert zones[5]["label"] == "Zone 5"
+
+
+async def test_tamper_is_kept_for_every_zone_type(monkeypatch):
+    monkeypatch.setattr(cfg, "ZONE_DEVICE_CLASS", {"fasado_durys": "door"})
+    panel = _panel({1: b"fasado durys", 2: b"virtuve"})
+    zones = (await panel.load_labels())["zone"]
+    assert zones[1]["device_class"] == "door"
+
+    reply = Container(
+        fields=Container(
+            value=Container(
+                address=0x8153,
+                data=_zone_status(open_zones=[3], tamper_zones=[1, 2]) + bytes(20),
+            )
+        )
+    )
+    panel.core.send_wait = AsyncMock(return_value=reply)
+
+    status = await panel.request_status(0x8153)
+
+    assert status["zone_tamper"][1] is True  # "door" zone keeps its tamper
+    assert status["zone_tamper"][2] is True
+    assert status["zone_open"][3] is True
+    assert status["zone_open"][1] is False
+
+
+async def test_partition_names_only_supply_labels(monkeypatch, caplog):
+    monkeypatch.setattr(cfg, "PARTITION_NAMES", {"1": "House", 6: "Shed"})
+    panel = _panel({})
+
+    with caplog.at_level(logging.WARNING):
+        partitions = (await panel.load_labels())["partition"]
+
+    assert {i: p["label"] for i, p in partitions.items()} == {
+        1: "House",
+        2: "Partition 2",
+    }
+    assert "partition [6] not supported" in caplog.text
+
+
+async def test_partition_limits_restrict_status(monkeypatch):
+    monkeypatch.setattr(cfg, "LIMITS", {"partition": "2"})
+    panel = _panel({})
+    assert list((await panel.load_labels())["partition"]) == [2]
+
+    data = bytearray(32)
+    data[16] = data[21] = 0x01  # partitions 1 and 2 armed
+    reply = Container(fields=Container(value=Container(address=0x8185, data=data)))
+    panel.core.send_wait = AsyncMock(return_value=reply)
+
+    status = await panel.request_status(0x8185)
+
+    assert set(status["partition_status"]) == {2}
+    assert status["partition_status"][2]["arm"] is True
+
+
+def test_ne96_warns_about_unsupported_zones(caplog):
+    response = Container(
+        fields=Container(value=Container(product_id="DIGIPLEX_NE"), data=b"")
+    )
+
+    with caplog.at_level(logging.WARNING):
+        Panel_DGP848(MagicMock(), response)
+
+    assert "only zones 1-48 and partitions 1-2 are supported" in caplog.text
+
+
+async def test_fallback_key_never_duplicates_a_labelled_key():
+    zones = (await _panel({2: b"zone 1", 3: b"zone 1 1"}).load_labels())["zone"]
+
+    assert zones[2]["key"] == "zone_1"
+    assert zones[3]["key"] == "zone_1_1"
+    assert len({z["key"] for z in zones.values()}) == len(zones)
+
+
+async def test_limits_do_not_change_labelled_keys(monkeypatch):
+    monkeypatch.setattr(cfg, "LIMITS", {"zone": [2]})
+    zones = (await _panel({1: b"Kitchen", 2: b"Kitchen"}).load_labels())["zone"]
+
+    assert list(zones) == [2]
+    assert zones[2]["key"] == "Kitchen_2"
