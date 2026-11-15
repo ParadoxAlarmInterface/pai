@@ -279,9 +279,9 @@ def test_partition_action_command_map():
     # HA night maps to stay arm: INSTANT_ARM (0x4) is reported by the panel
     # as a full arm, which would show as armed_away instead of armed_home.
     assert parsers.PARTITION_ACTION_COMMANDS["arm_sleep"] == 0x03
-    assert parsers.PARTITION_ACTION_COMMANDS["force"] == 0x05
+    assert parsers.PARTITION_ACTION_COMMANDS["arm_force"] == 0x05
     assert parsers.PARTITION_ACTION_COMMANDS["disarm"] == 0x06
-    assert parsers.PARTITION_ACTION_COMMANDS["beep"] == 0x08
+    assert parsers.PARTITION_ACTION_COMMANDS["beep_keypads"] == 0x08
 
 
 def test_entry_delay_flag():

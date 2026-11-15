@@ -199,6 +199,15 @@ async def test_partition_name_collision_with_default_is_unique(monkeypatch):
     assert partitions[2]["key"] == "Partition_2_2"
 
 
+def test_empty_selection_publishes_nothing():
+    panel = _panel({})
+    result = {"zone_open": {1: True}, "partition_status": {1: {"arm": False}}}
+
+    panel._keep_published(result)
+
+    assert result == {"zone_open": {}, "partition_status": {}}
+
+
 async def test_eeprom_timeout_returns_empty_block(caplog):
     panel = PanelDGP848(MagicMock())
     panel.core.send_wait = AsyncMock(side_effect=asyncio.TimeoutError)

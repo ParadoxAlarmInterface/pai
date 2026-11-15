@@ -89,9 +89,9 @@ One command nibble per partition, `NOP` in the slots that are not addressed:
 | `0x2` | full arm | `armed_away` |
 | `0x3` | stay arm | `armed_home` (after the exit delay) |
 | `0x4` | instant arm | — (see limitations) |
-| `0x5` | force arm | — |
+| `0x5` | force arm (`arm_force`) | — |
 | `0x6` | disarm | `disarmed` |
-| `0x8` | beep | — |
+| `0x8` | beep (`beep_keypads`) | — |
 
 No user code is sent: authority comes from the PC session. The panel answers
 with an **echo** of the frame; an `ErrorMessage` (0x70) means the command was

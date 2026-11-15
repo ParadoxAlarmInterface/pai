@@ -207,9 +207,9 @@ PARTITION_ACTION_COMMANDS = {
     # (0x4) as a full arm (no stay bit), which would show up as armed_away and
     # confuse the night mode. Instant arm is therefore not exposed.
     "arm_sleep": 0x3,
-    "force": 0x5,
+    "arm_force": 0x5,
     "disarm": 0x6,
-    "beep": 0x8,
+    "beep_keypads": 0x8,
 }
 
 PerformPartitionAction = Struct(

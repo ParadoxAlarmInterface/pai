@@ -391,7 +391,7 @@ class PanelDGP848(PanelBase):
             ("partition_status", self._partitions),
         )
         for key, published in selections:
-            if published and key in result:
+            if key in result:
                 result[key] = {i: v for i, v in result[key].items() if i in published}
 
     def _log_partition_changes(self, result):
