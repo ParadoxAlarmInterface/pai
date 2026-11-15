@@ -39,6 +39,8 @@ PRT3 uses its own discovery and ASCII liveness check with no binary probes.
 - `build_close_connection()` returns logout bytes, or `None` when there is no logout.
   The coordinator then calls `Connection.end_session()` before closing the link.
 - `supports_time_sync` gates clock synchronization.
+- `module_pgm_packet_slots` declares module-PGM support and the panel protocol's
+  command limit; it defaults to `0` (unsupported).
 - `handle_async_message(message)` handles additional unsolicited protocol messages.
   Its persistent dispatcher is registered once per connection, not per installation.
 - `dispatch_panel_event(event)` publishes a driver-produced event through the

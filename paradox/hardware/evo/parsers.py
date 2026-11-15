@@ -36,7 +36,6 @@ from construct import (
 from ..common import (
     CommunicationSourceIDEnum,
     DictArray,
-    MODULE_PGM_PACKET_SLOTS,
     PacketChecksum,
     PacketLength,
     ProductIdEnum,
@@ -823,6 +822,9 @@ PerformPGMAction = Struct(
     ),
     "checksum" / PacketChecksum(Bytes(1)),
 )
+
+# The 0xA4 EVO packet carries one command byte per slot.
+MODULE_PGM_PACKET_SLOTS = 4
 
 PerformModulePGMAction = Struct(
     "fields"

@@ -32,6 +32,8 @@ ZONE_ACTIONS = dict(
 
 
 class Panel_EVOBase(PanelBase):
+    module_pgm_packet_slots = parsers.MODULE_PGM_PACKET_SLOTS
+
     event_map = event_map
     property_map = property_map
     max_eeprom_response_data_length = 64

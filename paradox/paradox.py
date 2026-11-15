@@ -21,7 +21,6 @@ from paradox.exceptions import (
     async_loop_unhandled_exception_handler,
 )
 from paradox.hardware import Panel, detect_panel
-from paradox.hardware.common import MODULE_PGM_PACKET_SLOTS
 from paradox.lib import ps
 from paradox.lib.async_message_manager import ErrorMessageHandler, EventMessageHandler
 from paradox.lib.handlers import PersistentHandler
@@ -499,6 +498,14 @@ class Paradox:
             raise
 
     def _init_module_pgms(self):
+        pgm_slots = self.panel.module_pgm_packet_slots if self.panel else 0
+        if not pgm_slots:
+            if cfg.MODULE_PGM_ADDRESSES:
+                logger.warning(
+                    "MODULE_PGM_ADDRESSES: current panel does not support module PGMs"
+                )
+            return
+
         seen_addresses = set()
         for module in cfg.MODULE_PGM_ADDRESSES:
             if not isinstance(module, dict):
@@ -515,14 +522,12 @@ class Paradox:
                     addr,
                 )
                 continue
-            if type(pgm_count) is not int or not (
-                1 <= pgm_count <= MODULE_PGM_PACKET_SLOTS
-            ):
+            if type(pgm_count) is not int or not (1 <= pgm_count <= pgm_slots):
                 logger.warning(
                     "MODULE_PGM_ADDRESSES: invalid pgm_count %r for address %d (expected int 1-%d), skipping",
                     pgm_count,
                     addr,
-                    MODULE_PGM_PACKET_SLOTS,
+                    pgm_slots,
                 )
                 continue
             if addr in seen_addresses:
