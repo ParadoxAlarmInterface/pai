@@ -23,5 +23,7 @@ class PRT3SerialConnection(SerialCommunication):
     line-delimited ASCII framing instead of the binary nibble-pattern framer.
     """
 
+    panel_protocol = "prt3"
+
     def make_protocol(self) -> PRT3Protocol:
         return PRT3Protocol(self)

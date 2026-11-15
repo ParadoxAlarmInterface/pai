@@ -39,6 +39,7 @@ import logging
 from typing import Optional
 
 from paradox.config import config as cfg
+from paradox.data.model import DetectedPanel
 from paradox.hardware.panel import Panel
 from paradox.hardware.prt3 import adapter, encoder
 from paradox.hardware.prt3.parser import (
@@ -47,10 +48,14 @@ from paradox.hardware.prt3.parser import (
     PRT3CommandEcho,
     PRT3CommStatus,
     PRT3LabelReply,
+    PRT3SystemEvent,
     PRT3ZoneStatus,
     parse_line,
 )
+from paradox.hardware.prt3.event import PRT3Event
 from paradox.hardware.prt3.property import property_map
+from paradox.lib.utils import sanitize_key
+from paradox.lib import ps
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -92,6 +97,7 @@ class PRT3Panel(Panel):
     # the poll loop calls request_status(0) once per cycle and it polls
     # all configured areas and zones internally.
     status_request_addresses = [0]
+    supports_time_sync = False  # no SetTimeDate over the ASCII protocol
 
     def __init__(self, core):
         # variable_message_length=False: PRT3Protocol.variable_message_length()
@@ -147,6 +153,44 @@ class PRT3Panel(Panel):
             logger.warning("PRT3: non-ASCII message: %r", message)
             return None
         return parse_line(line)
+
+    def handle_async_message(self, message):
+        """Dispatch an async PRT3 system event into PAI's event pipeline."""
+        if not isinstance(message, PRT3SystemEvent):
+            return
+        logger.info(
+            "PRT3 system event: G%03dN%03dA%03d",
+            message.group,
+            message.number,
+            message.area,
+        )
+        try:
+            evt = PRT3Event.from_prt3(message, label_provider=self.core.get_label)
+        except (KeyError, AttributeError, ValueError) as exc:
+            logger.warning("handle_async_message: failed to parse event: %s", exc)
+            return
+        try:
+            self.core.dispatch_panel_event(evt)
+        except (KeyError, AttributeError) as exc:
+            logger.warning("handle_async_message: storage dispatch error: %s", exc)
+        except Exception:
+            logger.exception("handle_async_message")
+
+    def on_partition_command(self, partitions, command):
+        # The &OK echo is authoritative; suppress stale RA arm bits for 3 s.
+        if command != "disarm":
+            return
+        change = {
+            "arm": False,
+            "arm_stay": False,
+            "arm_away": False,
+            "arm_force": False,
+            "exit_delay": False,
+            "entry_delay": False,
+        }
+        self.core.apply_partition_state_change(
+            partitions, change, arm_freeze_seconds=3.0
+        )
 
     # ------------------------------------------------------------------
     # Internal request/reply helper
@@ -210,6 +254,25 @@ class PRT3Panel(Panel):
     # Startup handshake
     # ------------------------------------------------------------------
 
+    @classmethod
+    async def detect(cls, core):
+        """PRT3 has no binary identification exchange: synthesise an identity
+        from the configured port so HA discovery has a stable device identity
+        to anchor entity unique_ids to. Link liveness is checked by
+        initialize_communication()."""
+        panel = cls(core)
+        core.install_panel(panel)
+        port_id = sanitize_key(cfg.PRT3_SERIAL_PORT) or "prt3"
+        return panel, DetectedPanel(
+            product_id=None,
+            model="PRT3",
+            firmware_version="N/A",
+            serial_number=f"prt3_{port_id}",
+        )
+
+    def build_close_connection(self):
+        return None  # no logout over the ASCII protocol
+
     async def initialize_communication(self, password) -> bool:
         """
         Verify the PRT3 serial link is live.
@@ -232,7 +295,6 @@ class PRT3Panel(Panel):
         The ``password`` argument is accepted for interface compatibility but
         ignored — PRT3 has no password exchange.
         """
-        from paradox.hardware.prt3.parser import PRT3SystemEvent
 
         def _any_prt3_msg(m):
             return isinstance(

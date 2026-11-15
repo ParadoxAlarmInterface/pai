@@ -118,6 +118,12 @@ def test_mg6250_username_from_environment(monkeypatch):
     assert c.MG6250_USERNAME == "installer"
 
 
+def test_digiplex_partition_names_from_config(monkeypatch):
+    monkeypatch.delenv("PAI_DIGIPLEX_PARTITION_NAMES", raising=False)
+    c = _make_config(monkeypatch, {"DIGIPLEX_PARTITION_NAMES": {1: "House"}})
+    assert c.DIGIPLEX_PARTITION_NAMES == {1: "House"}
+
+
 def test_prt3_user_code_empty_accepted(monkeypatch):
     """Empty PRT3_USER_CODE is valid (quick-arm mode)."""
     c = _make_config(monkeypatch, {"PRT3_USER_CODE": ""})

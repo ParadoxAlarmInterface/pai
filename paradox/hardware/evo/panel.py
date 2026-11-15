@@ -9,7 +9,7 @@ from paradox.config import config as cfg
 from paradox.exceptions import AuthenticationFailed, StatusRequestException
 
 from . import parsers
-from ..panel import Panel as PanelBase
+from ..binary import BinaryPanel as PanelBase
 from .event import event_map
 from .property import property_map
 
@@ -32,6 +32,8 @@ ZONE_ACTIONS = dict(
 
 
 class Panel_EVOBase(PanelBase):
+    module_pgm_packet_slots = parsers.MODULE_PGM_PACKET_SLOTS
+
     event_map = event_map
     property_map = property_map
     max_eeprom_response_data_length = 64

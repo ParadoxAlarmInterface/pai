@@ -31,8 +31,8 @@ from construct import (
     Int8ub,
     Int16ub,
     Int16ul,
-    Optional,
     Int32ul,
+    Optional,
     Prefixed,
     RawCopy,
     Rebuild,
@@ -55,7 +55,7 @@ from paradox.lib import ps
 from paradox.lib.crypto import decrypt as paradox_decrypt, encrypt as paradox_encrypt
 from paradox.lib.handlers import Handler
 
-from ..panel import Panel as PanelBase
+from ..binary import BinaryPanel as PanelBase
 from .event import event_map
 from .property import property_map
 
@@ -561,6 +561,13 @@ class Panel(PanelBase):
     event_map = event_map
     property_map = property_map
     status_request_addresses = [0]
+    supports_time_sync = True  # as BabyWare: a write in a programming session
+
+    @classmethod
+    async def start_communication(cls, core, initiate_reply):
+        # The MG6250 ignores StartCommunication (0x5F); the 0x72 reply
+        # already identifies it.
+        return initiate_reply
 
     def __init__(
         self, core, start_communication_response=None, variable_message_length=False
@@ -822,18 +829,21 @@ class Panel(PanelBase):
         self._save_session()
         return True
 
-    def close_connection(self):
+    def build_close_connection(self):
         """Log out, so that the next login is not refused as busy."""
         if self.session is None:
-            super().close_connection()
-            return
-        self.core.connection.write(
-            build_frame(
-                CMD_LOGIN,
-                SESSION_LOGOUT,
-                bytes([self.session.selector, self.session.mode]),
-            )
+            return super().build_close_connection()
+        return build_frame(
+            CMD_LOGIN,
+            SESSION_LOGOUT,
+            bytes([self.session.selector, self.session.mode]),
         )
+
+    def on_close_connection_sent(self):
+        # Kept when the write failed: the panel still holds the session, and
+        # the saved key lets the next start resume it.
+        if self.session is None:
+            return
         self.session = self.session_key = None
         self._log_enabled = False
         self._forget_session()
@@ -999,9 +1009,7 @@ class Panel(PanelBase):
 
         # Area 2 is listed only when the panel is set for two partitions.
         start_time = time.time()
-        settings = await self.read_objects(
-            OBJ_SETTINGS, [1], (SETTINGS_FIELD_OPTIONS,)
-        )
+        settings = await self.read_objects(OBJ_SETTINGS, [1], (SETTINGS_FIELD_OPTIONS,))
         options = settings.get(1, {}).get(SETTINGS_FIELD_OPTIONS, b"")
         two = bool(options) and bool(options[0] & OPTION_TWO_PARTITIONS)
         indexes = limited_indexes("partition", PARTITIONS if two else PARTITIONS[:1])

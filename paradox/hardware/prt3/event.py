@@ -57,37 +57,37 @@ EVENT_MAP: dict = {
 
     # Arm events (PRT3 spec page 18: G009=Master, G010=User, G011=Keyswitch, G012=Special)
     # number = user/keyswitch ID, area = affected partition.
-    # exit_delay cleared because the panel is now fully armed (delay is over)
+    # exit/entry delay cleared because the panel is now fully armed (delay is over)
     9:  {"type": "partition", "subtype": "arm",                "level": EventLevel.INFO,
-         "change": {"arm": True, "exit_delay": False},
+         "change": {"arm": True, "exit_delay": False, "entry_delay": False},
          "tags": ["arm", "master"],
          "message": "Partition {label} armed by master"},
     10: {"type": "partition", "subtype": "arm",                "level": EventLevel.INFO,
-         "change": {"arm": True, "exit_delay": False},
+         "change": {"arm": True, "exit_delay": False, "entry_delay": False},
          "tags": ["arm", "user"],
          "message": "Partition {label} armed by user"},
     11: {"type": "partition", "subtype": "arm",                "level": EventLevel.INFO,
-         "change": {"arm": True, "exit_delay": False},
+         "change": {"arm": True, "exit_delay": False, "entry_delay": False},
          "tags": ["arm", "keyswitch"],
          "message": "Partition {label} armed via keyswitch"},
     12: {"type": "partition", "subtype": "arm",                "level": EventLevel.INFO,
-         "change": {"arm": True, "exit_delay": False},
+         "change": {"arm": True, "exit_delay": False, "entry_delay": False},
          "tags": ["arm", "special"],
          "message": "Partition {label} special arm"},
 
     # Disarm events (PRT3 spec page 18: G013=Master, G014=User, G015=Keyswitch).
     # number = user/keyswitch ID, area = affected partition.
-    # exit_delay cleared because arming was cancelled (or disarm after full arm).
+    # exit/entry delay cleared because arming was cancelled or a code was entered.
     13: {"type": "partition", "subtype": "disarm",             "level": EventLevel.INFO,
-         "change": {"arm": False, "exit_delay": False},
+         "change": {"arm": False, "exit_delay": False, "entry_delay": False},
          "tags": ["disarm", "master"],
          "message": "Partition {label} disarmed by master"},
     14: {"type": "partition", "subtype": "disarm",             "level": EventLevel.INFO,
-         "change": {"arm": False, "exit_delay": False},
+         "change": {"arm": False, "exit_delay": False, "entry_delay": False},
          "tags": ["disarm", "user"],
          "message": "Partition {label} disarmed by user"},
     15: {"type": "partition", "subtype": "disarm",             "level": EventLevel.INFO,
-         "change": {"arm": False, "exit_delay": False},
+         "change": {"arm": False, "exit_delay": False, "entry_delay": False},
          "tags": ["disarm", "keyswitch"],
          "message": "Partition {label} disarmed via keyswitch"},
     # G016/G017 = Disarm after alarm (per spec G016=Master, G017=User, G018=Keyswitch).
@@ -95,11 +95,11 @@ EVENT_MAP: dict = {
     # to PAI's pre-spec-realignment behaviour to avoid behaviour drift for events
     # we haven't observed from the user's panel — G013 was the critical fix.
     16: {"type": "partition", "subtype": "disarm",             "level": EventLevel.INFO,
-         "change": {"arm": False, "exit_delay": False},
+         "change": {"arm": False, "exit_delay": False, "entry_delay": False},
          "tags": ["disarm", "master", "alarm_cancel"],
          "message": "Partition {label} disarmed after alarm by master"},
     17: {"type": "partition", "subtype": "disarm",             "level": EventLevel.INFO,
-         "change": {"arm": False, "exit_delay": False, "audible_alarm": False},
+         "change": {"arm": False, "exit_delay": False, "entry_delay": False, "audible_alarm": False},
          "tags": ["disarm", "user", "alarm_cancel"],
          "message": "Partition {label} disarmed after alarm by user"},
     18: {"type": "partition", "subtype": "alarm_cancelled",    "level": EventLevel.INFO,
@@ -107,7 +107,7 @@ EVENT_MAP: dict = {
          "tags": ["alarm", "cancel"],
          "message": "Partition {label} alarm cancelled"},
     20: {"type": "partition", "subtype": "disarm",             "level": EventLevel.INFO,
-         "change": {"arm": False, "exit_delay": False},
+         "change": {"arm": False, "exit_delay": False, "entry_delay": False},
          "tags": ["disarm", "special"],
          "message": "Partition {label} special disarm"},
 

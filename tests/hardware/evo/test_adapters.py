@@ -1,7 +1,8 @@
 from construct import (Bitwise, Bytes, Computed, Container, Default, Flag,
                        Struct, this)
 
-from paradox.hardware.evo.adapters import DictArray, EventAdapter
+from paradox.hardware.common import DictArray
+from paradox.hardware.evo.adapters import EventAdapter
 
 TestParser = Bitwise(
     DictArray(

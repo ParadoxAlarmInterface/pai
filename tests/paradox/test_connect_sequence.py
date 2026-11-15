@@ -17,6 +17,7 @@ import pytest
 from paradox.config import config as cfg
 from paradox.connections.connection import Connection, Exchange
 from paradox.connections.ip.connection import BareIPConnection, LocalIPConnection
+from paradox.connections.prt3.connection import PRT3SerialConnection
 from paradox.connections.serial.connection import SerialCommunication
 from paradox.connections.serial.protocol import SerialConnectionProtocol
 from paradox.hardware.mg6250 import Panel as MG6250Panel
@@ -464,3 +465,80 @@ async def test_initiate_hook_exchange_follows_retransmit_requests():
         INITIATE,
         EVO_REPLIES[0x72].hex(),
     ]
+
+
+class SequencedReplies(dict):
+    """Command byte -> replies answered in turn; the last one repeats."""
+
+    def get(self, command, default=None):
+        replies = super().get(command)
+        if not replies:
+            return default
+        return replies.pop(0) if len(replies) > 1 else replies[0]
+
+
+DGP_START = "5f20" + "00" * 34 + "7f"
+DGP_START_REPLY = bytes.fromhex(
+    "00 00 08 10 00 04 13 00 00 00 00 00 06 12 02 A0 95 " + "00 " * 19 + "7E"
+)
+DGP_BUSY_REPLY = bytes.fromhex("70 " + "00 " * 35 + "70")
+DGP_LOGIN_REPLY = bytes.fromhex("10 " + "00 " * 35 + "10")
+
+
+@pytest.fixture
+def fast_digiplex(monkeypatch):
+    from paradox.hardware.digiplex import panel as digiplex_panel
+
+    monkeypatch.setattr(ScriptedSerial, "retransmit_requests", False)
+    monkeypatch.setattr(digiplex_panel, "SESSION_RELEASE_SILENCE", 0)
+    return digiplex_panel
+
+
+@pytest.mark.asyncio
+async def test_digiplex_detected_when_initiate_times_out(mocker, fast_digiplex):
+    detected = mocker.patch("paradox.paradox.ps.sendMessage")
+    connection = ScriptedSerial(
+        SequencedReplies(
+            {0x5F: [DGP_BUSY_REPLY, DGP_START_REPLY], 0x00: [DGP_LOGIN_REPLY]}
+        )
+    )
+    tx = await run_session(connection)
+
+    # Busy panel: Start again after silence, then login; no logout frame.
+    assert tx[:-1] == [INITIATE, DGP_START, DGP_START]
+    assert tx[-1] == ("000008100004130012340000061202a095" + "00" * 19 + "c4")
+    identity = next(
+        c.kwargs["panel"]
+        for c in detected.call_args_list
+        if c.args == ("panel_detected",)
+    )
+    assert (identity.product_id, identity.model) == ("DIGIPLEX_v13", "Digiplex DGP")
+    # The panel reports no serial: identity must not be shared by every DGP.
+    assert identity.serial_number.startswith("digiplex_")
+
+
+@pytest.mark.asyncio
+async def test_digiplex_gives_up_silently_while_busy(mocker, fast_digiplex):
+    mocker.patch.object(fast_digiplex, "DETECT_DEADLINE", 0)
+    connection = ScriptedSerial(SequencedReplies({0x5F: [DGP_BUSY_REPLY]}))
+    alarm = make_alarm(connection)
+
+    assert not await alarm.connect()
+    await alarm.disconnect()
+
+    # Teardown must not reset the panel's session release timer.
+    assert connection.transport.tx[-1].hex() == DGP_START
+
+
+@pytest.mark.asyncio
+async def test_prt3_probe_bytes_without_binary_discovery(monkeypatch):
+    class ScriptedPRT3(PRT3SerialConnection, ScriptedSerial):
+        async def wait_for_message(self, check_fn=None, timeout=None):
+            # Shorten only the spontaneous-listen window, not the real probe.
+            return await super().wait_for_message(
+                check_fn, timeout=0.001 if timeout == 2.0 else timeout
+            )
+
+    monkeypatch.setattr(cfg, "CONNECTION_TYPE", "PRT3")
+    connection = ScriptedPRT3({ord("R"): b"RA001DOOOOOO\r"})
+    assert await run_session(connection) == [b"RA001\r".hex()]

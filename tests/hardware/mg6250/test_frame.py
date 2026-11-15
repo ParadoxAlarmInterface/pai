@@ -31,11 +31,9 @@ from paradox.hardware.mg6250.panel import (
     OBJ_PARTITION_STATUS,
     OBJ_PGM,
     OBJ_SETTINGS,
-    SETTINGS_FIELD_OPTIONS,
     OBJ_SYSTEM,
     OBJ_USER,
     OBJ_ZONE,
-    ZONE_DEFINITIONS,
     OBJ_ZONE_STATUS,
     PARTITION_ACTIONS,
     PARTITION_STATUS_FIELD,
@@ -46,8 +44,10 @@ from paradox.hardware.mg6250.panel import (
     SERVICE_OBJECTS,
     SERVICE_PROGRAMMING,
     SET_TIME_RETRY,
+    SETTINGS_FIELD_OPTIONS,
     SYSTEM_FIELD_STATUS,
     ZONE_ALARM_MEMORY,
+    ZONE_DEFINITIONS,
     ZONE_IN_ALARM,
     ZONE_STATUS_FIELD,
     Frame,
@@ -65,10 +65,10 @@ from paradox.hardware.mg6250.panel import (
     parse_log_records,
     parse_records,
 )
-from paradox.lib import ps
-from paradox.lib.crypto import encrypt as paradox_encrypt
 from paradox.hardware.spectra_magellan import parsers as sp_parsers
 from paradox.hardware.spectra_magellan.panel import Panel as SpectraPanel
+from paradox.lib import ps
+from paradox.lib.crypto import encrypt as paradox_encrypt
 from paradox.lib.handlers import HandlerRegistry
 from paradox.paradox import Paradox
 from paradox.parsers.status import convert_raw_status
@@ -1633,37 +1633,40 @@ async def test_load_memory_sends_definitions_then_labels(mocker):
 LOGOUT_REQUEST = bytes.fromhex("de01000c0000000191692 8b5".replace(" ", ""))
 
 
-async def test_close_connection_logs_out(monkeypatch, tmp_path):
+def logged_in_alarm(monkeypatch, tmp_path):
     path = tmp_path / "session.json"
     path.write_text("{}")
     monkeypatch.setattr(cfg, "MG6250_SESSION_FILE", str(path))
-    core = MagicMock()
-    panel = session_panel(0x91, 0x69, STATUS_KEY, core)
-    panel._log_enabled = True
-    panel.close_connection()
-    core.connection.write.assert_called_once_with(LOGOUT_REQUEST)
+    alarm = Paradox()
+    alarm._connection = MagicMock(connected=True)
+    alarm.panel = session_panel(0x91, 0x69, STATUS_KEY, alarm)
+    alarm.panel._log_enabled = True
+    return alarm, path
+
+
+def test_clean_session_logs_out(monkeypatch, tmp_path):
+    alarm, path = logged_in_alarm(monkeypatch, tmp_path)
+    panel = alarm.panel
+    alarm._clean_session()
+    alarm.connection.write.assert_called_once_with(LOGOUT_REQUEST)
     assert panel.session is None
     assert panel.session_key is None
     assert panel._log_enabled is False
     assert not path.exists()  # it cannot be resumed any more
 
 
-def test_close_connection_without_a_session_sends_the_generic_close():
-    core = MagicMock()
-    panel = Panel(core)
-    panel.close_connection()
-    core.connection.write.assert_called_once_with(
-        panel.get_message("CloseConnection").build(dict())
-    )
+def test_failed_logout_keeps_the_session_to_resume(monkeypatch, tmp_path):
+    alarm, path = logged_in_alarm(monkeypatch, tmp_path)
+    alarm.connection.write.side_effect = ConnectionError("gone")
+    alarm._clean_session()
+    assert alarm.panel.session is not None
+    assert path.exists()
 
 
-def test_base_panel_close_connection_is_unchanged():
-    core = MagicMock()
-    start = Container(fields=Container(value=Container(firmware=Container(version=7))))
-    panel = SpectraPanel(core, start)
-    panel.close_connection()
-    core.connection.write.assert_called_once_with(
-        panel.get_message("CloseConnection").build(dict())
+def test_close_connection_without_a_session_is_the_generic_close():
+    panel = Panel(MagicMock())
+    assert panel.build_close_connection() == panel.get_message("CloseConnection").build(
+        dict()
     )
 
 
