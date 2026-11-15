@@ -12,7 +12,7 @@ Compatibility depends on the panel model, firmware, and connection method.
 - [Installation](https://github.com/ParadoxAlarmInterface/pai/wiki/Installation)
 - [Configuration](https://github.com/ParadoxAlarmInterface/pai/wiki/Configuration)
 - [Connection methods](https://github.com/ParadoxAlarmInterface/pai/wiki/Connection-methods)
-- [Compatibility reports for PAI 3.8.1](https://github.com/ParadoxAlarmInterface/pai/wiki/Compatibility)
+- [Compatibility reports](https://github.com/ParadoxAlarmInterface/pai/wiki/Compatibility)
 - [Integration guides](https://github.com/ParadoxAlarmInterface/pai/wiki)
 
 For help or discussion, join the [Discord community](https://discord.gg/6KaXFtg39r)
