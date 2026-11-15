@@ -305,7 +305,7 @@ class Paradox:
     def _process_status(raw_status: Container) -> None:
         status = convert_raw_status(raw_status)
 
-        for limit_key in cfg.LIMITS.keys():
+        for limit_key in cfg.LIMITS:
             if limit_key not in status:
                 continue
 

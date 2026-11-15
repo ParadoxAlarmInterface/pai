@@ -301,11 +301,9 @@ class AbstractMQTTInterface(ThreadQueueInterface):
             await asyncio.sleep(cfg.MQTT_REPUBLISH_INTERVAL)
             trigger = time.time() - cfg.MQTT_REPUBLISH_INTERVAL
 
-            for k, v in filter(
-                lambda f: f[1].get("last_publish") <= trigger,
-                self.republish_cache.items(),
-            ):
-                self.publish(k, v["value"], v["qos"], v["retain"])
+            for k, v in self.republish_cache.items():
+                if v.get("last_publish") <= trigger:
+                    self.publish(k, v["value"], v["qos"], v["retain"])
 
     def _run(self):
         super()._run()

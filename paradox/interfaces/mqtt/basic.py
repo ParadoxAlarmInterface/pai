@@ -525,10 +525,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
     def _on_ready(self):
         self._publish_definitions()
 
-        if (
-            cfg.MQTT_DASH_PUBLISH
-            and len(list(self.labels.get("partition", {}).keys())) >= 2
-        ):
+        if cfg.MQTT_DASH_PUBLISH and len(self.labels.get("partition", {})) >= 2:
             self._publish_dash(cfg.MQTT_DASH_TEMPLATE, self.labels.get("partition", {}))
 
         if cfg.MQTT_CHALLENGE_SECRET:
@@ -537,7 +534,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
     def _publish_dash(self, fname, partitions):
         # TODO: move to a separate component
-        if len(list(partitions.keys())) < 2:
+        if len(partitions) < 2:
             return
 
         if os.path.exists(fname):

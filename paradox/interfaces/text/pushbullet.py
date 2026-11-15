@@ -33,7 +33,7 @@ class PushBulletWSClient(WebSocketBaseClient):
         self.interface = interface
 
         self.device = None
-        for _, device in enumerate(self.pb.devices):
+        for device in self.pb.devices:
             if device.nickname == cfg.PUSHBULLET_DEVICE:
                 logger.debug("Device found")
                 self.device = device

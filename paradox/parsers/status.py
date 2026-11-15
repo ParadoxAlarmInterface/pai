@@ -48,7 +48,7 @@ def convert_raw_status(raw_status: Container) -> Dict[str, ElementTypeContainer]
 def _parse_raw_status(prop_name: str, value) -> (dict, list):
     if isinstance(value, dict):
         arr = {}
-        all_keys_are_int = all([isinstance(k, int) for k in value.keys()])
+        all_keys_are_int = all(isinstance(k, int) for k in value.keys())
         for element_key, element_value in _iterate_properties(value):
             if (
                 all_keys_are_int
