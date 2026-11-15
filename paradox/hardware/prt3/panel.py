@@ -49,9 +49,11 @@ from paradox.hardware.prt3.parser import (
     PRT3CommandEcho,
     PRT3CommStatus,
     PRT3LabelReply,
+    PRT3SystemEvent,
     PRT3ZoneStatus,
     parse_line,
 )
+from paradox.hardware.prt3.event import PRT3Event
 from paradox.hardware.prt3.property import property_map
 from paradox.lib.utils import sanitize_key
 from paradox.lib import ps
@@ -155,9 +157,6 @@ class PRT3Panel(Panel):
 
     def handle_async_message(self, message):
         """Dispatch an async PRT3 system event into PAI's event pipeline."""
-        from .event import PRT3Event
-        from .parser import PRT3SystemEvent
-
         if not isinstance(message, PRT3SystemEvent):
             return
         logger.info(
@@ -313,8 +312,6 @@ class PRT3Panel(Panel):
         The ``password`` argument is accepted for interface compatibility but
         ignored — PRT3 has no password exchange.
         """
-        from paradox.hardware.prt3.parser import PRT3SystemEvent
-
         def _any_prt3_msg(m):
             return isinstance(
                 m,

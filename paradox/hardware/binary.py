@@ -11,6 +11,7 @@ from paradox.data.model import DetectedPanel
 from paradox.exceptions import PanelNotDetected
 from paradox.lib.utils import describe_connection
 
+from . import create_panel
 from . import parsers
 from .panel import Panel
 
@@ -24,7 +25,6 @@ class BinaryPanel(Panel):
 
     @staticmethod
     async def detect(core):
-        from . import create_panel
         from .registry import PRODUCTS
 
         bootstrap = BinaryPanel(core)
