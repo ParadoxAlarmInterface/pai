@@ -20,11 +20,14 @@ class Connection(AsyncMessageManager, ConnectionHandler):
     """Base for all panel links.
 
     Besides the transport, a connection may take part in the session the
-    panel sees. ``Paradox`` calls the hooks below at fixed points; the
-    defaults keep the plain behaviour every existing connection relies on.
+    panel sees. The binary driver calls the identification hook; ``Paradox``
+    calls the teardown hook. Defaults preserve plain transport behaviour.
     """
 
     _protocol: ConnectionProtocol
+
+    #: Discovery protocol understood by this link's initial framing.
+    panel_protocol: str = "binary"
 
     #: ``source_id`` sent in StartCommunication.
     start_communication_source_id: int = 0x2

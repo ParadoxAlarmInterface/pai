@@ -36,6 +36,7 @@ PRT3EventHandler to be registered — this is Phase 3 / runtime wiring work.
 
 import asyncio
 import logging
+import time
 from typing import Optional
 
 from paradox.config import config as cfg
@@ -53,6 +54,7 @@ from paradox.hardware.prt3.parser import (
 )
 from paradox.hardware.prt3.property import property_map
 from paradox.lib.utils import sanitize_key
+from paradox.lib import ps
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -150,6 +152,63 @@ class PRT3Panel(Panel):
             logger.warning("PRT3: non-ASCII message: %r", message)
             return None
         return parse_line(line)
+
+    def handle_async_message(self, message):
+        """Dispatch an async PRT3 system event into PAI's event pipeline."""
+        from .event import PRT3Event
+        from .parser import PRT3SystemEvent
+
+        if not isinstance(message, PRT3SystemEvent):
+            return
+        logger.info(
+            "PRT3 system event: G%03dN%03dA%03d",
+            message.group,
+            message.number,
+            message.area,
+        )
+        try:
+            evt = PRT3Event.from_prt3(message, label_provider=self.core.get_label)
+        except (KeyError, AttributeError, ValueError) as exc:
+            logger.warning("handle_async_message: failed to parse event: %s", exc)
+            return
+        try:
+            self._apply_event_change(evt)
+            ps.sendEvent(evt)
+            if evt.type == "partition":
+                self.core._update_partition_states()
+        except (KeyError, AttributeError) as exc:
+            logger.warning("handle_async_message: storage dispatch error: %s", exc)
+        except Exception:
+            logger.exception("handle_async_message")
+
+    def _apply_event_change(self, evt):
+        if not evt.change:
+            return
+        if evt.type == "partition" and evt.id in (0, 255):
+            # Global event: broadcast to every known partition (area=0/255).
+            for pid in self.core.storage.get_container("partition").keys():
+                self.core.storage.update_container_object("partition", pid, evt.change)
+        else:
+            self.core.storage.update_container_object(evt.type, evt.id, evt.change)
+
+    def on_partition_command(self, partitions, command):
+        # The &OK echo is authoritative; suppress stale RA arm bits for 3 s.
+        if command != "disarm":
+            return
+        change = {
+            "arm": False,
+            "arm_stay": False,
+            "arm_away": False,
+            "arm_force": False,
+            "exit_delay": False,
+            "entry_delay": False,
+        }
+        freeze_deadline = time.monotonic() + 3.0
+        for pid in partitions:
+            if self.core.storage.get_container_object("partition", pid):
+                self.core.storage.update_container_object("partition", pid, change)
+                self.core._partition_arm_freeze_until[pid] = freeze_deadline
+        self.core._update_partition_states()
 
     # ------------------------------------------------------------------
     # Internal request/reply helper

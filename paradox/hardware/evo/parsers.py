@@ -36,6 +36,7 @@ from construct import (
 from ..common import (
     CommunicationSourceIDEnum,
     DictArray,
+    MODULE_PGM_PACKET_SLOTS,
     PacketChecksum,
     PacketLength,
     ProductIdEnum,
@@ -822,10 +823,6 @@ PerformPGMAction = Struct(
     ),
     "checksum" / PacketChecksum(Bytes(1)),
 )
-
-# Fixed number of PGM command slots in the 0xA4 packet — a protocol constant,
-# not the number of PGMs a specific module exposes (which is configured separately).
-MODULE_PGM_PACKET_SLOTS = 4
 
 PerformModulePGMAction = Struct(
     "fields"

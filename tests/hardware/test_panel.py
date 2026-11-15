@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from paradox.hardware import Panel
+from paradox.hardware.binary import BinaryPanel as Panel
 
 
 @pytest.fixture(scope="module")

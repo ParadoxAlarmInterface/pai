@@ -1,18 +1,15 @@
 from abc import abstractmethod
-import binascii
 from collections import defaultdict, namedtuple
-import inspect
 from itertools import chain
 import logging
 from time import time
 import typing
 
-from construct import Construct, Container, EnumIntegerString
+from construct import Construct, Container
 
 from paradox.config import config as cfg, get_limits_for_type
 from paradox.lib.utils import construct_free, sanitize_key
 
-from . import parsers
 from ..lib import ps
 
 logger = logging.getLogger("PAI").getChild(__name__)
@@ -26,126 +23,39 @@ class Panel:
     property_map = {}  # override in a subclass
     max_eeprom_response_data_length = 0  # override in a subclass
     status_request_addresses = []  # override in a subclass
-    supports_time_sync = True  # whether SetTimeDate is implemented
+    supports_time_sync = False  # opt in when clock synchronization is implemented
 
     def __init__(self, core, variable_message_length=True):
         self.core = core
         self.settings = {}
         self.variable_message_length = variable_message_length
 
-    @classmethod
-    async def start_communication(cls, core, initiate_reply: Container) -> Container:
-        """StartCommunication exchange after InitiateCommunication.
-
-        Returns the reply that identifies the product (passed to the driver).
-        """
-        logger.info("Initiating panel connection")
-        reply = await core.send_wait(
-            parsers.StartCommunication,
-            args={"source_id": core.connection.start_communication_source_id},
-            reply_expected=0x0,
-        )
-        if reply is None:
-            raise ConnectionError("Panel did not replied to StartCommunication")
-        return reply
-
     def build_close_connection(self) -> typing.Optional[bytes]:
         """Logout frame sent on teardown, or None if the panel has none."""
-        return self.get_message("CloseConnection").build({})
+        return None
 
     def parse_message(self, message, direction="topanel") -> typing.Optional[Container]:
-        if message is None or len(message) < 2:
-            return None
+        raise NotImplementedError("override parse_message in a subclass")
 
-        if message[0] >> 4 == 0xE and message[1] == 0xFE:
-            return parsers.Encrypted.parse(message)
+    def handle_async_message(self, message):
+        """Handle protocol-specific unsolicited messages, if any."""
 
-        if direction == "topanel":
-            if message[0] == 0x72 and message[1] == 0:
-                return parsers.InitiateCommunication.parse(message)
-            elif message[0] == 0x5F:
-                return parsers.StartCommunication.parse(message)
-        else:
-            if message[0] == 0x72 and message[1] == 0xFF:
-                return parsers.InitiateCommunicationResponse.parse(message)
-            elif message[0] == 0x00 and message[4] > 0:
-                return parsers.StartCommunicationResponse.parse(message)
+    def on_partition_command(self, partitions, command):
+        """Apply protocol-specific state after an accepted partition command."""
 
-        return None
+    async def send_utility_key(self, key: int) -> bool:
+        raise NotImplementedError("Utility keys are not supported by this panel")
 
     def make_framer(self):
         """A framer to replace the connection's default one, or None to keep it."""
         return None
 
     def get_message(self, name) -> Construct:
-        clsmembers = dict(inspect.getmembers(parsers))
-        if name in clsmembers:
-            return clsmembers[name]
-        else:
-            raise ResourceWarning(f"{name} parser not found")
+        raise ResourceWarning(f"{name} parser not found")
 
     @staticmethod
     def get_error_message(error_code) -> str:
-        # This is from EVO and may not apply to all panels
-
-        error_str = str(error_code)
-        if isinstance(error_code, EnumIntegerString):
-            error_code = int(error_code)
-
-        if error_code == 0x00:
-            message = "Requested command did not work"
-        elif error_code == 0x01:
-            message = "User Code is invalid"
-        elif error_code == 0x02:
-            message = "Partition in code lockout (too many bad entries)"
-        elif error_code == 0x05:
-            message = "Panel will disconnect"
-        elif error_code == 0x10:
-            message = "Panel Not connected"
-        elif error_code == 0x11:
-            message = "Panel Already Connected"
-        elif error_code == 0x12:
-            message = "Invalid PC Password"
-        elif error_code == 0x13:
-            message = "Winload on phone line"
-        elif error_code == 0x14:
-            message = "Invalid Module address"
-        elif error_code == 0x15:
-            message = "Cannot write in RAM"
-        elif error_code == 0x16:
-            message = "Request to Upgrade Failed"
-        elif error_code == 0x17:
-            message = "Record number out of range"
-        elif error_code == 0x19:
-            message = "Invalid record type"
-        elif error_code == 0x1A:
-            message = "Multi-Bus not supported"
-        elif error_code == 0x1B:
-            message = "Incorrect number of users"
-        elif error_code == 0x1C:
-            message = "Invalid label number"
-        else:
-            # Include the hex form so unknown codes can be looked up easily
-            # in Paradox docs / issues (e.g. "29 (0x1D)" reported by panels
-            # in response to PGM and panic commands on some EVO firmwares).
-            if isinstance(error_code, int):
-                message = f"{error_str} (0x{error_code:02X})"
-            else:
-                message = error_str
-
-        return message
-
-    @staticmethod
-    def encode_password(password) -> bytes:
-        if password is None:
-            password = 0
-
-        if isinstance(password, int):
-            password = str(password).zfill(4)
-        elif isinstance(password, str):
-            password = password.encode()
-
-        return binascii.a2b_hex(password.zfill(4))
+        return str(error_code)
 
     async def load_memory(self):
         logger.info("Loading definitions")

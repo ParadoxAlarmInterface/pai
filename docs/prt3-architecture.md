@@ -72,10 +72,15 @@ new `PRT3_*` config keys (`PRT3_SERIAL_PORT`, `PRT3_SERIAL_BAUD`, `PRT3_MAX_AREA
 `PRT3_MAX_ZONES`, `PRT3_MAX_USERS`, `PRT3_USER_CODE`, `PRT3_COMM_TIMEOUT`,
 `PRT3_UTILITY_KEYS`).
 
-**`paradox/paradox.py`** — one `elif cfg.CONNECTION_TYPE == "PRT3":` branch in the
-`connection` property; a guard in `connect()` that skips the binary panel detection
-path and directly instantiates `PRT3Panel`; protocol-gap guards for `sync_time`,
-`_clean_session`, and `control_utility_key`.
+**`paradox/connections/__init__.py`** — creates the configured transport.
+`PRT3SerialConnection.panel_protocol = "prt3"` selects the PRT3 discovery strategy
+in `paradox/hardware/registry.py`, without binary identification probes.
+
+**`paradox/paradox.py`** — coordinates discovery, login and teardown through
+driver hooks. `PRT3Panel` owns link-liveness checks, async event conversion,
+accepted-disarm state updates and utility commands. Time synchronization and
+logout use the same capability hooks as other drivers; there are no PRT3 branches
+in the coordinator.
 
 **`paradox/interfaces/mqtt/`** — utility key button discovery (`UtilityKeyButton`
 entity, HA discovery publish, MQTT subscription and command handler).

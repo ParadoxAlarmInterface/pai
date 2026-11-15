@@ -13,6 +13,9 @@ from construct import (
     this,
 )
 
+# Command slots in a module PGM packet, not the module's physical relay count.
+MODULE_PGM_PACKET_SLOTS = 4
+
 
 def calculate_checksum(message):
     r = 0

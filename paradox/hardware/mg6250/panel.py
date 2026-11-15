@@ -49,7 +49,7 @@ from paradox.exceptions import AuthenticationFailed, StatusRequestException
 from paradox.lib.crypto import decrypt as paradox_decrypt, encrypt as paradox_encrypt
 from paradox.lib.handlers import Handler
 
-from ..panel import Panel as PanelBase
+from ..binary import BinaryPanel as PanelBase
 
 logger = logging.getLogger("PAI").getChild(__name__)
 

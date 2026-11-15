@@ -9,7 +9,7 @@ from paradox.config import config as cfg
 from paradox.exceptions import AuthenticationFailed, StatusRequestException
 
 from . import parsers
-from ..panel import Panel as PanelBase
+from ..binary import BinaryPanel as PanelBase
 from .event import event_map
 from .property import property_map
 

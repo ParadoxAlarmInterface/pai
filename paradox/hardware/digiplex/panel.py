@@ -15,7 +15,7 @@ from paradox.exceptions import AuthenticationFailed, StatusRequestException
 from paradox.lib.utils import describe_connection
 
 from . import parsers
-from ..panel import Panel as PanelBase
+from ..binary import BinaryPanel as PanelBase
 from .adapters import PARTITION_COUNT
 from .property import RAMDataParserMap, property_map
 
