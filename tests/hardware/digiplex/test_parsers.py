@@ -306,3 +306,14 @@ def test_parse_event_response_full_frame():
 
     assert parsed.fields.value.raw == payload[1:]
     assert parsed.checksum == frame[36:]
+
+
+@pytest.mark.parametrize("prop", ["audible_alarm", "silent_alarm"])
+def test_partition_alarm_matches_documented_notification_filter(prop):
+    from paradox.event import Change, ChangeEvent
+    from paradox.hardware.digiplex.property import property_map
+    from paradox.lib.event_filter import EventTagFilter
+
+    event = ChangeEvent(Change("partition", "house", prop, True), property_map)
+
+    assert EventTagFilter(["change,alarm"]).match(event)

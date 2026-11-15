@@ -79,9 +79,18 @@ property_map = {
     },
     "audible_alarm": {
         "level": EventLevel.CRITICAL,
+        "tags": ["alarm"],
         "message": {
             "True": "{Type} {label} in alarm",
             "False": "{Type} {label} alarm stopped",
+        },
+    },
+    "silent_alarm": {
+        "level": EventLevel.CRITICAL,
+        "tags": ["alarm"],
+        "message": {
+            "True": "{Type} {label} in silent alarm",
+            "False": "{Type} {label} silent alarm stopped",
         },
     },
 }

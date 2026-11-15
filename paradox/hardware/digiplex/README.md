@@ -118,6 +118,10 @@ rejected.
   log requests (`0xE` + number) are answered with an echo of the request. The
   event buffer exists (it is readable by WinLoad), but its protocol is not
   publicly documented.
+  Notifications therefore only see status changes (tag `change`, not `live`),
+  so the default `live,alarm,-restore` filters never fire. Add
+  `"change,alarm"` (and `"change,tamper"`) to the `*_EVENT_FILTERS` of the
+  notification interfaces to be alerted of partition alarms.
 - **No PGM / siren control.** The command set for outputs is undocumented for
   this family; `control_outputs`, `control_zones` and `send_panic` remain
   `NotImplementedError`.
