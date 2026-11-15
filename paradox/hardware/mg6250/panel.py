@@ -234,9 +234,9 @@ AREA_FIELD_LABEL = 2  # 16 bytes
 FIELD_SERIAL = 0  # 6 bytes, all zero when nothing is enrolled (not for zones)
 FIELD_LABEL = 1  # 16 bytes
 # Zone field 0 contains a two-byte device ID, definition, partition, options
-# and an unknown byte. An empty
-# zone reads 00 00 00 01 87 00. change-zone: BabyWare wrote definition
-# 09 -> 08 for zones 4-7.
+# and an unknown byte. Empty zones return hex "00 00 00 01 87 00".
+# In the change-zone capture, BabyWare changed the definition from hex 09
+# to hex 08 for zones 4 through 7.
 ZONE_DEFINITION = 2
 ZONE_PARTITION = 3  # 1, 2 or 3 = both
 # Programming guide table 4, with the names of the SP/MG definitions where
