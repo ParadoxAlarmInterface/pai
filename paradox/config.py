@@ -1,3 +1,4 @@
+import copy
 import logging
 import os
 import re
@@ -101,6 +102,14 @@ class Config:
         # Digiplex: partition number -> name used in Home Assistant.
         # Missing entries default to "Partition <number>".
         "DIGIPLEX_PARTITION_NAMES": {},
+        # Same mapping as a list of "zone_key=device_class" strings. Home
+        # Assistant add-on options cannot hold maps, but they can hold a list
+        # of strings, so this is the option-friendly form.
+        "ZONE_TYPES": [],
+        # Optional YAML file with zone, partition and system names, for setups
+        # whose configuration is a flat JSON document (Home Assistant add-on
+        # options). Values from the file override the options above.
+        "NAMES_FILE": "",
         "LABEL_ENCODING": "paradox-en",  # Encoding to use when decoding labels. paradox-* or https://docs.python.org/3/library/codecs.html#standard-encodings
         "LABEL_REFRESH_INTERVAL": (
             15 * 60,
@@ -241,6 +250,13 @@ class Config:
         # "open" sensor. Panels do not expose the physical sensor type, so the
         # mapping is explicit. Unlisted zones default to "motion".
         "ZONE_DEVICE_CLASS": {},
+        # Zone key -> display overrides: name (device name), area (Home
+        # Assistant area) and per-property entity names, e.g.
+        # {"garazas": {"name": "Garage", "area": "garage", "open": "Motion"}}.
+        "ZONE_NAMES": {},
+        # System sensor names: "<key>_<property>" -> entity name, e.g.
+        # {"power_battery": "battery voltage"} and "pai_status".
+        "SYSTEM_NAMES": {},
         # Home Assistant Notifications (HASS.io required)
         "HOMEASSISTANT_NOTIFICATIONS_ENABLE": False,
         "HOMEASSISTANT_NOTIFICATIONS_API_URL": "http://supervisor/core/api/services/:domain/:service",
@@ -432,8 +448,104 @@ class Config:
             raise ValueError(err)
 
         self._check_serial_protocol(entries)
+        self._apply_zone_types()
+        self._load_names_file()
 
         self.CONFIG_LOADED = True
+
+    def _apply_zone_types(self):
+        """Merge ``ZONE_TYPES`` entries into ``ZONE_DEVICE_CLASS``.
+
+        ``ZONE_TYPES`` is a list of ``zone_key=device_class`` strings. It
+        exists because Home Assistant add-on options are a flat JSON document
+        and cannot hold the mapping itself.
+        """
+        if not isinstance(self.ZONE_DEVICE_CLASS, dict):
+            self.ZONE_DEVICE_CLASS = {}
+
+        for item in self.ZONE_TYPES or []:
+            if not isinstance(item, str) or "=" not in item:
+                sys.stderr.write("Ignoring ZONE_TYPES entry: %r\n" % (item,))
+                continue
+
+            key, _, device_class = item.partition("=")
+            key = key.strip()
+            device_class = device_class.strip()
+            if key and device_class:
+                self.ZONE_DEVICE_CLASS[key] = device_class
+
+    def _load_names_file(self):
+        """Merge display names and zone types from ``NAMES_FILE``.
+
+        Home Assistant add-on options are a flat JSON document without support
+        for maps, so the naming tables can also live in a YAML file::
+
+            zones:
+              garazas:
+                name: Garage
+                area: garage
+                device_class: motion
+                open: Motion
+                tamper: Tamper
+            partitions:
+              1: House
+            system:
+              power_battery: Battery voltage
+              pai_status: PAI status
+
+        File values override ``ZONE_NAMES``, ``ZONE_DEVICE_CLASS``,
+        ``DIGIPLEX_PARTITION_NAMES`` and ``SYSTEM_NAMES``. A missing file is
+        not an error: the add-on may have it not created yet.
+        """
+        path = self.NAMES_FILE
+        if not path:
+            return
+
+        import yaml
+
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+        except FileNotFoundError:
+            sys.stderr.write("NAMES_FILE not found: %s\n" % path)
+            return
+        except Exception as exc:
+            sys.stderr.write("Error reading NAMES_FILE %s: %s\n" % (path, exc))
+            return
+
+        if not isinstance(data, dict):
+            sys.stderr.write("NAMES_FILE %s must contain a mapping\n" % path)
+            return
+
+        for name in (
+            "ZONE_NAMES",
+            "ZONE_DEVICE_CLASS",
+            "DIGIPLEX_PARTITION_NAMES",
+            "SYSTEM_NAMES",
+        ):
+            if not isinstance(getattr(self, name, None), dict):
+                setattr(self, name, {})
+
+        zones = data.get("zones") or {}
+        for key, entry in zones.items():
+            if not isinstance(entry, dict):
+                continue
+
+            device_class = entry.get("device_class")
+            if device_class:
+                self.ZONE_DEVICE_CLASS[key] = device_class
+
+            self.ZONE_NAMES[key] = {
+                k: v for k, v in entry.items() if k != "device_class"
+            }
+
+        partitions = data.get("partitions") or {}
+        self.DIGIPLEX_PARTITION_NAMES.update(partitions)
+
+        system = data.get("system") or {}
+        for key, name in system.items():
+            if isinstance(name, str) and name:
+                self.SYSTEM_NAMES[key] = name
 
     def _check_serial_protocol(self, entries):
         protocol = self.SERIAL_PROTOCOL
@@ -535,7 +647,9 @@ class Config:
             if isinstance(v, tuple):
                 v = v[0]
 
-            setattr(self, k, v)
+            # Mutable defaults (dicts, lists) must not be shared between
+            # instances, otherwise one Config would change another's values.
+            setattr(self, k, copy.deepcopy(v))
 
 
 config = Config()

@@ -26,8 +26,10 @@ class MQTTAutodiscoveryEntityFactory:
     def make_zone_bypass_switch(self, zone):
         return ZoneBypassSwitch(zone, self.device, self.availability_topic)
 
-    def make_zone_status_binary_sensor(self, zone, status):
-        return ZoneStatusBinarySensor(zone, status, self.device, self.availability_topic)
+    def make_zone_status_binary_sensor(self, zone, status, properties=None):
+        return ZoneStatusBinarySensor(
+            zone, status, self.device, self.availability_topic, properties=properties
+        )
 
     def make_zone_status_numeric_sensor(self, zone, status):
         return ZoneNumericSensor(zone, status, self.device, self.availability_topic)

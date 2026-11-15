@@ -9,10 +9,21 @@ from paradox.config import config as cfg
 from paradox.data.model import DetectedPanel
 from paradox.hardware.common import ProductIdEnum
 from paradox.interfaces.mqtt.entities.device import Device
-from paradox.interfaces.mqtt.homeassistant import HomeAssistantMQTTInterface
+from paradox.interfaces.mqtt.homeassistant import (
+    HomeAssistantMQTTInterface,
+    _load_discovery_topics,
+    _save_discovery_topics,
+    stale_discovery_topics,
+)
 from paradox.lib.ps import sendMessage
 
 from tests.hardware.evo.test_panel import create_evo192_panel
+
+
+@pytest.fixture(autouse=True)
+def no_discovery_state_file(monkeypatch):
+    # Keep the discovery manifest out of the repository during tests.
+    monkeypatch.setattr(cfg, "CONFIG_FILE_LOCATION", None)
 
 
 @pytest.mark.asyncio
@@ -82,10 +93,10 @@ async def test_hass(mocker):
 
         assert_any_call_with_json(
             interface.mqtt.publish,
-            "homeassistant/alarm_control_panel/aabbccdd/partition_partition_1/config",
+            "homeassistant/alarm_control_panel/aabbccdd/partition_1/config",
             {
-                "name": "Partition Partition 1",
-                "unique_id": "paradox_aabbccdd_partition_partition_1",
+                "name": "Partition 1",
+                "unique_id": "paradox_aabbccdd_partition_1",
                 "command_topic": "paradox/control/partitions/Partition_1",
                 "state_topic": "paradox/states/partitions/Partition_1/current_state",
                 "availability_topic": "paradox/interface/availability",
@@ -114,7 +125,8 @@ async def test_hass(mocker):
             interface.mqtt.publish,
             "homeassistant/binary_sensor/aabbccdd/zone_front_door_open/config",
             {
-                "name": "Zone Front Door Open",
+                "name": "",
+                "default_entity_id": "binary_sensor.front_door_open",
                 "unique_id": "paradox_aabbccdd_zone_front_door_open",
                 "state_topic": "paradox/states/zones/Front_Door/open",
                 "availability_topic": "paradox/interface/availability",
@@ -250,3 +262,23 @@ async def test_homeassistant_republish_delays_states(mocker):
     finally:
         interface.stop()
         interface.join()
+
+
+def test_discovery_state_roundtrip(tmp_path):
+    path = str(tmp_path / "pai_discovery.json")
+
+    assert _load_discovery_topics(path) == set()
+
+    _save_discovery_topics(path, {"homeassistant/a/config", "homeassistant/b/config"})
+
+    assert _load_discovery_topics(path) == {
+        "homeassistant/a/config",
+        "homeassistant/b/config",
+    }
+
+
+def test_stale_discovery_topics():
+    assert stale_discovery_topics(
+        {"homeassistant/a/config", "homeassistant/b/config"},
+        {"homeassistant/b/config", "homeassistant/c/config"},
+    ) == ["homeassistant/a/config"]

@@ -28,6 +28,14 @@ class ZoneBypassSwitch(Switch):
 
         self.pai_entity_type = "zone"
 
+    @property
+    def entity_name(self):
+        naming = self.zone_naming
+        if "bypassed" in naming:
+            return naming["bypassed"] or ""
+
+        return "Bypass"
+
     def serialize(self):
         config = super().serialize()
         config.update(dict(

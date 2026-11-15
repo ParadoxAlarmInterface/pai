@@ -12,6 +12,7 @@ from construct import Construct, Container
 from paradox.config import config as cfg, get_limits_for_type
 from paradox.data.model import DetectedPanel
 from paradox.exceptions import AuthenticationFailed, StatusRequestException
+from paradox.interfaces.mqtt.entities.binary_sensors import zone_device_class
 from paradox.lib.utils import describe_connection
 
 from . import parsers
@@ -22,6 +23,27 @@ from .property import RAMDataParserMap, property_map
 logger = logging.getLogger("PAI").getChild(__name__)
 
 DIGIPLEX_PRODUCTS = ("DIGIPLEX_v13", "DIGIPLEX_v2", "DIGIPLEX_NE")
+
+# Only these zone types physically have a tamper switch on this installation:
+# motion (PIR) and glass-break detectors, plus the siren/cabinet tamper zone.
+# Window/door contacts, garage-door contacts and the fire detector do not,
+# so publishing tamper entities for them would only add noise.
+TAMPER_DEVICE_CLASSES = ("motion", "vibration", "tamper")
+
+
+def publishes_tamper(device_class: str) -> bool:
+    """Should this zone type expose a tamper binary sensor?"""
+    return device_class in TAMPER_DEVICE_CLASSES
+
+
+def publishes_open(device_class: str) -> bool:
+    """Should this zone type expose an open binary sensor?
+
+    A pure tamper contact (siren box, cabinet) reports its state through the
+    tamper bit; its open bit would describe the same thing, so it is skipped.
+    """
+    return device_class != "tamper"
+
 
 # How many bytes to request per status block (READ count, 1..32).
 STATUS_READ_LENGTHS = {
@@ -85,6 +107,8 @@ class PanelDGP848(PanelBase):
         # Zones / partitions published by this installation (see load_labels)
         self._zones: set = set()
         self._partitions: set = set()
+        # Zone number -> device_class, used for tamper/open filtering
+        self._zone_device_class: dict = {}
         # Last published partition state, for change-only logging
         self._last_partitions: dict | None = None
 
@@ -291,10 +315,29 @@ class PanelDGP848(PanelBase):
         for i in named + unnamed:
             elements[i] = self.label_element("zone", i, labels[i])
             elements[i]["label"] = labels[i] or f"Zone {i}"
+
+        # A duplicate label gets a suffixed key. When explicit zone names are
+        # configured, a spare duplicate is only published if it is named there.
+        original_keys = defaultdict(list)
+        for i, element in elements.items():
+            original_keys[element["key"].lower()].append(i)
+        duplicate_ids = {
+            i for ids in original_keys.values() if len(ids) > 1 for i in ids[1:]
+        }
+
         self._make_keys_unique(elements.values())
 
+        configured = set(cfg.ZONE_NAMES or {})
+        only_labelled = bool(configured)
         for i in self._selected("zone", ZONES):
-            data["zone"][i] = elements[i]
+            element = elements[i]
+            if only_labelled:
+                if not labels[i] and i not in known:
+                    continue
+                if i in duplicate_ids and element["key"] not in configured:
+                    continue
+            data["zone"][i] = element
+            self._zone_device_class[i] = zone_device_class(element["key"])
         self._zones = set(data["zone"])
 
         partition_names = {
@@ -383,9 +426,10 @@ class PanelDGP848(PanelBase):
         return result
 
     def _keep_published(self, result):
-        """Publish only the zones and partitions selected in load_labels().
+        """Publish only the zones, partitions and properties this zone type has.
 
-        Tamper is published for every published zone.
+        Tamper is published for zone types with a tamper switch (motion, glass
+        break, siren/cabinet); a pure tamper zone exposes only the tamper bit.
         """
         selections = (
             ("zone_open", self._zones),
@@ -393,8 +437,23 @@ class PanelDGP848(PanelBase):
             ("partition_status", self._partitions),
         )
         for key, published in selections:
-            if key in result:
-                result[key] = {i: v for i, v in result[key].items() if i in published}
+            if key not in result:
+                continue
+
+            kept = {i: v for i, v in result[key].items() if i in published}
+            if key == "zone_tamper":
+                kept = {
+                    i: v
+                    for i, v in kept.items()
+                    if publishes_tamper(self._zone_device_class.get(i, "motion"))
+                }
+            elif key == "zone_open":
+                kept = {
+                    i: v
+                    for i, v in kept.items()
+                    if publishes_open(self._zone_device_class.get(i, "motion"))
+                }
+            result[key] = kept
 
     def _log_partition_changes(self, result):
         """Log partition changes only when they happen, so the add-on log

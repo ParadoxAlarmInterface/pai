@@ -21,16 +21,82 @@ class AbstractEntity:
         self.key: str = None
         self.property: str = None
         self.label: str = None
+        # Properties published for this entity's zone. Used to tell a zone
+        # with a single thing to report from one with several.
+        self.zone_properties = frozenset()
 
     @property
     def entity_id(self):
-        return f"{self.pai_entity_type}_{self.key.lower()}_{self.property}"
+        return f"{self._typed_key()}_{self.property}"
+
+    def _typed_key(self) -> str:
+        """Key prefixed with the entity type, without repeating the prefix.
+
+        Partition keys come from their display name, so a default partition
+        key already reads "partition_1"; prefixing it again would produce
+        "partition_partition_1" in unique_ids and discovery topics.
+        """
+        key = self.key.lower()
+        prefix = f"{self.pai_entity_type}_"
+        if self.pai_entity_type == "partition" and key.startswith(prefix):
+            return key
+        return prefix + key
+
+    @property
+    def zone_naming(self) -> dict:
+        """Per-zone display overrides from the ``ZONE_NAMES`` config option.
+
+        Zones listed there get their own device name and property names, so
+        one zone can be named in any language without touching the code.
+        """
+        if self.pai_entity_type != "zone":
+            return {}
+
+        naming = (cfg.ZONE_NAMES or {}).get(self.key)
+        return naming if isinstance(naming, dict) else {}
 
     @property
     def entity_name(self):
+        naming = self.zone_naming
+        if naming:
+            # The zone already has its own device named after the object, so
+            # repeating it here would show the name twice. ``None`` means the
+            # entity is the device's main feature and takes its name.
+            if self.property in naming:
+                # Empty (or null) means the entity takes the device name.
+                return naming[self.property] or ""
+            return to_label(self.property)
+
+        if self.pai_entity_type == "zone" and self.property in ("open", "tamper"):
+            # Let Home Assistant name the entity from its device class, so the
+            # name follows the Home Assistant language (motion -> Judesys,
+            # tamper -> Tamperis, ...). A zone with a single thing to report
+            # takes the device name instead of repeating it.
+            if self.property == "tamper" or len(self.zone_properties) > 1:
+                return None
+            return ""
+
+        if self.pai_entity_type == "system":
+            name = (cfg.SYSTEM_NAMES or {}).get(f"{self.key}_{self.property}")
+            if name is not None:
+                return name
+
         label = self.label or to_label(self.key)
 
         return f"{self.pai_entity_type.title()} {label} {to_label(self.property)}"
+
+    @property
+    def default_entity_id(self):
+        """Entity id for newly discovered entities, if it has to be set.
+
+        ``None`` leaves the id to Home Assistant, which derives it from the
+        entity name. Zones get a short, stable id
+        (``binary_sensor.<zone>_<property>``) that does not repeat the label.
+        """
+        if self.pai_entity_type != "zone":
+            return None
+
+        return f"{self.hass_entity_type}.{self.key.lower()}_{self.property}"
 
     @property
     def configuration_topic(self):
@@ -59,13 +125,19 @@ class AbstractEntity:
         if self.pai_entity_type != "zone":
             return self.device
 
-        return dict(
+        naming = self.zone_naming
+        device = dict(
             identifiers=[f"Paradox_{self.device.serial_number}_zone_{self.key}"],
-            name=self.label or to_label(self.key),
+            name=naming.get("name") or self.label or to_label(self.key),
             manufacturer="Paradox",
             model="Zone",
             via_device=self.device.serialize()["identifiers"][0],
         )
+        if naming.get("area"):
+            # Home Assistant only uses this when the device is created.
+            device["suggested_area"] = naming["area"]
+
+        return device
 
     def serialize(self):
         prefix = cfg.MQTT_HOMEASSISTANT_ENTITY_PREFIX.format_map(
@@ -74,13 +146,25 @@ class AbstractEntity:
                 "model": self.device.model,
             }
         )
-        return dict(
+        config = dict(
             availability_topic=self.availability_topic,
             device=self._hass_device(),
-            name=prefix + f"{self.entity_name}",
             unique_id=f"paradox_{self.device.serial_number}_{self.entity_id}",
             state_topic=self.state_topic,
         )
+        # An empty name is meaningful: the entity is the device's main feature
+        # and Home Assistant shows just the device name. Omitting the key does
+        # not work, because a binary sensor with a device class is then named
+        # after the class, which repeats the device name.
+        name = self.entity_name
+        if name is not None:
+            config["name"] = (prefix + name) if name else ""
+
+        default_entity_id = self.default_entity_id
+        if default_entity_id:
+            config["default_entity_id"] = default_entity_id
+
+        return config
 
     @property
     def command_topic(self):

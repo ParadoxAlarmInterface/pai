@@ -14,11 +14,12 @@ from paradox.lib.utils import SerializableToJSONEncoder
 def mqtt_entity_factory():
     return MQTTAutodiscoveryEntityFactory("paradox/interface/availability", _make_device())
 
+
 def test_alarm_control_panel_serialize(mqtt_entity_factory):
     alarm_control_panel = mqtt_entity_factory.make_alarm_control_panel_config({"key": "Partition_1", "label": "Partition 1"})
     assert _serialize_deserialize(alarm_control_panel) == {
-        'unique_id': 'paradox_1234abcd_partition_partition_1',
-        'name': 'Partition Partition 1',
+        'unique_id': 'paradox_1234abcd_partition_1',
+        'name': 'Partition 1',
         'availability_topic': 'paradox/interface/availability',
         'state_topic': 'paradox/states/partitions/Partition_1/current_state',
         'command_topic': 'paradox/control/partitions/Partition_1',
@@ -32,14 +33,14 @@ def test_alarm_control_panel_serialize(mqtt_entity_factory):
         'code_trigger_required': False
     }
 
-    assert alarm_control_panel.configuration_topic == "homeassistant/alarm_control_panel/1234abcd/partition_partition_1/config"
+    assert alarm_control_panel.configuration_topic == "homeassistant/alarm_control_panel/1234abcd/partition_1/config"
 
 
 def test_partition_binary_sensor_serialize(mqtt_entity_factory):
     binary_sensor = mqtt_entity_factory.make_partition_status_binary_sensor({"key": "Partition_1", "label": "Partition 1"}, "arm")
     assert _serialize_deserialize(binary_sensor) == {
-        'unique_id': 'paradox_1234abcd_partition_partition_1_arm',
-        'name': 'Partition Partition 1 Arm',
+        'unique_id': 'paradox_1234abcd_partition_1_arm',
+        'name': 'Partition 1 Arm',
         'availability_topic': 'paradox/interface/availability',
         'state_topic': 'paradox/states/partitions/Partition_1/arm',
         'device': _get_expected_device_block(),
@@ -47,14 +48,17 @@ def test_partition_binary_sensor_serialize(mqtt_entity_factory):
         'payload_off': 'False',
     }
 
-    assert binary_sensor.configuration_topic == "homeassistant/binary_sensor/1234abcd/partition_partition_1_arm/config"
+    assert binary_sensor.configuration_topic == "homeassistant/binary_sensor/1234abcd/partition_1_arm/config"
 
 
 def test_zone_binary_sensor_serialize(mqtt_entity_factory):
-    binary_sensor = mqtt_entity_factory.make_zone_status_binary_sensor({"key": "Zone_1", "label": "Zone 1"}, "open")
+    binary_sensor = mqtt_entity_factory.make_zone_status_binary_sensor(
+        {"key": "Zone_1", "label": "Zone 1"}, "open", properties={"open"}
+    )
     assert _serialize_deserialize(binary_sensor) == {
         'unique_id': 'paradox_1234abcd_zone_zone_1_open',
-        'name': 'Zone Zone 1 Open',
+        'name': '',
+        'default_entity_id': 'binary_sensor.zone_1_open',
         'availability_topic': 'paradox/interface/availability',
         'state_topic': 'paradox/states/zones/Zone_1/open',
         'device': _get_expected_zone_device_block(),
@@ -83,7 +87,27 @@ def test_zone_binary_sensor_device_class(mqtt_entity_factory, monkeypatch, mappi
     tamper_sensor = mqtt_entity_factory.make_zone_status_binary_sensor(zone, "tamper")
 
     assert open_sensor.serialize()["device_class"] == expected
-    assert "device_class" not in tamper_sensor.serialize()
+    assert tamper_sensor.serialize()["device_class"] == "tamper"
+
+
+def test_zone_with_multiple_properties_uses_device_class_name(mqtt_entity_factory):
+    binary_sensor = mqtt_entity_factory.make_zone_status_binary_sensor(
+        {"key": "Zone_1", "label": "Zone 1"}, "open", properties={"open", "tamper"}
+    )
+    config = _serialize_deserialize(binary_sensor)
+    # No name key: Home Assistant names it from the device class in its own
+    # language.
+    assert "name" not in config
+    assert config["device_class"] == "motion"
+    assert config["default_entity_id"] == "binary_sensor.zone_1_open"
+
+    tamper = mqtt_entity_factory.make_zone_status_binary_sensor(
+        {"key": "Zone_1", "label": "Zone 1"}, "tamper", properties={"open", "tamper"}
+    )
+    tamper_config = _serialize_deserialize(tamper)
+    assert "name" not in tamper_config
+    assert tamper_config["device_class"] == "tamper"
+    assert tamper_config["default_entity_id"] == "binary_sensor.zone_1_tamper"
 
 
 def test_trouble_binary_sensor_serialize(mqtt_entity_factory):
@@ -147,7 +171,8 @@ def test_zone_bypass_switch_serialize(mqtt_entity_factory):
     sensor = mqtt_entity_factory.make_zone_bypass_switch({"key": "Zone_1", "label": "Zone 1"})
     assert _serialize_deserialize(sensor) == {
         'unique_id': 'paradox_1234abcd_zone_zone_1_bypassed',
-        'name': 'Zone Zone 1 Bypassed',
+        'name': 'Bypass',
+        'default_entity_id': 'switch.zone_1_bypassed',
         'availability_topic': 'paradox/interface/availability',
         'state_topic': 'paradox/states/zones/Zone_1/bypassed',
         'command_topic': 'paradox/control/zones/Zone_1',
@@ -161,6 +186,113 @@ def test_zone_bypass_switch_serialize(mqtt_entity_factory):
     assert sensor.configuration_topic == "homeassistant/switch/1234abcd/zone_zone_1_bypassed/config"
 
 
+def test_zone_naming_overrides_from_config(mqtt_entity_factory, monkeypatch):
+    from paradox.config import config as cfg
+
+    monkeypatch.setattr(
+        cfg,
+        "ZONE_NAMES",
+        {
+            "Zone_1": {
+                "name": "Garage",
+                "area": "garage",
+                "open": "Motion",
+                "tamper": "Tamper",
+            }
+        },
+    )
+
+    binary_sensor = mqtt_entity_factory.make_zone_status_binary_sensor(
+        {"key": "Zone_1", "label": "Zone 1", "device_class": "motion"}, "open"
+    )
+    assert _serialize_deserialize(binary_sensor) == {
+        'unique_id': 'paradox_1234abcd_zone_zone_1_open',
+        'name': 'Motion',
+        'default_entity_id': 'binary_sensor.zone_1_open',
+        'availability_topic': 'paradox/interface/availability',
+        'state_topic': 'paradox/states/zones/Zone_1/open',
+        'device': {
+            'identifiers': ['Paradox_1234abcd_zone_Zone_1'],
+            'manufacturer': 'Paradox',
+            'model': 'Zone',
+            'name': 'Garage',
+            'suggested_area': 'garage',
+            'via_device': 'Paradox_1234abcd',
+        },
+        'payload_on': 'True',
+        'payload_off': 'False',
+        'device_class': 'motion',
+    }
+
+    tamper = mqtt_entity_factory.make_zone_status_binary_sensor(
+        {"key": "Zone_1", "label": "Zone 1", "device_class": "motion"}, "tamper"
+    )
+    tamper_config = _serialize_deserialize(tamper)
+    assert tamper_config["name"] == "Tamper"
+    assert tamper_config["default_entity_id"] == "binary_sensor.zone_1_tamper"
+
+
+def test_zone_naming_falls_back_to_property_name(mqtt_entity_factory, monkeypatch):
+    from paradox.config import config as cfg
+
+    monkeypatch.setattr(cfg, "ZONE_NAMES", {"Zone_1": {"name": "Garage"}})
+
+    binary_sensor = mqtt_entity_factory.make_zone_status_binary_sensor(
+        {"key": "Zone_1", "label": "Zone 1"}, "open"
+    )
+    config = _serialize_deserialize(binary_sensor)
+    assert config["name"] == "Open"
+    assert config["default_entity_id"] == "binary_sensor.zone_1_open"
+    assert "suggested_area" not in config["device"]
+
+
+def test_zone_single_sensor_has_empty_entity_name(mqtt_entity_factory, monkeypatch):
+    from paradox.config import config as cfg
+
+    monkeypatch.setattr(cfg, "ZONE_NAMES", {"Zone_1": {"name": "Front door", "open": None}})
+
+    binary_sensor = mqtt_entity_factory.make_zone_status_binary_sensor(
+        {"key": "Zone_1", "label": "Zone 1"}, "open"
+    )
+    config = _serialize_deserialize(binary_sensor)
+    # An empty name is sent explicitly. Leaving the key out would make Home
+    # Assistant name the entity after the device class, which repeats the
+    # device name in the friendly name.
+    assert config["name"] == ""
+    assert config["device"]["name"] == "Front door"
+    assert config["default_entity_id"] == "binary_sensor.zone_1_open"
+
+
+def test_zone_empty_entity_name_ignores_prefix(mqtt_entity_factory, monkeypatch):
+    from paradox.config import config as cfg
+
+    monkeypatch.setattr(cfg, "ZONE_NAMES", {"Zone_1": {"name": "Front door", "open": None}})
+    monkeypatch.setattr(cfg, "MQTT_HOMEASSISTANT_ENTITY_PREFIX", "Paradox ")
+
+    binary_sensor = mqtt_entity_factory.make_zone_status_binary_sensor(
+        {"key": "Zone_1", "label": "Zone 1"}, "open"
+    )
+    assert _serialize_deserialize(binary_sensor)["name"] == ""
+
+
+def test_system_sensor_name_from_config(mqtt_entity_factory, monkeypatch):
+    from paradox.config import config as cfg
+
+    monkeypatch.setattr(cfg, "SYSTEM_NAMES", {"power_battery": "baterijos įtampa"})
+
+    sensor = mqtt_entity_factory.make_system_status("power", "battery")
+    assert _serialize_deserialize(sensor)["name"] == "baterijos įtampa"
+
+
+def test_pai_status_name_from_config(mqtt_entity_factory, monkeypatch):
+    from paradox.config import config as cfg
+
+    monkeypatch.setattr(cfg, "SYSTEM_NAMES", {"pai_status": "PAI būsena"})
+
+    sensor = mqtt_entity_factory.make_pai_status_sensor("paradox/interface/pai_status")
+    assert _serialize_deserialize(sensor)["name"] == "PAI būsena"
+
+
 def _serialize_deserialize(entity):
     return json.loads(json.dumps(entity, cls=SerializableToJSONEncoder))
 
@@ -172,22 +304,22 @@ def _make_device():
 
 def _get_expected_device_block():
     return {
-            'identifiers': ['Paradox_1234abcd'],
-            'manufacturer': 'Paradox',
-            'model': 'EVO',
-            'name': 'EVO',
-            'sw_version': '6.10'
-        }
+        'identifiers': ['Paradox_1234abcd'],
+        'manufacturer': 'Paradox',
+        'model': 'EVO',
+        'name': 'EVO',
+        'sw_version': '6.10'
+    }
 
 
 def _get_expected_zone_device_block():
     return {
-            'identifiers': ['Paradox_1234abcd_zone_Zone_1'],
-            'manufacturer': 'Paradox',
-            'model': 'Zone',
-            'name': 'Zone 1',
-            'via_device': 'Paradox_1234abcd'
-        }
+        'identifiers': ['Paradox_1234abcd_zone_Zone_1'],
+        'manufacturer': 'Paradox',
+        'model': 'Zone',
+        'name': 'Zone 1',
+        'via_device': 'Paradox_1234abcd'
+    }
 
 
 def test_device_model_is_sanitized_for_discovery_payload():

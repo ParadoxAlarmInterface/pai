@@ -42,8 +42,14 @@ class AlarmControlPanel(AbstractControllableEntity):
 
     @property
     def entity_id(self):
-        return f"{self.pai_entity_type}_{self.key.lower()}"
+        key = self.key.lower()
+        prefix = f"{self.pai_entity_type}_"
+        if key.startswith(prefix):
+            return key
+        return prefix + key
 
     @property
     def entity_name(self):
-        return f"{self.pai_entity_type.title()} {self.label}"
+        # The device is the panel, so the entity is named after the partition
+        # itself: a default label already reads "Partition 1".
+        return self.label
