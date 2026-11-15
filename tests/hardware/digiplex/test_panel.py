@@ -246,3 +246,19 @@ async def test_failed_label_read_keeps_published_labels():
     assert zones[1]["key"] == "fasado_durys"
     assert (zones[2]["key"], zones[2]["label"]) == ("zone_2_2", "Zone 2")
     assert zones[3]["key"] == "virtuve"
+
+
+async def test_partition_command_ignores_stale_echo():
+    from paradox.hardware.digiplex import parsers
+
+    panel = _panel({})
+    panel.core.send_wait = AsyncMock(return_value=None)
+    await panel.control_partitions([1], "disarm")
+    accepts = panel.core.send_wait.await_args.kwargs["reply_expected"]
+
+    def echo(partitions):
+        frame = parsers.build_partition_action(partitions)
+        return parsers.PerformPartitionAction.parse(frame)
+
+    assert accepts(echo({1: 0x6}))
+    assert not accepts(echo({1: 0x2}))  # late echo of an earlier "arm"

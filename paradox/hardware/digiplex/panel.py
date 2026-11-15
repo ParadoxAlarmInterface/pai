@@ -447,9 +447,15 @@ class PanelDGP848(PanelBase):
             return False
 
         message = parsers.build_partition_action(dict.fromkeys(selected, code))
+        # Match the echo to this frame: a late echo of an earlier command must
+        # not be taken as this command's acknowledgement.
         reply = await self.core.send_wait(
             message=message,
-            reply_expected=[0x4, 0x7],
+            reply_expected=lambda m: m.fields.value.po.command == 0x7
+            or (
+                m.fields.value.po.command == 0x4
+                and m.fields.value.partitions == message[2:6]
+            ),
             timeout=2.0,
             retries=1,
         )
