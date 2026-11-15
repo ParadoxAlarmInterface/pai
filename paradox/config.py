@@ -214,6 +214,18 @@ class Config:
             "armed_away": "arm",
             "disarmed": "disarm",
         },
+        # Home Assistant armed state for arm_no_entry (after arm_stay/arm_sleep).
+        "HOMEASSISTANT_ARM_NO_ENTRY_STATE": (
+            "armed_night",
+            str,
+            [
+                "armed_home",
+                "armed_away",
+                "armed_night",
+                "armed_vacation",
+                "armed_custom_bypass",
+            ],
+        ),
         "HOMEASSISTANT_PUBLISH_PARTITION_PROPERTIES": [  # List of partition properties to publish
             "target_state",
             "current_state",

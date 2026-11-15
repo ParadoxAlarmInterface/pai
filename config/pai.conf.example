@@ -142,6 +142,13 @@ import logging
 # MQTT_PUBLISH_COMMAND_STATUS = False  # Publish command statuses to MQTT
 # MQTT_COMMAND_STATUS_TOPIC = "command_status"
 #
+### Home Assistant partition states
+# HOMEASSISTANT_ARM_NO_ENTRY_STATE = 'armed_night'  # Default; applies to all partitions, even without auto discovery
+# Allowed: armed_home, armed_away, armed_night, armed_vacation, armed_custom_bypass.
+# Only maps arm_no_entry when armed and neither arm_stay nor arm_sleep is set.
+# Example: HOMEASSISTANT_ARM_NO_ENTRY_STATE = 'armed_away'
+# Does not change commands or panel delays. See docs/homeassistant-no-entry-state.md.
+#
 ### MQTT Home Assistant Auto Discovery
 # MQTT_HOMEASSISTANT_AUTODISCOVERY_ENABLE = False
 # MQTT_HOMEASSISTANT_CODE = None
