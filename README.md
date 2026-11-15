@@ -18,6 +18,11 @@ Compatibility depends on the panel model, firmware, and connection method.
 For help or discussion, join the [Discord community](https://discord.gg/6KaXFtg39r)
 or [report an issue](https://github.com/ParadoxAlarmInterface/pai/issues).
 
+## Disclaimer
+
+PAI is provided **as is**, without warranty. To the extent permitted by law,
+the contributors are not liable for damage caused by its use. See the [license](LICENSE).
+
 ## Authors
 
 * João Paulo Barraca - [@jpbarraca](https://github.com/jpbarraca) - Main code and MG/SP devices
