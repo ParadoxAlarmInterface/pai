@@ -64,7 +64,7 @@ property_map = {
     },
     "tamper": {
         "level": EventLevel.CRITICAL,
-        "tags": ["trouble"],
+        "tags": ["trouble", "tamper"],
         "message": {
             "True": "{Type} {label} tamper",
             "False": "{Type} {label} tamper restored",
