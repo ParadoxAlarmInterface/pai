@@ -11,7 +11,6 @@ from paradox.data.model import DetectedPanel
 from paradox.exceptions import PanelNotDetected
 from paradox.lib.utils import describe_connection
 
-from . import create_panel
 from . import parsers
 from .panel import Panel
 
@@ -24,9 +23,7 @@ class BinaryPanel(Panel):
     supports_time_sync = True
 
     @staticmethod
-    async def detect(core):
-        from .registry import PRODUCTS
-
+    async def detect(core, panel_factory, products):
         bootstrap = BinaryPanel(core)
         core.install_panel(bootstrap)
         try:
@@ -66,13 +63,13 @@ class BinaryPanel(Panel):
             ),
         )
 
-        driver = PRODUCTS.get(value.get("product_id"))
+        driver = products.get(value.get("product_id"))
         start_class = driver[0] if driver else BinaryPanel
         reply = await start_class.start_communication(core, initiate_reply)
         if reply.fields.value.product_id is None:
             raise PanelNotDetected("Failed to detect panel")
 
-        panel = create_panel(core, reply)
+        panel = panel_factory(core, reply)
         core.install_panel(panel)
         return panel, identity._replace(product_id=reply.fields.value.product_id)
 

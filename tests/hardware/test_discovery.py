@@ -7,10 +7,8 @@ import pytest
 from paradox.connections.connection import Connection
 from paradox.data.model import DetectedPanel
 from paradox.exceptions import PanelNotDetected
-from paradox.hardware import detect_panel
-from paradox.hardware.binary import BinaryPanel
+from paradox.hardware import detect_panel, registry
 from paradox.hardware.panel import Panel
-from paradox.hardware import registry
 from paradox.paradox import Paradox
 
 
@@ -130,7 +128,7 @@ async def test_start_timeout_after_identification_never_falls_back(monkeypatch):
         ),
     )
     fallback = AsyncMock()
-    monkeypatch.setitem(registry.DISCOVERY, "test", (BinaryPanel.detect, fallback))
+    monkeypatch.setitem(registry.DISCOVERY, "test", (registry._detect_binary, fallback))
 
     with pytest.raises(asyncio.TimeoutError):
         await detect_panel(core)
