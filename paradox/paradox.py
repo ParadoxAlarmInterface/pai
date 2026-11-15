@@ -3,7 +3,7 @@ import collections.abc
 from datetime import datetime
 import logging
 import time
-from typing import Optional
+from typing import Callable, Optional
 
 from construct import Container
 import pytz
@@ -33,6 +33,7 @@ logger = logging.getLogger("PAI").getChild(__name__)
 class Paradox:
     def __init__(self, retries=3):
         self.panel: Panel = None
+        self._syncing_time = False
         self._connection: Connection = None
         self.retries = retries
         try:
@@ -225,6 +226,10 @@ class Paradox:
     async def sync_time(self):
         if not self.panel.supports_time_sync:
             return
+        if self._syncing_time:
+            # Started again at every status update, and the clock is only read back
+            # after this one ends.
+            return
         now = datetime.now().astimezone()
         if cfg.SYNC_TIME_TIMEZONE:
             try:
@@ -239,23 +244,18 @@ class Paradox:
         if not self._is_time_sync_required(now.replace(tzinfo=None)):
             return
 
-        args = dict(
-            century=int(now.year / 100),
-            year=int(now.year % 100),
-            month=now.month,
-            day=now.day,
-            hour=now.hour,
-            minute=now.minute,
-        )
-
         logger.debug("Synchronizing panel time")
-        reply = await self.send_wait(
-            self.panel.get_message("SetTimeDate"), args, reply_expected=0x3, timeout=10
-        )
-        if reply is None:
-            logger.warning("Could not set panel time")
-        else:
-            logger.info("Panel time synchronized")
+        self._syncing_time = True
+        try:
+            result = await self.panel.set_time(now)
+            if result is None:
+                pass  # the panel skipped it, and said why when it stopped trying
+            elif result:
+                logger.info("Panel time synchronized")
+            else:
+                logger.warning("Could not set panel time")
+        finally:
+            self._syncing_time = False
 
     async def loop(self):
         logger.debug("Loop start")
@@ -352,7 +352,9 @@ class Paradox:
         retries=5,
         timeout=cfg.IO_TIMEOUT,
         reply_expected=None,
+        on_write: Optional[Callable[[], None]] = None,
     ) -> Optional[Container]:
+        """Send a request; on_write runs after each transport write, not an ack."""
         if self._disconnecting:
             raise ConnectionError("Disconnecting")
 
@@ -381,6 +383,8 @@ class Paradox:
                 try:
                     if message is not None:
                         self.connection.write(message)
+                        if on_write is not None:
+                            on_write()
 
                     if reply_expected is not None:
                         if callable(reply_expected):
@@ -807,6 +811,8 @@ class Paradox:
             self.connection.write(frame)
         except ConnectionError as e:
             logger.warning("Could not send CloseConnection: %s", e)
+        else:
+            self.panel.on_close_connection_sent()
 
     def _on_labels_load(self, data):
         for k, d in data.items():

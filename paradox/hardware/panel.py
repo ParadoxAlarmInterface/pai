@@ -35,6 +35,14 @@ class Panel:
         """Logout frame sent on teardown, or None if the panel has none."""
         return None
 
+    def on_close_connection_sent(self):
+        """Called once the close frame was written (not acknowledged)."""
+
+    async def set_time(self, now) -> typing.Optional[bool]:
+        """Set the panel clock; True if the panel accepted it, None if the panel
+        did not try (a subclass may hold back retries)."""
+        raise NotImplementedError("Time synchronization is not supported by this panel")
+
     def parse_message(self, message, direction="topanel") -> typing.Optional[Container]:
         raise NotImplementedError("override parse_message in a subclass")
 

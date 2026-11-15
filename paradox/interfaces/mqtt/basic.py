@@ -430,12 +430,17 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
         if not self.labels_future.done():
             self.labels_future.set_result(data)
+        elif self.definitions_future.done():
+            self._publish_definitions()
 
     def _handle_panel_definitions(self, data: dict):
         self.definitions = data
 
         if not self.definitions_future.done():
             self.definitions_future.set_result(data)
+        elif self.labels_future.done():
+            # loaded again after a change (MG6250 zone definition write)
+            self._publish_definitions()
 
     def _handle_panel_change(self, change: Change):
         attribute = change.property
@@ -495,26 +500,30 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             retain=cfg.MQTT_RETAIN,
         )
 
-    def _on_ready(self):
-        if cfg.MQTT_PUBLISH_DEFINITIONS:
-            for element_type in self.definitions:  # zones, partitions
-                labels = self.labels[element_type]
-                definitions = self.definitions[element_type]
-                for i in definitions:  # numeric index
-                    if i not in labels:
-                        continue
+    def _publish_definitions(self):
+        if not cfg.MQTT_PUBLISH_DEFINITIONS:
+            return
+        for element_type in self.definitions:  # zones, partitions
+            labels = self.labels.get(element_type, {})
+            definitions = self.definitions[element_type]
+            for i in definitions:  # numeric index
+                if i not in labels:
+                    continue
 
-                    definition = {**(definitions[i]), "id": i}
-                    for attribute in definition:  # attribute
-                        if element_type == "user" and attribute == "code":
-                            continue
-                        self._publish(
-                            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_DEFINITION_TOPIC}",
-                            element_type,
-                            labels[i]["key"],
-                            attribute,
-                            definition[attribute],
-                        )
+                definition = {**(definitions[i]), "id": i}
+                for attribute in definition:  # attribute
+                    if element_type == "user" and attribute == "code":
+                        continue
+                    self._publish(
+                        f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_DEFINITION_TOPIC}",
+                        element_type,
+                        labels[i]["key"],
+                        attribute,
+                        definition[attribute],
+                    )
+
+    def _on_ready(self):
+        self._publish_definitions()
 
         if (
             cfg.MQTT_DASH_PUBLISH

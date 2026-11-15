@@ -88,6 +88,20 @@ class BinaryPanel(Panel):
     def build_close_connection(self):
         return self.get_message("CloseConnection").build({})
 
+    async def set_time(self, now):
+        args = {
+            "century": int(now.year / 100),
+            "year": int(now.year % 100),
+            "month": now.month,
+            "day": now.day,
+            "hour": now.hour,
+            "minute": now.minute,
+        }
+        reply = await self.core.send_wait(
+            self.get_message("SetTimeDate"), args, reply_expected=0x3, timeout=10
+        )
+        return reply is not None
+
     def parse_message(self, message, direction="topanel"):
         if message is None or len(message) < 2:
             return None

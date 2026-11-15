@@ -63,6 +63,28 @@ See [wiki](https://github.com/ParadoxAlarmInterface/pai/wiki/Installation)
 
 For PRT3-specific setup, see the [PRT3 usage guide](docs/prt3-usage.md).
 
+### MG6250
+
+Set `PASSWORD` to the MG6250 PC communication password; it cannot be `None`.
+`MG6250_USERNAME` defaults to `admin`. The driver supports status polling,
+new event-log entries, clock synchronization (`SYNC_TIME`), partition controls,
+zone bypass and `definition_<name or number>` commands, and PGM controls.
+Disabling zones through a definition command is deliberately unsupported.
+
+Optionally set `MG6250_SESSION_FILE` to a file in a directory writable by PAI
+to recover an interrupted session when the panel reports busy. This file
+contains a sensitive session key, is replaced atomically with owner-only
+permissions, and remains after logout because sending logout does not confirm
+delivery. A new login replaces it; an unsuccessful resume keeps it for retry.
+
+State comes from polling, not historical log entries. Event log polling retries
+if initialization fails; entries before the first successful read are not
+replayed. Live event reception and PGM state reporting are not implemented.
+Pulse cleanup is best effort; after a lost connection, verify the output on the
+panel.
+Status decoding is based on packet captures: validate arm, exit-delay and
+bypass behavior on your hardware before relying on it.
+
 ### Building the Docker image
 
 Run `docker build -t pai .`. The Python 3.15 Debian slim multi-stage build requires
