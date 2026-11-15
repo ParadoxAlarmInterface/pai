@@ -1,8 +1,5 @@
 # Digiplex panel support (DGP-48 / DGP-848 / DGP-NE96)
 
-Work in progress, intended for
-[ParadoxAlarmInterface/pai#257](https://github.com/ParadoxAlarmInterface/pai/issues/257).
-
 This package adds a driver for the older **Digiplex** family, which is the
 predecessor of Spectra/EVO and speaks a related but incompatible variant of the
 PC protocol. It was reverse engineered against a **DGP-848, firmware build

@@ -134,36 +134,6 @@ padding. Serial strips trailing `0xEE`; IP150 trims to the header payload length
 
 ---
 
-## PAI implementation
-
-### Outgoing messages (`SerialConnectionProtocol.send_message`)
-
-In AES mode, `connection_made()` wraps the raw asyncio
-transport with `EncryptedSerialTransport`.  Every call to `transport.write()`
-transparently passes through `encrypt_serial_message()` before hitting the
-wire.
-
-```
-PAI message bytes
-    → encrypt_serial_message(payload, key)
-    → [E0|nibble][FE][AES...][cs]
-    → serial port
-```
-
-### Incoming messages (`SerialConnectionProtocol.data_received`)
-
-The framer distinguishes the E0 FE modes by the configured serial protocol:
-
-| Mode | `buffer[1] == 0xFE` action |
-|---|---|
-| plain | Read `buffer[2]` as total frame length (keyless E0 FE, passed on undecoded) |
-| AES | Scan `frame_len = 2 + n×16 + 1` (n = 1…7); accept first valid checksum |
-| E0 FE | `E0FESerialFramer`: LE16 length, 16-bit checksum; `E0FECodec` unwraps |
-
-For Format 2, the framer scans incrementally as bytes arrive — no timer is
-needed.  The decrypted payload is forwarded to `handler.on_message()`
-immediately once a valid checksum boundary is found.
-
 ### Configuration
 
 ```python
@@ -244,43 +214,3 @@ pai-decrypt capture.serial --serial --pc-password 0000
 | Full-AES E0 FE (≥ 16 bytes AES data) | Decrypted; inner message parsed by panel parsers |
 | Keyless E0 FE (LE16 length and 16-bit checksum valid) | Decoded; inner message parsed by panel parsers |
 | Regular Paradox frame | Parsed normally |
-
----
-
-## File locations
-
-| File | Role |
-|---|---|
-| `paradox/lib/crypto.py` | `encrypt()`, `decrypt()`, `encrypt_serial_message()`, `decrypt_serial_message()` |
-| `paradox/connections/serial/encryption.py` | `EncryptedSerialTransport`, `make_serial_key()` |
-| `paradox/connections/serial/framing.py` | `SerialFramer` — pure byte framing and AES block scan |
-| `paradox/connections/serial/protocol.py` | `SerialConnectionProtocol` — asyncio glue and dispatch |
-| `paradox/connections/serial/e0fe.py` | `E0FECodec`: E0 FE wrap/unwrap and seq/seed state |
-| `paradox/connections/serial/e0fe_framing.py` | `E0FESerialFramer`: E0 FE byte framing |
-| `paradox/connections/serial/e0fe_protocol.py` | `E0FESerialConnectionProtocol`: E0 FE wrapping on the link |
-| `paradox/connections/serial/e0fe_connection.py` | E0 FE handshake, no retransmission, close acknowledgement |
-| `paradox/config.py` | `SERIAL_PROTOCOL` and `SERIAL_ENCRYPTED` settings |
-| `paradox/console_scripts/ip150_connection_decrypt.py` | Offline capture decryption tool |
-| `tests/lib/test_serial_crypto.py` | Unit tests for encrypt/decrypt roundtrips |
-| `tests/connection/serial/test_protocol.py` | Integration tests for framing and decryption |
-
----
-
-## Known pitfalls
-
-- **No length byte in Format 2.** An earlier PAI implementation incorrectly
-  read `buffer[2]` as the frame length.  In Format 2, that byte is AES
-  ciphertext — roughly half the time it exceeds the actual frame length,
-  causing the framer to stall.
-
-- **AES data offset.** An earlier implementation read `frame[3:-1]` for the
-  ciphertext, skipping three bytes instead of two, so decryption always
-  produced garbage.
-
-- **`str(bytes)` key corruption.** Passing a `bytes` password through
-  `str()` before encoding produces `"b'1234'"` instead of `"1234"`,
-  generating the wrong key.  `make_serial_key()` handles `bytes` directly to
-  avoid this.
-
-- **Keyless E0 FE frames are not AES.** Their cipher has no key (see Format 1), so
-  brute-forcing the PC password as an AES key yields no valid decryptions.

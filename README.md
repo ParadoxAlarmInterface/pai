@@ -31,9 +31,6 @@ With this interface it is possible to integrate Paradox panels with HomeAssistan
 
 It supports MG/SP/EVO panels (firmwares below 7.50.000) connected through a serial port, which is present in all panels (TTL 5V), or through a USB 307 module. It also supports connections using the IP150 module, both directly (ip module firmware version < 4.0 or >= 4.40.004), and through the SITE ID (firmware versions >4.0).
 
-Support for Magellan, Spectra and EVO panels is very stable. If you find a bug, please report it.
-
-
 For further information and detailed usage refer to the [Wiki](https://github.com/ParadoxAlarmInterface/pai/wiki).
 
 If you are having issues, or wish to discuss new features, join us at our [Discord community](https://discord.gg/6KaXFtg39r)
@@ -59,8 +56,12 @@ We do not recommend using SWAN because of https://github.com/CriticalSecurity/pa
 **Do not upgrade EVO firmware versions to 7.50.000+ if you use Serial connection. Process is irreversible! Paradox introduces serial communication encryption which most probably will break our PAI ability to talk to the panel.**
 Note: Paradox sells unlock code to re-enable the unencrypted serial port.
 
+For protocol details, see [EVO serial encryption notes](docs/serial_encryption.md).
+
 ## How to use
 See [wiki](https://github.com/ParadoxAlarmInterface/pai/wiki/Installation)
+
+For PRT3-specific setup, see the [PRT3 usage guide](docs/prt3-usage.md).
 
 ### Building the Docker image
 

@@ -7,19 +7,6 @@ a DB9 cable.  Unlike the native EVO/Spectra binary serial protocol (which requir
 knowledge of internal EEPROM addresses and is encrypted on newer firmware), the
 PRT3 protocol is documented by Paradox and uses human-readable ASCII commands.
 
-### Why PRT3 matters
-
-- **Native serial encryption**: Newer Paradox firmware encrypts the native binary
-  serial link, making reverse-engineered integrations unreliable or impossible.
-- **IP150 lockdown**: Recent IP150 firmware versions restrict third-party connections,
-  breaking IP-based integrations on many panels.
-- **PRT3 is stable**: Paradox publishes and maintains the PRT3 ASCII protocol. It
-  works over a simple USB-to-serial adapter and is unaffected by firmware encryption
-  changes to the native protocol.
-
-PRT3 is therefore a practical, long-term path for integrating Paradox panels that
-are otherwise inaccessible.
-
 ---
 
 ## Hardware setup
@@ -100,6 +87,9 @@ The alarm panel entity supports: `disarm`, `arm_away`, `arm_home`, `arm_night`.
 | `armed_home` | Armed stay/instant |
 | `pending` | Entry delay in progress |
 | `triggered` | Alarm active |
+
+For the poll/event timing and disarm-state handling behind these states, see
+[PRT3 state-tracking notes](prt3-architecture.md).
 
 ---
 
