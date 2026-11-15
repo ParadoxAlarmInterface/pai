@@ -1,5 +1,9 @@
 [build-system]
-requires = ["setuptools>=46.4.0"]
+# PEP 660 needs setuptools 64; that release uses an API removed in Python 3.12.
+requires = [
+    "setuptools>=64; python_version < '3.12'",
+    "setuptools>=68.2.2; python_version >= '3.12'",
+]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -30,7 +34,6 @@ requires-python = ">=3.11"
 dependencies = [
     "construct~=2.10.70",
     "cryptography>=43.0.0",
-    "argparse>=1.4.0",
     "python-slugify>=4.0.1",
     "pytz>=2021.3",
     "paho_mqtt>=2.1.0,<3",
@@ -69,6 +72,24 @@ exclude = ["tests", "tests.*", "config.*", "docs.*"]
 [tool.setuptools.dynamic]
 version = {attr = "paradox.__version__"}
 
+[tool.tox]
+# Inline INI preserves compatibility with tox versions predating native TOML.
+legacy_tox_ini = """
+[tox]
+envlist = py311, py312, py313, py314, py315
+isolated_build = True
+skip_missing_interpreters = True
+
+[testenv]
+changedir = tests
+deps =
+    pytest
+    pytest-asyncio
+    pytest-mock
+    pyyaml
+commands = pytest --basetemp="{envtmpdir}"  {posargs}
+"""
+
 [tool.black]
 target-version = ["py310", "py311", "py312", "py313", "py314", "py315"]
 exclude = 'generated'
@@ -87,9 +108,15 @@ forced_separate = [
 ]
 combine_as_imports = true
 
+[tool.mypy]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+
+[tool.yapf]
+based_on_style = "google"
 
 [tool.coverage.report]
 show_missing = true

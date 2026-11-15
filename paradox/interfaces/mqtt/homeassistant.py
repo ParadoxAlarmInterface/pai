@@ -24,7 +24,7 @@ PreparseResponse = namedtuple("PreparseResponse", "topics element content")
 class HomeAssistantMQTTInterface(AbstractMQTTInterface):
     def __init__(self, alarm):
         super().__init__(alarm)
-        self.armed = dict()
+        self.armed = {}
         self.partitions = {}
         self.zones = {}
         self.pgms = {}
@@ -170,7 +170,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 self._publish_config(zone_status_sensor)
 
     def _publish_pgm_configs(self, pgm_statuses):
-        for pgm_key in pgm_statuses.keys():
+        for pgm_key in pgm_statuses:
             if pgm_key not in self.pgms:
                 continue
 

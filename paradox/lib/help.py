@@ -6,9 +6,6 @@ MODULES = {
     "construct": dict(
         mandatory=True, desc="basic operation", install_name="construct>=2.9.43"
     ),
-    "argparse": dict(
-        mandatory=True, desc="basic operation", install_name="argparse>=1.4.0"
-    ),
     "slugify": dict(
         mandatory=True,
         desc="basic operation (remove non-ascii from mqtt topic names)",

@@ -3,7 +3,7 @@
 ## Development
 
 - Use Python 3.11+ and a virtual environment. If dependencies are missing, install them with `python -m pip install -e . pytest pytest-asyncio pytest-mock pyyaml`.
-- Run focused tests from the repository root, for example `python -m pytest -q tests/hardware/digiplex`; run the full suite with `python -m pytest -q`. CI's lint and tox configuration is in `.github/workflows/test.yml` and `tox.ini`.
+- Run focused tests from the repository root, for example `python -m pytest -q tests/hardware/digiplex`; run the full suite with `python -m pytest -q`. CI's lint configuration is in `.github/workflows/test.yml` and `.flake8`; tox configuration is in `pyproject.toml`.
 
 ## Panel changes
 

@@ -41,9 +41,7 @@ class PushoverTextInterface(ConfiguredAbstractTextInterface):
             if devices_raw == "*" or devices_raw is None:
                 self._send_pushover_message(user_key, message, level)
             else:
-                devices = list(filter(bool, re.split(r"[\s]*,[\s]*", devices_raw)))
-
-                for device in devices:
+                for device in filter(bool, re.split(r"[\s]*,[\s]*", devices_raw)):
                     self._send_pushover_message(user_key, message, level, device)
 
     def _send_pushover_message(self, user_key, message, level, device=None):
