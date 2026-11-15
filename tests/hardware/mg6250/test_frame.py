@@ -9,7 +9,7 @@ import pytest
 from paradox.config import config as cfg
 from paradox.connections.connection import Connection
 from paradox.connections.serial.encryption import make_serial_key
-from paradox.event import LiveEvent
+from paradox.event import EventLevel, LiveEvent
 from paradox.exceptions import AuthenticationFailed, StatusRequestException
 from paradox.hardware.mg6250.panel import (
     AC_VOLTS_PER_STEP,
@@ -26,6 +26,7 @@ from paradox.hardware.mg6250.panel import (
     KIND_ACK_REPEAT,
     KIND_DATA,
     LAST_FRAGMENT,
+    LOG_INITIAL_RETRY,
     LOG_OP_RANGE,
     LOG_OP_READ,
     OBJ_AREA,
@@ -71,6 +72,7 @@ from paradox.hardware.spectra_magellan import parsers as sp_parsers
 from paradox.hardware.spectra_magellan.panel import Panel as SpectraPanel
 from paradox.lib import ps
 from paradox.lib.crypto import encrypt as paradox_encrypt
+from paradox.lib.event_filter import EventFilter
 from paradox.lib.handlers import HandlerRegistry
 from paradox.paradox import Paradox
 from paradox.parsers.status import convert_raw_status
@@ -270,22 +272,55 @@ async def test_busy_login_resumes_saved_session(monkeypatch, tmp_path):
 
 
 @pytest.mark.parametrize(
-    "read", [AsyncMock(return_value={}), AsyncMock(side_effect=asyncio.TimeoutError)]
+    "first_reply", [{}, asyncio.TimeoutError(), StatusRequestException("no reply")]
 )
-async def test_busy_login_drops_stale_session(monkeypatch, tmp_path, read):
+async def test_busy_login_retries_an_unverified_session(
+    monkeypatch, tmp_path, first_reply
+):
     monkeypatch.setattr(cfg, "MG6250_SESSION_FILE", str(tmp_path / "s.json"))
     core = login_core()
     core.send_wait.side_effect = [None, None, Frame.parse(LOGIN_REPLY)]
     await Panel(core).initialize_communication("admin")
 
     core = login_core()
-    core.send_wait.side_effect = [None, None, Frame.parse(BUSY_REPLY)]
+    core.send_wait.side_effect = [
+        None,
+        None,
+        Frame.parse(BUSY_REPLY),
+        None,
+        None,
+        Frame.parse(BUSY_REPLY),
+    ]
     panel = Panel(core)
-    panel.read_records = read
+    panel.read_records = AsyncMock(
+        side_effect=[first_reply, {(OBJ_SYSTEM, 1): {1: b"\x05"}}]
+    )
     assert await panel.initialize_communication("admin") is False
     assert panel.session is None
     assert panel.session_key is None
-    assert not (tmp_path / "s.json").exists()  # not tried again at the next login
+    assert (tmp_path / "s.json").exists()
+    assert await panel.initialize_communication("admin") is True
+    assert panel.session is not None
+
+
+@pytest.mark.parametrize("failure", [ConnectionError, asyncio.CancelledError])
+async def test_resume_interruption_keeps_saved_session_without_logging_out(
+    monkeypatch, tmp_path, failure
+):
+    path = tmp_path / "s.json"
+    monkeypatch.setattr(cfg, "MG6250_SESSION_FILE", str(path))
+    core = login_core()
+    core.send_wait.side_effect = [None, None, Frame.parse(LOGIN_REPLY)]
+    await Panel(core).initialize_communication("admin")
+    panel = Panel(core)
+    panel.read_records = AsyncMock(side_effect=failure())
+
+    with pytest.raises(failure):
+        await panel._resume_session()
+
+    assert panel.session is None
+    assert panel.session_key is None
+    assert path.exists()
 
 
 async def test_busy_login_without_saved_session(monkeypatch, tmp_path):
@@ -1113,12 +1148,30 @@ async def test_duplicate_log_records_are_not_published_twice():
 @pytest.mark.parametrize(
     "failure", [asyncio.TimeoutError(), StatusRequestException("no reply")]
 )
-async def test_refused_first_request_stops_reading_the_log(failure):
-    panel, core = log_panel([failure])
+async def test_first_log_request_is_retried_with_backoff(monkeypatch, failure):
+    clock = [1000.0]
+    monkeypatch.setattr(
+        "paradox.hardware.mg6250.panel.time.monotonic", lambda: clock[0]
+    )
+    panel, core = log_panel(
+        [
+            failure,
+            [range_reply(1, 3)],
+            [range_reply(1, 4)],
+            [log_reply(4, 4, [log_event(4, 47, 15)])],
+        ]
+    )
     await panel._publish_new_events()
-    assert panel._log_enabled is False
-    await panel._publish_new_events()  # no second request
+    assert panel._log_enabled is True
+    clock[0] += LOG_INITIAL_RETRY - 1
+    await panel._publish_new_events()
     panel.transact.assert_awaited_once()
+    clock[0] += 1
+    await panel._publish_new_events()
+    assert panel._log_last == 3
+    core.handle_event_message.assert_not_called()
+    await panel._publish_new_events()
+    core.handle_event_message.assert_called_once()
 
 
 async def test_later_failure_keeps_reading_the_log():
@@ -1156,6 +1209,14 @@ def test_log_event_messages(major, minor, kind, text):
     panel, core = log_panel([])
     event = live_event(panel, major, minor)
     assert (event.type, event.message) == (kind, text)
+
+
+@pytest.mark.parametrize("minor", [17, 19, 29])
+def test_trouble_restore_events_pass_the_default_level_filter(minor):
+    panel, _ = log_panel([])
+    event = live_event(panel, 6, minor)
+    assert event.level == EventLevel.INFO
+    assert EventFilter().match(event)
 
 
 def test_log_event_uses_todays_label_and_changes_no_state():
@@ -2013,6 +2074,61 @@ async def test_output_pulse_is_on_then_off(monkeypatch):
 
     actions = [c.args[1][11:13] for c in panel.transact.await_args_list]
     assert actions == [b"\x02\x02", b"\x01\x02"]
+
+
+@pytest.mark.parametrize("cancel_during", ["delay", "off"])
+async def test_cancelled_output_pulse_attempts_to_turn_off(monkeypatch, cancel_during):
+    monkeypatch.setattr(
+        cfg, "OUTPUT_PULSE_DURATION", 60 if cancel_during == "delay" else 0
+    )
+    panel, _ = control_panel()
+    started = asyncio.Event()
+    release = asyncio.Event()
+    off_calls = 0
+
+    async def control(pgm, command):
+        nonlocal off_calls
+        if command == "on" and cancel_during == "delay":
+            started.set()
+        if command == "off":
+            off_calls += 1
+            if cancel_during == "off" and off_calls == 1:
+                started.set()
+                await release.wait()
+        return True
+
+    panel._control_pgm = AsyncMock(side_effect=control)
+    task = asyncio.create_task(panel.control_outputs([2], "pulse"))
+    await started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert panel._control_pgm.await_args_list[-1].args == (2, "off")
+    assert off_calls == (1 if cancel_during == "delay" else 2)
+
+
+async def test_cancelled_pulse_logs_cleanup_failure_and_propagates_cancellation(
+    monkeypatch, caplog
+):
+    monkeypatch.setattr(cfg, "OUTPUT_PULSE_DURATION", 60)
+    panel, _ = control_panel()
+    started = asyncio.Event()
+
+    async def control(pgm, command):
+        if command == "on":
+            started.set()
+            return True
+        raise ConnectionError("disconnected")
+
+    panel._control_pgm = AsyncMock(side_effect=control)
+    task = asyncio.create_task(panel.control_outputs([2], "pulse"))
+    await started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert "could not stop output 2 pulse" in caplog.text
 
 
 @pytest.mark.parametrize("outputs, command", [([1], "toggle"), ([9], "on")])

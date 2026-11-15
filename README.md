@@ -75,12 +75,13 @@ Optionally set `MG6250_SESSION_FILE` to a file in a directory writable by PAI
 to recover an interrupted session when the panel reports busy. This file
 contains a sensitive session key, is replaced atomically with owner-only
 permissions, and remains after logout because sending logout does not confirm
-delivery. A new login replaces it; a failed resume discards the expired session.
+delivery. A new login replaces it; an unsuccessful resume keeps it for retry.
 
-State comes from polling, not historical log entries; old log entries are not
-replayed at startup. Live event reception and PGM state reporting are not
-implemented. Status decoding is based on packet captures: validate arm,
-exit-delay and bypass behavior on your hardware before relying on it.
+State comes from polling, not historical log entries. Event log polling retries
+if initialization fails; entries before the first successful read are not
+replayed. Live event reception and PGM state reporting are not implemented.
+Status decoding is based on packet captures: validate arm, exit-delay and
+bypass behavior on your hardware before relying on it.
 
 ### Building the Docker image
 

@@ -188,9 +188,15 @@ event_map = {
                 "message": "Partition {label}: supervision loss generated alarm",
             },
             16: {"level": EventLevel.WARN, "message": "Doorbell 1 battery trouble"},
-            17: "Doorbell 1 battery trouble restore",
+            17: {
+                "level": EventLevel.INFO,
+                "message": "Doorbell 1 battery trouble restore",
+            },
             18: {"level": EventLevel.WARN, "message": "Doorbell 2 battery trouble"},
-            19: "Doorbell 2 battery trouble restore",
+            19: {
+                "level": EventLevel.INFO,
+                "message": "Doorbell 2 battery trouble restore",
+            },
             20: {
                 "level": EventLevel.INFO,
                 "type": "partition",
@@ -218,6 +224,7 @@ event_map = {
                 "message": "Fail to communicate to central station channel(s)",
             },
             29: {
+                "level": EventLevel.INFO,
                 "tags": ["trouble", "restore"],
                 "message": "Fail to communicate to central station channel(s) restore",
             },

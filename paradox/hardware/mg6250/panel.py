@@ -4,8 +4,8 @@ Login, labels (zones, keypads, repeaters, sirens, users, partitions, outputs),
 the panel clock, battery and AC voltage, zone open/bypassed/alarm and partition
 exit delay/armed (stay, sleep or full)/alarm as status (the alarm bits are
 provisional), arm / arm stay / arm sleep / disarm of partitions 1 and 2, zone
-bypass and definition, and output on / off / release. Other controls are not
-implemented.
+bypass and definition, output on / off / release / pulse, and clock
+synchronization. Other controls are not implemented.
 """
 
 import asyncio
@@ -348,8 +348,8 @@ LOG_OP_READ = 0x00
 LOG_OP_RANGE = 0x01
 LOG_REQUEST = b"\x00\x01\x01"
 LOG_ANY = 0xFFFFFFFF
-LOG_REPLY_HEADER = 7
 LOG_EVENT_LEN = 36
+LOG_INITIAL_RETRY = 60
 LogRecord = Struct(
     "op" / Int8ub,
     "len" / Int8ub,
@@ -594,6 +594,7 @@ class Panel(PanelBase):
         self._set_time_retry_at = 0.0  # time.monotonic() of the next try
         self._acked = collections.deque(maxlen=ACKED_KEPT)  # (tid, fragment)
         self._log_last = None  # number of the last event published
+        self._log_retry_at = 0.0
         self._change_counter = None  # last object 0x1c counter seen
         # read when the counter changes: {zone: field 0}, {partition: field 0}
         self._zone_status = None
@@ -902,18 +903,6 @@ class Panel(PanelBase):
                     logger.warning("MG6250: cannot remove %s: %s", temporary, e)
 
     @staticmethod
-    def _forget_session():
-        """The saved session ended: it cannot be resumed any more."""
-        path = cfg.MG6250_SESSION_FILE
-        if path:
-            try:
-                os.remove(path)
-            except FileNotFoundError:
-                pass
-            except OSError as e:
-                logger.warning("MG6250: cannot remove %s: %s", path, e)
-
-    @staticmethod
     def _load_session() -> typing.Optional[Container]:
         path = cfg.MG6250_SESSION_FILE
         if not path or not os.path.exists(path):
@@ -945,15 +934,19 @@ class Panel(PanelBase):
             return False
         self.session, self.session_key = saved, saved.session_key
         self._register_ack_handler()
+        resumed = False
         try:
             records = await self.read_records([(OBJ_SYSTEM, 1, SYSTEM_FIELDS)])
-        except (StatusRequestException, asyncio.TimeoutError):
-            records = {}
-        if (OBJ_SYSTEM, 1) not in records:
-            logger.warning("MG6250: the saved session is no longer open")
-            self.session = self.session_key = None
-            self._forget_session()  # do not wait on it again at the next login
+            if (OBJ_SYSTEM, 1) not in records:
+                logger.warning("MG6250: could not verify the saved session")
+                return False
+            resumed = True
+        except (StatusRequestException, asyncio.TimeoutError) as e:
+            logger.warning("MG6250: could not verify the saved session: %s", e)
             return False
+        finally:
+            if not resumed:
+                self.session = self.session_key = None
         self._log_enabled = True
         logger.info(
             "MG6250: resumed the previous session (selector 0x%02x mode 0x%02x)",
@@ -980,7 +973,7 @@ class Panel(PanelBase):
         except ConstructError:
             return None
 
-    # -- record protocol (cmd 0x24): read-only ---------------------------
+    # -- record protocol (cmd 0x24) --------------------------------------
     async def load_memory(self):
         # The zone definitions come with the labels (zone field 0): one read.
         # Sent in the order of the other panels, definitions first.
@@ -1205,12 +1198,10 @@ class Panel(PanelBase):
     async def _publish_new_events(self):
         """Publish the events added to the log since the last poll.
 
-        BabyWare always asks from its saved position, so the first request,
-        from 0, is not from a capture: if the panel refuses it, stop reading
-        the log for this session rather than slow down the status polling.
+        The first successful range request establishes the current position.
         Old events are not published: they would look like new alarms.
         """
-        if not self._log_enabled:
+        if not self._log_enabled or time.monotonic() < self._log_retry_at:
             return
         first = self._log_last or 0
         try:
@@ -1241,8 +1232,12 @@ class Panel(PanelBase):
             )
         except (StatusRequestException, asyncio.TimeoutError) as e:
             if self._log_last is None:
-                logger.warning("MG6250: not reading the event log: %s", e)
-                self._log_enabled = False
+                self._log_retry_at = time.monotonic() + LOG_INITIAL_RETRY
+                logger.warning(
+                    "MG6250: event log initialization failed; retrying in %ds: %s",
+                    LOG_INITIAL_RETRY,
+                    e,
+                )
             else:
                 logger.debug("MG6250: event log read failed: %s", e)
             return
@@ -1551,8 +1546,16 @@ class Panel(PanelBase):
             elif command != PGM_PULSE:
                 accepted |= await self._control_pgm(pgm, command)
             elif await self._control_pgm(pgm, "on"):
-                await asyncio.sleep(cfg.OUTPUT_PULSE_DURATION)
-                accepted |= await self._control_pgm(pgm, "off")
+                try:
+                    await asyncio.sleep(cfg.OUTPUT_PULSE_DURATION)
+                    accepted |= await self._control_pgm(pgm, "off")
+                except asyncio.CancelledError:
+                    try:
+                        if not await self._control_pgm(pgm, "off"):
+                            logger.error("MG6250: could not stop output %d pulse", pgm)
+                    except (ConnectionError, asyncio.TimeoutError):
+                        logger.exception("MG6250: could not stop output %d pulse", pgm)
+                    raise
         return accepted
 
     async def control_module_pgm_outputs(
