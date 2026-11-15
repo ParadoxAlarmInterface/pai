@@ -3,7 +3,7 @@ import collections.abc
 from datetime import datetime
 import logging
 import time
-from typing import Optional
+from typing import Callable, Optional
 
 from construct import Container
 import pytz
@@ -352,7 +352,9 @@ class Paradox:
         retries=5,
         timeout=cfg.IO_TIMEOUT,
         reply_expected=None,
+        on_write: Optional[Callable[[], None]] = None,
     ) -> Optional[Container]:
+        """Send a request; on_write runs after each transport write, not an ack."""
         if self._disconnecting:
             raise ConnectionError("Disconnecting")
 
@@ -381,6 +383,8 @@ class Paradox:
                 try:
                     if message is not None:
                         self.connection.write(message)
+                        if on_write is not None:
+                            on_write()
 
                     if reply_expected is not None:
                         if callable(reply_expected):

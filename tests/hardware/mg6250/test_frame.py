@@ -2086,7 +2086,7 @@ async def test_cancelled_output_pulse_attempts_to_turn_off(monkeypatch, cancel_d
     release = asyncio.Event()
     off_calls = 0
 
-    async def control(pgm, command):
+    async def control(pgm, command, **kwargs):
         nonlocal off_calls
         if command == "on" and cancel_during == "delay":
             started.set()
@@ -2115,7 +2115,7 @@ async def test_cancelled_pulse_logs_cleanup_failure_and_propagates_cancellation(
     panel, _ = control_panel()
     started = asyncio.Event()
 
-    async def control(pgm, command):
+    async def control(pgm, command, **kwargs):
         if command == "on":
             started.set()
             return True
@@ -2129,6 +2129,80 @@ async def test_cancelled_pulse_logs_cleanup_failure_and_propagates_cancellation(
         await task
 
     assert "could not stop output 2 pulse" in caplog.text
+
+
+def pulse_panel_with_live_sender():
+    core = Paradox()
+    core._connection = Connection()
+    core.connection._protocol = MagicMock()
+    core.connection.connected = True
+    panel = session_panel(0xB4, 0x62, SET_TIME_KEY, core)
+    panel.panel_serial = PANEL_SERIAL
+    return panel, core
+
+
+@pytest.mark.parametrize("lock_name", ["panel", "core"])
+async def test_cancelled_pulse_waiting_for_a_lock_does_not_change_output(lock_name):
+    panel, core = pulse_panel_with_live_sender()
+    lock = panel._get_transaction_lock() if lock_name == "panel" else core.request_lock
+    await lock.acquire()
+    panel._stop_pulse = AsyncMock()
+    task = asyncio.create_task(panel.control_outputs([2], "pulse"))
+    await asyncio.sleep(0)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    lock.release()
+
+    core.connection._protocol.send_message.assert_not_called()
+    panel._stop_pulse.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "failure", [asyncio.CancelledError, asyncio.TimeoutError, StatusRequestException]
+)
+async def test_pulse_stops_output_if_on_was_sent_without_a_reply(failure):
+    panel, core = pulse_panel_with_live_sender()
+    core.connection.retransmit_requests = False
+    written = asyncio.Event()
+    core.connection._protocol.send_message.side_effect = lambda _: written.set()
+    if failure is asyncio.CancelledError:
+
+        async def wait_for_reply(*args, **kwargs):
+            await asyncio.Event().wait()
+
+        core.connection.wait_for_message = AsyncMock(side_effect=wait_for_reply)
+    elif failure is StatusRequestException:
+        core.connection.wait_for_message = AsyncMock(return_value=None)
+    else:
+        core.connection.wait_for_message = AsyncMock(side_effect=asyncio.TimeoutError())
+    original_control = panel._control_pgm
+
+    async def control(pgm, command, **kwargs):
+        if command == "off":
+            return True
+        return await original_control(pgm, command, **kwargs)
+
+    panel._control_pgm = AsyncMock(side_effect=control)
+    task = asyncio.create_task(panel.control_outputs([2], "pulse"))
+    await written.wait()
+    if failure is asyncio.CancelledError:
+        task.cancel()
+    if failure is StatusRequestException:
+        assert await task is False
+    else:
+        with pytest.raises(failure):
+            await task
+
+    assert panel._control_pgm.await_args_list[-1].args == (2, "off")
+
+
+async def test_refused_pulse_on_does_not_send_off():
+    panel, _ = control_panel()
+    panel.transact = AsyncMock(return_value=[b"refused"])
+
+    assert await panel.control_outputs([2], "pulse") is False
+    panel.transact.assert_awaited_once()
 
 
 @pytest.mark.parametrize("outputs, command", [([1], "toggle"), ([9], "on")])

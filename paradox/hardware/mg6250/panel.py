@@ -704,12 +704,16 @@ class Panel(PanelBase):
                 self.build_ack_repeat(header.tid, header.fragment, header.service)
             )
 
-    async def transact(self, service: int, data: bytes) -> typing.List[bytes]:
+    async def transact(
+        self, service: int, data: bytes, *, on_write=None
+    ) -> typing.List[bytes]:
         """Send one request, ACK each reply fragment, return their data.
 
         Each fragment is padded on its own, so parse them separately.
         """
         async with self._get_transaction_lock():
+            if on_write is not None:
+                return await self._transact_locked(service, data, on_write=on_write)
             return await self._transact_locked(service, data)
 
     def _get_transaction_lock(self):
@@ -717,7 +721,9 @@ class Panel(PanelBase):
             self._transaction_lock = asyncio.Lock()
         return self._transaction_lock
 
-    async def _transact_locked(self, service: int, data: bytes) -> typing.List[bytes]:
+    async def _transact_locked(
+        self, service: int, data: bytes, *, on_write=None
+    ) -> typing.List[bytes]:
         """Exchange one request while the caller holds the transaction lock."""
         if self.session is None:
             # e.g. an MQTT command arriving while PAI reconnects
@@ -729,12 +735,14 @@ class Panel(PanelBase):
         message = self.build_request(tid, service, data)
         fragments = []
         received_fragments = set()
+        write_callback = {"on_write": on_write} if on_write is not None else {}
         while True:
             reply = await self.core.send_wait(
                 message=message,
                 reply_expected=lambda m: self._is_reply(
                     m, tid, service, received_fragments
                 ),
+                **write_callback,
             )
             if self.session is None:
                 raise StatusRequestException("MG6250: session ended during request")
@@ -1513,13 +1521,18 @@ class Panel(PanelBase):
                 logger.error("MG6250: %s refused, reply %s", command, reply.hex())
         return accepted
 
-    async def _control_pgm(self, pgm: int, command: str) -> bool:
+    async def _control_pgm(self, pgm: int, command: str, *, on_write=None) -> bool:
         try:
+            write_callback = {"on_write": on_write} if on_write is not None else {}
             fragments = await self.transact(
-                SERVICE_CONTROL, self.build_pgm_control(pgm, PGM_ACTIONS[command])
+                SERVICE_CONTROL,
+                self.build_pgm_control(pgm, PGM_ACTIONS[command]),
+                **write_callback,
             )
         except StatusRequestException as e:
             logger.exception("MG6250: %s of output %d failed: %s", command, pgm, e)
+            if on_write is not None:
+                raise
             return False
         reply = b"".join(fragments)
         accepted = self._control_accepted(CONTROL_PGM_PREFIX, reply)
@@ -1528,6 +1541,43 @@ class Panel(PanelBase):
                 "MG6250: %s of output %d refused, reply %s", command, pgm, reply.hex()
             )
         return accepted
+
+    async def _stop_pulse(self, pgm: int):
+        try:
+            # Allow the normal retries, but do not wait indefinitely for a lock.
+            timeout = max(10, cfg.IO_TIMEOUT * 10 + ACK_GAP + 1)
+            if not await asyncio.wait_for(self._control_pgm(pgm, "off"), timeout):
+                logger.error("MG6250: could not stop output %d pulse", pgm)
+        except asyncio.CancelledError:
+            logger.error("MG6250: stopping output %d pulse was cancelled", pgm)
+            raise
+        except (ConnectionError, asyncio.TimeoutError):
+            logger.exception("MG6250: could not stop output %d pulse", pgm)
+
+    async def _pulse_pgm(self, pgm: int) -> bool:
+        on_sent = False
+
+        def mark_on_sent():
+            nonlocal on_sent
+            on_sent = True
+
+        try:
+            if not await self._control_pgm(pgm, "on", on_write=mark_on_sent):
+                return False
+            on_sent = True
+            await asyncio.sleep(cfg.OUTPUT_PULSE_DURATION)
+            return await self._control_pgm(pgm, "off")
+        except (
+            asyncio.CancelledError,
+            asyncio.TimeoutError,
+            ConnectionError,
+            StatusRequestException,
+        ) as e:
+            if on_sent:
+                await self._stop_pulse(pgm)
+            if isinstance(e, StatusRequestException):
+                return False
+            raise
 
     async def control_outputs(self, outputs, command) -> bool:
         """on, off, release (BabyWare's Activate, Deactivate, Release) or
@@ -1545,17 +1595,8 @@ class Panel(PanelBase):
                 logger.warning("MG6250: there is no output %d", pgm)
             elif command != PGM_PULSE:
                 accepted |= await self._control_pgm(pgm, command)
-            elif await self._control_pgm(pgm, "on"):
-                try:
-                    await asyncio.sleep(cfg.OUTPUT_PULSE_DURATION)
-                    accepted |= await self._control_pgm(pgm, "off")
-                except asyncio.CancelledError:
-                    try:
-                        if not await self._control_pgm(pgm, "off"):
-                            logger.error("MG6250: could not stop output %d pulse", pgm)
-                    except (ConnectionError, asyncio.TimeoutError):
-                        logger.exception("MG6250: could not stop output %d pulse", pgm)
-                    raise
+            else:
+                accepted |= await self._pulse_pgm(pgm)
         return accepted
 
     async def control_module_pgm_outputs(
