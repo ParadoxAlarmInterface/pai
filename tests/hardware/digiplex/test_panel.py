@@ -8,6 +8,7 @@ from construct import Container
 import pytest
 
 from paradox.config import config as cfg
+from paradox.data.memory_storage import MemoryStorage
 from paradox.hardware.digiplex.panel import ZONE_LABELS_BASE, PanelDGP848
 
 
@@ -199,3 +200,24 @@ async def test_unsupported_partition_selection_is_rejected(partitions):
 
     assert await panel.control_partitions(partitions, "arm") is False
     panel.core.send_wait.assert_not_awaited()
+
+
+async def test_failed_label_read_keeps_published_labels():
+    memory = _labels({1: b"fasado durys", 3: b"virtuve"})
+    memory[ZONE_LABELS_BASE] = b""  # zones 1-2 time out on reconnect
+    core = MagicMock()
+    core.storage = MemoryStorage()
+    core.storage.get_container("zone").deep_merge(
+        {
+            1: {"key": "fasado_durys", "label": "fasado durys"},
+            2: {"key": "zone_2_2", "label": "Zone 2"},
+        }
+    )
+    panel = PanelDGP848(core)
+    panel._read_eeprom = AsyncMock(side_effect=lambda address, count: memory[address])
+
+    zones = (await panel.load_labels())["zone"]
+
+    assert zones[1]["key"] == "fasado_durys"
+    assert (zones[2]["key"], zones[2]["label"]) == ("zone_2_2", "Zone 2")
+    assert zones[3]["key"] == "virtuve"

@@ -512,6 +512,8 @@ async def test_digiplex_detected_when_initiate_times_out(mocker, fast_digiplex):
         if c.args == ("panel_detected",)
     )
     assert (identity.product_id, identity.model) == ("DIGIPLEX_v13", "Digiplex DGP")
+    # The panel reports no serial: identity must not be shared by every DGP.
+    assert identity.serial_number.startswith("digiplex_")
 
 
 @pytest.mark.asyncio

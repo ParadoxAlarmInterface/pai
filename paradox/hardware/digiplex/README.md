@@ -108,8 +108,12 @@ rejected.
   layout in EEPROM is unknown, so all zones 1–48 are published unless
   `LIMITS["zone"]` restricts them. Unlabelled zones are named `Zone <n>`;
   their keys are allocated after the labelled zones, so they never change the
-  key of a labelled zone.
-
+  key of a labelled zone. If a label block cannot be read on reconnect, the
+  zone keeps the key and label it already has.
+- **No serial number.** The recorded panels report an all-zero serial, so the
+  Home Assistant device identity is derived from the configured connection
+  (`digiplex_<hash>`). Changing the serial port or IP address creates a new
+  device; two panels on one broker need different connection settings.
 - **No event history.** The panel does not broadcast `0xE0` frames, and event
   log requests (`0xE` + number) are answered with an echo of the request. The
   event buffer exists (it is readable by WinLoad), but its protocol is not

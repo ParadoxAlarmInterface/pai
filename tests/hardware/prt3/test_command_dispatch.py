@@ -408,3 +408,16 @@ async def test_arm_does_not_optimistically_change_state(monkeypatch):
     assert (
         p2["exit_delay"] is False
     ), "exit_delay should be set by G065N001, not optimistically"
+
+
+def test_keypad_disarm_ends_entry_delay(monkeypatch):
+    """G013 after G065/N002 must clear entry_delay, else HA stays 'pending'."""
+    from paradox.hardware.prt3.parser import PRT3SystemEvent
+
+    with patch("paradox.paradox.ps.sendChange"), patch("paradox.paradox.ps.sendEvent"):
+        paradox = _make_paradox_with_partitions(monkeypatch)
+        paradox.storage.get_container("partition")[1]["entry_delay"] = True
+
+        paradox.handle_prt3_event_message(PRT3SystemEvent(group=13, number=1, area=1))
+
+    assert paradox.storage.get_container_object("partition", 1)["entry_delay"] is False

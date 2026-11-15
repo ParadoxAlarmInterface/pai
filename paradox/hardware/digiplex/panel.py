@@ -1,4 +1,5 @@
 from binascii import hexlify
+import hashlib
 from collections import defaultdict
 import asyncio
 import inspect
@@ -11,6 +12,7 @@ from construct import Construct, Container
 from paradox.config import config as cfg, get_limits_for_type
 from paradox.data.model import DetectedPanel
 from paradox.exceptions import AuthenticationFailed, StatusRequestException
+from paradox.lib.utils import describe_connection
 
 from . import parsers
 from ..panel import Panel as PanelBase
@@ -112,6 +114,13 @@ class PanelDGP848(PanelBase):
                 "Unsupported Digiplex product_id: %s" % value.product_id
             )
 
+        serial_number = hexlify(value.serial_number).decode()
+        if not any(value.serial_number):
+            # Recorded panels report no serial: derive a stable per-installation
+            # identity so two panels on one MQTT broker do not merge.
+            digest = hashlib.sha256(describe_connection().encode()).hexdigest()
+            serial_number = f"digiplex_{digest[:8]}"
+
         panel = cls(core, reply)
         core.install_panel(panel)
         return panel, DetectedPanel(
@@ -120,7 +129,7 @@ class PanelDGP848(PanelBase):
             firmware_version="{}.{} build {:#06x}".format(
                 value.firmware.version, value.firmware.revision, value.firmware_build
             ),
-            serial_number=hexlify(value.serial_number).decode(),
+            serial_number=serial_number,
         )
 
     @staticmethod
@@ -253,9 +262,14 @@ class PanelDGP848(PanelBase):
         """
         data = defaultdict(dict)
         raw = bytearray()
+        failed = set()
         for base in range(ZONE_LABELS_BASE, ZONE_LABELS_BASE + ZONES * 16, 32):
             chunk = await self._read_eeprom(base, 32)
-            raw.extend(chunk if len(chunk) == 32 else bytes(32))
+            if len(chunk) != 32:
+                first = (base - ZONE_LABELS_BASE) // 16 + 1
+                failed.update((first, first + 1))
+                chunk = bytes(32)
+            raw.extend(chunk)
 
         labels = {
             i: bytes(raw[(i - 1) * 16 : i * 16])
@@ -264,12 +278,19 @@ class PanelDGP848(PanelBase):
             .strip()
             for i in range(1, ZONES + 1)
         }
+        # A failed read on reconnect keeps the zone already published (key
+        # reserved first), so its MQTT topics do not change.
+        known = self.core.storage.get_container("zone")
+        elements = {}
+        for i in failed & set(known):
+            elements[i] = self.label_element("zone", i, known[i]["label"])
+            elements[i]["key"] = known[i]["key"]
 
         # Keys are allocated over all zones (labelled first) before LIMITS is
         # applied, so neither fallbacks nor LIMITS change a labelled zone's key.
-        named = [i for i in range(1, ZONES + 1) if labels[i]]
-        unnamed = [i for i in range(1, ZONES + 1) if not labels[i]]
-        elements = {}
+        rest = [i for i in range(1, ZONES + 1) if i not in elements]
+        named = [i for i in rest if labels[i]]
+        unnamed = [i for i in rest if not labels[i]]
         for i in named + unnamed:
             elements[i] = self.label_element("zone", i, labels[i])
             elements[i]["label"] = labels[i] or f"Zone {i}"
