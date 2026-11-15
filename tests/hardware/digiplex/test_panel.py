@@ -1,5 +1,6 @@
 """Which Digiplex zones / partitions are published (load_labels + status)."""
 
+import asyncio
 import logging
 from unittest.mock import AsyncMock, MagicMock
 
@@ -152,3 +153,52 @@ async def test_limits_do_not_change_labelled_keys(monkeypatch):
 
     assert list(zones) == [2]
     assert zones[2]["key"] == "Kitchen_2"
+
+
+async def test_suffixed_zone_keys_are_unique():
+    zones = (
+        await _panel({1: b"Kitchen 3", 2: b"Kitchen", 3: b"Kitchen"}).load_labels()
+    )["zone"]
+
+    assert zones[1]["key"] == "Kitchen_3"
+    assert zones[2]["key"] == "Kitchen"
+    assert zones[3]["key"] == "Kitchen_3_3"
+    assert len({zone["key"] for zone in zones.values()}) == len(zones)
+
+
+async def test_partition_keys_are_unique_before_limits(monkeypatch):
+    monkeypatch.setattr(cfg, "PARTITION_NAMES", {"1": "House", "2": "House"})
+    all_partitions = (await _panel({}).load_labels())["partition"]
+    assert [p["key"] for p in all_partitions.values()] == ["House", "House_2"]
+
+    monkeypatch.setattr(cfg, "LIMITS", {"partition": "2"})
+    limited = (await _panel({}).load_labels())["partition"]
+    assert limited[2]["key"] == "House_2"
+
+
+async def test_partition_name_collision_with_default_is_unique(monkeypatch):
+    monkeypatch.setattr(cfg, "PARTITION_NAMES", {"1": "Partition 2"})
+
+    partitions = (await _panel({}).load_labels())["partition"]
+
+    assert partitions[1]["key"] == "Partition_2"
+    assert partitions[2]["key"] == "Partition_2_2"
+
+
+async def test_eeprom_timeout_returns_empty_block(caplog):
+    panel = PanelDGP848(MagicMock())
+    panel.core.send_wait = AsyncMock(side_effect=asyncio.TimeoutError)
+
+    with caplog.at_level(logging.WARNING):
+        assert await panel._read_eeprom(ZONE_LABELS_BASE, 32) == b""
+
+    assert "EEPROM read at 0x2000 timed out" in caplog.text
+
+
+@pytest.mark.parametrize("partitions", [[], [9], [1, 9]])
+async def test_unsupported_partition_selection_is_rejected(partitions):
+    panel = _panel({})
+    panel.core.send_wait = AsyncMock()
+
+    assert await panel.control_partitions(partitions, "arm") is False
+    panel.core.send_wait.assert_not_awaited()

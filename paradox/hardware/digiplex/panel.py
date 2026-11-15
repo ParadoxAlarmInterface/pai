@@ -1,4 +1,5 @@
 from collections import defaultdict
+import asyncio
 import inspect
 import logging
 import typing
@@ -204,7 +205,7 @@ class PanelDGP848(PanelBase):
             element["label"] = labels[i] or f"Zone {i}"
             if element["key"] in keys:  # e.g. zones 7 and 24 are both 'garazo vartai'
                 element["key"] = f"{element['key']}_{i}"
-            while not labels[i] and element["key"] in keys:
+            while element["key"] in keys:
                 element["key"] = f"{element['key']}_{i}"
             keys.add(element["key"])
             elements[i] = element
@@ -219,9 +220,19 @@ class PanelDGP848(PanelBase):
         self._zones = set(data["zone"])
 
         partition_names = {int(k): v for k, v in (cfg.PARTITION_NAMES or {}).items()}
-        for i in self._selected("partition", PARTITION_COUNT, partition_names):
+        partition_elements = {}
+        keys = set()
+        for i in range(1, PARTITION_COUNT + 1):
             name = partition_names.get(i) or f"Partition {i}"
-            data["partition"][i] = self.label_element("partition", i, name)
+            element = self.label_element("partition", i, name)
+            if element["key"] in keys:
+                element["key"] = f"{element['key']}_{i}"
+            while element["key"] in keys:
+                element["key"] = f"{element['key']}_{i}"
+            keys.add(element["key"])
+            partition_elements[i] = element
+        for i in self._selected("partition", PARTITION_COUNT, partition_names):
+            data["partition"][i] = partition_elements[i]
         self._partitions = set(data["partition"])
 
         logger.info(
@@ -252,13 +263,17 @@ class PanelDGP848(PanelBase):
         """EEPROM read (address without the 0x8000 bit). A longer timeout is
         used because EEPROM reads are occasionally slow; on failure an empty
         result is returned."""
-        reply = await self.core.send_wait(
-            message=parsers.build_read_ram(address, count),
-            reply_expected=lambda m, a=address: m.fields.value.po.command == 0x5
-            and m.fields.value.address == a,
-            timeout=3.0,
-            retries=2,
-        )
+        try:
+            reply = await self.core.send_wait(
+                message=parsers.build_read_ram(address, count),
+                reply_expected=lambda m, a=address: m.fields.value.po.command == 0x5
+                and m.fields.value.address == a,
+                timeout=3.0,
+                retries=2,
+            )
+        except asyncio.TimeoutError:
+            logger.warning("Digiplex EEPROM read at %#x timed out", address)
+            return b""
         return reply.fields.value.data[:count] if reply is not None else b""
 
     async def request_status(self, nr: int):
@@ -331,8 +346,23 @@ class PanelDGP848(PanelBase):
             logger.warning('Partition command "%s" is not supported', command)
             return False
 
+        try:
+            selected = [int(partition) for partition in partitions]
+        except (TypeError, ValueError):
+            logger.warning("Invalid Digiplex partition selection: %r", partitions)
+            return False
+        if not selected or any(
+            not 1 <= partition <= PARTITION_COUNT for partition in selected
+        ):
+            logger.warning(
+                "Unsupported Digiplex partition selection: %r (supported: 1-%d)",
+                partitions,
+                PARTITION_COUNT,
+            )
+            return False
+
         message = parsers.build_partition_action(
-            {int(partition): code for partition in partitions}
+            {partition: code for partition in selected}
         )
         reply = await self.core.send_wait(
             message=message,
