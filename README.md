@@ -1,153 +1,35 @@
-<div align="center">
-    <div style="display: flex;">
-        <a href="https://discord.gg/6KaXFtg39r">
-            <img alt="Discord" src="https://img.shields.io/discord/1310653159596888064">
-        </a>
-        <a href="https://github.com/ParadoxAlarmInterface/pai/actions/workflows/master.yml">
-            <img alt="CI/CD master" src="https://github.com/ParadoxAlarmInterface/pai/actions/workflows/master.yml/badge.svg?branch=master">
-        </a>
-        <a href="https://github.com/ParadoxAlarmInterface/pai/actions/workflows/dev.yml">
-            <img alt="CI/CD dev" src="https://github.com/ParadoxAlarmInterface/pai/actions/workflows/dev.yml/badge.svg?branch=dev">
-        </a>
-        <a href="https://hub.docker.com/r/paradoxalarminterface/pai">
-            <img alt="Docker Arch" src="https://img.shields.io/badge/docker_arch-amd64%7Carmv7%7Carm64-green?logo=docker">
-            <img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/paradoxalarminterface/pai?logo=docker">
-        </a>
-        <a href="https://snyk.io/test/github/ParadoxAlarmInterface/pai?targetFile=requirements.txt">
-            <img src="https://snyk.io/test/github/ParadoxAlarmInterface/pai/badge.svg?targetFile=requirements.txt" alt="Known Vulnerabilities" data-canonical-src="https://snyk.io/test/github/ParadoxAlarmInterface/pai?targetFile=requirements.txt" style="max-width:100%;">
-        </a>
-        <img alt="GitHub" src="https://img.shields.io/github/license/ParadoxAlarmInterface/pai">
-    </div>
-</div>
+# PAI — Paradox Alarm Interface
 
-<br/>
-<p align="center">
-<img src="https://github.com/ParadoxAlarmInterface/pai/raw/master/docs/pai_logo.png">
-</p>
-<h1 align="center">PAI - Paradox Alarm Interface</h1>
+PAI connects Paradox alarm panels to home automation through MQTT. It integrates
+with Home Assistant, Homebridge, OpenHAB, and other MQTT clients.
 
-Middleware that aims to connect to a Paradox Alarm panel, exposing the interface for monitoring and control via several technologies.
-With this interface it is possible to integrate Paradox panels with HomeAssistant, OpenHAB, Homebridge or other domotics system that supports MQTT, as well as several IM methods.
+The code includes drivers for Digiplex, EVO, Spectra/Magellan, and MG6250
+(partial support). Compatible panels can also connect through a PRT3 module.
+Compatibility depends on the panel model, firmware, and connection method.
 
-It supports MG/SP/EVO panels (firmwares below 7.50.000) connected through a serial port, which is present in all panels (TTL 5V), or through a USB 307 module. It also supports connections using the IP150 module, both directly (ip module firmware version < 4.0 or >= 4.40.004), and through the SITE ID (firmware versions >4.0).
+## Documentation
 
-For further information and detailed usage refer to the [Wiki](https://github.com/ParadoxAlarmInterface/pai/wiki).
+- [Installation](https://github.com/ParadoxAlarmInterface/pai/wiki/Installation)
+- [Configuration](https://github.com/ParadoxAlarmInterface/pai/wiki/Configuration)
+- [Connection methods](https://github.com/ParadoxAlarmInterface/pai/wiki/Connection-methods)
+- [Compatibility reports for PAI 3.8.1](https://github.com/ParadoxAlarmInterface/pai/wiki/Compatibility)
+- [Integration guides](https://github.com/ParadoxAlarmInterface/pai/wiki)
 
-If you are having issues, or wish to discuss new features, join us at our [Discord community](https://discord.gg/6KaXFtg39r)
-
-On Android, if you install [MQTT Dash](https://play.google.com/store/apps/details?id=net.routix.mqttdash), and [follow the instructions](https://github.com/ParadoxAlarmInterface/pai/wiki#mqtt-dash) you will automatically get a panel like this:
-![mqtt_dash](https://user-images.githubusercontent.com/497717/52603920-d4984d80-2e60-11e9-9772-578b10576b3c.jpg)
-
-## Things you need to have to be able to connect
-We support two [connection options](https://github.com/ParadoxAlarmInterface/pai/wiki/Connection-methods): via [Serial](https://github.com/ParadoxAlarmInterface/pai/wiki/Connection-methods#serial-connection) and via [IP150 Module](https://github.com/ParadoxAlarmInterface/pai/wiki/Connection-methods#ip-module-connection-IP100-IP150).
-
-#### For all connection methods
-- **PC Password:** 4 digit `[0-9a-f]` password.
-Can be looked up in Babyware (_Right click on a panel ⇾ Properties ⇾ PC Communication (BabyWare) ⇾ PC Communication (BabyWare) ⇾ PC Password_)
-#### In case of IP150 you need additionally:
-- **IP Module password**: Default is `paradox`
-##### For IP150 firmware > 4.0 if you connect via Paradox Cloud (SWAN)
-- **SITE ID**
-- **Email registered in the site**
-
-We do not recommend using SWAN because of https://github.com/CriticalSecurity/paradox
-
-## Firmware Upgrade WARNING:
-**Do not upgrade EVO firmware versions to 7.50.000+ if you use Serial connection. Process is irreversible! Paradox introduces serial communication encryption which most probably will break our PAI ability to talk to the panel.**
-Note: Paradox sells unlock code to re-enable the unencrypted serial port.
-
-For protocol details, see [EVO serial encryption notes](docs/serial_encryption.md).
-
-## How to use
-See [wiki](https://github.com/ParadoxAlarmInterface/pai/wiki/Installation)
-
-For PRT3-specific setup, see the [PRT3 usage guide](docs/prt3-usage.md).
-
-### MG6250
-
-Set `PASSWORD` to the MG6250 PC communication password; it cannot be `None`.
-`MG6250_USERNAME` defaults to `admin`. The driver supports status polling,
-new event-log entries, clock synchronization (`SYNC_TIME`), partition controls,
-zone bypass and `definition_<name or number>` commands, and PGM controls.
-Disabling zones through a definition command is deliberately unsupported.
-
-Optionally set `MG6250_SESSION_FILE` to a file in a directory writable by PAI
-to recover an interrupted session when the panel reports busy. This file
-contains a sensitive session key, is replaced atomically with owner-only
-permissions, and remains after logout because sending logout does not confirm
-delivery. A new login replaces it; an unsuccessful resume keeps it for retry.
-
-State comes from polling, not historical log entries. Event log polling retries
-if initialization fails; entries before the first successful read are not
-replayed. Live event reception and PGM state reporting are not implemented.
-Pulse cleanup is best effort; after a lost connection, verify the output on the
-panel.
-Status decoding is based on packet captures: validate arm, exit-delay and
-bypass behavior on your hardware before relying on it.
-
-### Building the Docker image
-
-Run `docker build -t pai .`. The Python 3.15 Debian slim multi-stage build requires
-a prebuilt `cryptography` wheel, avoiding Rust compilation. A C compiler and
-libffi headers are available in the builder stage for dependencies such as CFFI.
-The runtime image contains the installed Python environment and shared libraries,
-without the compiler toolchain.
-
-Dependencies are installed in a separate layer from the application so
-code changes do not recompile them. The publishing workflow saves all build
-stages in the GitHub Actions cache, including the dependency layer.
-
-Published images support `linux/amd64`, `linux/arm/v7`, and `linux/arm64/v8`.
-32-bit x86 and ARMv6 images are no longer published. Raspberry Pi 1 and the
-original Pi Zero/Zero W cannot run the ARMv7 image; Pi 2 and newer, including
-Zero 2 W, can use it with a suitable 32-bit OS.
-
-## Tested Environment
-
-Tested in the following environment:
-* Python 3.11, 3.12, 3.13, 3.14 and 3.15
-* Mosquitto MQTT Broker > 1.4.8
-* OrangePi 2G-IOT, NanoPi NEO, and Raspberry Pi 3 through their built in Serial Port (with a level shifter!), or a USB RS232 TTL adapter (CP2102, PL2303, CH340, etc..)
-* Ubuntu Server 16.04.3 LTS
-* Paradox MG5050, SP7000 and EVO panels
-* [Signal Cli](https://github.com/AsamK/signal-cli) through a DBUS interface
-* Pushbullet.py
-* SIM900 module through a serial port
-* Serial over TCP (ESP32 or Arduino connected to the panel's serial port acts as a proxy)
+For help or discussion, join the [Discord community](https://discord.gg/6KaXFtg39r)
+or [report an issue](https://github.com/ParadoxAlarmInterface/pai/issues).
 
 ## Authors
 
 * João Paulo Barraca - [@jpbarraca](https://github.com/jpbarraca) - Main code and MG/SP devices
 * Jevgeni Kiski - [@yozik04](https://github.com/yozik04) - Main code and EVO devices
 * Ion Darie - [@iondarie](https://github.com/iondarie) - PAI Logo, Homebridge integration, testing
-
+* Ricardas - [@richka](https://github.com/richka) - Digiplex (DGP-48/848/NE96)
+* Sylvain Pelissier - [@sylvainpelissier](https://github.com/sylvainpelissier) - MG6250
+* Naanya Biz - [@NaanyaBiz](https://github.com/NaanyaBiz) - PRT3
 
 ## Acknowledgments
 
-This work is inspired or uses parts from the following projects:
-
-* Tertiush at https://github.com/Tertiush/ParadoxIP150v2
-* Spinza at https://github.com/spinza/paradox_mqtt
-
-## Thanks
-* Ivan Markov - [@ivmarkov](https://github.com/ivmarkov) - Multi-platform Docker builds
-* Claudiu Bucur - [@clau-bucur](https://github.com/clau-bucur) - For fixing HomeAssistant plugin after Supervisor(2021.02.5) upgrade [#199](https://github.com/ParadoxAlarmInterface/pai/issues/199)
-* David Tekan - [@tekand](https://github.com/tekand) - For supporting different label encodings.
-
-## Disclaimer
-
-Paradox, MG5050 and IP150 are registered marks of PARADOX. Other brands are owned by their respective owners.
-
-The code was developed as a way of integrating personally owned Paradox systems, and it cannot be used for other purposes.
-It is not affiliated with any company and it doesn't have have commercial intent.
-
-The code is provided AS IS and the developers will not be held responsible for failures in the alarm systems, or any other malfunction.
-
-## Donations
-
-We have fully stopped accepting donations due to lack of free time to spend on this project.
-
-[//]: # (## With support from)
-
-[//]: # ()
-[//]: # (<a href="https://www.jetbrains.com/?from=PAI-ParadoxAlarmInterface"><img src="/docs/jetbrains.svg" alt="JetBrains"/></a>)
+Inspired by [Tertiush/ParadoxIP150v2](https://github.com/Tertiush/ParadoxIP150v2)
+and [spinza/paradox_mqtt](https://github.com/spinza/paradox_mqtt). Thanks to
+[@ivmarkov](https://github.com/ivmarkov), [@clau-bucur](https://github.com/clau-bucur),
+and [@tekand](https://github.com/tekand) for their contributions.
