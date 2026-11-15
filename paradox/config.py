@@ -98,11 +98,6 @@ class Config:
         "IO_TIMEOUT": 0.5,  # Timeout for IO operations
         "LIMITS": {},  # By default all zones will be monitored
         "MODULE_PGM_ADDRESSES": [],  # Entries with bus module address and PGM count
-        # Digiplex: zone key -> Home Assistant binary_sensor device_class.
-        # The panel does not expose the physical sensor type (zone definitions
-        # describe behaviour only), so the mapping has to be explicit. Zones
-        # that are not listed default to "motion".
-        "ZONE_DEVICE_CLASS": {},
         # Digiplex: partition number -> name used in Home Assistant.
         # Missing entries default to "Partition <number>".
         "PARTITION_NAMES": {},
@@ -223,6 +218,10 @@ class Config:
             "open",
             "tamper",
         ],
+        # Zone key -> Home Assistant binary_sensor device_class of the zone
+        # "open" sensor. Panels do not expose the physical sensor type, so the
+        # mapping is explicit. Unlisted zones default to "motion".
+        "ZONE_DEVICE_CLASS": {},
         # Home Assistant Notifications (HASS.io required)
         "HOMEASSISTANT_NOTIFICATIONS_ENABLE": False,
         "HOMEASSISTANT_NOTIFICATIONS_API_URL": "http://supervisor/core/api/services/:domain/:service",

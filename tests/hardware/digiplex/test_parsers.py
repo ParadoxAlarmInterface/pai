@@ -9,7 +9,6 @@ regression fixtures: the driver must produce exactly these bytes.
 import pytest
 
 from paradox.hardware.digiplex import parsers
-from paradox.hardware.digiplex.adapters import zone_device_class
 from paradox.hardware.digiplex.property import RAMDataParserMap
 
 # --- recorded frames -----------------------------------------------------
@@ -296,25 +295,6 @@ def test_entry_delay_flag():
         _partition_block(house_arm=0x05, house_status=0x00)
     )
     assert parsed.partition_status[1]["entry_delay"] is False
-
-
-@pytest.mark.parametrize(
-    ("zone_key", "mapping", "expected"),
-    [
-        ("garazas", {}, "motion"),
-        ("garazas", {"garazas": "motion"}, "motion"),
-        ("fasado_durys", {"fasado_durys": "door"}, "door"),
-        ("vaiku_rytu_lang", {"vaiku_rytu_lang": "window"}, "window"),
-        ("garazo_vartai", {"garazo_vartai": "garage_door"}, "garage_door"),
-        ("miegamojo_duzis", {"miegamojo_duzis": "vibration"}, "vibration"),
-        ("sirena_deze_tamp", {"sirena_deze_tamp": "tamper"}, "tamper"),
-        ("gaisras", {"gaisras": "smoke"}, "smoke"),
-        ("virtuve", {"other": "door"}, "motion"),
-        ("virtuve", {"virtuve": "not_a_device_class"}, "motion"),
-    ],
-)
-def test_zone_device_class(zone_key, mapping, expected):
-    assert zone_device_class(zone_key, mapping) == expected
 
 
 def test_parse_event_response_full_frame():

@@ -26,12 +26,32 @@ class Panel:
     property_map = {}  # override in a subclass
     max_eeprom_response_data_length = 0  # override in a subclass
     status_request_addresses = []  # override in a subclass
-    close_connection_supported = True  # Digiplex panels have no logout command
+    supports_time_sync = True  # whether SetTimeDate is implemented
 
     def __init__(self, core, variable_message_length=True):
         self.core = core
         self.settings = {}
         self.variable_message_length = variable_message_length
+
+    @classmethod
+    async def start_communication(cls, core, initiate_reply: Container) -> Container:
+        """StartCommunication exchange after InitiateCommunication.
+
+        Returns the reply that identifies the product (passed to the driver).
+        """
+        logger.info("Initiating panel connection")
+        reply = await core.send_wait(
+            parsers.StartCommunication,
+            args={"source_id": core.connection.start_communication_source_id},
+            reply_expected=0x0,
+        )
+        if reply is None:
+            raise ConnectionError("Panel did not replied to StartCommunication")
+        return reply
+
+    def build_close_connection(self) -> typing.Optional[bytes]:
+        """Logout frame sent on teardown, or None if the panel has none."""
+        return self.get_message("CloseConnection").build({})
 
     def parse_message(self, message, direction="topanel") -> typing.Optional[Container]:
         if message is None or len(message) < 2:

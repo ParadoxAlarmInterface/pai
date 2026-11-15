@@ -7,6 +7,7 @@ import pytest
 from paradox.connections.connection import Connection
 from paradox.config import Config, config as cfg
 from paradox.hardware import Panel, create_panel
+from paradox.hardware.prt3.panel import PRT3Panel
 from paradox.paradox import Paradox
 
 
@@ -26,9 +27,10 @@ async def test_sync_time_respects_panel_support(
     monkeypatch.setattr(cfg, "SYNC_TIME", True)
     monkeypatch.setattr(cfg, "SYNC_TIME_TIMEZONE", "")
     alarm = Paradox()
-    alarm.panel = create_panel(
-        alarm, _start_communication_reply(product_id) if product_id else None
-    )
+    if connection_type == "PRT3":
+        alarm.panel = PRT3Panel(alarm)
+    else:
+        alarm.panel = create_panel(alarm, _start_communication_reply(product_id))
     alarm.storage.get_container("system").deep_merge(
         {"date": {"time": datetime(2000, 1, 1)}}
     )

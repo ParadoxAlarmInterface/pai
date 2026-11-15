@@ -1,5 +1,48 @@
+import logging
+
+from paradox.config import config as cfg
 from paradox.interfaces.mqtt.entities.abstract_entity import AbstractEntity
 from paradox.lib.utils import sanitize_key
+
+logger = logging.getLogger("PAI").getChild(__name__)
+
+# Home Assistant binary_sensor device classes accepted in ZONE_DEVICE_CLASS.
+ZONE_DEVICE_CLASSES = (
+    "motion",
+    "door",
+    "window",
+    "garage_door",
+    "smoke",
+    "vibration",
+    "tamper",
+    "gas",
+    "moisture",
+    "occupancy",
+    "opening",
+    "safety",
+    "problem",
+)
+DEFAULT_ZONE_DEVICE_CLASS = "motion"
+
+
+def zone_device_class(zone_key: str) -> str:
+    """Zone key -> Home Assistant device_class from ``ZONE_DEVICE_CLASS``.
+
+    Panels do not expose the physical sensor type (zone definitions describe
+    behaviour only), so the mapping is explicit configuration. Unlisted zones
+    and unknown classes fall back to "motion".
+    """
+    device_class = (cfg.ZONE_DEVICE_CLASS or {}).get(zone_key, DEFAULT_ZONE_DEVICE_CLASS)
+    if device_class not in ZONE_DEVICE_CLASSES:
+        logger.warning(
+            "Ignoring unknown device_class %r for zone %r, using %r",
+            device_class,
+            zone_key,
+            DEFAULT_ZONE_DEVICE_CLASS,
+        )
+        return DEFAULT_ZONE_DEVICE_CLASS
+
+    return device_class
 
 
 class AbstractStatusBinarySensor(AbstractEntity):
@@ -8,9 +51,6 @@ class AbstractStatusBinarySensor(AbstractEntity):
 
         self.label = entity.get("label", entity["key"].replace("_", " "))
         self.property = property
-        # Per-entity device_class (currently only Digiplex zones provide one).
-        # None means "let the concrete sensor decide its default".
-        self.device_class = entity.get("device_class")
 
         self.key = sanitize_key(entity["key"])
 
@@ -41,7 +81,7 @@ class ZoneStatusBinarySensor(AbstractStatusBinarySensor):
     def serialize(self):
         config = super().serialize()
         if self.property == 'open':
-            config['device_class'] = self.device_class or 'motion'
+            config['device_class'] = zone_device_class(self.key)
 
         return config
 

@@ -147,6 +147,10 @@ import logging
 #     'open',
 #     'tamper'
 # ]
+# ZONE_DEVICE_CLASS = {  # Zone key -> Home Assistant device_class of the zone "open" sensor. Default: 'motion'
+#     'front_door': 'door',
+#     'kitchen_window': 'window',
+# }
 #
 ### Dash App
 # MQTT_DASH_PUBLISH = False

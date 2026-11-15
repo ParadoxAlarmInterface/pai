@@ -40,7 +40,6 @@ def _panel(labels: dict) -> PanelDGP848:
 @pytest.fixture(autouse=True)
 def config(monkeypatch):
     monkeypatch.setattr(cfg, "LIMITS", {})
-    monkeypatch.setattr(cfg, "ZONE_DEVICE_CLASS", {})
     monkeypatch.setattr(cfg, "PARTITION_NAMES", {})
 
 
@@ -74,11 +73,9 @@ async def test_zone_limits_select_zones(monkeypatch):
     assert zones[5]["label"] == "Zone 5"
 
 
-async def test_tamper_is_kept_for_every_zone_type(monkeypatch):
-    monkeypatch.setattr(cfg, "ZONE_DEVICE_CLASS", {"fasado_durys": "door"})
+async def test_tamper_is_kept_for_every_published_zone():
     panel = _panel({1: b"fasado durys", 2: b"virtuve"})
-    zones = (await panel.load_labels())["zone"]
-    assert zones[1]["device_class"] == "door"
+    await panel.load_labels()
 
     reply = Container(
         fields=Container(
@@ -92,7 +89,7 @@ async def test_tamper_is_kept_for_every_zone_type(monkeypatch):
 
     status = await panel.request_status(0x8153)
 
-    assert status["zone_tamper"][1] is True  # "door" zone keeps its tamper
+    assert status["zone_tamper"][1] is True
     assert status["zone_tamper"][2] is True
     assert status["zone_open"][3] is True
     assert status["zone_open"][1] is False

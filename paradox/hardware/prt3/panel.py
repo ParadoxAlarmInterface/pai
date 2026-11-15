@@ -39,6 +39,7 @@ import logging
 from typing import Optional
 
 from paradox.config import config as cfg
+from paradox.data.model import DetectedPanel
 from paradox.hardware.panel import Panel
 from paradox.hardware.prt3 import adapter, encoder
 from paradox.hardware.prt3.parser import (
@@ -51,6 +52,7 @@ from paradox.hardware.prt3.parser import (
     parse_line,
 )
 from paradox.hardware.prt3.property import property_map
+from paradox.lib.utils import sanitize_key
 
 logger = logging.getLogger("PAI").getChild(__name__)
 
@@ -92,6 +94,7 @@ class PRT3Panel(Panel):
     # the poll loop calls request_status(0) once per cycle and it polls
     # all configured areas and zones internally.
     status_request_addresses = [0]
+    supports_time_sync = False  # no SetTimeDate over the ASCII protocol
 
     def __init__(self, core):
         # variable_message_length=False: PRT3Protocol.variable_message_length()
@@ -209,6 +212,25 @@ class PRT3Panel(Panel):
     # ------------------------------------------------------------------
     # Startup handshake
     # ------------------------------------------------------------------
+
+    @classmethod
+    async def detect(cls, core):
+        """PRT3 has no binary identification exchange: synthesise an identity
+        from the configured port so HA discovery has a stable device identity
+        to anchor entity unique_ids to. Link liveness is checked by
+        initialize_communication()."""
+        panel = cls(core)
+        core.install_panel(panel)
+        port_id = sanitize_key(cfg.PRT3_SERIAL_PORT) or "prt3"
+        return panel, DetectedPanel(
+            product_id=None,
+            model="PRT3",
+            firmware_version="N/A",
+            serial_number=f"prt3_{port_id}",
+        )
+
+    def build_close_connection(self):
+        return None  # no logout over the ASCII protocol
 
     async def initialize_communication(self, password) -> bool:
         """

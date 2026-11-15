@@ -128,9 +128,10 @@ rejected.
 
 The panel does not expose the physical type of a zone: zone definitions only
 describe behaviour (instant, entry delay, 24h fire, ...), not whether a zone is
-a PIR, a contact or a glass-break detector. The type is therefore set
-explicitly, per zone key, and never guessed from the label text — a panel
-programmed in any language behaves the same.
+a PIR, a contact or a glass-break detector. The Home Assistant type is
+therefore set explicitly, per zone key, with the generic MQTT option
+`ZONE_DEVICE_CLASS` (it works for every panel family) and never guessed from
+the label text — a panel programmed in any language behaves the same.
 
 ```python
 # Zone key -> Home Assistant binary_sensor device_class of the "open" sensor.

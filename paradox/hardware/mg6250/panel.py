@@ -370,6 +370,13 @@ class Panel(PanelBase):
     event_map = {}  # TODO
     property_map = {}  # TODO
     status_request_addresses = [0]
+    supports_time_sync = False  # no SetTimeDate in this protocol
+
+    @classmethod
+    async def start_communication(cls, core, initiate_reply):
+        # The MG6250 ignores StartCommunication (0x5F); the 0x72 reply
+        # already identifies it.
+        return initiate_reply
 
     def __init__(
         self, core, start_communication_response=None, variable_message_length=False

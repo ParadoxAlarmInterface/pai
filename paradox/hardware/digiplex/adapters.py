@@ -1,7 +1,5 @@
 """Construct helpers that turn Digiplex RAM bytes into ``convert_raw_status()`` values."""
 
-import logging
-
 from construct import (
     Adapter,
     BitStruct,
@@ -13,9 +11,7 @@ from construct import (
     this,
 )
 
-from ..evo.adapters import DictArray, StatusFlags
-
-logger = logging.getLogger("PAI").getChild(__name__)
+from ..common import DictArray, StatusFlags
 
 
 def zone_flags(count: int):
@@ -51,48 +47,6 @@ class VoltageAdapter(Adapter):
 
     def _encode(self, obj, context, path):
         return int(round(obj / self.step))
-
-
-# Home Assistant binary_sensor device classes accepted in ZONE_DEVICE_CLASS.
-ZONE_DEVICE_CLASSES = (
-    "motion",
-    "door",
-    "window",
-    "garage_door",
-    "smoke",
-    "vibration",
-    "tamper",
-    "gas",
-    "moisture",
-    "occupancy",
-    "opening",
-    "safety",
-    "problem",
-)
-DEFAULT_ZONE_DEVICE_CLASS = "motion"
-
-
-def zone_device_class(zone_key: str, mapping: dict | None = None) -> str:
-    """Zone key -> Home Assistant binary_sensor device_class.
-
-    The panel does not expose the physical sensor type: zone definitions only
-    describe behaviour (instant, entry delay, 24h fire, ...), not whether a
-    zone is a PIR, a contact or a glass-break detector. The mapping therefore
-    comes from the ``ZONE_DEVICE_CLASS`` configuration option (zone key ->
-    device_class) and never from the label text, so it works the same for a
-    panel programmed in any language. Unlisted zones default to "motion".
-    """
-    device_class = (mapping or {}).get(zone_key, DEFAULT_ZONE_DEVICE_CLASS)
-    if device_class not in ZONE_DEVICE_CLASSES:
-        logger.warning(
-            "Ignoring unknown device_class %r for zone %r, using %r",
-            device_class,
-            zone_key,
-            DEFAULT_ZONE_DEVICE_CLASS,
-        )
-        return DEFAULT_ZONE_DEVICE_CLASS
-
-    return device_class
 
 
 # Partition status: 5-byte blocks starting at RAM 0x0195 (see README.md),

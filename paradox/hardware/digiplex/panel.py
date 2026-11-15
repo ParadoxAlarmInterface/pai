@@ -1,17 +1,20 @@
+from binascii import hexlify
 from collections import defaultdict
 import asyncio
 import inspect
 import logging
+import time
 import typing
 
 from construct import Construct, Container
 
 from paradox.config import config as cfg, get_limits_for_type
+from paradox.data.model import DetectedPanel
 from paradox.exceptions import AuthenticationFailed, StatusRequestException
 
 from . import parsers
 from ..panel import Panel as PanelBase
-from .adapters import PARTITION_COUNT, zone_device_class
+from .adapters import PARTITION_COUNT
 from .property import RAMDataParserMap, property_map
 
 logger = logging.getLogger("PAI").getChild(__name__)
@@ -32,6 +35,10 @@ ZONES = 48
 # Verified live on 2026-10-24: z.1='vaiku rytu lang.' ... z.48='gaisras'.
 ZONE_LABELS_BASE = 0x2000
 
+# The panel releases a stale PC session only after ~15-25 s of line silence.
+SESSION_RELEASE_SILENCE = 30
+DETECT_DEADLINE = 120
+
 
 class PanelDGP848(PanelBase):
     """Paradox Digiplex panel (DGP-48 / DGP-848 / DGP-NE96).
@@ -45,7 +52,7 @@ class PanelDGP848(PanelBase):
     - Only one PC session at a time. After a connection loss the panel keeps
       the session and releases it only after ~15-25 s of absolute line silence
       - every request, even a rejected one, resets that timer. Retries must
-      therefore be slow (see Paradox._digiplex_connect).
+      therefore be slow (see detect()).
     """
 
     property_map = property_map
@@ -56,10 +63,6 @@ class PanelDGP848(PanelBase):
     # EEPROM label layout is unknown for this family; labels are synthesized
     # in load_labels() instead (same approach as the PRT3 panel).
     mem_map = {}
-
-    # Digiplex has no logout command; sending the generic CloseConnection
-    # frame would be an error and would reset the panel's session timer.
-    close_connection_supported = False
 
     def __init__(
         self, core, start_communication_response=None, variable_message_length=False
@@ -90,6 +93,74 @@ class PanelDGP848(PanelBase):
                 ZONES,
                 PARTITION_COUNT,
             )
+
+    @classmethod
+    async def detect(cls, core):
+        """Discovery when InitiateCommunication went unanswered (issue #257).
+
+        The panel identifies itself in the StartCommunication response, which
+        it only accepts with source_id=0. A reply other than 0x0 means the
+        panel still holds a previous session; it is released only after line
+        silence, so retries are slow and silent.
+        """
+        core.install_panel(cls(core))
+        reply = await cls._wait_for_session(core)
+
+        value = reply.fields.value
+        if value.product_id not in DIGIPLEX_PRODUCTS:
+            raise ConnectionError(
+                "Unsupported Digiplex product_id: %s" % value.product_id
+            )
+
+        panel = cls(core, reply)
+        core.install_panel(panel)
+        return panel, DetectedPanel(
+            product_id=value.product_id,
+            model="Digiplex DGP",
+            firmware_version="{}.{} build {:#06x}".format(
+                value.firmware.version, value.firmware.revision, value.firmware_build
+            ),
+            serial_number=hexlify(value.serial_number).decode(),
+        )
+
+    @staticmethod
+    async def _wait_for_session(core):
+        """Send StartCommunication until the panel accepts it (command 0x00)."""
+        deadline = time.monotonic() + DETECT_DEADLINE
+        while True:
+            try:
+                reply = await core.send_wait(
+                    parsers.StartCommunication,
+                    args={"source_id": 0},
+                    reply_expected=[0x0, 0x7],
+                    retries=1,
+                )
+            except asyncio.TimeoutError:
+                reply = None
+
+            if reply is not None and reply.fields.value.po.command == 0x0:
+                return reply
+
+            if reply is None:
+                logger.info(
+                    "Digiplex panel did not reply. Waiting %ds before retry",
+                    SESSION_RELEASE_SILENCE,
+                )
+            else:
+                logger.info(
+                    "Digiplex panel reports a busy session. Waiting %ds of "
+                    "line silence for the panel to release it",
+                    SESSION_RELEASE_SILENCE,
+                )
+
+            if time.monotonic() + SESSION_RELEASE_SILENCE >= deadline:
+                raise ConnectionError("Panel did not release its previous session")
+            await asyncio.sleep(SESSION_RELEASE_SILENCE)
+
+    def build_close_connection(self):
+        # No logout command: the generic CloseConnection frame is an error
+        # and would reset the panel's session release timer.
+        return None
 
     @property
     def status_request_addresses(self):
@@ -196,41 +267,26 @@ class PanelDGP848(PanelBase):
 
         # Keys are allocated over all zones (labelled first) before LIMITS is
         # applied, so neither fallbacks nor LIMITS change a labelled zone's key.
-        keys = set()
-        elements = {}
         named = [i for i in range(1, ZONES + 1) if labels[i]]
         unnamed = [i for i in range(1, ZONES + 1) if not labels[i]]
+        elements = {}
         for i in named + unnamed:
-            element = self.label_element("zone", i, labels[i])
-            element["label"] = labels[i] or f"Zone {i}"
-            if element["key"] in keys:  # e.g. zones 7 and 24 are both 'garazo vartai'
-                element["key"] = f"{element['key']}_{i}"
-            while element["key"] in keys:
-                element["key"] = f"{element['key']}_{i}"
-            keys.add(element["key"])
-            elements[i] = element
+            elements[i] = self.label_element("zone", i, labels[i])
+            elements[i]["label"] = labels[i] or f"Zone {i}"
+        self._make_keys_unique(elements.values())
 
         for i in self._selected("zone", ZONES):
-            element = elements[i]
-            element["device_class"] = zone_device_class(
-                element["key"], cfg.ZONE_DEVICE_CLASS
-            )
-            data["zone"][i] = element
-        data["zone"] = dict(sorted(data["zone"].items()))
+            data["zone"][i] = elements[i]
         self._zones = set(data["zone"])
 
         partition_names = {int(k): v for k, v in (cfg.PARTITION_NAMES or {}).items()}
-        partition_elements = {}
-        keys = set()
-        for i in range(1, PARTITION_COUNT + 1):
-            name = partition_names.get(i) or f"Partition {i}"
-            element = self.label_element("partition", i, name)
-            if element["key"] in keys:
-                element["key"] = f"{element['key']}_{i}"
-            while element["key"] in keys:
-                element["key"] = f"{element['key']}_{i}"
-            keys.add(element["key"])
-            partition_elements[i] = element
+        partition_elements = {
+            i: self.label_element(
+                "partition", i, partition_names.get(i) or f"Partition {i}"
+            )
+            for i in range(1, PARTITION_COUNT + 1)
+        }
+        self._make_keys_unique(partition_elements.values())
         for i in self._selected("partition", PARTITION_COUNT, partition_names):
             data["partition"][i] = partition_elements[i]
         self._partitions = set(data["partition"])
@@ -241,6 +297,16 @@ class PanelDGP848(PanelBase):
             sorted(self._partitions),
         )
         return dict(data)
+
+    @staticmethod
+    def _make_keys_unique(elements) -> None:
+        """Suffix a key already taken by an earlier element with the element
+        ID (e.g. zones 7 and 24 are both 'garazo vartai' -> 'garazo_vartai_24')."""
+        keys = set()
+        for element in elements:
+            while element["key"] in keys:
+                element["key"] = f"{element['key']}_{element['id']}"
+            keys.add(element["key"])
 
     @staticmethod
     def _selected(elem_type: str, supported: int, configured=()) -> list:
@@ -299,8 +365,7 @@ class PanelDGP848(PanelBase):
     def _keep_published(self, result):
         """Publish only the zones and partitions selected in load_labels().
 
-        Tamper is published for every published zone: the configured
-        device_class only changes how Home Assistant shows the open state.
+        Tamper is published for every published zone.
         """
         selections = (
             ("zone_open", self._zones),
@@ -361,9 +426,7 @@ class PanelDGP848(PanelBase):
             )
             return False
 
-        message = parsers.build_partition_action(
-            {partition: code for partition in selected}
-        )
+        message = parsers.build_partition_action(dict.fromkeys(selected, code))
         reply = await self.core.send_wait(
             message=message,
             reply_expected=[0x4, 0x7],
