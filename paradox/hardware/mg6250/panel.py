@@ -235,8 +235,8 @@ AREA_FIELD_LABEL = 2  # 16 bytes
 FIELD_SERIAL = 0  # 6 bytes, all zero when nothing is enrolled (not for zones)
 FIELD_LABEL = 1  # 16 bytes
 # Zone field 0: device (2) | definition | partition | options | ?. An empty
-# zone reads 00 00 00 01 87 00. change-zone: BabyWare wrote definition
-# 09 -> 08 for zones 4-7.
+# zone reads 00 00 00 01 87 00. In the change-zone capture, BabyWare changed
+# the definition of zones 4 to 7 from 9 to 8.
 ZONE_DEFINITION = 2
 ZONE_PARTITION = 3  # Values 1 and 2 select one partition; 3 selects both.
 # Programming guide table 4, with the names of the SP/MG definitions where
