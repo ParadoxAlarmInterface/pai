@@ -731,6 +731,32 @@ class Paradox:
         if self.panel is not None:
             self.panel.handle_async_message(message)
 
+    def dispatch_panel_event(self, event):
+        """Apply and publish an event produced by a panel-specific protocol."""
+        if event.change:
+            if event.type == "partition" and event.id in (0, 255):
+                for partition_id in self.storage.get_container("partition").keys():
+                    self.storage.update_container_object(
+                        "partition", partition_id, event.change
+                    )
+            else:
+                self.storage.update_container_object(event.type, event.id, event.change)
+        ps.sendEvent(event)
+        if event.type == "partition":
+            self._update_partition_states()
+
+    def apply_partition_state_change(
+        self, partitions, change, *, arm_freeze_seconds: float = 0
+    ):
+        """Apply a panel-confirmed state change and optionally ignore stale arm polls."""
+        freeze_deadline = time.monotonic() + arm_freeze_seconds
+        for partition_id in partitions:
+            if self.storage.get_container_object("partition", partition_id):
+                self.storage.update_container_object("partition", partition_id, change)
+                if arm_freeze_seconds:
+                    self._partition_arm_freeze_until[partition_id] = freeze_deadline
+        self._update_partition_states()
+
     async def disconnect(self):
         async with self._loop_primitive("_disconnect_lock", asyncio.Lock):
             self._disconnecting = True

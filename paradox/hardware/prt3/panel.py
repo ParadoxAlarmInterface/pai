@@ -36,7 +36,6 @@ PRT3EventHandler to be registered — this is Phase 3 / runtime wiring work.
 
 import asyncio
 import logging
-import time
 from typing import Optional
 
 from paradox.config import config as cfg
@@ -171,24 +170,11 @@ class PRT3Panel(Panel):
             logger.warning("handle_async_message: failed to parse event: %s", exc)
             return
         try:
-            self._apply_event_change(evt)
-            ps.sendEvent(evt)
-            if evt.type == "partition":
-                self.core._update_partition_states()
+            self.core.dispatch_panel_event(evt)
         except (KeyError, AttributeError) as exc:
             logger.warning("handle_async_message: storage dispatch error: %s", exc)
         except Exception:
             logger.exception("handle_async_message")
-
-    def _apply_event_change(self, evt):
-        if not evt.change:
-            return
-        if evt.type == "partition" and evt.id in (0, 255):
-            # Global event: broadcast to every known partition (area=0/255).
-            for pid in self.core.storage.get_container("partition").keys():
-                self.core.storage.update_container_object("partition", pid, evt.change)
-        else:
-            self.core.storage.update_container_object(evt.type, evt.id, evt.change)
 
     def on_partition_command(self, partitions, command):
         # The &OK echo is authoritative; suppress stale RA arm bits for 3 s.
@@ -202,12 +188,9 @@ class PRT3Panel(Panel):
             "exit_delay": False,
             "entry_delay": False,
         }
-        freeze_deadline = time.monotonic() + 3.0
-        for pid in partitions:
-            if self.core.storage.get_container_object("partition", pid):
-                self.core.storage.update_container_object("partition", pid, change)
-                self.core._partition_arm_freeze_until[pid] = freeze_deadline
-        self.core._update_partition_states()
+        self.core.apply_partition_state_change(
+            partitions, change, arm_freeze_seconds=3.0
+        )
 
     # ------------------------------------------------------------------
     # Internal request/reply helper
@@ -312,6 +295,7 @@ class PRT3Panel(Panel):
         The ``password`` argument is accepted for interface compatibility but
         ignored — PRT3 has no password exchange.
         """
+
         def _any_prt3_msg(m):
             return isinstance(
                 m,

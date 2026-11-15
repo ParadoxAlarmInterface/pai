@@ -41,6 +41,10 @@ PRT3 uses its own discovery and ASCII liveness check with no binary probes.
 - `supports_time_sync` gates clock synchronization.
 - `handle_async_message(message)` handles additional unsolicited protocol messages.
   Its persistent dispatcher is registered once per connection, not per installation.
+- `dispatch_panel_event(event)` publishes a driver-produced event through the
+  coordinator's storage and state pipeline.
+- `apply_partition_state_change(...)` applies confirmed partition state and can
+  freeze stale arm polls for a short interval.
 - `on_partition_command(partitions, command)` applies driver-specific state after an
   accepted command. `send_utility_key(key)` raises `NotImplementedError` by default.
 
