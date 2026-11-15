@@ -258,7 +258,7 @@ class PanelDGP848(PanelBase):
         "Zone <n>" fallback; their keys are allocated after the labelled
         zones, so a fallback never changes the key of a labelled zone.
         Partitions 1-2 are published unless ``LIMITS["partition"]`` restricts
-        them; ``PARTITION_NAMES`` only supplies their labels.
+        them; ``DIGIPLEX_PARTITION_NAMES`` only supplies their labels.
         """
         data = defaultdict(dict)
         raw = bytearray()
@@ -297,7 +297,9 @@ class PanelDGP848(PanelBase):
             data["zone"][i] = elements[i]
         self._zones = set(data["zone"])
 
-        partition_names = {int(k): v for k, v in (cfg.PARTITION_NAMES or {}).items()}
+        partition_names = {
+            int(k): v for k, v in (cfg.DIGIPLEX_PARTITION_NAMES or {}).items()
+        }
         partition_elements = {
             i: self.label_element(
                 "partition", i, partition_names.get(i) or f"Partition {i}"

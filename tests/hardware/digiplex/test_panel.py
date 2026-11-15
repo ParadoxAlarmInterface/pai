@@ -41,7 +41,7 @@ def _panel(labels: dict) -> PanelDGP848:
 @pytest.fixture(autouse=True)
 def config(monkeypatch):
     monkeypatch.setattr(cfg, "LIMITS", {})
-    monkeypatch.setattr(cfg, "PARTITION_NAMES", {})
+    monkeypatch.setattr(cfg, "DIGIPLEX_PARTITION_NAMES", {})
 
 
 async def test_all_zones_are_published_with_fallback_labels():
@@ -73,7 +73,7 @@ async def test_labels_use_configured_encoding(monkeypatch):
 
 
 async def test_case_only_label_collision_gets_suffix(monkeypatch):
-    monkeypatch.setattr(cfg, "PARTITION_NAMES", {"1": "House", "2": "house"})
+    monkeypatch.setattr(cfg, "DIGIPLEX_PARTITION_NAMES", {"1": "House", "2": "house"})
     labels = await _panel({1: b"Kitchen", 2: b"kitchen"}).load_labels()
 
     assert [labels["zone"][i]["key"] for i in (1, 2)] == ["Kitchen", "kitchen_2"]
@@ -113,7 +113,7 @@ async def test_tamper_is_kept_for_every_published_zone():
 
 
 async def test_partition_names_only_supply_labels(monkeypatch, caplog):
-    monkeypatch.setattr(cfg, "PARTITION_NAMES", {"1": "House", 6: "Shed"})
+    monkeypatch.setattr(cfg, "DIGIPLEX_PARTITION_NAMES", {"1": "House", 6: "Shed"})
     panel = _panel({})
 
     with caplog.at_level(logging.WARNING):
@@ -181,7 +181,7 @@ async def test_suffixed_zone_keys_are_unique():
 
 
 async def test_partition_keys_are_unique_before_limits(monkeypatch):
-    monkeypatch.setattr(cfg, "PARTITION_NAMES", {"1": "House", "2": "House"})
+    monkeypatch.setattr(cfg, "DIGIPLEX_PARTITION_NAMES", {"1": "House", "2": "House"})
     all_partitions = (await _panel({}).load_labels())["partition"]
     assert [p["key"] for p in all_partitions.values()] == ["House", "House_2"]
 
@@ -191,7 +191,7 @@ async def test_partition_keys_are_unique_before_limits(monkeypatch):
 
 
 async def test_partition_name_collision_with_default_is_unique(monkeypatch):
-    monkeypatch.setattr(cfg, "PARTITION_NAMES", {"1": "Partition 2"})
+    monkeypatch.setattr(cfg, "DIGIPLEX_PARTITION_NAMES", {"1": "Partition 2"})
 
     partitions = (await _panel({}).load_labels())["partition"]
 

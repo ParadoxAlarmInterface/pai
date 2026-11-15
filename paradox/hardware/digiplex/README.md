@@ -102,8 +102,8 @@ rejected.
 - **Zones 1–48 and partitions 1–2 only.** The DGP-848 supports 8 partitions
   and the DGP-NE96 96 zones, but our captures only cover partitions 1–2 and
   zones 1–48. On a DGP-NE96 a warning is logged at startup, and zones or
-  partitions beyond that range in `LIMITS` / `PARTITION_NAMES` are logged as
-  unsupported instead of being silently dropped.
+  partitions beyond that range in `LIMITS` / `DIGIPLEX_PARTITION_NAMES` are
+  logged as unsupported instead of being silently dropped.
 - **Which zones exist is not read from the panel.** The zone definition
   layout in EEPROM is unknown, so all zones 1–48 are published unless
   `LIMITS["zone"]` restricts them. Unlabelled zones are named `Zone <n>`;
@@ -158,7 +158,7 @@ ZONE_DEVICE_CLASS = {
 # Partition number -> partition name shown in Home Assistant. Only supplies
 # labels: missing entries default to "Partition <number>". Partitions 1-2 are
 # published unless LIMITS["partition"] restricts them.
-PARTITION_NAMES = {1: "House", 2: "Garage"}
+DIGIPLEX_PARTITION_NAMES = {1: "House", 2: "Garage"}
 
 # Optional: publish only these zones / partitions (default: zones 1-48,
 # partitions 1-2).
@@ -167,6 +167,9 @@ LIMITS = {"zone": "1-26,30", "partition": [1]}
 
 The zone key is the normalised EEPROM label (see `sanitize_key`), for example
 `vaiku rytu lang.` → `vaiku_rytu_lang`.
+
+If you configured `PARTITION_NAMES` in an earlier version of this branch, rename
+it to `DIGIPLEX_PARTITION_NAMES`.
 
 ## Tested environment
 

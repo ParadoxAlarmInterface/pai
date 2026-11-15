@@ -100,7 +100,7 @@ class Config:
         "MODULE_PGM_ADDRESSES": [],  # Entries with bus module address and PGM count
         # Digiplex: partition number -> name used in Home Assistant.
         # Missing entries default to "Partition <number>".
-        "PARTITION_NAMES": {},
+        "DIGIPLEX_PARTITION_NAMES": {},
         "LABEL_ENCODING": "paradox-en",  # Encoding to use when decoding labels. paradox-* or https://docs.python.org/3/library/codecs.html#standard-encodings
         "LABEL_REFRESH_INTERVAL": (
             15 * 60,
