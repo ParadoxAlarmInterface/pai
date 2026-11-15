@@ -14,6 +14,7 @@ import datetime
 import json
 import logging
 import os
+import tempfile
 import time
 import typing
 
@@ -673,7 +674,9 @@ class Panel(PanelBase):
             return None
         return self.decrypt_data(bytes(fields.payload))
 
-    def _is_reply(self, message, tid: int, service: int) -> bool:
+    def _is_reply(
+        self, message, tid: int, service: int, received_fragments: set
+    ) -> bool:
         decrypted = self._decrypt_message(message)
         if decrypted is None:
             return False
@@ -683,6 +686,7 @@ class Panel(PanelBase):
             and header.kind == KIND_DATA
             and header.tid == tid
             and header.service == service
+            and header.fragment not in received_fragments
         )
 
     def is_session_frame(self, message) -> bool:
@@ -704,41 +708,57 @@ class Panel(PanelBase):
 
         Each fragment is padded on its own, so parse them separately.
         """
+        async with self._get_transaction_lock():
+            return await self._transact_locked(service, data)
+
+    def _get_transaction_lock(self):
+        if self._transaction_lock is None:
+            self._transaction_lock = asyncio.Lock()
+        return self._transaction_lock
+
+    async def _transact_locked(self, service: int, data: bytes) -> typing.List[bytes]:
+        """Exchange one request while the caller holds the transaction lock."""
         if self.session is None:
             # e.g. an MQTT command arriving while PAI reconnects
             raise StatusRequestException("MG6250: not logged in")
-        if self._transaction_lock is None:
-            self._transaction_lock = asyncio.Lock()
-        async with self._transaction_lock:
-            # A byte counter, as BabyWare's: 255 is followed by 0. Skipping 0
-            # makes the panel ignore every request after the 255th.
-            self._tid = (self._tid + 1) & 0xFF
-            tid = self._tid
-            message = self.build_request(tid, service, data)
-            fragments = []
-            while True:
-                reply = await self.core.send_wait(
-                    message=message,
-                    reply_expected=lambda m: self._is_reply(m, tid, service),
-                )
-                if reply is None:
-                    raise StatusRequestException(f"MG6250: no reply to request {tid}")
-                header, reply_data = self.decrypt_data(
-                    bytes(reply.fields.value.payload)
-                )
-                fragments.append(reply_data)
-                self._acked.append((tid, header.fragment))
-                message = self.build_ack(tid, header.fragment, service)
-                if header.fragment & LAST_FRAGMENT:
-                    # send_wait without a reply would resend it; write the ack once.
-                    self.core.connection.write(message)
-                    await asyncio.sleep(ACK_GAP)
-                    return fragments
+        # A byte counter, as BabyWare's: 255 is followed by 0. Skipping 0
+        # makes the panel ignore every request after the 255th.
+        self._tid = (self._tid + 1) & 0xFF
+        tid = self._tid
+        message = self.build_request(tid, service, data)
+        fragments = []
+        received_fragments = set()
+        while True:
+            reply = await self.core.send_wait(
+                message=message,
+                reply_expected=lambda m: self._is_reply(
+                    m, tid, service, received_fragments
+                ),
+            )
+            if self.session is None:
+                raise StatusRequestException("MG6250: session ended during request")
+            if reply is None:
+                raise StatusRequestException(f"MG6250: no reply to request {tid}")
+            header, reply_data = self.decrypt_data(bytes(reply.fields.value.payload))
+            fragments.append(reply_data)
+            received_fragments.add(header.fragment)
+            self._acked.append((tid, header.fragment))
+            message = self.build_ack(tid, header.fragment, service)
+            if header.fragment & LAST_FRAGMENT:
+                # send_wait without a reply would resend it; write the ack once.
+                self.core.connection.write(message)
+                await asyncio.sleep(ACK_GAP)
+                return fragments
 
     async def read_records(
         self, requests: typing.Iterable[typing.Tuple[int, int, typing.Iterable[int]]]
     ) -> typing.Dict[typing.Tuple[int, int], dict]:
         """Read (obj, index, fields) -> {(obj, index): {field: value}}."""
+        async with self._get_transaction_lock():
+            return await self._read_records_locked(requests)
+
+    async def _read_records_locked(self, requests):
+        """Read records while the caller holds the transaction lock."""
         requests = list(requests)
         result = {}
         for start in range(0, len(requests), READ_BATCH):
@@ -746,7 +766,7 @@ class Panel(PanelBase):
                 build_read_record(obj, index, fields)
                 for obj, index, fields in requests[start : start + READ_BATCH]
             )
-            for fragment in await self.transact(SERVICE_OBJECTS, request):
+            for fragment in await self._transact_locked(SERVICE_OBJECTS, request):
                 for record in parse_records(fragment):
                     # The panel may split one object's fields over several records.
                     if record.op == OP_READ:
@@ -841,13 +861,11 @@ class Panel(PanelBase):
         )
 
     def on_close_connection_sent(self):
-        # Kept when the write failed: the panel still holds the session, and
-        # the saved key lets the next start resume it.
+        # The write only queued logout; retain the saved key if it never arrives.
         if self.session is None:
             return
         self.session = self.session_key = None
         self._log_enabled = False
-        self._forget_session()
 
     def _register_ack_handler(self):
         registry = self.core.connection.handler_registry
@@ -865,12 +883,23 @@ class Panel(PanelBase):
             "session_key": self.session_key.hex(),
             "label": self.session.label.hex(),
         }
+        temporary = None
         try:
-            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-            with os.fdopen(fd, "w") as f:
+            with tempfile.NamedTemporaryFile(
+                mode="w", dir=os.path.dirname(path) or ".", delete=False
+            ) as f:
+                temporary = f.name
                 json.dump(data, f)
+            os.replace(temporary, path)
+            temporary = None
         except OSError as e:
             logger.warning("MG6250: cannot save the session to %s: %s", path, e)
+        finally:
+            if temporary is not None:
+                try:
+                    os.remove(temporary)
+                except OSError as e:
+                    logger.warning("MG6250: cannot remove %s: %s", temporary, e)
 
     @staticmethod
     def _forget_session():
@@ -892,12 +921,19 @@ class Panel(PanelBase):
         try:
             with open(path) as f:
                 data = json.load(f)
-            return Container(
+            saved = Container(
                 selector=int(data["selector"]),
                 mode=int(data["mode"]),
                 session_key=bytes.fromhex(data["session_key"]),
                 label=bytes.fromhex(data.get("label", "")),
             )
+            if not (
+                0 <= saved.selector <= 255
+                and 0 <= saved.mode <= 255
+                and len(saved.session_key) == 16
+            ):
+                raise ValueError("invalid session identifier or key length")
+            return saved
         except (OSError, ValueError, KeyError, TypeError) as e:
             logger.warning("MG6250: cannot read the session from %s: %s", path, e)
             return None
@@ -1216,9 +1252,10 @@ class Panel(PanelBase):
             for record in parse_log_records(fragment)
             if record.op == LOG_OP_READ
             for event in record.events
-            if event.number > self._log_last
         ]
         for event in sorted(events, key=lambda e: e.number):
+            if event.number <= self._log_last:
+                continue
             self._log_last = event.number
             self.core.handle_event_message(self._log_event_message(event))
 
@@ -1265,7 +1302,7 @@ class Panel(PanelBase):
         )
 
     async def _programming(self, request: bytes) -> bool:
-        fragments = await self.transact(SERVICE_PROGRAMMING, request)
+        fragments = await self._transact_locked(SERVICE_PROGRAMMING, request)
         return b"".join(fragments)[PROGRAMMING_STATUS] == bytes(2)
 
     async def _end_programming(self):
@@ -1279,13 +1316,18 @@ class Panel(PanelBase):
         """One write inside a programming session, as BabyWare; False if the
         session or the write is refused. A lost reply raises, once the session
         is ended."""
+        async with self._get_transaction_lock():
+            return await self._write_locked(record, what)
+
+    async def _write_locked(self, record: bytes, what: str) -> bool:
+        """Write one record while the caller holds the transaction lock."""
         begun = True  # Begin sent and not refused: End must follow
         try:
             if not await self._programming(PROGRAMMING_BEGIN):
                 begun = False
                 logger.warning("MG6250: programming session refused")
                 return False
-            reply = b"".join(await self.transact(SERVICE_OBJECTS, record))
+            reply = b"".join(await self._transact_locked(SERVICE_OBJECTS, record))
             accepted = reply[WRITE_STATUS] == bytes(2)
             if not accepted:
                 logger.warning("MG6250: %s refused, reply %s", what, reply.hex())
@@ -1340,31 +1382,40 @@ class Panel(PanelBase):
     async def set_zone_definition(self, zone: int, definition: int) -> bool:
         """Write the definition of a zone, as BabyWare: the whole field 0,
         read again first so that nothing else in it changes."""
-        try:
-            objects = await self.read_objects(OBJ_ZONE, [zone], (FIELD_SERIAL,))
-            field = objects.get(zone, {}).get(FIELD_SERIAL, b"")
-            if len(field) <= ZONE_DEFINITION or not field[ZONE_DEFINITION]:
-                logger.error("MG6250: zone %d is not enrolled", zone)
-                return False
-            if field[ZONE_DEFINITION] != definition:
-                value = bytearray(field)
-                value[ZONE_DEFINITION] = definition
-                record = build_write_record(OBJ_ZONE, zone, FIELD_SERIAL, bytes(value))
-                if not await self._write(record, f"zone {zone} definition write"):
-                    return False
-                logger.info(
-                    "MG6250: zone %d definition %d -> %d",
-                    zone,
-                    field[ZONE_DEFINITION],
-                    definition,
+        async with self._get_transaction_lock():
+            try:
+                records = await self._read_records_locked(
+                    [(OBJ_ZONE, zone, (FIELD_SERIAL,))]
                 )
-        except (StatusRequestException, asyncio.TimeoutError) as e:
-            logger.exception("MG6250: setting zone %d definition failed: %s", zone, e)
-            return False
-        if self._zone_definitions.get(zone) != definition:
-            self._zone_definitions[zone] = definition
-            # publish the new definition
-            ps.sendMessage("definitions_loaded", data=await self.load_definitions())
+                field = records.get((OBJ_ZONE, zone), {}).get(FIELD_SERIAL, b"")
+                if len(field) <= ZONE_DEFINITION or not field[ZONE_DEFINITION]:
+                    logger.error("MG6250: zone %d is not enrolled", zone)
+                    return False
+                if field[ZONE_DEFINITION] != definition:
+                    value = bytearray(field)
+                    value[ZONE_DEFINITION] = definition
+                    record = build_write_record(
+                        OBJ_ZONE, zone, FIELD_SERIAL, bytes(value)
+                    )
+                    if not await self._write_locked(
+                        record, f"zone {zone} definition write"
+                    ):
+                        return False
+                    logger.info(
+                        "MG6250: zone %d definition %d -> %d",
+                        zone,
+                        field[ZONE_DEFINITION],
+                        definition,
+                    )
+            except (StatusRequestException, asyncio.TimeoutError) as e:
+                logger.exception(
+                    "MG6250: setting zone %d definition failed: %s", zone, e
+                )
+                return False
+            if self._zone_definitions.get(zone) != definition:
+                self._zone_definitions[zone] = definition
+                # publish the new definition
+                ps.sendMessage("definitions_loaded", data=await self.load_definitions())
         return True
 
     async def _set_zone_definitions(self, zones, command: str) -> bool:

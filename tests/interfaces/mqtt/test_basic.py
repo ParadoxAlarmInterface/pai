@@ -209,3 +209,40 @@ async def test_definitions_loaded_again_are_published_again(mocker):
         interface.stop()
         interface.join()
         assert not interface.is_alive()
+
+
+@pytest.mark.asyncio
+async def test_reloaded_labels_publish_definitions_for_renamed_and_new_zones(mocker):
+    mocker.patch("paradox.interfaces.mqtt.basic.cfg.MQTT_PUBLISH_DEFINITIONS", True)
+    interface = get_interface(mocker)
+    try:
+        interface._handle_panel_definitions({"zone": {14: {"definition": "instant"}}})
+        interface._handle_panel_labels({"zone": {14: {"key": "Old_name"}}})
+        await asyncio.sleep(0.01)
+        interface.mqtt.publish.reset_mock()
+
+        interface._handle_panel_definitions(
+            {
+                "zone": {
+                    14: {"definition": "instant"},
+                    15: {"definition": "delay_1"},
+                }
+            }
+        )
+        interface._handle_panel_labels(
+            {"zone": {14: {"key": "New_name"}, 15: {"key": "New_zone"}}}
+        )
+        await asyncio.wrap_future(
+            asyncio.run_coroutine_threadsafe(asyncio.sleep(0), interface.loop)
+        )
+
+        interface.mqtt.publish.assert_any_call(
+            "paradox/definitions/zones/New_name/definition", "instant", 0, True
+        )
+        interface.mqtt.publish.assert_any_call(
+            "paradox/definitions/zones/New_zone/definition", "delay_1", 0, True
+        )
+    finally:
+        interface.stop()
+        interface.join()
+        assert not interface.is_alive()

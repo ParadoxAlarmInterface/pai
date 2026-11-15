@@ -430,6 +430,8 @@ class BasicMQTTInterface(AbstractMQTTInterface):
 
         if not self.labels_future.done():
             self.labels_future.set_result(data)
+        elif self.definitions_future.done():
+            self._publish_definitions()
 
     def _handle_panel_definitions(self, data: dict):
         self.definitions = data

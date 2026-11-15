@@ -1,11 +1,13 @@
 import asyncio
 import datetime
+import json
 from unittest.mock import AsyncMock, MagicMock
 
 from construct import Container
 import pytest
 
 from paradox.config import config as cfg
+from paradox.connections.connection import Connection
 from paradox.connections.serial.encryption import make_serial_key
 from paradox.event import LiveEvent
 from paradox.exceptions import AuthenticationFailed, StatusRequestException
@@ -188,8 +190,14 @@ def login_core():
     return core
 
 
-async def test_login_saves_session(monkeypatch, tmp_path):
+@pytest.mark.parametrize("existing_mode", [None, 0o644])
+async def test_login_saves_session_with_owner_only_permissions(
+    monkeypatch, tmp_path, existing_mode
+):
     path = tmp_path / "session.json"
+    if existing_mode is not None:
+        path.write_text("{}")
+        path.chmod(existing_mode)
     monkeypatch.setattr(cfg, "MG6250_SESSION_FILE", str(path))
     core = login_core()
     core.send_wait.side_effect = [None, None, Frame.parse(LOGIN_REPLY)]
@@ -200,6 +208,50 @@ async def test_login_saves_session(monkeypatch, tmp_path):
     saved = Panel._load_session()
     assert (saved.selector, saved.mode) == (0x08, 0x26)
     assert saved.session_key == panel.session_key
+
+
+async def test_failed_session_save_preserves_the_previous_file(monkeypatch, tmp_path):
+    path = tmp_path / "session.json"
+    path.write_text("previous session")
+    monkeypatch.setattr(cfg, "MG6250_SESSION_FILE", str(path))
+    replace = MagicMock(side_effect=OSError("write failed"))
+    monkeypatch.setattr("paradox.hardware.mg6250.panel.os.replace", replace)
+    core = login_core()
+    core.send_wait.side_effect = [None, None, Frame.parse(LOGIN_REPLY)]
+
+    assert await Panel(core).initialize_communication("admin") is True
+
+    replace.assert_called_once()
+    assert path.read_text() == "previous session"
+    assert list(tmp_path.iterdir()) == [path]
+
+
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        {"selector": -1},
+        {"selector": 256},
+        {"mode": -1},
+        {"mode": 256},
+        {"session_key": "00"},
+    ],
+)
+async def test_busy_login_ignores_invalid_saved_sessions(
+    monkeypatch, tmp_path, invalid
+):
+    path = tmp_path / "session.json"
+    path.write_text(
+        json.dumps({"selector": 8, "mode": 38, "session_key": "00" * 16, **invalid})
+    )
+    monkeypatch.setattr(cfg, "MG6250_SESSION_FILE", str(path))
+    core = login_core()
+    core.send_wait.side_effect = [None, None, Frame.parse(BUSY_REPLY)]
+    panel = Panel(core)
+    panel.read_records = AsyncMock()
+
+    assert await panel.initialize_communication("admin") is False
+
+    panel.read_records.assert_not_awaited()
 
 
 async def test_busy_login_resumes_saved_session(monkeypatch, tmp_path):
@@ -380,7 +432,7 @@ def test_parse_records_preserves_field_ending_in_padding_byte(padding):
 
 async def test_read_records_merges_fields_across_fragments():
     panel = session_panel(0xB4, 0x62, SET_TIME_KEY)
-    panel.transact = AsyncMock(
+    panel._transact_locked = AsyncMock(
         return_value=[
             bytes.fromhex("000e000100020000010000024142") + b"\xee" * 2,
             bytes.fromhex("000d0001000200000000000100") + b"\xee" * 3,
@@ -401,9 +453,77 @@ async def test_transact_acks_last_fragment():
 
     assert {r.obj for r in parse_records(fragment)} == {0x1C, OBJ_CLOCK}
     check = core.send_wait.call_args.kwargs["reply_expected"]
-    assert check(Frame.parse(SET_TIME_REPLY))
+    assert not check(Frame.parse(SET_TIME_REPLY))  # already received
     assert not check(Frame.parse(SET_TIME_ACK))  # the panel's ack is skipped
     core.connection.write.assert_called_once_with(SET_TIME_ACK)
+
+
+async def test_replayed_fragment_does_not_complete_the_next_wait():
+    core = Paradox()
+    core._connection = Connection()
+    core.connection._protocol = MagicMock()
+    core.connection.connected = True
+    panel = session_panel(0xB4, 0x62, SET_TIME_KEY, core)
+    panel._register_ack_handler()
+    fragments = [b"A" * 16, b"B" * 16]
+    replies = [
+        Frame.parse(
+            panel.build_data_frame(
+                panel._encrypted_header(1, fragment, KIND_DATA, SERVICE_OBJECTS)
+                + b"\x01\x00"
+                + paradox_encrypt(data, panel.session_key)
+            )
+        )
+        for fragment, data in zip([1, LAST_FRAGMENT | 2], fragments)
+    ]
+    replayed = False
+    loop = asyncio.get_running_loop()
+
+    def write(raw):
+        nonlocal replayed
+        header, _ = panel.decrypt_data(payload(raw))
+        if header.kind == KIND_DATA:
+            loop.call_soon(core.connection.schedule_message_handling, replies[0])
+        elif header.kind == KIND_ACK and header.fragment == 1 and not replayed:
+            replayed = True
+            loop.call_soon(core.connection.schedule_message_handling, replies[0])
+            loop.call_later(0.01, core.connection.schedule_message_handling, replies[1])
+
+    core.connection.write = MagicMock(side_effect=write)
+
+    assert await asyncio.wait_for(panel.transact(SERVICE_OBJECTS, b""), 1) == fragments
+
+    kinds = [
+        panel.decrypt_data(payload(call.args[0]))[0].kind
+        for call in core.connection.write.call_args_list
+    ]
+    assert kinds.count(KIND_ACK_REPEAT) == 1
+
+
+async def test_session_ending_during_a_reply_is_reported_as_a_status_error():
+    core = AsyncMock()
+    panel = session_panel(0xB4, 0x62, SET_TIME_KEY, core)
+
+    async def reply_after_logout(**kwargs):
+        panel.on_close_connection_sent()
+        return Frame.parse(SET_TIME_REPLY)
+
+    core.send_wait.side_effect = reply_after_logout
+    with pytest.raises(StatusRequestException, match="session ended"):
+        await panel.transact(SERVICE_OBJECTS, b"")
+
+
+async def test_queued_transaction_rechecks_the_session_after_taking_the_lock():
+    panel = session_panel(0xB4, 0x62, SET_TIME_KEY)
+    lock = panel._get_transaction_lock()
+    await lock.acquire()
+    request = asyncio.create_task(panel.transact(SERVICE_OBJECTS, b""))
+    await asyncio.sleep(0)
+    panel.on_close_connection_sent()
+    lock.release()
+
+    with pytest.raises(StatusRequestException, match="not logged in"):
+        await request
 
 
 async def test_transact_pauses_after_last_ack():
@@ -732,7 +852,7 @@ def test_set_time_record_matches_capture():
 def set_time_panel(monkeypatch, replies):
     monkeypatch.setattr("paradox.hardware.mg6250.panel.WRITE_SETTLE", 0)
     panel = session_panel(0xB4, 0x62, SET_TIME_KEY)
-    panel.transact = AsyncMock(side_effect=replies)
+    panel._transact_locked = AsyncMock(side_effect=replies)
     return panel
 
 
@@ -741,7 +861,7 @@ async def test_set_time_is_a_write_inside_a_programming_session(monkeypatch):
         monkeypatch, [[BEGIN_REPLY], [CLOCK_WRITE_REPLY], [END_REPLY]]
     )
     assert await panel.set_time(SET_TIME_NOW) is True
-    assert [c.args for c in panel.transact.await_args_list] == [
+    assert [c.args for c in panel._transact_locked.await_args_list] == [
         (SERVICE_PROGRAMMING, bytes.fromhex("00000000ffffffff3c00")),
         (SERVICE_OBJECTS, bytes.fromhex(SET_TIME_RECORD)),
         (SERVICE_PROGRAMMING, bytes.fromhex("01000000ffffffff")),
@@ -753,7 +873,7 @@ async def test_set_time_refused_session_writes_nothing_and_is_not_retried(monkey
     panel = set_time_panel(monkeypatch, [[refused]])
     assert await panel.set_time(SET_TIME_NOW) is False
     assert await panel.set_time(SET_TIME_NOW) is None  # not tried again
-    panel.transact.assert_awaited_once()  # and no End after a refused Begin
+    panel._transact_locked.assert_awaited_once()  # no End after a refused Begin
 
 
 async def test_set_time_refused_write_is_not_retried(monkeypatch):
@@ -761,7 +881,7 @@ async def test_set_time_refused_write_is_not_retried(monkeypatch):
     panel = set_time_panel(monkeypatch, [[BEGIN_REPLY], [refused], [END_REPLY]])
     assert await panel.set_time(SET_TIME_NOW) is False
     assert await panel.set_time(SET_TIME_NOW) is None
-    assert panel.transact.await_count == 3
+    assert panel._transact_locked.await_count == 3
 
 
 @pytest.mark.parametrize(
@@ -771,7 +891,7 @@ async def test_set_time_lost_begin_reply_still_ends_the_session(monkeypatch, fai
     # the panel may have opened the programming session all the same
     panel = set_time_panel(monkeypatch, [failure, [END_REPLY]])
     assert await panel.set_time(SET_TIME_NOW) is False
-    assert [c.args[1] for c in panel.transact.await_args_list] == [
+    assert [c.args[1] for c in panel._transact_locked.await_args_list] == [
         PROGRAMMING_BEGIN,
         PROGRAMMING_END,
     ]
@@ -804,7 +924,7 @@ async def test_set_time_lost_reply_is_retried_later(monkeypatch):
     assert await panel.set_time(SET_TIME_NOW) is False
     clock[0] += SET_TIME_RETRY - 1
     assert await panel.set_time(SET_TIME_NOW) is None  # too early
-    assert panel.transact.await_count == 3
+    assert panel._transact_locked.await_count == 3
     clock[0] += 1
     assert await panel.set_time(SET_TIME_NOW) is True
 
@@ -813,7 +933,9 @@ async def test_set_time_refused_write_still_ends_the_session(monkeypatch):
     refused = bytes.fromhex("050d0024000100010400010000")
     panel = set_time_panel(monkeypatch, [[BEGIN_REPLY], [refused], [END_REPLY]])
     assert await panel.set_time(SET_TIME_NOW) is False
-    assert panel.transact.await_args.args[1] == bytes.fromhex("01000000ffffffff")
+    assert panel._transact_locked.await_args.args[1] == bytes.fromhex(
+        "01000000ffffffff"
+    )
 
 
 @pytest.mark.parametrize(
@@ -822,8 +944,10 @@ async def test_set_time_refused_write_still_ends_the_session(monkeypatch):
 async def test_set_time_lost_write_still_ends_the_session(monkeypatch, failure):
     panel = set_time_panel(monkeypatch, [[BEGIN_REPLY], failure, [END_REPLY]])
     assert await panel.set_time(SET_TIME_NOW) is False
-    assert panel.transact.await_count == 3
-    assert panel.transact.await_args.args[1] == bytes.fromhex("01000000ffffffff")
+    assert panel._transact_locked.await_count == 3
+    assert panel._transact_locked.await_args.args[1] == bytes.fromhex(
+        "01000000ffffffff"
+    )
 
 
 async def test_base_panel_set_time_still_sends_set_time_date():
@@ -973,6 +1097,17 @@ async def test_new_events_are_published_once_in_order():
     assert [(m.event.major, m.event.minor) for m in messages] == [(47, 15), (42, 1)]
     assert messages[0].time == datetime.datetime(2026, 11, 7, 22, 2)
     assert panel._log_last == 0x72B0
+
+
+async def test_duplicate_log_records_are_not_published_twice():
+    repeated = log_reply(5, 5, [log_event(5, 47, 15)])
+    panel, core = log_panel([[range_reply(1, 5)], [repeated, repeated]])
+    panel._log_last = 4
+
+    await panel._publish_new_events()
+
+    core.handle_event_message.assert_called_once()
+    assert panel._log_last == 5
 
 
 @pytest.mark.parametrize(
@@ -1513,6 +1648,7 @@ async def test_zone_control_without_reply_or_login_is_not_accepted():
 # captures/send-zone-sleep: BabyWare set zone 14 (IR S/SOL) from Instant (Full
 # Arm) to Instant (Sleep / Full Arm)
 ZONE_FIELD_BEFORE = bytes.fromhex("bb8b0a018700")
+ZONE_FIELD_READ = bytes.fromhex("00120001000e000000000006") + ZONE_FIELD_BEFORE
 ZONE_DEFINITION_WRITE = "0110" + "0001000e" + "00" + "00" + "0006" + "bb8b09018700"
 ZONE_WRITE_REPLY = bytes.fromhex("010b0001000e0000000000")
 
@@ -1522,8 +1658,10 @@ def definition_panel(monkeypatch, replies, field=ZONE_FIELD_BEFORE):
     monkeypatch.setattr("paradox.lib.ps.sendMessage", MagicMock())
     panel, core = control_panel()
     panel._zone_definitions = {14: field[2]}
-    panel.read_objects = AsyncMock(return_value={14: {FIELD_SERIAL: field}})
-    panel.transact = AsyncMock(side_effect=replies)
+    panel._read_records_locked = AsyncMock(
+        return_value={(OBJ_ZONE, 14): {FIELD_SERIAL: field}}
+    )
+    panel._transact_locked = AsyncMock(side_effect=replies)
     return panel
 
 
@@ -1533,8 +1671,10 @@ async def test_zone_definition_write_matches_capture(monkeypatch, command):
         monkeypatch, [[BEGIN_REPLY], [ZONE_WRITE_REPLY], [END_REPLY]]
     )
     assert await panel.control_zones([14], command) is True
-    panel.read_objects.assert_awaited_once_with(OBJ_ZONE, [14], (FIELD_SERIAL,))
-    assert [c.args for c in panel.transact.await_args_list] == [
+    panel._read_records_locked.assert_awaited_once_with(
+        [(OBJ_ZONE, 14, (FIELD_SERIAL,))]
+    )
+    assert [c.args for c in panel._transact_locked.await_args_list] == [
         (SERVICE_PROGRAMMING, bytes.fromhex("00000000ffffffff3c00")),
         (SERVICE_OBJECTS, bytes.fromhex(ZONE_DEFINITION_WRITE)),
         (SERVICE_PROGRAMMING, bytes.fromhex("01000000ffffffff")),
@@ -1550,7 +1690,7 @@ async def test_zone_definition_write_matches_capture(monkeypatch, command):
 async def test_zone_definition_already_set_writes_nothing(monkeypatch):
     panel = definition_panel(monkeypatch, [])
     assert await panel.control_zones([14], "definition_instant_full") is True
-    panel.transact.assert_not_awaited()
+    panel._transact_locked.assert_not_awaited()
     ps.sendMessage.assert_not_called()
 
 
@@ -1567,21 +1707,21 @@ async def test_zone_definition_already_set_writes_nothing(monkeypatch):
 async def test_zone_definition_refuses_unknown_definitions(monkeypatch, command):
     panel = definition_panel(monkeypatch, [])
     assert await panel.control_zones([14], command) is False
-    panel.read_objects.assert_not_awaited()
-    panel.transact.assert_not_awaited()
+    panel._read_records_locked.assert_not_awaited()
+    panel._transact_locked.assert_not_awaited()
 
 
 async def test_zone_definition_refuses_a_zone_not_enrolled(monkeypatch):
     panel = definition_panel(monkeypatch, [], field=bytes.fromhex("000000018700"))
     assert await panel.control_zones([14], "definition_9") is False
-    panel.transact.assert_not_awaited()
+    panel._transact_locked.assert_not_awaited()
 
 
 async def test_zone_definition_refused_write_ends_the_session(monkeypatch):
     refused = bytes.fromhex("010b0001000e0001000000")
     panel = definition_panel(monkeypatch, [[BEGIN_REPLY], [refused], [END_REPLY]])
     assert await panel.control_zones([14], "definition_9") is False
-    assert panel.transact.await_count == 3
+    assert panel._transact_locked.await_count == 3
     assert panel._zone_definitions == {14: 10}
 
 
@@ -1590,11 +1730,96 @@ async def test_zone_definition_lost_write_ends_the_session(monkeypatch):
         monkeypatch, [[BEGIN_REPLY], StatusRequestException("no reply"), [END_REPLY]]
     )
     assert await panel.control_zones([14], "definition_9") is False
-    assert panel.transact.await_args_list[-1].args == (
+    assert panel._transact_locked.await_args_list[-1].args == (
         SERVICE_PROGRAMMING,
         bytes.fromhex("01000000ffffffff"),
     )
     assert panel._zone_definitions == {14: 10}
+
+
+async def test_programming_sessions_exclude_other_writes_and_control(monkeypatch):
+    monkeypatch.setattr("paradox.hardware.mg6250.panel.WRITE_SETTLE", 0)
+    monkeypatch.setattr("paradox.hardware.mg6250.panel.ACK_GAP", 0)
+    panel, core = control_panel()
+    requests = []
+
+    async def send_wait(message, **kwargs):
+        header, data = panel.decrypt_data(payload(message))
+        data = data.rstrip(b"\xee")
+        requests.append((header.service, data))
+        await asyncio.sleep(0)
+        if header.service == SERVICE_PROGRAMMING:
+            response = BEGIN_REPLY if data == PROGRAMMING_BEGIN else END_REPLY
+        elif header.service == SERVICE_OBJECTS:
+            if data[0] == 0:
+                response = ZONE_FIELD_READ
+            else:
+                response = CLOCK_WRITE_REPLY if data[0] == 5 else ZONE_WRITE_REPLY
+        else:
+            response = bytes(16)
+        return Frame.parse(
+            panel.build_data_frame(
+                panel._encrypted_header(
+                    header.tid, LAST_FRAGMENT | 1, KIND_DATA, header.service
+                )
+                + bytes([1, -len(response) % 16])
+                + paradox_encrypt(response, panel.session_key)
+            )
+        )
+
+    core.send_wait.side_effect = send_wait
+    results = await asyncio.wait_for(
+        asyncio.gather(
+            panel.set_time(SET_TIME_NOW),
+            panel.set_zone_definition(14, 9),
+            panel.transact(SERVICE_CONTROL, b"poll"),
+        ),
+        timeout=1,
+    )
+
+    assert results[:2] == [True, True]
+    assert requests == [
+        (SERVICE_PROGRAMMING, PROGRAMMING_BEGIN),
+        (SERVICE_OBJECTS, bytes.fromhex(SET_TIME_RECORD)),
+        (SERVICE_PROGRAMMING, PROGRAMMING_END),
+        (SERVICE_OBJECTS, build_read_record(OBJ_ZONE, 14, (FIELD_SERIAL,))),
+        (SERVICE_PROGRAMMING, PROGRAMMING_BEGIN),
+        (SERVICE_OBJECTS, bytes.fromhex(ZONE_DEFINITION_WRITE)),
+        (SERVICE_PROGRAMMING, PROGRAMMING_END),
+        (SERVICE_CONTROL, b"poll"),
+    ]
+
+
+async def test_concurrent_zone_commands_recheck_the_definition_under_the_lock(
+    monkeypatch,
+):
+    monkeypatch.setattr("paradox.hardware.mg6250.panel.WRITE_SETTLE", 0)
+    panel, _ = control_panel()
+    field = bytearray(ZONE_FIELD_BEFORE)
+    written = []
+
+    async def exchange(service, data):
+        await asyncio.sleep(0)
+        if service == SERVICE_PROGRAMMING:
+            return [BEGIN_REPLY if data == PROGRAMMING_BEGIN else END_REPLY]
+        if data[0] == 0:
+            return [ZONE_FIELD_READ[:12] + bytes(field)]
+        field[:] = data[10:]
+        written.append(field[2])
+        return [ZONE_WRITE_REPLY]
+
+    panel._transact_locked = AsyncMock(side_effect=exchange)
+
+    assert await asyncio.wait_for(
+        asyncio.gather(
+            panel.set_zone_definition(14, 9),
+            panel.set_zone_definition(14, 10),
+        ),
+        timeout=1,
+    ) == [True, True]
+
+    assert written == [9, 10]
+    assert field[2] == panel._zone_definitions[14] == 10
 
 
 async def test_definitions_are_named_as_for_the_sp_mg_panels():
@@ -1653,7 +1878,7 @@ def test_clean_session_logs_out(monkeypatch, tmp_path):
     assert panel.session is None
     assert panel.session_key is None
     assert panel._log_enabled is False
-    assert not path.exists()  # it cannot be resumed any more
+    assert path.exists()  # a queued logout is not proof the panel received it
 
 
 def test_failed_logout_keeps_the_session_to_resume(monkeypatch, tmp_path):
@@ -1662,6 +1887,30 @@ def test_failed_logout_keeps_the_session_to_resume(monkeypatch, tmp_path):
     alarm._clean_session()
     assert alarm.panel.session is not None
     assert path.exists()
+
+
+async def test_busy_login_can_resume_when_a_queued_logout_was_lost(
+    monkeypatch, tmp_path
+):
+    path = tmp_path / "session.json"
+    monkeypatch.setattr(cfg, "MG6250_SESSION_FILE", str(path))
+    core = login_core()
+    core.send_wait.side_effect = [None, None, Frame.parse(LOGIN_REPLY)]
+    panel = Panel(core)
+    assert await panel.initialize_communication("admin") is True
+    saved_key = panel.session_key
+    alarm = Paradox()
+    alarm._connection = core.connection
+    alarm.panel = panel
+    alarm._clean_session()
+
+    core = login_core()
+    core.send_wait.side_effect = [None, None, Frame.parse(BUSY_REPLY)]
+    resumed = Panel(core)
+    resumed.read_records = AsyncMock(return_value={(OBJ_SYSTEM, 1): {1: b"\x05"}})
+
+    assert await resumed.initialize_communication("admin") is True
+    assert resumed.session_key == saved_key
 
 
 def test_close_connection_without_a_session_is_the_generic_close():

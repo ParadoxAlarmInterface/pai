@@ -1,11 +1,12 @@
+import asyncio
 from datetime import datetime
 import json
 from unittest.mock import AsyncMock
 
 import pytest
 
-from paradox.connections.connection import Connection
 from paradox.config import Config, config as cfg
+from paradox.connections.connection import Connection
 from paradox.hardware import Panel, create_panel
 from paradox.hardware.prt3.panel import PRT3Panel
 from paradox.paradox import Paradox
@@ -85,6 +86,24 @@ async def test_sync_time_warns_only_when_set_time_was_tried(
     await alarm.sync_time()
 
     assert ("Could not set panel time" in caplog.text) is warned
+
+
+@pytest.mark.parametrize("failure", [asyncio.TimeoutError, asyncio.CancelledError])
+async def test_failed_time_sync_does_not_block_the_next_attempt(monkeypatch, failure):
+    monkeypatch.setattr(cfg, "SYNC_TIME_TIMEZONE", "")
+    alarm = Paradox()
+    alarm.panel = create_panel(alarm, _start_communication_reply("MAGELLAN_MG6250"))
+    alarm.storage.get_container("system").deep_merge(
+        {"date": {"time": datetime(2000, 1, 1)}}
+    )
+    alarm.panel.set_time = AsyncMock(side_effect=[failure(), True])
+
+    with pytest.raises(failure):
+        await alarm.sync_time()
+
+    await alarm.sync_time()
+
+    assert alarm.panel.set_time.await_count == 2
 
 
 @pytest.mark.asyncio
