@@ -499,25 +499,26 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         )
 
     def _publish_definitions(self):
-        if cfg.MQTT_PUBLISH_DEFINITIONS:
-            for element_type in self.definitions:  # zones, partitions
-                labels = self.labels.get(element_type, {})
-                definitions = self.definitions[element_type]
-                for i in definitions:  # numeric index
-                    if i not in labels:
-                        continue
+        if not cfg.MQTT_PUBLISH_DEFINITIONS:
+            return
+        for element_type in self.definitions:  # zones, partitions
+            labels = self.labels.get(element_type, {})
+            definitions = self.definitions[element_type]
+            for i in definitions:  # numeric index
+                if i not in labels:
+                    continue
 
-                    definition = {**(definitions[i]), "id": i}
-                    for attribute in definition:  # attribute
-                        if element_type == "user" and attribute == "code":
-                            continue
-                        self._publish(
-                            f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_DEFINITION_TOPIC}",
-                            element_type,
-                            labels[i]["key"],
-                            attribute,
-                            definition[attribute],
-                        )
+                definition = {**(definitions[i]), "id": i}
+                for attribute in definition:  # attribute
+                    if element_type == "user" and attribute == "code":
+                        continue
+                    self._publish(
+                        f"{cfg.MQTT_BASE_TOPIC}/{cfg.MQTT_DEFINITION_TOPIC}",
+                        element_type,
+                        labels[i]["key"],
+                        attribute,
+                        definition[attribute],
+                    )
 
     def _on_ready(self):
         self._publish_definitions()

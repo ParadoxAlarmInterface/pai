@@ -251,8 +251,9 @@ async def test_login_refused_is_fatal(status):
     core = AsyncMock()
     reply = Frame.parse(build_frame(CMD_LOGIN, 2, bytes([status])))
     core.send_wait.side_effect = [None, None, reply]
+    panel = Panel(core)
     with pytest.raises(AuthenticationFailed):
-        await Panel(core).initialize_communication("admin")
+        await panel.initialize_communication("admin")
 
 
 def test_decrypt_captured_data_frame():

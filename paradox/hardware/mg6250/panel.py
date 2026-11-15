@@ -207,6 +207,7 @@ ZONE_DEFINITION_COMMAND = "definition_"
 CONTROL_OK = bytes(3)
 PARTITIONS = [1, 2]  # 2 only with section [2000] option 7, see load_labels
 IDENTIFY_SERIAL = slice(8, 12)  # panel serial in the first identify reply
+MISSING_PANEL_SERIAL = "MG6250: panel serial unknown (no identify reply)"
 
 # Objects (big-endian ids), with the index count BabyWare reads
 OBJ_ZONE = 0x0001
@@ -232,7 +233,8 @@ AREA_FIELD_LABEL = 2  # 16 bytes
 
 FIELD_SERIAL = 0  # 6 bytes, all zero when nothing is enrolled (not for zones)
 FIELD_LABEL = 1  # 16 bytes
-# Zone field 0: device (2) | definition | partition | options | ?. An empty
+# Zone field 0 contains a two-byte device ID, definition, partition, options
+# and an unknown byte. An empty
 # zone reads 00 00 00 01 87 00. change-zone: BabyWare wrote definition
 # 09 -> 08 for zones 4-7.
 ZONE_DEFINITION = 2
@@ -970,28 +972,9 @@ class Panel(PanelBase):
         for elem_type, (obj, count) in LABEL_OBJECTS.items():
             start_time = time.time()
             indexes = limited_indexes(elem_type, range(1, count + 1))
-            objects = await self.read_objects(obj, indexes, (FIELD_SERIAL, FIELD_LABEL))
-            elements = data[elem_type] = {}
-            for index in indexes:
-                fields = objects.get(index, {})
-                serial = fields.get(FIELD_SERIAL, b"")
-                if obj == OBJ_ZONE:
-                    if len(serial) <= ZONE_DEFINITION:
-                        raise StatusRequestException(
-                            f"MG6250: incomplete enrollment reply for zone {index}"
-                        )
-                    enrolled = serial[ZONE_DEFINITION]
-                else:
-                    enrolled = any(serial)
-                if not enrolled:
-                    continue  # nothing enrolled at this index, or zone disabled
-                label = self.decode_label(fields.get(FIELD_LABEL, b""))
-                element = self.label_element(elem_type, index, label)
-                if obj == OBJ_ZONE and len(serial) > ZONE_PARTITION:
-                    self._zone_partitions[index] = serial[ZONE_PARTITION]
-                if obj == OBJ_ZONE:
-                    self._zone_definitions[index] = enrolled
-                elements[index] = element
+            elements = data[elem_type] = await self._load_enrolled_labels(
+                elem_type, obj, indexes
+            )
             self.log_labels_loaded(elem_type, elements, start_time)
         self._zones = sorted(data["zone"])
 
@@ -1041,6 +1024,31 @@ class Panel(PanelBase):
         }
         self.log_labels_loaded("pgm", data["pgm"], start_time)
         return data
+
+    async def _load_enrolled_labels(self, elem_type, obj, indexes):
+        objects = await self.read_objects(obj, indexes, (FIELD_SERIAL, FIELD_LABEL))
+        elements = {}
+        for index in indexes:
+            fields = objects.get(index, {})
+            serial = fields.get(FIELD_SERIAL, b"")
+            if obj == OBJ_ZONE:
+                if len(serial) <= ZONE_DEFINITION:
+                    raise StatusRequestException(
+                        f"MG6250: incomplete enrollment reply for zone {index}"
+                    )
+                enrolled = serial[ZONE_DEFINITION]
+            else:
+                enrolled = any(serial)
+            if not enrolled:
+                continue  # nothing enrolled at this index, or zone disabled
+            label = self.decode_label(fields.get(FIELD_LABEL, b""))
+            element = self.label_element(elem_type, index, label)
+            if obj == OBJ_ZONE and len(serial) > ZONE_PARTITION:
+                self._zone_partitions[index] = serial[ZONE_PARTITION]
+            if obj == OBJ_ZONE:
+                self._zone_definitions[index] = enrolled
+            elements[index] = element
+        return elements
 
     async def request_status(self, _nr) -> typing.Optional[Container]:
         """Panel clock, battery and AC voltage, zone open/alarm and partition
@@ -1384,7 +1392,7 @@ class Panel(PanelBase):
             logger.warning("MG6250: zone command %r is not supported", command)
             return False
         if self.panel_serial is None:
-            logger.exception("MG6250: panel serial unknown (no identify reply)")
+            logger.error(MISSING_PANEL_SERIAL)
             return False
 
         accepted = False
@@ -1394,7 +1402,7 @@ class Panel(PanelBase):
                     SERVICE_CONTROL, self.build_zone_control(zone, action)
                 )
             except StatusRequestException as e:
-                logger.error("MG6250: %s of zone %d failed: %s", command, zone, e)
+                logger.exception("MG6250: %s of zone %d failed: %s", command, zone, e)
                 continue
             reply = b"".join(fragments)
             if self._control_accepted(CONTROL_ZONE_PREFIX, reply):
@@ -1434,7 +1442,7 @@ class Panel(PanelBase):
             logger.warning("MG6250: partition command %r is not supported", command)
             return False
         if self.panel_serial is None:
-            logger.error("MG6250: panel serial unknown (no identify reply)")
+            logger.error(MISSING_PANEL_SERIAL)
             return False
 
         accepted = False
@@ -1483,7 +1491,7 @@ class Panel(PanelBase):
             logger.warning("MG6250: output command %r is not supported", command)
             return False
         if self.panel_serial is None:
-            logger.error("MG6250: panel serial unknown (no identify reply)")
+            logger.error(MISSING_PANEL_SERIAL)
             return False
 
         accepted = False

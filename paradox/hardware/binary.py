@@ -89,14 +89,14 @@ class BinaryPanel(Panel):
         return self.get_message("CloseConnection").build({})
 
     async def set_time(self, now):
-        args = dict(
-            century=int(now.year / 100),
-            year=int(now.year % 100),
-            month=now.month,
-            day=now.day,
-            hour=now.hour,
-            minute=now.minute,
-        )
+        args = {
+            "century": int(now.year / 100),
+            "year": int(now.year % 100),
+            "month": now.month,
+            "day": now.day,
+            "hour": now.hour,
+            "minute": now.minute,
+        }
         reply = await self.core.send_wait(
             self.get_message("SetTimeDate"), args, reply_expected=0x3, timeout=10
         )
