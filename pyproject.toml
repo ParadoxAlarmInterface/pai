@@ -73,22 +73,14 @@ exclude = ["tests", "tests.*", "config.*", "docs.*"]
 version = {attr = "paradox.__version__"}
 
 [tool.tox]
-# Inline INI preserves compatibility with tox versions predating native TOML.
-legacy_tox_ini = """
-[tox]
-envlist = py311, py312, py313, py314, py315
-isolated_build = True
-skip_missing_interpreters = True
+requires = ["tox>=4.21"]
+env_list = ["py311", "py312", "py313", "py314", "py315"]
+skip_missing_interpreters = true
 
-[testenv]
-changedir = tests
-deps =
-    pytest
-    pytest-asyncio
-    pytest-mock
-    pyyaml
-commands = pytest --basetemp="{envtmpdir}"  {posargs}
-"""
+[tool.tox.env_run_base]
+change_dir = "tests"
+deps = ["pytest", "pytest-asyncio", "pytest-mock", "pyyaml"]
+commands = [["pytest", "--basetemp={env_tmp_dir}", { replace = "posargs", extend = true }]]
 
 [tool.black]
 target-version = ["py310", "py311", "py312", "py313", "py314", "py315"]
