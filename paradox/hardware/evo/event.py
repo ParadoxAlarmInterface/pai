@@ -174,7 +174,12 @@ event_map = {
                 message="arming with Winload by {@user}",
                 user=_minor2_provider,
             ),
-            2: dict(type="partition", message="late to close"),
+            2: dict(
+                type="partition",
+                message="late to close",
+                change={},
+                hook_fn=_request_status_refresh,
+            ),
             3: dict(type="partition", message="no movement arming"),
             4: dict(type="partition", message="partial arming"),
             5: dict(type="partition", message="one-touch arming"),
