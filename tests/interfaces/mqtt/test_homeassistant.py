@@ -229,3 +229,24 @@ async def test_homeassistant_birth_triggers_republish(payload, republished, mock
     interface._handle_homeassistant_status(None, None, message)
 
     assert con.get_instance.return_value.republish_all.called is republished
+
+
+@pytest.mark.asyncio
+async def test_homeassistant_republish_delays_states(mocker):
+    mocker.patch("paradox.interfaces.mqtt.core.MQTTConnection")
+    interface = HomeAssistantMQTTInterface(mocker.MagicMock())
+    interface.republish_state_delay = 0.05
+    interface.start()
+    try:
+        await asyncio.sleep(0.01)
+        on_done = mocker.Mock()
+
+        interface.republish_all(on_done=on_done)
+        await asyncio.sleep(0.02)
+        on_done.assert_not_called()
+
+        await asyncio.sleep(0.1)
+        on_done.assert_called_once_with()
+    finally:
+        interface.stop()
+        interface.join()

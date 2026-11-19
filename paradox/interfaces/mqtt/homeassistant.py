@@ -23,6 +23,7 @@ PreparseResponse = namedtuple("PreparseResponse", "topics element content")
 
 class HomeAssistantMQTTInterface(AbstractMQTTInterface):
     republish_first = True  # discovery configs must precede states
+    republish_state_delay = 2  # seconds for HA to subscribe to (re)created entities
 
     def __init__(self, alarm):
         super().__init__(alarm)
@@ -74,6 +75,13 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         if message.payload.strip() == b"online":
             logger.info("Home Assistant came online")
             self.mqtt.republish_all()
+
+    def republish_all(self, on_done=None):
+        def delayed_done():
+            if on_done:
+                self.loop.call_later(self.republish_state_delay, on_done)
+
+        super().republish_all(on_done=delayed_done)
 
     def _handle_labels_loaded(self, data):
         partitions = data.get("partition", {})
