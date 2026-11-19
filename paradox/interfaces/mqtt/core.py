@@ -5,6 +5,7 @@ import os
 import socket
 import ssl
 import sys
+import threading
 import time
 import typing
 
@@ -64,6 +65,7 @@ class MQTTConnection:
             transport=cfg.MQTT_TRANSPORT,
         )
         self._last_pai_status = "unknown"
+        self._pai_status_lock = threading.RLock()
         self.pai_status_topic = "{}/{}/{}".format(
             cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, "pai_status"
         )
@@ -170,7 +172,8 @@ class MQTTConnection:
         configs arrive before their states.
         """
         logger.info("Re-publishing all MQTT messages")
-        self._report_pai_status(self._last_pai_status)
+        with self._pai_status_lock:
+            self._report_pai_status(self._last_pai_status)
         pending = sorted(
             self.registrars, key=lambda r: not getattr(r, "republish_first", False)
         )
@@ -228,14 +231,15 @@ class MQTTConnection:
         return self.state == ConnectionState.CONNECTED
 
     def _report_pai_status(self, status):
-        self._last_pai_status = status
-        self.publish(self.pai_status_topic, status, qos=cfg.MQTT_QOS, retain=True)
-        self.publish(
-            self.availability_topic,
-            "online" if status in ["online", "paused"] else "offline",
-            qos=cfg.MQTT_QOS,
-            retain=True,
-        )
+        with self._pai_status_lock:
+            self._last_pai_status = status
+            self.publish(self.pai_status_topic, status, qos=cfg.MQTT_QOS, retain=True)
+            self.publish(
+                self.availability_topic,
+                "online" if status in ["online", "paused"] else "offline",
+                qos=cfg.MQTT_QOS,
+                retain=True,
+            )
 
     def _on_connect_cb(
         self, client, userdata, connect_flags, reason_code, properties=None

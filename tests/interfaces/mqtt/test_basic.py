@@ -325,7 +325,7 @@ def test_connection_republish_all_puts_discovery_first(mocker):
     )
     hass = mocker.Mock(republish_first=True)
     hass.republish_all.side_effect = lambda on_done: (calls.append("hass"), on_done())
-    connection = mocker.Mock(registrars=[basic, hass], _last_pai_status="online")
+    connection = mocker.MagicMock(registrars=[basic, hass], _last_pai_status="online")
 
     MQTTConnection.republish_all(connection)
 
