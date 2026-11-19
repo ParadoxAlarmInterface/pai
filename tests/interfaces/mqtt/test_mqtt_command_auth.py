@@ -98,6 +98,43 @@ async def test_validate_challenge_user(mocker):
 
 
 @pytest.mark.asyncio
+async def test_validate_challenge_multiple_users(mocker):
+    interface = get_interface(mocker, {"UserA": "secretA", "UserB": "secretB"})
+    try:
+        await asyncio.sleep(0.01)
+        interface._on_ready()
+        await asyncio.sleep(0.01)
+        rounds = cfg.MQTT_CHALLENGE_ROUNDS
+
+        resp = calc_response(interface.challenge, "secretB", rounds)
+        assert interface._validate_command_with_challenge(f"arm UserB {resp}") == (
+            "arm",
+            "UserB",
+        )
+
+        # Another user's secret must not authenticate as UserA
+        resp = calc_response(interface.challenge, "secretB", rounds)
+        assert interface._validate_command_with_challenge(f"arm UserA {resp}") == (
+            None,
+            None,
+        )
+
+        resp = calc_response(interface.challenge, "secretA", rounds)
+        assert interface._validate_command_with_challenge(f"arm UserC {resp}") == (
+            None,
+            None,
+        )
+        assert interface._validate_command_with_challenge(f"arm {resp}") == (
+            None,
+            None,
+        )
+    finally:
+        interface.stop()
+        interface.join()
+        assert not interface.is_alive()
+
+
+@pytest.mark.asyncio
 async def test_auth_output_control(mocker):
     interface = get_interface(mocker, SECRET)
     try:

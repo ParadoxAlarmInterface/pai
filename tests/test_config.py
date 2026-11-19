@@ -171,3 +171,14 @@ def test_prt3_serial_baud_38400_rejected(monkeypatch):
     monkeypatch.setattr(c, "_read_config", lambda: {"PRT3_SERIAL_BAUD": 38400})
     with pytest.raises(Exception, match="PRT3_SERIAL_BAUD"):
         c.load()
+
+def test_mqtt_challenge_secret_per_user_dict_accepted(monkeypatch):
+    monkeypatch.delenv("PAI_MQTT_CHALLENGE_SECRET", raising=False)
+    c = _make_config(monkeypatch, {"MQTT_CHALLENGE_SECRET": {"foo": "bar"}})
+    assert c.MQTT_CHALLENGE_SECRET == {"foo": "bar"}
+
+
+def test_mqtt_challenge_secret_invalid_type_rejected(monkeypatch):
+    monkeypatch.delenv("PAI_MQTT_CHALLENGE_SECRET", raising=False)
+    with pytest.raises(Exception, match="MQTT_CHALLENGE_SECRET"):
+        _make_config(monkeypatch, {"MQTT_CHALLENGE_SECRET": ["bar"]})

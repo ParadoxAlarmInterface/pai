@@ -588,10 +588,14 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         response = None
 
         if isinstance(cfg.MQTT_CHALLENGE_SECRET, dict):
-            if aux[1] in cfg.MQTT_CHALLENGE_SECRET and len(aux) == 3:
-                secret = cfg.MQTT_CHALLENGE_SECRET[aux[1]]
-                user = aux[1]
-                response = aux[2]
+            if len(aux) != 3 or aux[1] not in cfg.MQTT_CHALLENGE_SECRET:
+                message = "Authentication failed. Unknown user or missing response"
+                self._publish_command_status(message)
+                logger.warning(message)
+                return None, None
+            secret = cfg.MQTT_CHALLENGE_SECRET[aux[1]]
+            user = aux[1]
+            response = aux[2]
         elif isinstance(cfg.MQTT_CHALLENGE_SECRET, str):
             secret = cfg.MQTT_CHALLENGE_SECRET
             response = aux[1]
