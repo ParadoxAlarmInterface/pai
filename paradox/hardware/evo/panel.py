@@ -131,6 +131,8 @@ class Panel_EVOBase(PanelBase):
                 elif message[0] == 0xD0:
                     return parsers.PerformZoneAction.parse(message)
                 elif message[0] == 0xA4:
+                    if len(message) == 2 + 4 + parsers.PANEL_PGM_PACKET_SLOTS + 1:
+                        return parsers.PerformPanelPGMAction.parse(message)
                     return parsers.PerformModulePGMAction.parse(message)
             else:
                 if message[0] >> 4 == 0x7:
@@ -294,12 +296,25 @@ class Panel_EVOBase(PanelBase):
         :return: True if we have at least one success
         """
 
-        args = {"pgms": outputs, "command": command}
-
         try:
-            reply = await self.core.send_wait(
-                parsers.PerformPGMAction, args, reply_expected=0x4
-            )
+            if self._onboard_pgm_uses_bit_mask():
+                reply = await self.core.send_wait(
+                    parsers.PerformPGMAction,
+                    {"pgms": outputs, "command": command},
+                    reply_expected=0x4,
+                )
+            else:
+                pgm_commands = ["release"] * parsers.PANEL_PGM_PACKET_SLOTS
+                for pgm in outputs:
+                    if not 1 <= pgm <= parsers.PANEL_PGM_PACKET_SLOTS:
+                        logger.warning("PGM %s is out of range" % pgm)
+                        return False
+                    pgm_commands[pgm - 1] = command
+                reply = await self.core.send_wait(
+                    parsers.PerformPanelPGMAction,
+                    {"pgm_commands": pgm_commands},
+                    reply_expected=0xA,
+                )
         except MappingError:
             logger.warning('PGM command: "%s" is not supported' % command)
             return False
@@ -309,6 +324,12 @@ class Panel_EVOBase(PanelBase):
         else:
             logger.info('PGM command: "%s" failed' % command)
         return reply is not None
+
+    def _onboard_pgm_uses_bit_mask(self) -> bool:
+        """Firmware 4.75+ controls onboard PGMs with 0x40, older with 0xA4."""
+        firmware = self.settings.firmware
+        # revision is BCD: 4.75 is version 0x04, revision 0x75
+        return (firmware.version, firmware.revision) >= (0x04, 0x75)
 
     async def control_module_pgm_outputs(
         self, module_address: int, pgm_index: int, command: str
