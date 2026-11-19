@@ -34,7 +34,7 @@ which carries the module address in byte 3 and has 4 slots.
 | 6-69 | 64 | one command byte per PGM; offset `6 + (pgm - 1)`; unused slots `00` |
 | 70 | 1 | checksum of bytes 0-69 |
 
-Slot values are the `_PGMCommandEnum` values (`release` `00`, `off` `01`,
+Slot values (`release` `00`, `off` `01`,
 `on` `03`, `on_override` `04`). Observed on a panel: `04` activates the PGM.
 Behaviour of the other values over `0xA4` is unverified. Slots 1-5 map to the
 5 onboard PGMs.
