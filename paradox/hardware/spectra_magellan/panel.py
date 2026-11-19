@@ -61,6 +61,8 @@ class Panel(PanelBase):
         },
     }
 
+    ram_parser_map = parsers.RAMDataParserMap
+
     def __init__(
         self, core, start_communication_response, variable_message_length=True
     ):
@@ -72,7 +74,7 @@ class Panel(PanelBase):
 
     @property
     def status_request_addresses(self):
-        addresses = list(parsers.RAMDataParserMap.keys())
+        addresses = list(self.ram_parser_map.keys())
 
         if not self.supports_pgm_status:
             addresses.remove(7)
@@ -236,7 +238,7 @@ class Panel(PanelBase):
         )
         if reply is not None:
             logger.debug("Received status response: %d" % i)
-            return self.handle_status(reply, parsers.RAMDataParserMap)
+            return self.handle_status(reply, self.ram_parser_map)
         else:
             raise StatusRequestException("No reply to status request: %d" % i)
 
