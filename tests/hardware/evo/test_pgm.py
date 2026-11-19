@@ -1,3 +1,4 @@
+import pytest
 from binascii import unhexlify
 
 from paradox.hardware.evo.adapters import PGMFlags
@@ -137,3 +138,38 @@ def test_pgm_confirmation():
     assert parsed.fields.value.po.status.Winload_connected is True
     assert parsed.fields.value.po.status.alarm_reporting_pending is False
     assert parsed.fields.value.packet_length == 7
+
+
+def test_panel_pgm_action_packet():
+    from paradox.hardware.evo.parsers import PerformPanelPGMAction
+
+    commands = ["release"] * 64
+    commands[4] = "on_override"
+    raw = PerformPanelPGMAction.build({"fields": {"value": {"pgm_commands": commands}}})
+
+    assert raw == unhexlify("a447000000000000000004" + "00" * 59 + "ef")
+
+
+@pytest.mark.parametrize(
+    "version,revision,expected",
+    [
+        (4, 0x74, "PerformPanelPGMAction"),
+        (4, 0x75, "PerformPGMAction"),
+        (7, 0x15, "PerformPGMAction"),
+        (2, 0x80, "PerformPanelPGMAction"),
+    ],
+)
+async def test_control_outputs_command_by_firmware(mocker, version, revision, expected):
+    from paradox.hardware.evo.panel import Panel_EVOBase
+    from paradox.hardware.evo import parsers
+
+    panel = Panel_EVOBase.__new__(Panel_EVOBase)
+    panel.core = mocker.MagicMock()
+    panel.core.send_wait = mocker.AsyncMock(return_value=object())
+    panel.settings = mocker.MagicMock()
+    panel.settings.firmware.version = version
+    panel.settings.firmware.revision = revision
+
+    assert await panel.control_outputs([5], "on_override")
+    assert panel.core.send_wait.call_count == 1
+    assert panel.core.send_wait.call_args.args[0] is getattr(parsers, expected)

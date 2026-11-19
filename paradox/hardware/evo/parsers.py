@@ -842,6 +842,25 @@ PerformModulePGMAction = Struct(
     "checksum" / PacketChecksum(Bytes(1)),
 )
 
+# Onboard PGM control on EVO firmware older than 4.75: 0xA4 addressed to module 0, 64 slots.
+PANEL_PGM_PACKET_SLOTS = 64
+
+PerformPanelPGMAction = Struct(
+    "fields"
+    / RawCopy(
+        Struct(
+            "po" / Struct("command" / Const(0xA4, Int8ub)),
+            "packet_length" / PacketLength(Int8ub),
+            "_not_used0" / Padding(1),
+            "module_address" / Const(0, Int8ub),
+            "_not_used1" / Padding(2),
+            "pgm_commands"
+            / Array(PANEL_PGM_PACKET_SLOTS, Default(_PGMCommandEnum, "release")),
+        )
+    ),
+    "checksum" / PacketChecksum(Bytes(1)),
+)
+
 PerformModulePGMActionResponse = Struct(
     "fields"
     / RawCopy(
