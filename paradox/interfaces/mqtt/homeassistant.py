@@ -210,8 +210,13 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             self._publish_system_property_configs(system_statuses)
 
     def _publish_system_property_configs(self, system_statuses):
+        excluded = set(cfg.HOMEASSISTANT_EXCLUDE_SYSTEM_PROPERTIES)
         for system_key, system_status in system_statuses.items():
+            if system_key in excluded:
+                continue
             for property_name in system_status:
+                if f"{system_key}/{property_name}" in excluded:
+                    continue
                 system_property_config = self.entity_factory.make_system_status(
                     system_key, property_name
                 )

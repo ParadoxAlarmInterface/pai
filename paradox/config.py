@@ -234,6 +234,9 @@ class Config:
             "open",
             "tamper",
         ],
+        # System properties not to publish, as "<key>/<property>" (e.g. "date/time")
+        # or a whole group (e.g. "troubles").
+        "HOMEASSISTANT_EXCLUDE_SYSTEM_PROPERTIES": [],
         # Zone key -> Home Assistant binary_sensor device_class of the zone
         # "open" sensor. Panels do not expose the physical sensor type, so the
         # mapping is explicit. Unlisted zones default to "motion".

@@ -7,6 +7,7 @@ import pytest
 from paradox.config import config as cfg
 from paradox.data.model import DetectedPanel
 from paradox.hardware.common import ProductIdEnum
+from paradox.interfaces.mqtt.entities.device import Device
 from paradox.interfaces.mqtt.homeassistant import HomeAssistantMQTTInterface
 from paradox.lib.ps import sendMessage
 
@@ -184,3 +185,31 @@ def assert_any_call_with_json(self, *args, **kwargs):
     expected = (args, kwargs)
 
     assert expected in actual
+
+
+@pytest.mark.asyncio
+async def test_exclude_system_properties(mocker):
+    con = mocker.patch("paradox.interfaces.mqtt.core.MQTTConnection")
+    con.get_instance.return_value.availability_topic = "paradox/interface/availability"
+    mocker.patch.multiple(
+        cfg, HOMEASSISTANT_EXCLUDE_SYSTEM_PROPERTIES=["date/time", "troubles"]
+    )
+    interface = HomeAssistantMQTTInterface(mocker.MagicMock())
+    interface.entity_factory.set_device(
+        Device(
+            DetectedPanel(
+                ProductIdEnum.parse(b"\x05"), "EVO192", "6.80 build 5", "aabbccdd"
+            )
+        )
+    )
+    publish = mocker.patch.object(interface, "publish")
+
+    interface._publish_system_configs_from_status(
+        dict(
+            system=dict(date=dict(time="x"), power=dict(vdc=13.5)),
+            troubles=dict(ac_failure_trouble=False),
+        )
+    )
+
+    topics = [c.args[0] for c in publish.call_args_list]
+    assert topics == ["homeassistant/sensor/aabbccdd/system_power_vdc/config"]
