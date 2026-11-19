@@ -5,10 +5,8 @@ controlled, by firmware version.
 
 ## Transport
 
-* Panel messages are carried in an IP150 multicommand (`0xFB`) frame. Each inner
-  message is prefixed with one byte holding its length. Several commands can be
-  concatenated into one frame; the panel answers each one separately.
-* Checksum: sum of the message bytes (length prefix excluded), low 8 bits.
+* Packets below are the panel messages as sent by PAI, with no extra length prefix.
+* Checksum: sum of the preceding message bytes, low 8 bits.
 
 ## Command by firmware version
 
@@ -26,7 +24,7 @@ which carries the module address in byte 3 and has 4 slots.
 
 ## `0xA4` — one command byte per PGM (firmware below 4.75, `PerformPanelPGMAction`)
 
-71 bytes, no length prefix (the multicommand frame prepends `0x47`):
+71 bytes, no length prefix:
 
 | Offset | Size | Value |
 | --- | --- | --- |
@@ -36,11 +34,13 @@ which carries the module address in byte 3 and has 4 slots.
 | 6-69 | 64 | one command byte per PGM; offset `6 + (pgm - 1)`; unused slots `00` |
 | 70 | 1 | checksum of bytes 0-69 |
 
-Slot values: `04` to turn a PGM on, `03` to turn
-it off. `00` leaves the PGM untouched. Only slots 0-4 are used (5 onboard PGMs).
+Slot values are the `_PGMCommandEnum` values (`release` `00`, `off` `01`,
+`on` `03`, `on_override` `04`). Observed on a panel: `04` activates the PGM.
+Behaviour of the other values over `0xA4` is unverified. Slots 1-5 map to the
+5 onboard PGMs.
 
-Several PGMs: send one single-PGM packet per PGM, each with its own length
-prefix, in one multicommand frame (do not merge them into one packet).
+PAI sets all requested PGMs in a single packet. Behaviour with several active
+slots is unverified.
 
 Reply: `a2 07 00 00 00 00 <checksum>` (high nibble `0xA`, length `0x07`).
 
@@ -57,7 +57,7 @@ Same 71-byte layout, command `0xAC`. Utility key `i` (0-7) is a bit mask: byte
 
 ## `0x40` — PGM bit mask (firmware 4.75 and above, `PerformPGMAction`)
 
-19 bytes (the multicommand frame prepends `0x13`):
+19 bytes:
 
 | Offset | Size | Value |
 | --- | --- | --- |
@@ -65,7 +65,8 @@ Same 71-byte layout, command `0xAC`. Utility key `i` (0-7) is a bit mask: byte
 | 1 | 1 | `0x13` |
 | 2 | 1 | `0x06` |
 | 3-5 | 3 | `00` |
-| 6-13 | 8 | little-endian bit mask, bit `pgm - 1` set |
+| 6-9 | 4 | little-endian 32-bit PGM mask, bit `pgm - 1` set |
+| 10-13 | 4 | `00` |
 | 14 | 1 | command: `03` on, `01` off |
 | 15-17 | 3 | `00` |
 | 18 | 1 | checksum of bytes 0-17 |
