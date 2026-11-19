@@ -5,6 +5,7 @@ import os
 import socket
 import ssl
 import sys
+import threading
 import time
 import typing
 
@@ -64,6 +65,7 @@ class MQTTConnection:
             transport=cfg.MQTT_TRANSPORT,
         )
         self._last_pai_status = "unknown"
+        self._pai_status_lock = threading.RLock()
         self.pai_status_topic = "{}/{}/{}".format(
             cfg.MQTT_BASE_TOPIC, cfg.MQTT_INTERFACE_TOPIC, "pai_status"
         )
@@ -162,6 +164,31 @@ class MQTTConnection:
 
         self.client.publish(topic, payload, *args, **kwargs)
 
+    def republish_all(self):
+        """Re-publish PAI status and every interface's cached messages now.
+
+        Interfaces are replayed one after another; those that set
+        ``republish_first`` (Home Assistant discovery) go first so that entity
+        configs arrive before their states.
+        """
+        logger.info("Re-publishing all MQTT messages")
+        with self._pai_status_lock:
+            self._report_pai_status(self._last_pai_status)
+        pending = sorted(
+            self.registrars, key=lambda r: not getattr(r, "republish_first", False)
+        )
+
+        def replay_next():
+            while pending:
+                r = pending.pop(0)
+                try:
+                    r.republish_all(on_done=replay_next)
+                    return
+                except Exception:
+                    logger.exception('Failed to republish "%s"', r.__class__.__name__)
+
+        replay_next()
+
     def _call_registars(self, method, *args, **kwargs):
         for r in self.registrars:
             try:
@@ -204,14 +231,15 @@ class MQTTConnection:
         return self.state == ConnectionState.CONNECTED
 
     def _report_pai_status(self, status):
-        self._last_pai_status = status
-        self.publish(self.pai_status_topic, status, qos=cfg.MQTT_QOS, retain=True)
-        self.publish(
-            self.availability_topic,
-            "online" if status in ["online", "paused"] else "offline",
-            qos=cfg.MQTT_QOS,
-            retain=True,
-        )
+        with self._pai_status_lock:
+            self._last_pai_status = status
+            self.publish(self.pai_status_topic, status, qos=cfg.MQTT_QOS, retain=True)
+            self.publish(
+                self.availability_topic,
+                "online" if status in ["online", "paused"] else "offline",
+                qos=cfg.MQTT_QOS,
+                retain=True,
+            )
 
     def _on_connect_cb(
         self, client, userdata, connect_flags, reason_code, properties=None
@@ -304,6 +332,21 @@ class AbstractMQTTInterface(ThreadQueueInterface):
             for k, v in self.republish_cache.items():
                 if v.get("last_publish") <= trigger:
                     self.publish(k, v["value"], v["qos"], v["retain"])
+
+    def republish_all(self, on_done=None):
+        # Runs on the interface loop, so it is serialized with queued publishes
+        # and cannot resend a value older than one already sent.
+        def replay():
+            try:
+                now = time.time()
+                for topic, v in list(self.republish_cache.items()):
+                    v["last_publish"] = now
+                    self.mqtt.publish(topic, v["value"], v["qos"], v["retain"])
+            finally:
+                if on_done:
+                    on_done()
+
+        self.loop.call_soon_threadsafe(replay)
 
     def _run(self):
         super()._run()
