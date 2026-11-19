@@ -160,6 +160,13 @@ import logging
 #     'open',
 #     'tamper'
 # ]
+# Excluded system entities are no longer published. Already discovered entities stay
+# until their retained discovery topic is cleared, e.g.:
+#   mosquitto_pub -r -n -t homeassistant/sensor/<serial>/system_date_time/config
+# HOMEASSISTANT_EXCLUDE_SYSTEM_PROPERTIES = [  # Default: [] (publish all)
+#     'date/time',  # Panel clock; updates every few seconds and floods the HA logbook
+#     # 'troubles',  # A whole group can be excluded too
+# ]
 # ZONE_DEVICE_CLASS = {  # Zone key -> Home Assistant device_class of the zone "open" sensor. Default: 'motion'
 #     'front_door': 'door',
 #     'kitchen_window': 'window',
