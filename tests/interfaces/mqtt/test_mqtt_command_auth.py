@@ -101,7 +101,9 @@ async def test_validate_challenge_user(mocker):
 async def test_validate_challenge_multiple_users(mocker):
     interface = get_interface(mocker, {"UserA": "secretA", "UserB": "secretB"})
     try:
+        await asyncio.sleep(0.01)
         interface._on_ready()
+        await asyncio.sleep(0.01)
         rounds = cfg.MQTT_CHALLENGE_ROUNDS
 
         resp = calc_response(interface.challenge, "secretB", rounds)
