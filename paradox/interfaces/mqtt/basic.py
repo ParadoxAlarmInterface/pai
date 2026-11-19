@@ -187,7 +187,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             command, user = _extract_command_user(command)
 
         message = f"Zone command: {element}={command} user: {user}"
-        logger.debug(message)
+        logger.info(message)
         self._publish_command_status(message)
 
         if not await self.alarm.control_zone(element, command):
@@ -295,7 +295,7 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             command, user = _extract_command_user(command)
 
         message = f"Output command: {element}={command} user: {user}"
-        logger.debug(message)
+        logger.info(message)
         self._publish_command_status(message)
 
         if not await self.alarm.control_output(element, command):
@@ -359,9 +359,8 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         else:
             command, user = _extract_command_user(command)
 
-        message = f"Door command: {element}={command} user="
-
-        logger.debug(message)
+        message = f"Door command: {element}={command} user: {user}"
+        logger.info(message)
         self._publish_command_status(message)
 
         if not await self.alarm.control_door(element, command):

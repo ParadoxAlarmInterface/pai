@@ -246,3 +246,28 @@ async def test_reloaded_labels_publish_definitions_for_renamed_and_new_zones(moc
         interface.stop()
         interface.join()
         assert not interface.is_alive()
+
+
+@pytest.mark.asyncio
+async def test_zone_control_routed_through_paho_subscription(mocker, caplog):
+    from paho.mqtt.client import CallbackAPIVersion, Client
+
+    client = Client(CallbackAPIVersion.VERSION2)
+    interface = get_interface(mocker)
+    try:
+        interface.alarm.control_zone = mocker.AsyncMock(return_value=True)
+        interface.mqtt.message_callback_add.side_effect = client.message_callback_add
+        interface.on_connect(None, None, None, None)
+
+        message = MQTTMessage(topic=b"paradox/control/zones/Zone_07")
+        message.payload = b"bypass"
+        with caplog.at_level("INFO", logger="PAI"):
+            client._handle_on_message(message)
+            await asyncio.sleep(0.01)
+
+        interface.alarm.control_zone.assert_called_once_with("Zone_07", "bypass")
+        assert "Zone command: Zone_07=bypass user: None" in caplog.text
+    finally:
+        interface.stop()
+        interface.join()
+        assert not interface.is_alive()

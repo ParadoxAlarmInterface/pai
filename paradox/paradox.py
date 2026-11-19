@@ -427,7 +427,7 @@ class Paradox:
 
     async def control_zone(self, zone: str, command: str) -> bool:
         command = command.lower()
-        logger.debug(f"Control Zone: {zone} - {command}")
+        logger.info("Control Zone: %s - %s", zone, command)
 
         zones_selected = self.storage.get_container("zone").select(zone)
 
