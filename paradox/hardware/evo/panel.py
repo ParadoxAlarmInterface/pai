@@ -35,6 +35,7 @@ class Panel_EVOBase(PanelBase):
     event_map = event_map
     property_map = property_map
     max_eeprom_response_data_length = 64
+    ram_parser_map = parsers.RAMDataParserMap
     status_request_addresses = parsers.RAMDataParserMap.keys()
 
     def __init__(
@@ -230,7 +231,7 @@ class Panel_EVOBase(PanelBase):
         )
         if reply is not None:
             logger.debug("Received status response: %d" % i)
-            return self.handle_status(reply, parsers.RAMDataParserMap)
+            return self.handle_status(reply, self.ram_parser_map)
         else:
             raise StatusRequestException("No reply to status request: %d" % i)
 

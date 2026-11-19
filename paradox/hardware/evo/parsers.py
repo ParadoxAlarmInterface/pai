@@ -177,8 +177,32 @@ InitializeCommunication = Struct(
     "checksum" / PacketChecksum(Bytes(1)),
 )
 
-RAMDataParserMap = {
-    1: Struct(
+
+def _millivolts(subcon):
+    return ExprAdapter(
+        subcon,
+        lambda obj, ctx: round(obj / 1000.0, 1),
+        lambda obj, ctx: int(obj * 1000),
+    )
+
+
+_power_8bit = Struct(
+    "vdc"
+    / ExprAdapter(Byte, lambda obj, ctx: round(obj * (20.3 - 1.4) / 255.0 + 1.4, 1), 0),
+    "battery" / ExprAdapter(Byte, lambda obj, ctx: round(obj * 22.8 / 255.0, 1), 0),
+    "dc" / ExprAdapter(Byte, lambda obj, ctx: round(obj * 22.8 / 255.0, 1), 0),
+)
+
+# EVOHD+ reports voltages in RAM block 4 as millivolts
+_power_mv = Struct(
+    "vdc" / _millivolts(Int16ul),
+    "battery" / _millivolts(Int16ul),
+    "dc" / _millivolts(Int16ul),
+)
+
+
+def _ram_block_1(power):
+    return Struct(
         "_weekday" / Int8ub,
         "_system_flags"
         / BitStruct(  # TODO: Do we need BitsSwapped here?
@@ -243,28 +267,16 @@ RAMDataParserMap = {
                 "weekday" / Computed(lambda ctx: ctx._._._weekday),
                 "time" / DateAdapter(Bytes(7)),
             ),
-            "power"
-            / Struct(
-                "vdc"
-                / ExprAdapter(
-                    Byte, lambda obj, ctx: round(obj * (20.3 - 1.4) / 255.0 + 1.4, 1), 0
-                ),
-                "battery"
-                / ExprAdapter(Byte, lambda obj, ctx: round(obj * 22.8 / 255.0, 1), 0),
-                "dc"
-                / ExprAdapter(Byte, lambda obj, ctx: round(obj * 22.8 / 255.0, 1), 0),
-            ),
+            power,
         ),
         "zone_open" / BitsSwapped(Bitwise(StatusFlags(96))),
         "zone_tamper" / BitsSwapped(Bitwise(StatusFlags(96))),
         "zone_low_battery" / BitsSwapped(Bitwise(StatusFlags(96))),
-    ),
-    2: Struct("zone_status" / ZoneFlags(64)),
-    3: Struct(
-        "zone_status" / ZoneFlags(32, start_index_from=65),
-        "partition_status" / PartitionStatus(Bytes(32)),
-    ),
-    4: Struct(
+    )
+
+
+def _ram_block_4(*system_tail, free):
+    return Struct(
         "partition_status" / PartitionStatus(Bytes(16)),
         "system"
         / Struct(
@@ -280,16 +292,20 @@ RAMDataParserMap = {
             / Struct(
                 "arm_disarm_delay_timer" / Int8ub,
             ),
+            *system_tail,
         ),
-        # --- NEW EVOHD+ v1.9 SYSTEM POWER MAPPING ---
-        "_free" / Padding(22), 
-        "power" / Struct(
-            "vdc" / ExprAdapter(Int16ul, lambda obj, ctx: round(obj / 1000.0, 1), lambda obj, ctx: int(obj * 1000)),
-            "battery" / ExprAdapter(Int16ul, lambda obj, ctx: round(obj / 1000.0, 1), lambda obj, ctx: int(obj * 1000)),
-            "dc" / ExprAdapter(Int16ul, lambda obj, ctx: round(obj / 1000.0, 1), lambda obj, ctx: int(obj * 1000)),
-        ),
-        "hardware_status_flags" / Bytes(6),
+        "_free" / Padding(free),
+    )
+
+
+RAMDataParserMap = {
+    1: _ram_block_1("power" / _power_8bit),
+    2: Struct("zone_status" / ZoneFlags(64)),
+    3: Struct(
+        "zone_status" / ZoneFlags(32, start_index_from=65),
+        "partition_status" / PartitionStatus(Bytes(32)),
     ),
+    4: _ram_block_4(free=34),
     5: Struct(
         "_not_used" / Int8ub,
         "module_trouble" / ModuleTroubles(count=63, start_index_from=1),
@@ -336,15 +352,27 @@ RAMDataParserMap = {
 # 56 ram address
 # 58 ram address
 
+
 # compile all RAMDataParserMap parsers if possible
-for key, parser in RAMDataParserMap.items():
-    try:
-        RAMDataParserMap[key] = parser.compile()
-    except Exception:
-        logger.debug(
-            "Could not compile parser for RAM address %s. Using the original version.",
-            key,
-        )
+def _compile_parsers(parser_map, keys):
+    for key in keys:
+        try:
+            parser_map[key] = parser_map[key].compile()
+        except Exception:
+            logger.debug(
+                "Could not compile parser for RAM address %s. Using the original version.",
+                key,
+            )
+
+
+_compile_parsers(RAMDataParserMap, list(RAMDataParserMap))
+
+RAMDataParserMap_EVOHDPlus = {
+    **RAMDataParserMap,
+    1: _ram_block_1("_power" / Bytes(3)),
+    4: _ram_block_4("_free" / Padding(22), "power" / _power_mv, free=6),
+}
+_compile_parsers(RAMDataParserMap_EVOHDPlus, [1, 4])
 
 
 def get_user_definition(settings):

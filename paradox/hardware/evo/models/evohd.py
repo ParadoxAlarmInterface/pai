@@ -1,5 +1,6 @@
 import logging
 
+from .. import parsers
 from ..panel import Panel_EVOBase
 
 logger = logging.getLogger("PAI").getChild(__name__)
@@ -56,3 +57,7 @@ class Panel_EVOHD(Panel_EVOBase):
             "user": {"addresses": [range(0x0BF0, 0x32EC + 10, 10),]},  # 999 users
         },
     }
+
+
+class Panel_EVOHDPlus(Panel_EVOHD):
+    ram_parser_map = parsers.RAMDataParserMap_EVOHDPlus

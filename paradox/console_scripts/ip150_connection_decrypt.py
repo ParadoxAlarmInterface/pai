@@ -108,7 +108,10 @@ class PayloadParser:
             and parsed_payload.fields.value.bus_address == 0
         ):
             ram_address = parsed_payload.fields.value.address
-            ram_parser = self.panel.get_message("RAMDataParserMap").get(ram_address)
+            ram_parser_map = getattr(
+                self.panel, "ram_parser_map", None
+            ) or self.panel.get_message("RAMDataParserMap")
+            ram_parser = ram_parser_map.get(ram_address)
             if ram_parser is not None:
                 print(
                     f"{Colors.ON_WHITE}{ram_parser.parse(parsed_payload.fields.value.data)}{Colors.ENDC}"

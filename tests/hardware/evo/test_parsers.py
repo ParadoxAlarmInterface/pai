@@ -2,8 +2,12 @@ import binascii
 
 from construct import Container
 
-from paradox.hardware.evo.parsers import (DefinitionsParserMap,
-                                          get_user_definition, RAMDataParserMap)
+from paradox.hardware.evo.parsers import (
+    DefinitionsParserMap,
+    RAMDataParserMap,
+    RAMDataParserMap_EVOHDPlus,
+    get_user_definition,
+)
 
 
 def test_zone_definition_test():
@@ -168,3 +172,35 @@ def test_parse_ram_1_troubles():
     assert data["system"]["troubles"]["module_ac_trouble"]
 
     assert data["system"]["troubles"]["missing_keypad_trouble"]
+
+
+# Captured from a real EVO192 v7.30
+EVO192_RAM1 = binascii.unhexlify(
+    "051000000000000000000000000000000000141a0b13151e1fcf8a9a000000000000"
+    "000000000000000000000000000000000000000000000000000000000000"
+)
+EVO192_RAM4 = binascii.unhexlify(
+    "0000000001090000001f01090000001f00a9022f0da802000000000000000000"
+    "0002000000000000000000000000400000000000000000000000000000000000"
+)
+
+
+def test_parse_ram_power_evo192():
+    assert RAMDataParserMap[1].parse(EVO192_RAM1).system.power == {
+        "vdc": 16.7,
+        "battery": 12.3,
+        "dc": 13.8,
+    }
+    assert "power" not in RAMDataParserMap[4].parse(EVO192_RAM4).system
+
+
+def test_parse_ram_power_evohd_plus():
+    raw_data = bytearray(64)
+    raw_data[52:61] = binascii.unhexlify("5046bd352a3611017f")
+
+    ram1 = RAMDataParserMap_EVOHDPlus[1].parse(EVO192_RAM1)
+    ram4 = RAMDataParserMap_EVOHDPlus[4].parse(raw_data)
+
+    assert "power" not in ram1.system
+    assert ram1.system.date == RAMDataParserMap[1].parse(EVO192_RAM1).system.date
+    assert ram4.system.power == {"vdc": 18.0, "battery": 13.8, "dc": 13.9}
