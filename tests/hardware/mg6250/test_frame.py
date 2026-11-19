@@ -1053,6 +1053,13 @@ def test_parse_log_range_reply():
     assert record.events == []
 
 
+def test_parse_log_range_reply_with_padding():
+    """The decrypted fragment is padded to 16 bytes after the terminator."""
+    data = bytes.fromhex(LOG_RANGE_REPLY) + bytes([0xEE]) * 12
+    (record,) = parse_log_records(data)
+    assert (record.op, record.last) == (LOG_OP_RANGE, 0x72AE)
+
+
 def test_parse_log_read_reply():
     data = log_reply(
         0x7292, 0x7293, [log_event(0x7292, 6, 3), log_event(0x7293, 41, 5)]
@@ -2034,8 +2041,8 @@ async def test_time_sync_does_not_overlap():
     assert alarm.panel.set_time.await_count == 2
 
 
-async def test_tid_wraps_to_zero_as_babyware():
-    """255 is followed by 0 (long-tid-wrapped-many-operations.pcapng)."""
+async def test_tid_is_16_bit_as_babyware():
+    """255 is followed by 256, header bytes 00 01 (long-tid-wrapped-many-operations.pcapng)."""
     panel, core = control_panel()
     panel._tid = 254
     tids = []
@@ -2049,7 +2056,7 @@ async def test_tid_wraps_to_zero_as_babyware():
             )
         )
         tids.append(header.tid)
-    assert tids == [255, 0, 1]
+    assert tids == [255, 256, 257]
 
 
 # long-tid-wrapped-many-operations.pcapng, decrypted (panel serial 02002de7)

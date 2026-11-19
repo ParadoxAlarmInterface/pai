@@ -142,8 +142,9 @@ PAD = 0xEE  # Paradox padding byte
 # fragment and vice versa; a reply ends at the fragment with LAST_FRAGMENT.
 # ---------------------------------------------------------------------------
 DataHeader = Struct(
-    "tid" / Int8ub,
-    "_reserved0" / Int8ub,
+    # 16-bit, little endian: BabyWare's tid 255 is followed by 00 01
+    # (long-tid-wrapped-many-operations), which the 1-byte view read as 0.
+    "tid" / Int16ul,
     "fragment" / Int16ul,
     "kind" / Int8ub,
     "service" / Int8ub,
@@ -385,6 +386,8 @@ def parse_log_records(data: bytes) -> typing.List[Container]:
     records = []
     i = 0
     while i + 2 <= len(data) and data[i] != PAD and data[i + 1] >= 2:
+        if data[i:].rstrip(bytes([PAD])) == b"\x00":
+            break  # zero terminator before the padding, not a read record
         length = data[i + 1]
         raw = data[i : i + length]
         i += length
@@ -618,7 +621,6 @@ class Panel(PanelBase):
         header = DataHeader.build(
             {
                 "tid": tid,
-                "_reserved0": 0,
                 "fragment": fragment,
                 "kind": kind,
                 "service": service,
@@ -733,9 +735,10 @@ class Panel(PanelBase):
         if self.session is None:
             # e.g. an MQTT command arriving while PAI reconnects
             raise StatusRequestException("MG6250: not logged in")
-        # A byte counter, as BabyWare's: 255 is followed by 0. Skipping 0
-        # makes the panel ignore every request after the 255th.
-        self._tid = (self._tid + 1) & 0xFF
+        # A 16-bit counter, as BabyWare's: 255 is followed by 256 (00 01).
+        # Going back to 0 (or skipping to 1) makes the panel ignore every
+        # request after the 255th. What follows 65535 is not captured.
+        self._tid = (self._tid + 1) & 0xFFFF
         tid = self._tid
         message = self.build_request(tid, service, data)
         fragments = []
