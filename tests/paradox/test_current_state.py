@@ -138,3 +138,39 @@ async def test_unlabelled_partitions_do_not_break_state_updates(alarm):
         "Partition_1",
         {"current_state": "armed_away", "target_state": "armed_away"},
     )
+
+
+# EVO "Special arming: late to close" (major 12, minor 2) for partition 1
+LATE_TO_CLOSE = binascii.unhexlify(
+    "e2ff187914130b0e0e3b0c010200000000000000000000000000000000000000000000000a"
+)
+
+
+@pytest.mark.asyncio
+async def test_late_to_close_does_not_report_armed(mocker):
+    """Issue #633: scheduled auto-arm emits 12/2 before the exit delay starts.
+
+    It must not mark the partition armed; the status poll drives arming.
+    """
+    mocker.patch("paradox.lib.utils.main_thread_loop", asyncio.get_running_loop())
+    alarm = Paradox(None)
+    alarm.panel = create_evo192_panel(alarm)
+    mocker.spy(alarm.storage, "update_container_object")
+
+    send_initial_status(alarm)
+    alarm.storage.update_container_object.reset_mock()
+
+    alarm.handle_event_message(LiveEvent.parse(LATE_TO_CLOSE))
+    await asyncio.sleep(0.01)
+
+    partition = alarm.storage.get_container_object("partition", "Partition_1")
+    assert partition["arm"] is False
+    assert partition["current_state"] == "disarmed"
+
+    alarm._on_status_update(status=dict(partition={1: dict(arm=True, exit_delay=True)}))
+    alarm.storage.update_container_object.assert_any_call(
+        "partition",
+        "Partition_1",
+        {"current_state": "arming", "target_state": "armed_away"},
+    )
+    alarm.panel = None
