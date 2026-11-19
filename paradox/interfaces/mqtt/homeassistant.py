@@ -22,6 +22,8 @@ PreparseResponse = namedtuple("PreparseResponse", "topics element content")
 
 
 class HomeAssistantMQTTInterface(AbstractMQTTInterface):
+    republish_first = True  # discovery configs must precede states
+
     def __init__(self, alarm):
         super().__init__(alarm)
         self.armed = {}
@@ -60,8 +62,18 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         ps.subscribe(first_status_update_future, "status_update")
 
     def on_connect(self, client, userdata, connect_flags, reason_code, properties=None):
+        self.subscribe_callback(
+            f"{cfg.MQTT_HOMEASSISTANT_DISCOVERY_PREFIX}/status",
+            self._handle_homeassistant_status,
+        )
         # TODO: do not create connected_future, use some other
         set_future_result_threadsafe(self.connected_future, True)
+
+    def _handle_homeassistant_status(self, client, userdata, message):
+        # Home Assistant birth message: re-send discovery configs and states
+        if message.payload.decode("utf-8").strip() == "online":
+            logger.info("Home Assistant came online")
+            self.mqtt.republish_all()
 
     def _handle_labels_loaded(self, data):
         partitions = data.get("partition", {})

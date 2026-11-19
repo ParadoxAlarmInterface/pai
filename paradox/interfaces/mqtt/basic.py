@@ -149,6 +149,12 @@ class BasicMQTTInterface(AbstractMQTTInterface):
             ),
             self._mqtt_handle_send_panic,
         )
+        self.subscribe_callback(
+            "{}/{}/{}".format(
+                cfg.MQTT_BASE_TOPIC, cfg.MQTT_CONTROL_TOPIC, cfg.MQTT_INTERFACE_TOPIC
+            ),
+            self._mqtt_handle_interface_control,
+        )
 
         if cfg.CONNECTION_TYPE == "PRT3":
             self.subscribe_callback(
@@ -174,6 +180,13 @@ class BasicMQTTInterface(AbstractMQTTInterface):
         ps.sendNotification(
             Notification(sender=self.name, message=prep.content, level=level)
         )
+
+    @mqtt_handle_decorator
+    async def _mqtt_handle_interface_control(self, prep: ParsedMessage):
+        if prep.content.lower() == "republish":
+            self.mqtt.republish_all()
+        else:
+            logger.warning(f"Unknown interface command: {prep.content}")
 
     @mqtt_handle_decorator
     async def _mqtt_handle_zone_control(self, prep: ParsedMessage):

@@ -109,6 +109,9 @@ import logging
 # MQTT_BIND_ADDRESS = ''        # MQTT Client bind address. Default: "" - pick automatically
 # MQTT_BIND_PORT = 0            # MQTT Client bind port. Default: 0 - pick automatically
 # MQTT_REPUBLISH_INTERVAL = 60 * 60 * 12  # Interval for republishing all data
+#   Republish on demand: publish 'republish' to {base}/control/interface (e.g. paradox/control/interface).
+#   With Home Assistant autodiscovery, everything is also republished when Home Assistant
+#   sends its birth message ('online' on {MQTT_HOMEASSISTANT_DISCOVERY_PREFIX}/status).
 # MQTT_PUBLISH_DEFINITIONS = False        # Publish definitions of partitions/zones/users to MQTT. Not required in most cases.
 #
 ### MQTT Topics

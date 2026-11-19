@@ -162,6 +162,22 @@ class MQTTConnection:
 
         self.client.publish(topic, payload, *args, **kwargs)
 
+    def republish_all(self):
+        """Re-publish PAI status and every interface's cached messages now.
+
+        Interfaces that set ``republish_first`` (Home Assistant discovery) go
+        first so that entity configs arrive before their states.
+        """
+        logger.info("Re-publishing all MQTT messages")
+        self._report_pai_status(self._last_pai_status)
+        for r in sorted(
+            self.registrars, key=lambda r: not getattr(r, "republish_first", False)
+        ):
+            try:
+                r.republish_all()
+            except Exception:
+                logger.exception('Failed to republish "%s"', r.__class__.__name__)
+
     def _call_registars(self, method, *args, **kwargs):
         for r in self.registrars:
             try:
@@ -304,6 +320,13 @@ class AbstractMQTTInterface(ThreadQueueInterface):
             for k, v in self.republish_cache.items():
                 if v.get("last_publish") <= trigger:
                     self.publish(k, v["value"], v["qos"], v["retain"])
+
+    def republish_all(self):
+        # Publish directly (not via self.loop) to keep ordering across interfaces
+        now = time.time()
+        for topic, v in list(self.republish_cache.items()):
+            v["last_publish"] = now
+            self.mqtt.publish(topic, v["value"], v["qos"], v["retain"])
 
     def _run(self):
         super()._run()

@@ -271,3 +271,59 @@ async def test_zone_control_routed_through_paho_subscription(mocker, caplog):
         interface.stop()
         interface.join()
         assert not interface.is_alive()
+
+
+@pytest.mark.asyncio
+async def test_mqtt_handle_interface_republish(mocker):
+    interface = get_interface(mocker)
+    try:
+        await asyncio.sleep(0.01)
+
+        message = MQTTMessage(topic=b"paradox/control/interface")
+        message.payload = b"republish"
+
+        interface._mqtt_handle_interface_control(None, None, message)
+        await asyncio.sleep(0.01)
+
+        interface.mqtt.republish_all.assert_called_once_with()
+    finally:
+        interface.stop()
+        interface.join()
+        assert not interface.is_alive()
+
+
+@pytest.mark.asyncio
+async def test_republish_all_resends_cached_messages(mocker):
+    interface = get_interface(mocker)
+    try:
+        await asyncio.sleep(0.01)
+
+        interface.publish("paradox/states/zones/Z1/open", "True", 0, False)
+        await asyncio.sleep(0.01)
+        interface.mqtt.publish.reset_mock()
+
+        interface.republish_all()
+
+        interface.mqtt.publish.assert_called_once_with(
+            "paradox/states/zones/Z1/open", "True", 0, False
+        )
+    finally:
+        interface.stop()
+        interface.join()
+        assert not interface.is_alive()
+
+
+def test_connection_republish_all_puts_discovery_first(mocker):
+    from paradox.interfaces.mqtt.core import MQTTConnection
+
+    calls = []
+    basic = mocker.Mock(republish_first=False)
+    basic.republish_all.side_effect = lambda: calls.append("basic")
+    hass = mocker.Mock(republish_first=True)
+    hass.republish_all.side_effect = lambda: calls.append("hass")
+    connection = mocker.Mock(registrars=[basic, hass], _last_pai_status="online")
+
+    MQTTConnection.republish_all(connection)
+
+    connection._report_pai_status.assert_called_once_with("online")
+    assert calls == ["hass", "basic"]

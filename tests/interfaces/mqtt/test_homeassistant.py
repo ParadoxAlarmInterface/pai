@@ -2,6 +2,7 @@ import asyncio
 import json
 from json.decoder import JSONDecodeError
 
+from paho.mqtt.client import MQTTMessage
 import pytest
 
 from paradox.config import config as cfg
@@ -213,3 +214,18 @@ async def test_exclude_system_properties(mocker):
 
     topics = [c.args[0] for c in publish.call_args_list]
     assert topics == ["homeassistant/sensor/aabbccdd/system_power_vdc/config"]
+
+
+@pytest.mark.parametrize(
+    "payload,republished", [(b"online", True), (b"offline", False)]
+)
+@pytest.mark.asyncio
+async def test_homeassistant_birth_triggers_republish(payload, republished, mocker):
+    con = mocker.patch("paradox.interfaces.mqtt.core.MQTTConnection")
+    interface = HomeAssistantMQTTInterface(mocker.MagicMock())
+
+    message = MQTTMessage(topic=b"homeassistant/status")
+    message.payload = payload
+    interface._handle_homeassistant_status(None, None, message)
+
+    assert con.get_instance.return_value.republish_all.called is republished
