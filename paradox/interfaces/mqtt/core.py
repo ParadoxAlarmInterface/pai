@@ -165,18 +165,26 @@ class MQTTConnection:
     def republish_all(self):
         """Re-publish PAI status and every interface's cached messages now.
 
-        Interfaces that set ``republish_first`` (Home Assistant discovery) go
-        first so that entity configs arrive before their states.
+        Interfaces are replayed one after another; those that set
+        ``republish_first`` (Home Assistant discovery) go first so that entity
+        configs arrive before their states.
         """
         logger.info("Re-publishing all MQTT messages")
         self._report_pai_status(self._last_pai_status)
-        for r in sorted(
+        pending = sorted(
             self.registrars, key=lambda r: not getattr(r, "republish_first", False)
-        ):
-            try:
-                r.republish_all()
-            except Exception:
-                logger.exception('Failed to republish "%s"', r.__class__.__name__)
+        )
+
+        def replay_next():
+            while pending:
+                r = pending.pop(0)
+                try:
+                    r.republish_all(on_done=replay_next)
+                    return
+                except Exception:
+                    logger.exception('Failed to republish "%s"', r.__class__.__name__)
+
+        replay_next()
 
     def _call_registars(self, method, *args, **kwargs):
         for r in self.registrars:
@@ -321,12 +329,20 @@ class AbstractMQTTInterface(ThreadQueueInterface):
                 if v.get("last_publish") <= trigger:
                     self.publish(k, v["value"], v["qos"], v["retain"])
 
-    def republish_all(self):
-        # Publish directly (not via self.loop) to keep ordering across interfaces
-        now = time.time()
-        for topic, v in list(self.republish_cache.items()):
-            v["last_publish"] = now
-            self.mqtt.publish(topic, v["value"], v["qos"], v["retain"])
+    def republish_all(self, on_done=None):
+        # Runs on the interface loop, so it is serialized with queued publishes
+        # and cannot resend a value older than one already sent.
+        def replay():
+            try:
+                now = time.time()
+                for topic, v in list(self.republish_cache.items()):
+                    v["last_publish"] = now
+                    self.mqtt.publish(topic, v["value"], v["qos"], v["retain"])
+            finally:
+                if on_done:
+                    on_done()
+
+        self.loop.call_soon_threadsafe(replay)
 
     def _run(self):
         super()._run()

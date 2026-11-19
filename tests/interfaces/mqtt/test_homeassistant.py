@@ -217,7 +217,7 @@ async def test_exclude_system_properties(mocker):
 
 
 @pytest.mark.parametrize(
-    "payload,republished", [(b"online", True), (b"offline", False)]
+    "payload,republished", [(b"online", True), (b"offline", False), (b"\xff", False)]
 )
 @pytest.mark.asyncio
 async def test_homeassistant_birth_triggers_republish(payload, republished, mocker):

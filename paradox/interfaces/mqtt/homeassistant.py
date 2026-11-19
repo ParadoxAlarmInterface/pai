@@ -71,7 +71,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
 
     def _handle_homeassistant_status(self, client, userdata, message):
         # Home Assistant birth message: re-send discovery configs and states
-        if message.payload.decode("utf-8").strip() == "online":
+        if message.payload.strip() == b"online":
             logger.info("Home Assistant came online")
             self.mqtt.republish_all()
 

@@ -303,6 +303,7 @@ async def test_republish_all_resends_cached_messages(mocker):
         interface.mqtt.publish.reset_mock()
 
         interface.republish_all()
+        await asyncio.sleep(0.01)
 
         interface.mqtt.publish.assert_called_once_with(
             "paradox/states/zones/Z1/open", "True", 0, False
@@ -318,9 +319,12 @@ def test_connection_republish_all_puts_discovery_first(mocker):
 
     calls = []
     basic = mocker.Mock(republish_first=False)
-    basic.republish_all.side_effect = lambda: calls.append("basic")
+    basic.republish_all.side_effect = lambda on_done: (
+        calls.append("basic"),
+        on_done(),
+    )
     hass = mocker.Mock(republish_first=True)
-    hass.republish_all.side_effect = lambda: calls.append("hass")
+    hass.republish_all.side_effect = lambda on_done: (calls.append("hass"), on_done())
     connection = mocker.Mock(registrars=[basic, hass], _last_pai_status="online")
 
     MQTTConnection.republish_all(connection)
