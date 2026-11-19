@@ -195,8 +195,8 @@ class Config:
         "MQTT_DASH_TEMPLATE": "/etc/pai/mqtt_dash.txt",
         "MQTT_CHALLENGE_SECRET": (
             None,
-            [str, type(None)],
-        ),  # MQTT Command authorization challenge
+            [str, dict, type(None)],
+        ),  # MQTT Command authorization challenge: secret or {user: secret}
         "MQTT_CHALLENGE_TOPIC": "challenge",
         "MQTT_CHALLENGE_ROUNDS": 1000,
         # Interfaces text command alias
