@@ -5,7 +5,7 @@ paho_mqtt>=2.1.0,<3
 
 pre-commit
 pushbullet.py>=0.11.0
-pyserial>=3.4
+pyserial>=3.5
 pyserial-asyncio>=0.4
 python-slugify>=4.0.1
 pytz>=2023.3.post1
