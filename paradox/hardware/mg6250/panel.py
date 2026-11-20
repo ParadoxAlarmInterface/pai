@@ -20,7 +20,9 @@ import typing
 
 from construct import (
     Adapter,
+    Array,
     Bytes,
+    Check,
     Checksum,
     Const,
     ConstructError,
@@ -350,15 +352,8 @@ LOG_OP_RANGE = 0x01
 LOG_REQUEST = b"\x00\x01\x01"
 LOG_ANY = 0xFFFFFFFF
 LOG_EVENT_LEN = 36
+LOG_HEADER_LEN = 19
 LOG_INITIAL_RETRY = 60
-LogRecord = Struct(
-    "op" / Int8ub,
-    "len" / Int8ub,
-    "_status" / Bytes(5),
-    "first" / Int32ul,
-    "last" / Int32ul,
-    "count" / Int32ul,
-)
 LogEvent = Struct(
     "number" / Int32ul,
     "_unknown0" / Bytes(1),
@@ -369,6 +364,16 @@ LogEvent = Struct(
     "_unknown1" / Bytes(5),
     "label_type" / Int8ub,
     "label" / Bytes(16),
+)
+LogRecord = Struct(
+    "op" / Int8ub,
+    "len" / Int8ub,
+    "_status" / Bytes(5),
+    "first" / Int32ul,
+    "last" / Int32ul,
+    "count" / Int32ul,
+    "events" / Array((this.len - LOG_HEADER_LEN) // LOG_EVENT_LEN, LogEvent),
+    Check((this.len - LOG_HEADER_LEN) % LOG_EVENT_LEN == 0),
 )
 
 
@@ -389,21 +394,11 @@ def parse_log_records(data: bytes) -> typing.List[Container]:
         if data[i:].rstrip(bytes([PAD])) == b"\x00":
             break  # zero terminator before the padding, not a read record
         length = data[i + 1]
-        raw = data[i : i + length]
+        try:
+            records.append(LogRecord.parse(data[i : i + length]))
+        except ConstructError as e:
+            raise StatusRequestException("MG6250: truncated event log record") from e
         i += length
-        if (
-            len(raw) < length
-            or len(raw) < LogRecord.sizeof()
-            or (len(raw) - LogRecord.sizeof()) % LOG_EVENT_LEN
-        ):
-            raise StatusRequestException("MG6250: truncated event log record")
-        record = LogRecord.parse(raw)
-        events = raw[LogRecord.sizeof() :]
-        record.events = [
-            LogEvent.parse(events[j : j + LOG_EVENT_LEN])
-            for j in range(0, len(events) - LOG_EVENT_LEN + 1, LOG_EVENT_LEN)
-        ]
-        records.append(record)
     return records
 
 
