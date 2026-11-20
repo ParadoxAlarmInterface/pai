@@ -20,7 +20,9 @@ import typing
 
 from construct import (
     Adapter,
+    Array,
     Bytes,
+    Check,
     Checksum,
     Const,
     ConstructError,
@@ -142,8 +144,9 @@ PAD = 0xEE  # Paradox padding byte
 # fragment and vice versa; a reply ends at the fragment with LAST_FRAGMENT.
 # ---------------------------------------------------------------------------
 DataHeader = Struct(
-    "tid" / Int8ub,
-    "_reserved0" / Int8ub,
+    # 16-bit, little endian: BabyWare's tid 255 is followed by 00 01
+    # (long-tid-wrapped-many-operations), which the 1-byte view read as 0.
+    "tid" / Int16ul,
     "fragment" / Int16ul,
     "kind" / Int8ub,
     "service" / Int8ub,
@@ -349,15 +352,8 @@ LOG_OP_RANGE = 0x01
 LOG_REQUEST = b"\x00\x01\x01"
 LOG_ANY = 0xFFFFFFFF
 LOG_EVENT_LEN = 36
+LOG_HEADER_LEN = 19
 LOG_INITIAL_RETRY = 60
-LogRecord = Struct(
-    "op" / Int8ub,
-    "len" / Int8ub,
-    "_status" / Bytes(5),
-    "first" / Int32ul,
-    "last" / Int32ul,
-    "count" / Int32ul,
-)
 LogEvent = Struct(
     "number" / Int32ul,
     "_unknown0" / Bytes(1),
@@ -368,6 +364,16 @@ LogEvent = Struct(
     "_unknown1" / Bytes(5),
     "label_type" / Int8ub,
     "label" / Bytes(16),
+)
+LogRecord = Struct(
+    "op" / Int8ub,
+    "len" / Int8ub,
+    "_status" / Bytes(5),
+    "first" / Int32ul,
+    "last" / Int32ul,
+    "count" / Int32ul,
+    "events" / Array((this.len - LOG_HEADER_LEN) // LOG_EVENT_LEN, LogEvent),
+    Check((this.len - LOG_HEADER_LEN) % LOG_EVENT_LEN == 0),
 )
 
 
@@ -385,22 +391,14 @@ def parse_log_records(data: bytes) -> typing.List[Container]:
     records = []
     i = 0
     while i + 2 <= len(data) and data[i] != PAD and data[i + 1] >= 2:
+        if data[i:].rstrip(bytes([PAD])) == b"\x00":
+            break  # zero terminator before the padding, not a read record
         length = data[i + 1]
-        raw = data[i : i + length]
+        try:
+            records.append(LogRecord.parse(data[i : i + length]))
+        except ConstructError as e:
+            raise StatusRequestException("MG6250: truncated event log record") from e
         i += length
-        if (
-            len(raw) < length
-            or len(raw) < LogRecord.sizeof()
-            or (len(raw) - LogRecord.sizeof()) % LOG_EVENT_LEN
-        ):
-            raise StatusRequestException("MG6250: truncated event log record")
-        record = LogRecord.parse(raw)
-        events = raw[LogRecord.sizeof() :]
-        record.events = [
-            LogEvent.parse(events[j : j + LOG_EVENT_LEN])
-            for j in range(0, len(events) - LOG_EVENT_LEN + 1, LOG_EVENT_LEN)
-        ]
-        records.append(record)
     return records
 
 
@@ -618,7 +616,6 @@ class Panel(PanelBase):
         header = DataHeader.build(
             {
                 "tid": tid,
-                "_reserved0": 0,
                 "fragment": fragment,
                 "kind": kind,
                 "service": service,
@@ -733,9 +730,10 @@ class Panel(PanelBase):
         if self.session is None:
             # e.g. an MQTT command arriving while PAI reconnects
             raise StatusRequestException("MG6250: not logged in")
-        # A byte counter, as BabyWare's: 255 is followed by 0. Skipping 0
-        # makes the panel ignore every request after the 255th.
-        self._tid = (self._tid + 1) & 0xFF
+        # A 16-bit counter, as BabyWare's: 255 is followed by 256 (00 01).
+        # Going back to 0 (or skipping to 1) makes the panel ignore every
+        # request after the 255th. What follows 65535 is not captured.
+        self._tid = (self._tid + 1) & 0xFFFF
         tid = self._tid
         message = self.build_request(tid, service, data)
         fragments = []
