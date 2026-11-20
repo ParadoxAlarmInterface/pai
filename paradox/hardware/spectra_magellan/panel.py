@@ -29,10 +29,13 @@ PARTITION_ACTIONS = dict(
 ZONE_ACTIONS = dict(bypass=0x10, clear_bypass=0x10)
 PGM_ACTIONS = dict(on_override=0x30, off_override=0x31, on=0x32, off=0x33, pulse=0)
 
+PLUS_POWER_PRODUCTS = {"SPECTRA_SP7000_PLUS"}
+
 
 class Panel(PanelBase):
 
     supports_pgm_status: bool
+    ram_parser_map: dict[int, Construct]
     event_map = event_map
     property_map = property_map
     max_eeprom_response_data_length = 32
@@ -70,9 +73,15 @@ class Panel(PanelBase):
 
         self.supports_pgm_status = self.settings.firmware.version >= 6
 
+        self.ram_parser_map = (
+            parsers.RAMDataParserMapPlus
+            if self.settings.get("product_id") in PLUS_POWER_PRODUCTS
+            else parsers.RAMDataParserMap
+        )
+
     @property
     def status_request_addresses(self):
-        addresses = list(parsers.RAMDataParserMap.keys())
+        addresses = list(self.ram_parser_map.keys())
 
         if not self.supports_pgm_status:
             addresses.remove(7)
@@ -236,7 +245,7 @@ class Panel(PanelBase):
         )
         if reply is not None:
             logger.debug("Received status response: %d" % i)
-            return self.handle_status(reply, parsers.RAMDataParserMap)
+            return self.handle_status(reply, self.ram_parser_map)
         else:
             raise StatusRequestException("No reply to status request: %d" % i)
 
