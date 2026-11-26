@@ -9,7 +9,7 @@ import pytest
 from paradox.config import config as cfg
 from paradox.connections.connection import Connection
 from paradox.connections.serial.encryption import make_serial_key
-from paradox.event import EventLevel, LiveEvent
+from paradox.event import Change, ChangeEvent, EventLevel, LiveEvent
 from paradox.exceptions import AuthenticationFailed, StatusRequestException
 from paradox.hardware.mg6250.panel import (
     AC_VOLTS_PER_STEP,
@@ -17,6 +17,7 @@ from paradox.hardware.mg6250.panel import (
     AREA_FIELD_LABEL,
     CLOCK_FIELD_DATE,
     CLOCK_FIELD_POWER,
+    CLOCK_FIELD_TROUBLES,
     CMD_DATA,
     CMD_IDENTIFY,
     CMD_LOGIN,
@@ -49,6 +50,7 @@ from paradox.hardware.mg6250.panel import (
     SET_TIME_RETRY,
     SETTINGS_FIELD_OPTIONS,
     SYSTEM_FIELD_STATUS,
+    TROUBLES,
     ZONE_ALARM_MEMORY,
     ZONE_DEFINITIONS,
     ZONE_IN_ALARM,
@@ -72,7 +74,7 @@ from paradox.hardware.spectra_magellan import parsers as sp_parsers
 from paradox.hardware.spectra_magellan.panel import Panel as SpectraPanel
 from paradox.lib import ps
 from paradox.lib.crypto import encrypt as paradox_encrypt
-from paradox.lib.event_filter import EventFilter
+from paradox.lib.event_filter import EventFilter, EventTagFilter
 from paradox.lib.handlers import HandlerRegistry
 from paradox.paradox import Paradox
 from paradox.parsers.status import convert_raw_status
@@ -743,7 +745,12 @@ def test_parse_captured_alarm():
     assert status[(OBJ_PARTITION_STATUS, 2)][PARTITION_STATUS_FIELD] == bytes(6)
 
 
-def status_reads(counters, zones=None, partition=bytes(6)):
+# the system troubles of every capture: time lost, AC failure, console tamper,
+# GSM missing module and byte 8 bit 0 (unknown)
+CAPTURED_TROUBLES = bytes.fromhex("000000320001000001")
+
+
+def status_reads(counters, zones=None, partition=bytes(6), troubles=bytes(9)):
     """read_records side effect: object 0x1c with each counter in turn.
 
     Zone status defaults to zone 6 open, all zones in exit delay (0x04).
@@ -765,6 +772,7 @@ def status_reads(counters, zones=None, partition=bytes(6)):
         return {
             (OBJ_SYSTEM, 1): {SYSTEM_FIELD_STATUS: bytes([next(replies)]) + bytes(7)},
             (OBJ_CLOCK, 1): {
+                CLOCK_FIELD_TROUBLES: troubles,
                 CLOCK_FIELD_DATE: bytes([20, 26, 10, 25, 14, 5]),
                 CLOCK_FIELD_POWER: bytes.fromhex("42000c"),  # BabyWare: 5.3 V, AC 0.0
             },
@@ -789,6 +797,8 @@ async def test_request_status_reports_clock_and_zones():
     assert converted["zone"][6] == {
         "open": True,
         "bypassed": False,
+        "tamper": False,
+        "low_battery": False,
         "presently_in_alarm": False,
         "generated_alarm": False,
     }
@@ -1290,6 +1300,8 @@ def test_property_map_covers_what_the_panel_publishes():
         "target_state",
         "open",
         "bypassed",
+        "tamper",
+        "low_battery",
         "presently_in_alarm",
         "generated_alarm",
         "time",
@@ -1336,15 +1348,153 @@ async def test_request_status_reports_zone_alarm():
     assert converted["zone"][15] == {
         "open": True,
         "bypassed": False,
+        "tamper": False,
+        "low_battery": False,
         "presently_in_alarm": True,
         "generated_alarm": True,
     }
     assert converted["zone"][14] == {
         "open": False,
         "bypassed": False,
+        "tamper": False,
+        "low_battery": False,
         "presently_in_alarm": False,
         "generated_alarm": True,
     }
+
+
+@pytest.mark.parametrize(
+    "byte0, open_, tamper, low_battery",
+    [
+        (0x00, False, False, False),
+        (0x01, True, False, False),
+        # bits found with the MG6250 emulator: neither one opens the zone
+        (0x02, False, True, False),
+        (0x08, False, False, True),
+        (0x0B, True, True, True),
+        (0x04, True, False, False),  # open zone in alarm
+        (0x22, False, True, False),  # bypassed and tampered
+    ],
+)
+async def test_request_status_reports_zone_tamper_and_low_battery(
+    byte0, open_, tamper, low_battery
+):
+    panel = session_panel(0x1E, 0xE0, ALARM_KEY)
+    panel._zones = [5]
+    panel._zone_partitions = {5: 1}
+    panel.read_records = status_reads([4], zones={5: bytes([byte0, 0, 0])})
+
+    converted = convert_raw_status(await panel.request_status(OBJ_CLOCK))
+
+    zone = converted["zone"][5]
+    assert (zone["open"], zone["tamper"], zone["low_battery"]) == (
+        open_,
+        tamper,
+        low_battery,
+    )
+    assert converted["partition"][1]["ready_status"] is not open_
+
+
+async def test_request_status_reports_captured_troubles():
+    panel = session_panel(0x1E, 0xE0, ALARM_KEY)
+    panel._zones = [5]
+    panel.read_records = status_reads([4], troubles=CAPTURED_TROUBLES)
+
+    converted = convert_raw_status(await panel.request_status(OBJ_CLOCK))
+
+    troubles = converted["troubles"]
+    assert {k for k, v in troubles.items() if v} == {
+        "timer_loss_trouble",
+        "ac_failure_trouble",
+        "panel_tamper_trouble",
+        "gsm_module_missing_trouble",
+    }
+    assert set(troubles) == {key for _, _, key in TROUBLES}
+
+
+async def test_request_status_troubles_follow_the_bits():
+    panel = session_panel(0x1E, 0xE0, ALARM_KEY)
+    panel._zones = [5]
+    for byte, mask, key in TROUBLES:
+        raw = bytearray(9)
+        raw[byte] = mask
+        panel.read_records = status_reads([4], troubles=bytes(raw))
+        status = await panel.request_status(OBJ_CLOCK)
+        assert [k for k, v in status.troubles.items() if v] == [key]
+
+
+@pytest.mark.parametrize("troubles", [bytes(3), CAPTURED_TROUBLES[:-1], b""])
+async def test_request_status_ignores_short_troubles_field(troubles):
+    panel = session_panel(0x1E, 0xE0, ALARM_KEY)
+    panel._zones = [5]
+    panel.read_records = status_reads([4], troubles=troubles)
+
+    status = await panel.request_status(OBJ_CLOCK)
+
+    assert "troubles" not in status
+    assert "troubles" not in convert_raw_status(status)
+
+
+def test_troubles_have_distinct_bits_and_keys():
+    assert len({key for _, _, key in TROUBLES}) == len(TROUBLES)
+    assert len({(byte, mask) for byte, mask, _ in TROUBLES}) == len(TROUBLES)
+    assert all(bin(mask).count("1") == 1 for _, mask, _ in TROUBLES)
+
+
+def change_event(element_type, key, prop, value):
+    change = Change(element_type, key, prop, value, not value, initial=False)
+    return ChangeEvent(change, Panel.property_map, lambda t, i: i)
+
+
+# HOMEASSISTANT_NOTIFICATIONS_EVENT_FILTERS and the others by default
+DEFAULT_FILTER = EventTagFilter(
+    ["live,alarm,-restore", "trouble,-clock", "live,tamper"]
+)
+
+
+@pytest.mark.parametrize(
+    "element_type, key, prop, logged",
+    [
+        ("zone", 5, "tamper", (57, 5)),
+        ("zone", 5, "low_battery", (59, 5)),
+        ("system", "troubles", "ac_failure_trouble", (55, 1)),
+        ("system", "troubles", "panel_tamper_trouble", (55, 4)),
+        ("system", "troubles", "timer_loss_trouble", (55, 3)),
+        ("system", "troubles", "rf_interference_trouble", (55, 5)),
+        ("system", "troubles", "central_land_1_ftc_trouble", (55, 11)),
+        ("system", "troubles", "personal_channel_1_ftc_trouble", (55, 12)),
+    ],
+)
+def test_logged_troubles_notify_once_from_the_log(element_type, key, prop, logged):
+    panel, _ = log_panel([])
+    for value in (True, False):
+        assert not DEFAULT_FILTER.match(change_event(element_type, key, prop, value))
+    major, minor = logged
+    assert DEFAULT_FILTER.match(live_event(panel, major, minor))
+    assert DEFAULT_FILTER.match(live_event(panel, major + 1, minor))  # restore
+
+
+@pytest.mark.parametrize(
+    "prop, text",
+    [
+        ("ac_overload_trouble", "Console AC overload"),
+        ("gsm_module_missing_trouble", "GSM module missing"),
+        ("gsm_sim_1_missing_trouble", "SIM card 1 missing"),
+        ("gprs_no_service_trouble", "GPRS no service"),
+        ("ip_module_missing_trouble", "IP module missing"),
+    ],
+)
+def test_troubles_without_a_notified_event_notify_from_the_status(prop, text):
+    event = change_event("system", "troubles", prop, True)
+    assert DEFAULT_FILTER.match(event)
+    assert event.message == text
+    restored = change_event("system", "troubles", prop, False)
+    assert DEFAULT_FILTER.match(restored)
+    assert restored.message == f"{text} restored"
+
+
+def test_global_trouble_does_not_notify():
+    assert not DEFAULT_FILTER.match(change_event("system", "troubles", "trouble", True))
 
 
 async def test_request_status_reads_zones_only_when_counter_changes():

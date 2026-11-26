@@ -1,7 +1,8 @@
 """Paradox MG6250 panel support (encrypted link)
 
 Login, labels (zones, keypads, repeaters, sirens, users, partitions, outputs),
-the panel clock, battery and AC voltage, zone open/bypassed/alarm and partition
+the panel clock, battery and AC voltage, system troubles, zone
+open/bypassed/tamper/low battery/alarm and partition
 exit delay/armed (stay, sleep or full)/alarm as status (the alarm bits are
 provisional), arm / arm stay / arm sleep / disarm of partitions 1 and 2, zone
 bypass and definition, output on / off / release / pulse, and clock
@@ -289,14 +290,63 @@ CLOCK_FIELD_DATE = 1  # century, year, month, day, hour, minute
 # 7.5 V adapter the AC byte is 0x5f and BabyWare shows 7.5 V (2026-11-11): a
 # little less per step, from this one point.
 CLOCK_FIELD_POWER = 2
+# Field 0: system troubles, 9 bytes of bits. Found with the MG6250 emulator by
+# setting bits and watching BabyWare; the bits BabyWare was not seen to show
+# (marked ?) are placed by the order of BabyWare's own table of trouble texts.
+# The captures read 00 00 00 32 00 01 00 00 01: time lost, AC failure, console
+# tamper and GSM missing module (byte 8 bit 0 is unknown). Keys are the SP/MG
+# (or EVO) property names where the trouble is the same.
+CLOCK_FIELD_TROUBLES = 0
+TROUBLES_LEN = 9
+TROUBLES = (
+    # the order of these 8 bits is not checked
+    *((0, 1 << (n - 1), f"personal_channel_{n}_ftc_trouble") for n in range(1, 9)),
+    (1, 0x02, "central_path_1_ftc_trouble"),  # ?
+    (1, 0x04, "central_path_2_ftc_trouble"),
+    (1, 0x08, "central_path_3_ftc_trouble"),  # ?
+    (2, 0x01, "central_gprs_1_ftc_trouble"),
+    (2, 0x02, "central_gprs_2_ftc_trouble"),  # ?
+    (2, 0x04, "central_ip_1_ftc_trouble"),  # ?
+    (2, 0x08, "central_ip_2_ftc_trouble"),  # ?
+    (2, 0x10, "central_land_1_ftc_trouble"),
+    (2, 0x20, "central_land_2_ftc_trouble"),  # ?
+    (2, 0x40, "central_gsm_1_ftc_trouble"),  # ?
+    (2, 0x80, "central_gsm_2_ftc_trouble"),
+    (3, 0x01, "telephone_line"),
+    (3, 0x02, "timer_loss_trouble"),
+    (3, 0x04, "battery_failure_trouble"),  # "Console No Battery"
+    (3, 0x08, "low_battery_trouble"),
+    (3, 0x10, "ac_failure_trouble"),
+    (3, 0x20, "panel_tamper_trouble"),
+    (3, 0x40, "ac_overload_trouble"),
+    (4, 0x01, "zone_tamper_trouble"),  # ? "Global RF Tamper"
+    (4, 0x02, "rf_power_failure_trouble"),  # ?
+    (4, 0x04, "rf_low_battery_trouble"),  # ?
+    (4, 0x08, "zone_supervision_trouble"),  # ? "Global RF Supervision Lost"
+    (4, 0x10, "rf_interference_trouble"),
+    (5, 0x01, "gsm_module_missing_trouble"),
+    (5, 0x02, "gsm_sim_1_missing_trouble"),  # ?
+    (5, 0x04, "gsm_sim_2_missing_trouble"),  # ?
+    (5, 0x10, "gprs_no_service_trouble"),  # ?
+    (6, 0x01, "ip_module_missing_trouble"),
+    (7, 0x01, "landline_no_service_trouble"),
+    (7, 0x02, "gsm_no_service_trouble"),  # ?
+    (7, 0x04, "internal_gprs_no_service_trouble"),  # ?
+    (7, 0x08, "ip_no_service_trouble"),  # ?
+)
 VOLTS_PER_STEP = 0.08
 AC_VOLTS_PER_STEP = 0.079
 SYSTEM_FIELDS = (0, 1)  # what BabyWare polls every 20 s
 SYSTEM_FIELD_STATUS = 1  # byte 0: counter, changes when a zone does
-# byte 0: 0x20 bypassed (long-tid-wrapped-many-operations: 20 from BabyWare's
-# bypass to its clear), any other bit = open (01; 04 on the zone in alarm);
-# byte 1: flags below; byte 2: 0x04 during the exit delay of partition 2
+# byte 0: 0x01 open (0x04 on the zone in alarm), 0x02 tamper, 0x08 low battery
+# (tamper and low battery found with the MG6250 emulator, as BabyWare shows
+# them), 0x20 bypassed (long-tid-wrapped-many-operations: 20 from BabyWare's
+# bypass to its clear); byte 1: flags below; byte 2: 0x04 during the exit delay
+# of partition 2
 ZONE_STATUS_FIELD = 0
+ZONE_OPEN = 0x05
+ZONE_TAMPER = 0x02
+ZONE_LOW_BATTERY = 0x08
 ZONE_BYPASSED = 0x20
 # Provisional, from one alarm capture (and set-sms for the memory flag).
 # Zone status byte 1: 0x04 on every zone during the exit delay (not used),
@@ -1090,8 +1140,8 @@ class Panel(PanelBase):
         return elements
 
     async def request_status(self, _nr) -> typing.Optional[Container]:
-        """Panel clock, battery and AC voltage, zone open/alarm and partition
-        exit delay/armed/alarm.
+        """Panel clock, battery and AC voltage, system troubles, zone
+        open/tamper/low battery/alarm and partition exit delay/armed/alarm.
 
         As BabyWare does: poll the change counter (object 0x1c) every loop and
         read zone status (object 0x1e) and partition status (object 0x25)
@@ -1148,10 +1198,14 @@ class Panel(PanelBase):
         await self._publish_new_events()
         zones = self._zone_status
         partitions = self._partition_status
-        return Container(
+        status = Container(
             system=system,
             zone_open={i: self._zone_open(v) for i, v in zones.items()},
             zone_bypassed={i: bool(v[0] & ZONE_BYPASSED) for i, v in zones.items()},
+            zone_tamper={i: bool(v[0] & ZONE_TAMPER) for i, v in zones.items()},
+            zone_low_battery={
+                i: bool(v[0] & ZONE_LOW_BATTERY) for i, v in zones.items()
+            },
             zone_presently_in_alarm={
                 i: bool(v[1] & ZONE_IN_ALARM) for i, v in zones.items()
             },
@@ -1183,10 +1237,18 @@ class Panel(PanelBase):
                 i: self._partition_ready(i, zones) for i in partitions
             },
         )
+        # A short field would read its missing bits as restored troubles: keep
+        # the previous trouble states until a complete one arrives.
+        troubles = clock.get(CLOCK_FIELD_TROUBLES, b"")
+        if len(troubles) >= TROUBLES_LEN:
+            status.troubles = Container(
+                (key, bool(troubles[byte] & mask)) for byte, mask, key in TROUBLES
+            )
+        return status
 
     @staticmethod
     def _zone_open(status: bytes) -> bool:
-        return bool(status[0] & ~ZONE_BYPASSED)
+        return bool(status[0] & ZONE_OPEN)
 
     @staticmethod
     def _armed_in(status: bytes, mode: int) -> bool:
