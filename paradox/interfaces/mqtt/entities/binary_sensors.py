@@ -73,8 +73,11 @@ class PartitionBinarySensor(AbstractStatusBinarySensor):
 
     @property
     def entity_name(self):
-        # "Partition 1 Arm" instead of "Partition Partition 1 Arm".
-        return f"{self.label} {to_label(self.property)}"
+        if cfg.DIGIPLEX_PARTITION_NAMES:
+            # "Partition 1 Arm" instead of "Partition Partition 1 Arm".
+            return f"{self.label} {to_label(self.property)}"
+
+        return super().entity_name
 
 
 class ZoneStatusBinarySensor(AbstractStatusBinarySensor):
@@ -87,7 +90,8 @@ class ZoneStatusBinarySensor(AbstractStatusBinarySensor):
     def serialize(self):
         config = super().serialize()
         if self.property == "tamper":
-            config["device_class"] = "tamper"
+            if cfg.ZONE_NAMES or cfg.ZONE_TYPES:
+                config["device_class"] = "tamper"
         elif self.property == "open":
             config["device_class"] = zone_device_class(self.key)
 

@@ -140,9 +140,10 @@ the label text — a panel programmed in any language behaves the same.
 
 ```python
 # Zone key -> Home Assistant binary_sensor device_class of the "open" sensor.
-# Unlisted zones default to "motion". Tamper is published only for zone types
-# that have a tamper switch (motion, vibration, tamper); a "tamper" zone
-# exposes only its tamper entity.
+# Unlisted zones default to "motion". When any zone names or ZONE_TYPES are
+# configured, tamper is published only for types with a tamper switch (motion,
+# vibration, tamper), and a "tamper" zone exposes only its tamper entity. A
+# stock configuration keeps publishing every property, as merged upstream.
 ZONE_DEVICE_CLASS = {
     "garazas": "motion",
     "fasado_durys": "door",

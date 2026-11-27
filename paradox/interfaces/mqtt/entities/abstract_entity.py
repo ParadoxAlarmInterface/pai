@@ -38,7 +38,11 @@ class AbstractEntity:
         """
         key = self.key.lower()
         prefix = f"{self.pai_entity_type}_"
-        if self.pai_entity_type == "partition" and key.startswith(prefix):
+        if (
+            self.pai_entity_type == "partition"
+            and cfg.DIGIPLEX_PARTITION_NAMES
+            and key.startswith(prefix)
+        ):
             return key
         return prefix + key
 
@@ -65,16 +69,17 @@ class AbstractEntity:
             if self.property in naming:
                 # Empty (or null) means the entity takes the device name.
                 return naming[self.property] or ""
-            return to_label(self.property)
 
-        if self.pai_entity_type == "zone" and self.property in ("open", "tamper"):
-            # Let Home Assistant name the entity from its device class, so the
-            # name follows the Home Assistant language (motion -> Judesys,
-            # tamper -> Tamperis, ...). A zone with a single thing to report
-            # takes the device name instead of repeating it.
-            if self.property == "tamper" or len(self.zone_properties) > 1:
-                return None
-            return ""
+            if self.property in ("open", "tamper"):
+                # Let Home Assistant name the entity from its device class, so
+                # the name follows the Home Assistant language (motion ->
+                # Judesys, tamper -> Tamperis, ...). A zone with a single thing
+                # to report takes the device name instead of repeating it.
+                if self.property == "tamper" or len(self.zone_properties) > 1:
+                    return None
+                return ""
+
+            return to_label(self.property)
 
         if self.pai_entity_type == "system":
             name = (cfg.SYSTEM_NAMES or {}).get(f"{self.key}_{self.property}")
@@ -90,10 +95,10 @@ class AbstractEntity:
         """Entity id for newly discovered entities, if it has to be set.
 
         ``None`` leaves the id to Home Assistant, which derives it from the
-        entity name. Zones get a short, stable id
+        entity name. Zones with explicit names get a short, stable id
         (``binary_sensor.<zone>_<property>``) that does not repeat the label.
         """
-        if self.pai_entity_type != "zone":
+        if self.pai_entity_type != "zone" or not self.zone_naming:
             return None
 
         return f"{self.hass_entity_type}.{self.key.lower()}_{self.property}"

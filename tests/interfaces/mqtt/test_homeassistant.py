@@ -93,10 +93,10 @@ async def test_hass(mocker):
 
         assert_any_call_with_json(
             interface.mqtt.publish,
-            "homeassistant/alarm_control_panel/aabbccdd/partition_1/config",
+            "homeassistant/alarm_control_panel/aabbccdd/partition_partition_1/config",
             {
-                "name": "Partition 1",
-                "unique_id": "paradox_aabbccdd_partition_1",
+                "name": "Partition Partition 1",
+                "unique_id": "paradox_aabbccdd_partition_partition_1",
                 "command_topic": "paradox/control/partitions/Partition_1",
                 "state_topic": "paradox/states/partitions/Partition_1/current_state",
                 "availability_topic": "paradox/interface/availability",
@@ -125,8 +125,7 @@ async def test_hass(mocker):
             interface.mqtt.publish,
             "homeassistant/binary_sensor/aabbccdd/zone_front_door_open/config",
             {
-                "name": "",
-                "default_entity_id": "binary_sensor.front_door_open",
+                "name": "Zone Front Door Open",
                 "unique_id": "paradox_aabbccdd_zone_front_door_open",
                 "state_topic": "paradox/states/zones/Front_Door/open",
                 "availability_topic": "paradox/interface/availability",

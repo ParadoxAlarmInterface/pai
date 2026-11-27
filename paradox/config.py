@@ -250,9 +250,12 @@ class Config:
         # "open" sensor. Panels do not expose the physical sensor type, so the
         # mapping is explicit. Unlisted zones default to "motion".
         "ZONE_DEVICE_CLASS": {},
-        # Zone key -> display overrides: name (device name), area (Home
-        # Assistant area) and per-property entity names, e.g.
-        # {"garazas": {"name": "Garage", "area": "garage", "open": "Motion"}}.
+        # Zone key -> display overrides: device name, Home Assistant area name
+        # and per-property entity names, e.g.
+        # {"garazas": {"name": "Garage", "area": "Garage", "open": "Motion"}}.
+        # Zones not listed keep the upstream "Zone <label> <property>" naming.
+        # Configuring zone names also enables short entity ids and per-zone
+        # property filtering in the Digiplex driver.
         "ZONE_NAMES": {},
         # System sensor names: "<key>_<property>" -> entity name, e.g.
         # {"power_battery": "battery voltage"} and "pai_status".

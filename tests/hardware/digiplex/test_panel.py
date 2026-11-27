@@ -122,6 +122,19 @@ async def test_properties_filtered_by_zone_type(
     assert bool(result["zone_tamper"]) is tamper_published
 
 
+async def test_properties_kept_without_naming_config(monkeypatch):
+    monkeypatch.setattr(cfg, "ZONE_NAMES", {})
+    monkeypatch.setattr(cfg, "ZONE_TYPES", [])
+    panel = _panel({1: b"door"})
+    await panel.load_labels()
+
+    result = {"zone_open": {1: True}, "zone_tamper": {1: True}}
+    panel._keep_published(result)
+
+    assert result["zone_open"] == {1: True}
+    assert result["zone_tamper"] == {1: True}
+
+
 async def test_zone_limits_select_zones(monkeypatch):
     monkeypatch.setattr(cfg, "LIMITS", {"zone": "2,5"})
     panel = _panel({1: b"fasado durys", 2: b"virtuve"})

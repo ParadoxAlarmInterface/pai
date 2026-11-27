@@ -109,6 +109,9 @@ class PanelDGP848(PanelBase):
         self._partitions: set = set()
         # Zone number -> device_class, used for tamper/open filtering
         self._zone_device_class: dict = {}
+        # Filter properties by zone type only when naming/types are configured,
+        # so a stock configuration keeps the upstream behaviour.
+        self._filter_properties = False
         # Last published partition state, for change-only logging
         self._last_partitions: dict | None = None
 
@@ -329,6 +332,7 @@ class PanelDGP848(PanelBase):
 
         configured = set(cfg.ZONE_NAMES or {})
         only_labelled = bool(configured)
+        self._filter_properties = bool(configured or cfg.ZONE_TYPES)
         for i in self._selected("zone", ZONES):
             element = elements[i]
             if only_labelled:
@@ -428,8 +432,11 @@ class PanelDGP848(PanelBase):
     def _keep_published(self, result):
         """Publish only the zones, partitions and properties this zone type has.
 
-        Tamper is published for zone types with a tamper switch (motion, glass
-        break, siren/cabinet); a pure tamper zone exposes only the tamper bit.
+        Property filtering is opt-in: when zone names or ZONE_TYPES are
+        configured, tamper is published only for zone types with a tamper
+        switch (motion, glass break, siren/cabinet), and a pure tamper zone
+        exposes only the tamper bit. A stock configuration keeps every
+        property, as published by the merged driver.
         """
         selections = (
             ("zone_open", self._zones),
@@ -441,13 +448,13 @@ class PanelDGP848(PanelBase):
                 continue
 
             kept = {i: v for i, v in result[key].items() if i in published}
-            if key == "zone_tamper":
+            if self._filter_properties and key == "zone_tamper":
                 kept = {
                     i: v
                     for i, v in kept.items()
                     if publishes_tamper(self._zone_device_class.get(i, "motion"))
                 }
-            elif key == "zone_open":
+            elif self._filter_properties and key == "zone_open":
                 kept = {
                     i: v
                     for i, v in kept.items()
