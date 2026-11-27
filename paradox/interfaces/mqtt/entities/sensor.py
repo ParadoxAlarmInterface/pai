@@ -1,3 +1,4 @@
+from paradox.config import config as cfg
 from paradox.interfaces.mqtt.entities.abstract_entity import AbstractEntity
 from paradox.lib.utils import sanitize_key
 
@@ -27,7 +28,7 @@ class PAIStatusSensor(AbstractEntity):
 
     @property
     def entity_name(self):
-        return "PAI Status"
+        return (cfg.SYSTEM_NAMES or {}).get("pai_status", "PAI Status")
 
 
 class ZoneNumericSensor(AbstractEntity):

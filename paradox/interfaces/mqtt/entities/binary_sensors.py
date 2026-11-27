@@ -1,7 +1,7 @@
 import logging
 
 from paradox.config import config as cfg
-from paradox.interfaces.mqtt.entities.abstract_entity import AbstractEntity
+from paradox.interfaces.mqtt.entities.abstract_entity import AbstractEntity, to_label
 from paradox.lib.utils import sanitize_key
 
 logger = logging.getLogger("PAI").getChild(__name__)
@@ -71,17 +71,29 @@ class PartitionBinarySensor(AbstractStatusBinarySensor):
 
         self.pai_entity_type = "partition"
 
+    @property
+    def entity_name(self):
+        if cfg.DIGIPLEX_PARTITION_NAMES:
+            # "Partition 1 Arm" instead of "Partition Partition 1 Arm".
+            return f"{self.label} {to_label(self.property)}"
+
+        return super().entity_name
+
 
 class ZoneStatusBinarySensor(AbstractStatusBinarySensor):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, properties=None, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.pai_entity_type = "zone"
+        self.zone_properties = frozenset(properties or ())
 
     def serialize(self):
         config = super().serialize()
-        if self.property == 'open':
-            config['device_class'] = zone_device_class(self.key)
+        if self.property == "tamper":
+            if cfg.ZONE_NAMES or cfg.ZONE_TYPES:
+                config["device_class"] = "tamper"
+        elif self.property == "open":
+            config["device_class"] = zone_device_class(self.key)
 
         return config
 

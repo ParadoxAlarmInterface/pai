@@ -1,3 +1,4 @@
+from paradox.config import config as cfg
 from paradox.interfaces.mqtt.entities.abstract_entity import AbstractControllableEntity
 from paradox.interfaces.mqtt.entities.device import Device
 from paradox.lib.utils import sanitize_key
@@ -42,8 +43,17 @@ class AlarmControlPanel(AbstractControllableEntity):
 
     @property
     def entity_id(self):
-        return f"{self.pai_entity_type}_{self.key.lower()}"
+        key = self.key.lower()
+        prefix = f"{self.pai_entity_type}_"
+        if cfg.DIGIPLEX_PARTITION_NAMES and key.startswith(prefix):
+            return key
+        return prefix + key
 
     @property
     def entity_name(self):
+        if cfg.DIGIPLEX_PARTITION_NAMES:
+            # The device is the panel, so a configured partition is named after
+            # itself: a default label already reads "Partition 1".
+            return self.label
+
         return f"{self.pai_entity_type.title()} {self.label}"

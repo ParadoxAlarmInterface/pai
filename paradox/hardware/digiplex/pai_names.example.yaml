@@ -1,0 +1,49 @@
+# Zone and partition names loaded by the NAMES_FILE option.
+#
+# This file exists because Home Assistant add-on options are a flat JSON
+# document and cannot hold nested maps. Copy it next to your configuration
+# (for the add-on: /config/pai_names.yaml) and point NAMES_FILE at it.
+#
+# zones:
+#   <zone key>:              # the normalised EEPROM label, e.g. "vaiku rytu lang." -> vaiku_rytu_lang
+#     name: <device name>    # defaults to the EEPROM label
+#     area: <area id>        # suggested Home Assistant area
+#     device_class: <motion|door|window|garage_door|vibration|smoke|tamper>
+#     open: <entity name>    # empty = the entity shows the device name
+#     tamper: <entity name>
+#     bypassed: <entity name>
+#
+# partitions:
+#   <number>: <name>
+
+zones:
+  front_door:
+    name: Front door
+    device_class: door
+    open: ""
+  garage_door:
+    name: Garage door
+    area: Garage
+    device_class: garage_door
+    open: ""
+  garage_motion:
+    name: Garage
+    area: Garage
+    device_class: motion
+    open: Motion
+    tamper: Tamper
+  living_room_motion:
+    name: Living room
+    area: Living room
+    device_class: motion
+    open: Motion
+    tamper: Tamper
+
+partitions:
+  1: House
+  2: Garage
+
+system:
+  power_battery: Battery voltage
+  power_psu: Power supply voltage
+  pai_status: PAI status

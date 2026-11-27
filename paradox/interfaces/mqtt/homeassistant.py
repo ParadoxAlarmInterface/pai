@@ -2,6 +2,7 @@ import asyncio
 from collections import namedtuple
 import json
 import logging
+import os
 
 from paradox.config import config as cfg
 from paradox.data.model import DetectedPanel
@@ -19,6 +20,40 @@ from .entities.factory import MQTTAutodiscoveryEntityFactory
 logger = logging.getLogger("PAI").getChild(__name__)
 
 PreparseResponse = namedtuple("PreparseResponse", "topics element content")
+
+
+def _load_discovery_topics(path):
+    """Discovery topics published by the previous run, if they are known."""
+    if not path:
+        return set()
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return set()
+    except Exception as exc:
+        logger.warning("Could not read discovery state %s: %s", path, exc)
+        return set()
+
+    return set(data.get("topics") or [])
+
+
+def _save_discovery_topics(path, topics):
+    """Remember the discovery topics of this run for the next cleanup."""
+    if not path:
+        return
+
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"topics": sorted(topics)}, f, indent=2)
+    except OSError as exc:
+        logger.warning("Could not write discovery state %s: %s", path, exc)
+
+
+def stale_discovery_topics(previous, current):
+    """Topics published before but no longer published."""
+    return sorted(set(previous) - set(current))
 
 
 class HomeAssistantMQTTInterface(AbstractMQTTInterface):
@@ -39,10 +74,17 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
 
         self.run_status_topic = self.mqtt.pai_status_topic
 
+        self._discovery_state_file = self._discovery_state_path()
+        self._previous_discovery_topics = _load_discovery_topics(
+            self._discovery_state_file
+        )
+        self._discovery_topics = set()
+
         self.connected_future = (
             asyncio.Future()
         )  # TODO: do not create it, use some other
         panel_detected_future = asyncio.Future()
+        labels_loaded_future = asyncio.Future()
         first_status_update_future = asyncio.Future()
 
         def _ready_future_callback(x):
@@ -53,13 +95,17 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
 
         ready_future = asyncio.ensure_future(
             asyncio.gather(
-                self.connected_future, panel_detected_future, first_status_update_future
+                self.connected_future,
+                panel_detected_future,
+                labels_loaded_future,
+                first_status_update_future,
             )
         )
         ready_future.add_done_callback(_ready_future_callback)
 
         ps.subscribe(panel_detected_future, "panel_detected")
         ps.subscribe(self._handle_labels_loaded, "labels_loaded")
+        ps.subscribe(labels_loaded_future, "labels_loaded")
         ps.subscribe(first_status_update_future, "status_update")
 
     def on_connect(self, client, userdata, connect_flags, reason_code, properties=None):
@@ -117,7 +163,42 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
         if cfg.CONNECTION_TYPE == "PRT3" and cfg.PRT3_UTILITY_KEYS:
             self._publish_utility_key_configs(cfg.PRT3_UTILITY_KEYS)
 
+        self._cleanup_stale_discovery_topics()
+
+    def _discovery_state_path(self):
+        """Where to remember published discovery topics between runs."""
+        location = cfg.CONFIG_FILE_LOCATION
+        if not isinstance(location, str) or not location:
+            return None
+
+        return os.path.join(
+            os.path.dirname(os.path.abspath(location)), "pai_discovery.json"
+        )
+
+    def _cleanup_stale_discovery_topics(self):
+        """Remove discovery topics this run no longer publishes.
+
+        Without this a zone whose type changes keeps its old entities in Home
+        Assistant, because the retained discovery message is never cleared.
+        """
+        stale = stale_discovery_topics(
+            self._previous_discovery_topics, self._discovery_topics
+        )
+        if not self._discovery_topics:
+            # Publishing failed or the panel reported nothing; removing every
+            # remembered topic would delete working entities.
+            logger.warning("No discovery topics published, skipping cleanup")
+            return
+
+        for topic in stale:
+            logger.info("Removing stale discovery topic %s", topic)
+            self.publish(topic, "", 0, True)
+
+        _save_discovery_topics(self._discovery_state_file, self._discovery_topics)
+        self._previous_discovery_topics = set(self._discovery_topics)
+
     def _publish_config(self, entity: AbstractEntity):
+        self._discovery_topics.add(entity.configuration_topic)
         self.publish(
             entity.configuration_topic,
             json.dumps(entity, cls=SerializableToJSONEncoder),
@@ -166,8 +247,13 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
             zone = self.zones[zone_key]
 
             # Publish Status
+            published_properties = {
+                name
+                for name in zone_status
+                if name in cfg.HOMEASSISTANT_PUBLISH_ZONE_PROPERTIES
+            }
             for property_name in zone_status:
-                if property_name not in cfg.HOMEASSISTANT_PUBLISH_ZONE_PROPERTIES:
+                if property_name not in published_properties:
                     continue
 
                 if property_name == "bypassed":
@@ -183,7 +269,7 @@ class HomeAssistantMQTTInterface(AbstractMQTTInterface):
                 else:
                     zone_status_sensor = (
                         self.entity_factory.make_zone_status_binary_sensor(
-                            zone, property_name
+                            zone, property_name, published_properties
                         )
                     )
 

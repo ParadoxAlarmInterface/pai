@@ -140,8 +140,10 @@ the label text — a panel programmed in any language behaves the same.
 
 ```python
 # Zone key -> Home Assistant binary_sensor device_class of the "open" sensor.
-# Unlisted zones default to "motion". Tamper is published for every zone; use
-# HOMEASSISTANT_PUBLISH_ZONE_PROPERTIES to hide it.
+# Unlisted zones default to "motion". When any zone names or ZONE_TYPES are
+# configured, tamper is published only for types with a tamper switch (motion,
+# vibration, tamper), and a "tamper" zone exposes only its tamper entity. A
+# stock configuration keeps publishing every property, as merged upstream.
 ZONE_DEVICE_CLASS = {
     "garazas": "motion",
     "fasado_durys": "door",
@@ -167,6 +169,49 @@ The zone key is the normalised EEPROM label (see `sanitize_key`), for example
 
 If you configured `PARTITION_NAMES` in an earlier version of this branch, rename
 it to `DIGIPLEX_PARTITION_NAMES`.
+
+### Naming and zone types
+
+`ZONE_TYPES` (add-on friendly) is a list of `zone_key=device_class` strings:
+
+```
+ZONE_TYPES = ["fasado_durys=door", "vaiku_rytu_lang=window"]
+```
+
+The same tables can be kept in a YAML file loaded with `NAMES_FILE`, for
+configurations that cannot hold maps:
+
+```yaml
+zones:
+  garazas:
+    name: Garage
+    area: Garage
+    device_class: motion
+    open: Motion
+    tamper: Tamper
+  fasado_durys:
+    name: Front door
+    open: ""
+partitions:
+  1: House
+system:
+  power_battery: Battery voltage
+  pai_status: PAI status
+```
+
+- `name` - device name; `area` - Home Assistant area **name** (not its id);
+  `device_class` - zone type.
+- a property key (`open`, `tamper`, …) — entity name. An empty value means the
+  entity takes the device name (single-sensor zones).
+- `partitions` goes to `DIGIPLEX_PARTITION_NAMES`, `system` keys are
+  `<key>_<property>` or `pai_status`.
+- Zones listed in `ZONE_NAMES`/`NAMES_FILE` get short, stable entity ids
+  (`binary_sensor.<zone>_<property>`) via MQTT `default_entity_id`; this needs
+  Home Assistant 2025.9 or newer and only affects newly created entities.
+- When zone names are configured, unlabelled EEPROM zones and duplicate labels
+  (unless the suffixed key is listed) are not published.
+
+`pai_names.example.yaml` next to this README is a complete template.
 
 ## Tested environment
 

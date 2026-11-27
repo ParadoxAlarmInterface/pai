@@ -1,3 +1,4 @@
+from paradox.config import config as cfg
 from paradox.interfaces.mqtt.entities.abstract_entity import AbstractControllableEntity
 from paradox.lib.utils import sanitize_key
 
@@ -27,6 +28,17 @@ class ZoneBypassSwitch(Switch):
         self.property = "bypassed"
 
         self.pai_entity_type = "zone"
+
+    @property
+    def entity_name(self):
+        naming = self.zone_naming
+        if "bypassed" in naming:
+            return naming["bypassed"] or ""
+
+        if naming or cfg.ZONE_NAMES or cfg.ZONE_TYPES:
+            return "Bypass"
+
+        return super().entity_name
 
     def serialize(self):
         config = super().serialize()

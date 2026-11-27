@@ -9,10 +9,21 @@ from paradox.config import config as cfg
 from paradox.data.model import DetectedPanel
 from paradox.hardware.common import ProductIdEnum
 from paradox.interfaces.mqtt.entities.device import Device
-from paradox.interfaces.mqtt.homeassistant import HomeAssistantMQTTInterface
+from paradox.interfaces.mqtt.homeassistant import (
+    HomeAssistantMQTTInterface,
+    _load_discovery_topics,
+    _save_discovery_topics,
+    stale_discovery_topics,
+)
 from paradox.lib.ps import sendMessage
 
 from tests.hardware.evo.test_panel import create_evo192_panel
+
+
+@pytest.fixture(autouse=True)
+def no_discovery_state_file(monkeypatch):
+    # Keep the discovery manifest out of the repository during tests.
+    monkeypatch.setattr(cfg, "CONFIG_FILE_LOCATION", None)
 
 
 @pytest.mark.asyncio
@@ -250,3 +261,23 @@ async def test_homeassistant_republish_delays_states(mocker):
     finally:
         interface.stop()
         interface.join()
+
+
+def test_discovery_state_roundtrip(tmp_path):
+    path = str(tmp_path / "pai_discovery.json")
+
+    assert _load_discovery_topics(path) == set()
+
+    _save_discovery_topics(path, {"homeassistant/a/config", "homeassistant/b/config"})
+
+    assert _load_discovery_topics(path) == {
+        "homeassistant/a/config",
+        "homeassistant/b/config",
+    }
+
+
+def test_stale_discovery_topics():
+    assert stale_discovery_topics(
+        {"homeassistant/a/config", "homeassistant/b/config"},
+        {"homeassistant/b/config", "homeassistant/c/config"},
+    ) == ["homeassistant/a/config"]

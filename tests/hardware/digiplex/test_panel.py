@@ -80,6 +80,61 @@ async def test_case_only_label_collision_gets_suffix(monkeypatch):
     assert [labels["partition"][i]["key"] for i in (1, 2)] == ["House", "house_2"]
 
 
+async def test_configured_names_hide_unlabelled_and_unlisted_duplicates(monkeypatch):
+    monkeypatch.setattr(
+        cfg,
+        "ZONE_NAMES",
+        {"fasado_durys": {}, "garazo_vartai": {}},
+    )
+    zones = (
+        await _panel(
+            {1: b"fasado durys", 7: b"garazo vartai", 24: b"garazo vartai"}
+        ).load_labels()
+    )["zone"]
+
+    assert sorted(zones) == [1, 7]
+    assert zones[1]["key"] == "fasado_durys"
+    assert zones[7]["key"] == "garazo_vartai"
+
+
+@pytest.mark.parametrize(
+    ("labels", "device_class", "open_published", "tamper_published"),
+    [
+        ({1: b"door"}, "door", True, False),
+        ({1: b"window"}, "window", True, False),
+        ({1: b"motion"}, "motion", True, True),
+        ({1: b"tamper"}, "tamper", False, True),
+    ],
+)
+async def test_properties_filtered_by_zone_type(
+    monkeypatch, labels, device_class, open_published, tamper_published
+):
+    key = next(iter(labels.values())).decode()
+    monkeypatch.setattr(cfg, "ZONE_NAMES", {key: {}})
+    monkeypatch.setattr(cfg, "ZONE_DEVICE_CLASS", {key: device_class})
+    panel = _panel(labels)
+    await panel.load_labels()
+
+    result = {"zone_open": {1: True}, "zone_tamper": {1: True}}
+    panel._keep_published(result)
+
+    assert bool(result["zone_open"]) is open_published
+    assert bool(result["zone_tamper"]) is tamper_published
+
+
+async def test_properties_kept_without_naming_config(monkeypatch):
+    monkeypatch.setattr(cfg, "ZONE_NAMES", {})
+    monkeypatch.setattr(cfg, "ZONE_TYPES", [])
+    panel = _panel({1: b"door"})
+    await panel.load_labels()
+
+    result = {"zone_open": {1: True}, "zone_tamper": {1: True}}
+    panel._keep_published(result)
+
+    assert result["zone_open"] == {1: True}
+    assert result["zone_tamper"] == {1: True}
+
+
 async def test_zone_limits_select_zones(monkeypatch):
     monkeypatch.setattr(cfg, "LIMITS", {"zone": "2,5"})
     panel = _panel({1: b"fasado durys", 2: b"virtuve"})
